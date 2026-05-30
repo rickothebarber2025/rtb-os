@@ -51,13 +51,16 @@ export function useRtbData(selectedBusinessUnitId, enabled = true) {
         return;
       }
 
-      const [staff, payrollRuns, boothRent, performanceSummary, masterDashboard] = await Promise.all([
-        getStaff(activeUnit.id, true),
-        getPayrollRuns(activeUnit.id),
-        getBoothRent(activeUnit.id),
-        getPerformanceSummary(activeUnit.name),
-        getAppSetting('rtb_master_dashboard'),
-      ]);
+      const [staff, payrollRuns, boothRent, performanceSummary, masterDashboard] =
+        await Promise.all([
+          getStaff(activeUnit.id, true),
+          getPayrollRuns(activeUnit.id),
+          getBoothRent(activeUnit.id),
+          getPerformanceSummary(activeUnit.name),
+          activeUnit.name === 'RTB Lounge'
+            ? getAppSetting('rtb_master_dashboard')
+            : Promise.resolve(null),
+        ]);
 
       setData({
         boothRent,

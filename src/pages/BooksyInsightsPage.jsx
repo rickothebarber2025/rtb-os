@@ -48,7 +48,7 @@ function BarRow({ color = 'var(--gold)', label, max, meta, value }) {
 
 function InsightTabs({ activeTab, setActiveTab }) {
   return (
-    <div className="insight-tabs" role="tablist" aria-label="Booksy insights views">
+    <div className="insight-tabs" role="tablist" aria-label="Appointment insights views">
       {TABS.map((tab) => (
         <button
           className={activeTab === tab.id ? 'active' : ''}
@@ -62,6 +62,27 @@ function InsightTabs({ activeTab, setActiveTab }) {
       ))}
     </div>
   );
+}
+
+function getAppointmentSource(businessUnit) {
+  if (businessUnit?.name === 'RTB Beauty Lounge') {
+    return {
+      dataLabel: 'Square Appointments data',
+      emptyMessage:
+        'RTB Beauty Lounge uses Square Appointments. Import Square Appointments data to fill this page.',
+      emptyTitle: 'Square Appointments data not loaded yet',
+      name: 'Square Appointments',
+      unit: 'RTB Beauty Lounge',
+    };
+  }
+
+  return {
+    dataLabel: 'Booksy data',
+    emptyMessage: 'RTB Lounge uses Booksy. Import the Booksy master dashboard data to fill this page.',
+    emptyTitle: 'No Booksy insights loaded',
+    name: 'Booksy',
+    unit: 'RTB Lounge',
+  };
 }
 
 function OverviewTab({ data, setActiveTab }) {
@@ -554,15 +575,31 @@ function ScheduleTab({ data }) {
 
 export default function BooksyInsightsPage({ businessUnit, masterDashboard }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const source = getAppointmentSource(businessUnit);
+  const hasBooksyData = source.name === 'Booksy' && masterDashboard;
 
-  if (!masterDashboard) {
+  if (!hasBooksyData) {
     return (
       <div className="page-grid">
+        <section className="hero-panel insights-hero">
+          <div>
+            <span className="eyebrow">{source.dataLabel}</span>
+            <h2>{businessUnit?.name || source.unit}</h2>
+            <p>
+              {source.name} is the appointment source for {businessUnit?.name || source.unit}.
+            </p>
+          </div>
+          <div className="hero-meta">
+            <strong>{source.name}</strong>
+            <span>Waiting for import</span>
+          </div>
+        </section>
+
         <section className="panel full-span">
           <EmptyState
             icon={CalendarDays}
-            title="No Booksy insights loaded"
-            message="Import the master dashboard data into app settings to fill this page."
+            title={source.emptyTitle}
+            message={source.emptyMessage}
           />
         </section>
       </div>
@@ -573,7 +610,7 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard }) {
     <div className="page-grid">
       <section className="hero-panel insights-hero">
         <div>
-          <span className="eyebrow">Booksy data</span>
+          <span className="eyebrow">{source.dataLabel}</span>
           <h2>{masterDashboard.businessUnit || businessUnit?.name || 'RTB Lounge'}</h2>
           <p>
             Revenue, clients, services, staff activity, and schedule data from the master
@@ -582,7 +619,7 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard }) {
         </div>
         <div className="hero-meta">
           <strong>{masterDashboard.summary?.periodLabel || 'Current period'}</strong>
-          <span>{masterDashboard.location || 'RTB Lounge'}</span>
+          <span>{source.name} · {masterDashboard.location || 'RTB Lounge'}</span>
         </div>
       </section>
 

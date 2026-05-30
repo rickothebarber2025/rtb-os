@@ -21,6 +21,7 @@ import {
 
 export default function DashboardPage({
   boothRent,
+  businessUnit,
   masterDashboard,
   payrollRuns,
   performanceSummary,
@@ -40,7 +41,8 @@ export default function DashboardPage({
     0,
   );
   const topPerformers = performanceSummary.slice(0, 5);
-  const booksySummary = masterDashboard?.summary || null;
+  const isBeautyLounge = businessUnit?.name === 'RTB Beauty Lounge';
+  const booksySummary = businessUnit?.name === 'RTB Lounge' ? masterDashboard?.summary : null;
 
   return (
     <div className="page-grid">
@@ -113,6 +115,24 @@ export default function DashboardPage({
               <strong>{formatNumber(booksySummary.slippingAwayClients)}</strong>
             </div>
           </div>
+        </section>
+      ) : null}
+
+      {isBeautyLounge ? (
+        <section className="panel full-span">
+          <div className="section-header">
+            <div>
+              <span>Square Appointments</span>
+              <h2>Beauty Lounge appointment source</h2>
+            </div>
+            <button className="ghost-button" type="button" onClick={() => setActivePage('insights')}>
+              Open insights
+            </button>
+          </div>
+          <p className="subtle-text">
+            RTB Beauty Lounge uses Square Appointments. Import Square Appointments data to
+            fill this snapshot.
+          </p>
         </section>
       ) : null}
 
