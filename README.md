@@ -35,3 +35,22 @@ The app expects the existing Supabase tables and RPC functions:
 - `calculate_staff_take_home()`
 - `lock_payroll_run()`
 - `save_performance_from_run()`
+
+## Appointment data
+
+RTB Lounge uses Booksy data. Booksy does not expose the same public OAuth API surface
+as Square, so RTB OS currently expects Booksy reports to be imported into
+`app_settings.rtb_master_dashboard`.
+
+RTB Beauty Lounge uses Square Appointments. Square secrets must be stored as
+Supabase Edge Function secrets, never in React code:
+
+```bash
+supabase secrets set SQUARE_APPLICATION_ID=your_square_application_id
+supabase secrets set SQUARE_APPLICATION_SECRET=your_square_application_secret
+supabase secrets set SQUARE_REDIRECT_URL=https://qbeficojfoqgzjxrzxyg.supabase.co/functions/v1/square-oauth-callback
+```
+
+Register the same redirect URL in the Square Developer Console for the production
+application. After that, open RTB Beauty Lounge in RTB OS, go to Appointment
+Insights, choose Connect Square, approve access, then run Sync Square.

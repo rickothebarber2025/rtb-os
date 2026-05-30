@@ -274,6 +274,34 @@ export async function getAppSetting(key) {
   return data?.value || null;
 }
 
+export async function startSquareConnection(businessUnitId) {
+  const client = requireClient();
+  const { data, error } = await client.functions.invoke('square-appointments', {
+    body: {
+      action: 'start',
+      businessUnitId,
+    },
+  });
+
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+export async function syncSquareAppointments(businessUnitId) {
+  const client = requireClient();
+  const { data, error } = await client.functions.invoke('square-appointments', {
+    body: {
+      action: 'sync',
+      businessUnitId,
+    },
+  });
+
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
 export async function saveBoothRent(record) {
   const client = requireClient();
   const payload = cleanObject({

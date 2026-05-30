@@ -10,6 +10,7 @@ import {
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
+import { startSquareConnection, syncSquareAppointments } from '../services/rtbService';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -85,7 +86,7 @@ function getAppointmentSource(businessUnit) {
   };
 }
 
-function OverviewTab({ data, setActiveTab }) {
+function OverviewTab({ data, setActiveTab, sourceName }) {
   const months = getRows(data.monthlyRevenue);
   const staff = getRows(data.staff);
   const services = getRows(data.services);
@@ -101,11 +102,23 @@ function OverviewTab({ data, setActiveTab }) {
       <section className="insight-alert full-span">
         <AlertTriangle size={20} />
         <div>
-          <strong>{formatNumber(summary.slippingAwayClients)} clients are slipping away</strong>
-          <span>
-            A reactivation campaign against the inactive client list is the biggest near-term
-            revenue opportunity in this data set.
-          </span>
+          {sourceName === 'Square Appointments' ? (
+            <>
+              <strong>Square Appointments sync is active</strong>
+              <span>
+                Square booking data is pulled server-side and saved into RTB OS for RTB Beauty
+                Lounge.
+              </span>
+            </>
+          ) : (
+            <>
+              <strong>{formatNumber(summary.slippingAwayClients)} clients are slipping away</strong>
+              <span>
+                A reactivation campaign against the inactive client list is the biggest near-term
+                revenue opportunity in this data set.
+              </span>
+            </>
+          )}
         </div>
       </section>
 
@@ -573,12 +586,71 @@ function ScheduleTab({ data }) {
   );
 }
 
-export default function BooksyInsightsPage({ businessUnit, masterDashboard }) {
+export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRefresh }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [actionError, setActionError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionLoading, setActionLoading] = useState('');
   const source = getAppointmentSource(businessUnit);
-  const hasBooksyData = source.name === 'Booksy' && masterDashboard;
+  const hasData = Boolean(masterDashboard);
 
-  if (!hasBooksyData) {
+  async function handleSquareConnect() {
+    setActionError('');
+    setActionMessage('');
+    setActionLoading('connect');
+
+    try {
+      const result = await startSquareConnection(businessUnit.id);
+      window.location.assign(result.authorizationUrl);
+    } catch (err) {
+      setActionError(err.message || 'Square connection could not start.');
+      setActionLoading('');
+    }
+  }
+
+  async function handleSquareSync() {
+    setActionError('');
+    setActionMessage('');
+    setActionLoading('sync');
+
+    try {
+      const result = await syncSquareAppointments(businessUnit.id);
+      setActionMessage(`Square synced ${formatNumber(result.bookingsSynced)} bookings.`);
+      await onRefresh?.();
+    } catch (err) {
+      setActionError(err.message || 'Square sync failed.');
+    } finally {
+      setActionLoading('');
+    }
+  }
+
+  if (!hasData) {
+    const squareActions =
+      source.name === 'Square Appointments' && businessUnit?.id ? (
+        <div className="stack">
+          {actionError ? <div className="alert danger">{actionError}</div> : null}
+          {actionMessage ? <div className="alert success">{actionMessage}</div> : null}
+          <div className="action-row">
+            <button
+              className="primary-button"
+              disabled={Boolean(actionLoading)}
+              type="button"
+              onClick={handleSquareConnect}
+            >
+              {actionLoading === 'connect' ? 'Opening Square...' : 'Connect Square'}
+            </button>
+            <button
+              className="secondary-button"
+              disabled={Boolean(actionLoading)}
+              type="button"
+              onClick={handleSquareSync}
+            >
+              {actionLoading === 'sync' ? 'Syncing...' : 'Sync Square'}
+            </button>
+          </div>
+        </div>
+      ) : null;
+
     return (
       <div className="page-grid">
         <section className="hero-panel insights-hero">
@@ -600,6 +672,7 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard }) {
             icon={CalendarDays}
             title={source.emptyTitle}
             message={source.emptyMessage}
+            action={squareActions}
           />
         </section>
       </div>
@@ -628,7 +701,11 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard }) {
       </section>
 
       {activeTab === 'overview' ? (
-        <OverviewTab data={masterDashboard} setActiveTab={setActiveTab} />
+        <OverviewTab
+          data={masterDashboard}
+          setActiveTab={setActiveTab}
+          sourceName={source.name}
+        />
       ) : null}
       {activeTab === 'staff' ? <StaffTab data={masterDashboard} /> : null}
       {activeTab === 'services' ? <ServicesTab data={masterDashboard} /> : null}

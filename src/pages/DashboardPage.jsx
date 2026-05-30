@@ -43,6 +43,7 @@ export default function DashboardPage({
   const topPerformers = performanceSummary.slice(0, 5);
   const isBeautyLounge = businessUnit?.name === 'RTB Beauty Lounge';
   const booksySummary = businessUnit?.name === 'RTB Lounge' ? masterDashboard?.summary : null;
+  const squareSummary = isBeautyLounge ? masterDashboard?.summary : null;
 
   return (
     <div className="page-grid">
@@ -118,7 +119,39 @@ export default function DashboardPage({
         </section>
       ) : null}
 
-      {isBeautyLounge ? (
+      {isBeautyLounge && squareSummary ? (
+        <section className="panel full-span">
+          <div className="section-header">
+            <div>
+              <span>Square Appointments</span>
+              <h2>Beauty Lounge appointment snapshot</h2>
+            </div>
+            <button className="ghost-button" type="button" onClick={() => setActivePage('insights')}>
+              Open insights
+            </button>
+          </div>
+
+          <div className="snapshot-grid">
+            <div>
+              <CalendarDays size={18} />
+              <span>Estimated sales</span>
+              <strong>{formatCurrency(squareSummary.ytdRevenue)}</strong>
+            </div>
+            <div>
+              <Users size={18} />
+              <span>Clients</span>
+              <strong>{formatNumber(squareSummary.allTimeClients)}</strong>
+            </div>
+            <div>
+              <AlertTriangle size={18} />
+              <span>Synced appts</span>
+              <strong>{formatNumber(squareSummary.completedAppointments)}</strong>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {isBeautyLounge && !squareSummary ? (
         <section className="panel full-span">
           <div className="section-header">
             <div>

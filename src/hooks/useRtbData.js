@@ -59,7 +59,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true) {
           getPerformanceSummary(activeUnit.name),
           activeUnit.name === 'RTB Lounge'
             ? getAppSetting('rtb_master_dashboard')
-            : Promise.resolve(null),
+            : getAppSetting('rtb_beauty_square_appointments'),
         ]);
 
       setData({
