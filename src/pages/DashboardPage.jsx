@@ -1,5 +1,7 @@
 import {
+  AlertTriangle,
   BadgeDollarSign,
+  CalendarDays,
   CircleDollarSign,
   ReceiptText,
   TrendingUp,
@@ -13,11 +15,13 @@ import {
   formatCompactCurrency,
   formatCurrency,
   formatDate,
+  formatNumber,
   formatPercent,
 } from '../utils/formatters';
 
 export default function DashboardPage({
   boothRent,
+  masterDashboard,
   payrollRuns,
   performanceSummary,
   setActivePage,
@@ -36,6 +40,7 @@ export default function DashboardPage({
     0,
   );
   const topPerformers = performanceSummary.slice(0, 5);
+  const booksySummary = masterDashboard?.summary || null;
 
   return (
     <div className="page-grid">
@@ -78,6 +83,38 @@ export default function DashboardPage({
           value={formatCompactCurrency(performanceTotal)}
         />
       </section>
+
+      {booksySummary ? (
+        <section className="panel full-span">
+          <div className="section-header">
+            <div>
+              <span>Booksy import</span>
+              <h2>Master dashboard snapshot</h2>
+            </div>
+            <button className="ghost-button" type="button" onClick={() => setActivePage('insights')}>
+              Open insights
+            </button>
+          </div>
+
+          <div className="snapshot-grid">
+            <div>
+              <CalendarDays size={18} />
+              <span>YTD revenue</span>
+              <strong>{formatCurrency(booksySummary.ytdRevenue)}</strong>
+            </div>
+            <div>
+              <Users size={18} />
+              <span>All-time clients</span>
+              <strong>{formatNumber(booksySummary.allTimeClients)}</strong>
+            </div>
+            <div>
+              <AlertTriangle size={18} />
+              <span>Slipping away</span>
+              <strong>{formatNumber(booksySummary.slippingAwayClients)}</strong>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="panel two-thirds">
         <div className="section-header">

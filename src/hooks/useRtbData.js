@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  getAppSetting,
   getBoothRent,
   getBusinessUnits,
   getPayrollRuns,
@@ -10,6 +11,7 @@ import {
 const EMPTY_STATE = {
   boothRent: [],
   businessUnits: [],
+  masterDashboard: null,
   payrollRuns: [],
   performanceSummary: [],
   staff: [],
@@ -49,16 +51,18 @@ export function useRtbData(selectedBusinessUnitId, enabled = true) {
         return;
       }
 
-      const [staff, payrollRuns, boothRent, performanceSummary] = await Promise.all([
+      const [staff, payrollRuns, boothRent, performanceSummary, masterDashboard] = await Promise.all([
         getStaff(activeUnit.id, true),
         getPayrollRuns(activeUnit.id),
         getBoothRent(activeUnit.id),
         getPerformanceSummary(activeUnit.name),
+        getAppSetting('rtb_master_dashboard'),
       ]);
 
       setData({
         boothRent,
         businessUnits,
+        masterDashboard,
         payrollRuns,
         performanceSummary,
         staff,

@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  CalendarDays,
   CircleDollarSign,
   LayoutDashboard,
   ReceiptText,
@@ -11,6 +12,7 @@ export const NAV_ITEMS = [
   { id: 'payroll', label: 'Payroll', icon: CircleDollarSign },
   { id: 'staff', label: 'Staff', icon: Users },
   { id: 'performance', label: 'Performance', icon: BarChart3 },
+  { id: 'insights', label: 'Booksy Insights', icon: CalendarDays },
   { id: 'booth-rent', label: 'Booth Rent', icon: ReceiptText },
 ];
 

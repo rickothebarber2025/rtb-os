@@ -262,6 +262,18 @@ export async function getBoothRent(businessUnitId) {
   );
 }
 
+export async function getAppSetting(key) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('app_settings')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.value || null;
+}
+
 export async function saveBoothRent(record) {
   const client = requireClient();
   const payload = cleanObject({

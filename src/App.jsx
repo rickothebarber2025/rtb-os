@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AppShell from './components/AppShell';
 import LoadingState from './components/LoadingState';
 import AuthPage from './pages/AuthPage';
+import BooksyInsightsPage from './pages/BooksyInsightsPage';
 import BoothRentPage from './pages/BoothRentPage';
 import DashboardPage from './pages/DashboardPage';
 import PayrollPage from './pages/PayrollPage';
@@ -37,6 +38,7 @@ export default function App() {
     () => ({
       boothRent: data.boothRent,
       businessUnit: data.selectedBusinessUnit,
+      masterDashboard: data.masterDashboard,
       onRefresh: data.refresh,
       payrollRuns: data.payrollRuns,
       performanceSummary: data.performanceSummary,
@@ -70,6 +72,8 @@ export default function App() {
         return <StaffPage {...pageProps} />;
       case 'performance':
         return <PerformancePage {...pageProps} />;
+      case 'insights':
+        return <BooksyInsightsPage {...pageProps} />;
       case 'booth-rent':
         return <BoothRentPage {...pageProps} />;
       case 'dashboard':
@@ -87,6 +91,7 @@ export default function App() {
       <AuthPage
         isConfigured={auth.isConfigured}
         sendMagicLink={auth.sendMagicLink}
+        signInWithGoogle={auth.signInWithGoogle}
         signInWithPassword={auth.signInWithPassword}
         signUp={auth.signUp}
       />

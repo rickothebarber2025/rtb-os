@@ -54,6 +54,14 @@ export function useAuth() {
     if (error) throw error;
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+  }, []);
+
   const signOut = useCallback(async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -65,11 +73,12 @@ export function useAuth() {
       loading,
       sendMagicLink,
       session,
+      signInWithGoogle,
       signInWithPassword,
       signOut,
       signUp,
       user: session?.user ?? null,
     }),
-    [loading, sendMagicLink, session, signInWithPassword, signOut, signUp],
+    [loading, sendMagicLink, session, signInWithGoogle, signInWithPassword, signOut, signUp],
   );
 }

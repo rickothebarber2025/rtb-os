@@ -4,6 +4,7 @@ import { LockKeyhole, Mail, Scissors } from 'lucide-react';
 export default function AuthPage({
   isConfigured,
   sendMagicLink,
+  signInWithGoogle,
   signInWithPassword,
   signUp,
 }) {
@@ -33,6 +34,19 @@ export default function AuthPage({
     } catch (err) {
       setError(err.message || 'Authentication failed.');
     } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError(err.message || 'Google sign-in failed.');
       setSubmitting(false);
     }
   }
@@ -87,6 +101,20 @@ export default function AuthPage({
           </div>
 
           <form className="stack" onSubmit={handleSubmit}>
+            <button
+              className="google-button"
+              disabled={!isConfigured || submitting}
+              type="button"
+              onClick={handleGoogleSignIn}
+            >
+              <span className="google-mark" aria-hidden="true">G</span>
+              Continue with Google
+            </button>
+
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+
             <label className="field">
               <span>Email</span>
               <div className="input-shell">
