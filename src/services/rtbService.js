@@ -274,6 +274,18 @@ export async function getAppSetting(key) {
   return data?.value || null;
 }
 
+export async function saveAppSetting(key, value) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('app_settings')
+    .upsert({ key, updated_at: new Date().toISOString(), value }, { onConflict: 'key' })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function startSquareConnection(businessUnitId) {
   const client = requireClient();
   const { data, error } = await client.functions.invoke('square-appointments', {

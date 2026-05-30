@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
@@ -10,7 +10,8 @@ import {
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
-import { startSquareConnection, syncSquareAppointments } from '../services/rtbService';
+import { saveAppSetting, startSquareConnection, syncSquareAppointments } from '../services/rtbService';
+import { parseBooksyReport } from '../utils/booksyReport';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -102,7 +103,14 @@ function OverviewTab({ data, setActiveTab, sourceName }) {
       <section className="insight-alert full-span">
         <AlertTriangle size={20} />
         <div>
-          {sourceName === 'Square Appointments' ? (
+          {summary.reportMode === 'booksy_file_import' ? (
+            <>
+              <strong>Booksy report imported</strong>
+              <span>
+                This view is built from the latest CSV or TSV report uploaded into RTB OS.
+              </span>
+            </>
+          ) : sourceName === 'Square Appointments' ? (
             <>
               <strong>Square Appointments sync is active</strong>
               <span>
@@ -591,6 +599,7 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const booksyInputRef = useRef(null);
   const source = getAppointmentSource(businessUnit);
   const hasData = Boolean(masterDashboard);
 
@@ -623,6 +632,55 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
       setActionLoading('');
     }
   }
+
+  async function handleBooksyImport(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setActionError('');
+    setActionMessage('');
+    setActionLoading('booksy');
+
+    try {
+      const text = await file.text();
+      const dashboard = parseBooksyReport(text, file.name);
+      await saveAppSetting('rtb_master_dashboard', dashboard);
+      setActionMessage(`Booksy imported ${formatNumber(dashboard.summary.allTimeBookings)} rows.`);
+      setActiveTab('overview');
+      await onRefresh?.();
+    } catch (err) {
+      setActionError(err.message || 'Booksy import failed.');
+    } finally {
+      setActionLoading('');
+      event.target.value = '';
+    }
+  }
+
+  const booksyActions =
+    source.name === 'Booksy' ? (
+      <div className="stack">
+        {actionError ? <div className="alert danger">{actionError}</div> : null}
+        {actionMessage ? <div className="alert success">{actionMessage}</div> : null}
+        <input
+          ref={booksyInputRef}
+          className="sr-only"
+          type="file"
+          accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
+          onChange={handleBooksyImport}
+        />
+        <div className="action-row">
+          <button
+            className="primary-button"
+            disabled={Boolean(actionLoading)}
+            type="button"
+            onClick={() => booksyInputRef.current?.click()}
+          >
+            {actionLoading === 'booksy' ? 'Importing...' : 'Import Booksy Report'}
+          </button>
+          <span className="subtle-text">CSV or TSV export</span>
+        </div>
+      </div>
+    ) : null;
 
   if (!hasData) {
     const squareActions =
@@ -672,7 +730,7 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
             icon={CalendarDays}
             title={source.emptyTitle}
             message={source.emptyMessage}
-            action={squareActions}
+            action={squareActions || booksyActions}
           />
         </section>
       </div>
@@ -695,6 +753,18 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
           <span>{source.name} · {masterDashboard.location || 'RTB Lounge'}</span>
         </div>
       </section>
+
+      {source.name === 'Booksy' ? (
+        <section className="panel full-span">
+          <div className="section-header">
+            <div>
+              <span>Booksy import</span>
+              <h2>Upload a weekly or monthly report</h2>
+            </div>
+          </div>
+          {booksyActions}
+        </section>
+      ) : null}
 
       <section className="full-span">
         <InsightTabs activeTab={activeTab} setActiveTab={setActiveTab} />
