@@ -43,7 +43,25 @@ as Square, so RTB OS currently expects Booksy reports to be imported into
 `app_settings.rtb_master_dashboard`.
 
 RTB Beauty Lounge uses Square Appointments. Square secrets must be stored as
-Supabase Edge Function secrets, never in React code:
+Supabase Edge Function secrets, never in React code.
+
+For the owner's Square account, the simplest production setup is the Square
+Production Access Token:
+
+```bash
+supabase secrets set SQUARE_ACCESS_TOKEN=your_square_production_access_token
+```
+
+RTB OS limits Square sync by default to 4 syncs per day, 6 hours apart, with a
+maximum of 500 bookings per sync. These can be tuned with:
+
+```bash
+supabase secrets set SQUARE_SYNC_DAILY_LIMIT=4
+supabase secrets set SQUARE_SYNC_MIN_INTERVAL_MINUTES=360
+supabase secrets set SQUARE_SYNC_MAX_BOOKINGS=500
+```
+
+For OAuth instead, add the Square app credentials:
 
 ```bash
 supabase secrets set SQUARE_APPLICATION_ID=your_square_application_id

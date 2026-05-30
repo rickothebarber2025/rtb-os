@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const SQUARE_API_BASE = "https://connect.squareup.com";
 const SQUARE_OAUTH_BASE = "https://connect.squareup.com/oauth2";
 const SQUARE_VERSION = Deno.env.get("SQUARE_VERSION") || "2026-05-20";
+const SYNC_USAGE_KEY = "square_sync_usage";
 const SCOPES = [
   "APPOINTMENTS_READ",
   "APPOINTMENTS_ALL_READ",
@@ -66,6 +67,32 @@ function getSquareConfig(requireSecret = false) {
   return { applicationId, applicationSecret, redirectUrl };
 }
 
+function getDirectSquareConnection() {
+  const accessToken = Deno.env.get("SQUARE_ACCESS_TOKEN");
+  if (!accessToken) return null;
+
+  return {
+    access_token: accessToken,
+    expires_at: null,
+    merchant_id: Deno.env.get("SQUARE_MERCHANT_ID") || "production_access_token",
+    refresh_token: null,
+    status: "direct_token",
+  };
+}
+
+function numberFromEnv(name: string, fallback: number) {
+  const value = Number(Deno.env.get(name));
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function getSyncLimits() {
+  return {
+    dailyLimit: numberFromEnv("SQUARE_SYNC_DAILY_LIMIT", 4),
+    maxBookings: numberFromEnv("SQUARE_SYNC_MAX_BOOKINGS", 500),
+    minIntervalMinutes: numberFromEnv("SQUARE_SYNC_MIN_INTERVAL_MINUTES", 360),
+  };
+}
+
 function addMonths(date: Date, months: number) {
   const copy = new Date(date);
   copy.setUTCMonth(copy.getUTCMonth() + months);
@@ -122,9 +149,10 @@ async function fetchSquare(path: string, accessToken: string, init: RequestInit 
   return body;
 }
 
-async function fetchAllBookings(accessToken: string, start: Date, end: Date) {
+async function fetchAllBookings(accessToken: string, start: Date, end: Date, maxBookings: number) {
   const bookings: Record<string, unknown>[] = [];
   let cursor = "";
+  let limited = false;
 
   do {
     const params = new URLSearchParams({
@@ -138,9 +166,13 @@ async function fetchAllBookings(accessToken: string, start: Date, end: Date) {
     const body = await fetchSquare(`/v2/bookings?${params.toString()}`, accessToken);
     bookings.push(...(body.bookings || []));
     cursor = body.cursor || "";
-  } while (cursor);
+    limited = bookings.length > maxBookings || (Boolean(cursor) && bookings.length >= maxBookings);
+  } while (cursor && bookings.length < maxBookings);
 
-  return bookings;
+  return {
+    bookings: bookings.slice(0, maxBookings),
+    limited,
+  };
 }
 
 async function fetchCatalog(accessToken: string, ids: string[]) {
@@ -416,7 +448,11 @@ async function getValidSquareConnection(admin: ReturnType<typeof createClient>, 
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) throw new Error("Square is not connected yet.");
+  if (!data) {
+    const directConnection = getDirectSquareConnection();
+    if (directConnection) return directConnection;
+    throw new Error("Square is not connected yet. Add SQUARE_ACCESS_TOKEN as a Supabase Function secret or use Connect Square.");
+  }
 
   const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
   const fiveMinutes = 5 * 60 * 1000;
@@ -426,6 +462,94 @@ async function getValidSquareConnection(admin: ReturnType<typeof createClient>, 
   }
 
   return data;
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function nextUtcDay() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString();
+}
+
+async function getSyncBudget(admin: ReturnType<typeof createClient>) {
+  const limits = getSyncLimits();
+  const { data, error } = await admin
+    .from("app_settings")
+    .select("value")
+    .eq("key", SYNC_USAGE_KEY)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const usage = data?.value || {};
+  const lastSyncAt = usage.lastSyncAt ? new Date(usage.lastSyncAt).getTime() : 0;
+  const minIntervalMs = limits.minIntervalMinutes * 60 * 1000;
+
+  if (lastSyncAt && Date.now() - lastSyncAt < minIntervalMs) {
+    const nextSyncAt = new Date(lastSyncAt + minIntervalMs).toISOString();
+    return {
+      allowed: false,
+      limits,
+      message: `Square already synced recently. Try again after ${nextSyncAt}.`,
+      nextSyncAt,
+      usage,
+    };
+  }
+
+  const daily = usage.daily?.date === todayKey()
+    ? usage.daily
+    : { count: 0, date: todayKey() };
+
+  if (Number(daily.count || 0) >= limits.dailyLimit) {
+    const nextSyncAt = nextUtcDay();
+    return {
+      allowed: false,
+      limits,
+      message: `Square sync limit reached for today. Try again after ${nextSyncAt}.`,
+      nextSyncAt,
+      usage: { ...usage, daily },
+    };
+  }
+
+  return {
+    allowed: true,
+    daily,
+    limits,
+    nextSyncAt: null,
+    usage: { ...usage, daily },
+  };
+}
+
+async function recordSyncUsage(
+  admin: ReturnType<typeof createClient>,
+  budget: Record<string, unknown>,
+  bookingsSynced: number,
+  limited: boolean,
+) {
+  const now = new Date().toISOString();
+  const daily = budget.daily as { count?: number; date?: string } | undefined;
+  const value = {
+    ...(budget.usage as Record<string, unknown> || {}),
+    daily: {
+      count: Number(daily?.count || 0) + 1,
+      date: daily?.date || todayKey(),
+    },
+    lastBookingsSynced: bookingsSynced,
+    lastLimitedSync: limited,
+    lastSyncAt: now,
+    limits: budget.limits,
+    nextSyncAt: new Date(new Date(now).getTime() + Number((budget.limits as { minIntervalMinutes?: number }).minIntervalMinutes || 0) * 60 * 1000).toISOString(),
+  };
+
+  await admin.from("app_settings").upsert({
+    key: SYNC_USAGE_KEY,
+    updated_at: now,
+    value,
+  });
+
+  return value;
 }
 
 async function upsertSourceStatus(admin: ReturnType<typeof createClient>, status: string) {
@@ -500,13 +624,41 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (error) throw error;
-      return jsonResponse({ connected: Boolean(data), connection: data || null });
+      const directConnection = getDirectSquareConnection();
+      return jsonResponse({
+        connected: Boolean(data || directConnection),
+        connection: data || (directConnection
+          ? {
+            expires_at: null,
+            merchant_id: directConnection.merchant_id,
+            status: directConnection.status,
+            updated_at: null,
+          }
+          : null),
+        limits: getSyncLimits(),
+      });
     }
 
     if (action === "sync") {
+      const budget = await getSyncBudget(admin);
+      if (!budget.allowed) {
+        return jsonResponse({
+          bookingsSynced: 0,
+          limits: budget.limits,
+          message: budget.message,
+          nextSyncAt: budget.nextSyncAt,
+          skipped: true,
+        });
+      }
+
       const connection = await getValidSquareConnection(admin, businessUnit.id);
       const { start, end } = getPeriod();
-      const bookings = await fetchAllBookings(String(connection.access_token), start, end);
+      const { bookings, limited } = await fetchAllBookings(
+        String(connection.access_token),
+        start,
+        end,
+        budget.limits.maxBookings,
+      );
       const serviceIds = [
         ...new Set(
           bookings.flatMap((booking) =>
@@ -530,9 +682,16 @@ Deno.serve(async (req) => {
 
       if (error) throw error;
       await upsertSourceStatus(admin, "loaded");
+      const usage = await recordSyncUsage(admin, budget, bookings.length, limited);
 
       return jsonResponse({
         bookingsSynced: bookings.length,
+        limited,
+        limits: budget.limits,
+        message: limited
+          ? `Square synced the first ${budget.limits.maxBookings} bookings to stay inside the usage cap.`
+          : "Square sync complete.",
+        nextSyncAt: usage.nextSyncAt,
         updatedAt: dashboard.updatedAt,
       });
     }

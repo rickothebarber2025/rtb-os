@@ -624,7 +624,10 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
 
     try {
       const result = await syncSquareAppointments(businessUnit.id);
-      setActionMessage(`Square synced ${formatNumber(result.bookingsSynced)} bookings.`);
+      setActionMessage(
+        result.message ||
+          `Square synced ${formatNumber(result.bookingsSynced)} bookings.`
+      );
       await onRefresh?.();
     } catch (err) {
       setActionError(err.message || 'Square sync failed.');
