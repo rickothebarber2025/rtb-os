@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CalendarDays,
+  ExternalLink,
   Scissors,
   TrendingDown,
   TrendingUp,
@@ -25,6 +26,8 @@ const TABS = [
   { id: 'clients', label: 'Clients' },
   { id: 'schedule', label: 'Schedule' },
 ];
+
+const SQUARE_APPOINTMENTS_DASHBOARD_URL = 'https://app.squareup.com/appointments/calendar';
 
 function getRows(rows) {
   return Array.isArray(rows) ? rows : [];
@@ -685,33 +688,42 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
       </div>
     ) : null;
 
-  if (!hasData) {
-    const squareActions =
-      source.name === 'Square Appointments' && businessUnit?.id ? (
-        <div className="stack">
-          {actionError ? <div className="alert danger">{actionError}</div> : null}
-          {actionMessage ? <div className="alert success">{actionMessage}</div> : null}
-          <div className="action-row">
-            <button
-              className="primary-button"
-              disabled={Boolean(actionLoading)}
-              type="button"
-              onClick={handleSquareConnect}
-            >
-              {actionLoading === 'connect' ? 'Opening Square...' : 'Connect Square'}
-            </button>
-            <button
-              className="secondary-button"
-              disabled={Boolean(actionLoading)}
-              type="button"
-              onClick={handleSquareSync}
-            >
-              {actionLoading === 'sync' ? 'Syncing...' : 'Sync Square'}
-            </button>
-          </div>
+  const squareActions =
+    source.name === 'Square Appointments' && businessUnit?.id ? (
+      <div className="stack">
+        {actionError ? <div className="alert danger">{actionError}</div> : null}
+        {actionMessage ? <div className="alert success">{actionMessage}</div> : null}
+        <div className="action-row">
+          <button
+            className="primary-button"
+            disabled={Boolean(actionLoading)}
+            type="button"
+            onClick={handleSquareConnect}
+          >
+            {actionLoading === 'connect' ? 'Opening Square...' : 'Connect Square'}
+          </button>
+          <button
+            className="secondary-button"
+            disabled={Boolean(actionLoading)}
+            type="button"
+            onClick={handleSquareSync}
+          >
+            {actionLoading === 'sync' ? 'Syncing...' : 'Sync Square'}
+          </button>
+          <a
+            className="secondary-button"
+            href={SQUARE_APPOINTMENTS_DASHBOARD_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink size={16} />
+            Open Square Dashboard
+          </a>
         </div>
-      ) : null;
+      </div>
+    ) : null;
 
+  if (!hasData) {
     return (
       <div className="page-grid">
         <section className="hero-panel insights-hero">
@@ -766,6 +778,18 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
             </div>
           </div>
           {booksyActions}
+        </section>
+      ) : null}
+
+      {source.name === 'Square Appointments' ? (
+        <section className="panel full-span">
+          <div className="section-header">
+            <div>
+              <span>Square Appointments</span>
+              <h2>Sync data or open Square</h2>
+            </div>
+          </div>
+          {squareActions}
         </section>
       ) : null}
 
