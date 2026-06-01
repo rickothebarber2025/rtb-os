@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Plus, UserMinus, Users } from 'lucide-react';
+import { Plus, Trash2, UserMinus, Users } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
-import { deactivateStaff, saveStaff } from '../services/rtbService';
+import { deactivateStaff, deleteStaff, saveStaff } from '../services/rtbService';
 import { formatDate, formatPercent } from '../utils/formatters';
 
 const blankStaff = {
@@ -84,6 +84,9 @@ export default function StaffPage({ businessUnit, onRefresh, staff }) {
   }
 
   async function handleDeactivate(member) {
+    const confirmed = window.confirm(`Deactivate ${member.full_name}? They will move to the inactive staff view.`);
+    if (!confirmed) return;
+
     setSaving(true);
     setError('');
 
@@ -92,6 +95,25 @@ export default function StaffPage({ businessUnit, onRefresh, staff }) {
       await onRefresh();
     } catch (err) {
       setError(err.message || 'Unable to deactivate staff profile.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(member) {
+    const confirmed = window.confirm(
+      `Delete ${member.full_name}? This only works when the profile is not tied to payroll, performance, or booth rent records.`,
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await deleteStaff(member.id);
+      await onRefresh();
+    } catch (err) {
+      setError(err.message || 'Unable to delete staff profile.');
     } finally {
       setSaving(false);
     }
@@ -188,6 +210,15 @@ export default function StaffPage({ businessUnit, onRefresh, staff }) {
                             <UserMinus size={16} />
                           </button>
                         ) : null}
+                        <button
+                          className="icon-button danger"
+                          disabled={saving}
+                          type="button"
+                          onClick={() => handleDelete(member)}
+                          aria-label={`Delete ${member.full_name}`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>

@@ -84,6 +84,32 @@ export async function deactivateStaff(staffId) {
   );
 }
 
+async function getLinkedRecordCount(table, staffId) {
+  const client = requireClient();
+  const { count, error } = await client
+    .from(table)
+    .select('id', { count: 'exact', head: true })
+    .eq('staff_id', staffId);
+
+  if (error) throw error;
+  return count || 0;
+}
+
+export async function deleteStaff(staffId) {
+  const client = requireClient();
+  const linkedCounts = await Promise.all([
+    getLinkedRecordCount('payroll_entries', staffId),
+    getLinkedRecordCount('performance_history', staffId),
+    getLinkedRecordCount('booth_rent', staffId),
+  ]);
+
+  if (linkedCounts.some((count) => count > 0)) {
+    throw new Error('This staff profile is tied to payroll, performance, or booth rent records. Deactivate it to keep history safe.');
+  }
+
+  return requireData(await client.from('staff').delete().eq('id', staffId));
+}
+
 async function getPayrollEntries(runIds) {
   const client = requireClient();
   if (!runIds.length) return [];
@@ -347,4 +373,9 @@ export async function toggleBoothRentPaid(record) {
       .select()
       .single(),
   );
+}
+
+export async function deleteBoothRent(recordId) {
+  const client = requireClient();
+  return requireData(await client.from('booth_rent').delete().eq('id', recordId));
 }

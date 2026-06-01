@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, ReceiptText } from 'lucide-react';
+import { Plus, ReceiptText, Trash2 } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
-import { saveBoothRent, toggleBoothRentPaid } from '../services/rtbService';
+import { deleteBoothRent, saveBoothRent, toggleBoothRentPaid } from '../services/rtbService';
 import { getDefaultPayrollWeek } from '../utils/dates';
 import { formatCurrency, formatDate } from '../utils/formatters';
 
@@ -103,6 +103,24 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
       await onRefresh();
     } catch (err) {
       setError(err.message || 'Unable to update booth rent status.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteRecord(record) {
+    const confirmed = window.confirm(`Delete booth rent record for ${record.renter_name}?`);
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await deleteBoothRent(record.id);
+      if (editingId === record.id) resetForm();
+      await onRefresh();
+    } catch (err) {
+      setError(err.message || 'Unable to delete booth rent record.');
     } finally {
       setSaving(false);
     }
@@ -232,6 +250,15 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
                           onClick={() => handleTogglePaid(record)}
                         >
                           {record.paid ? 'Reopen' : 'Mark paid'}
+                        </button>
+                        <button
+                          className="icon-button danger small"
+                          disabled={saving}
+                          type="button"
+                          onClick={() => handleDeleteRecord(record)}
+                          aria-label={`Delete booth rent record for ${record.renter_name}`}
+                        >
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>
