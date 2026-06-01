@@ -19,6 +19,33 @@ function cleanObject(payload) {
   );
 }
 
+async function getFunctionErrorMessage(error) {
+  const response = error?.context;
+
+  if (response?.json) {
+    try {
+      const body = await (response.clone ? response.clone() : response).json();
+      return body?.error || body?.message || error.message;
+    } catch (_err) {
+      return error.message;
+    }
+  }
+
+  return error?.message || 'Edge Function request failed.';
+}
+
+async function invokeFunction(name, body) {
+  const client = requireClient();
+  const { data, error } = await client.functions.invoke(name, { body });
+
+  if (error) {
+    throw new Error(await getFunctionErrorMessage(error));
+  }
+
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
 export async function getBusinessUnits() {
   const client = requireClient();
   return requireData(
@@ -313,31 +340,17 @@ export async function saveAppSetting(key, value) {
 }
 
 export async function startSquareConnection(businessUnitId) {
-  const client = requireClient();
-  const { data, error } = await client.functions.invoke('square-appointments', {
-    body: {
-      action: 'start',
-      businessUnitId,
-    },
+  return invokeFunction('square-appointments', {
+    action: 'start',
+    businessUnitId,
   });
-
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
-  return data;
 }
 
 export async function syncSquareAppointments(businessUnitId) {
-  const client = requireClient();
-  const { data, error } = await client.functions.invoke('square-appointments', {
-    body: {
-      action: 'sync',
-      businessUnitId,
-    },
+  return invokeFunction('square-appointments', {
+    action: 'sync',
+    businessUnitId,
   });
-
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
-  return data;
 }
 
 export async function saveBoothRent(record) {
