@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatCurrency, formatNumber } from './formatters';
+import { formatCurrency } from './formatters';
 
 const RTB_LOGO_URL = '/assets/rtb-logo.jpg';
 
@@ -23,13 +23,9 @@ function slug(value) {
     .replace(/^-|-$/g, '');
 }
 
-function staffTitle(businessUnitName) {
-  return businessUnitName === 'RTB Beauty Lounge' ? 'Nail Tech of the Month' : 'Barber of the Month';
-}
-
-function experienceLine(businessUnitName, awardTitle) {
+function experienceLine(businessUnitName) {
   const unitLabel = businessUnitName === 'RTB Beauty Lounge' ? 'RTB Beauty Lounge' : 'RTB Lounge';
-  return `In recognition of outstanding performance, dedication, and contribution to the ${unitLabel} experience as ${awardTitle}.`;
+  return `In recognition of outstanding performance, dedication, and contribution to the ${unitLabel} experience. Congratulations on being named Staff of the Month.`;
 }
 
 function drawDiagonalBand(doc, x, y, width, height, color) {
@@ -79,7 +75,6 @@ export async function downloadStaffOfMonthCertificate({
   const doc = new jsPDF({ format: 'letter', orientation: 'landscape', unit: 'pt' });
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
-  const awardTitle = staffTitle(businessName);
   const month = new Intl.DateTimeFormat('en-US', {
     month: 'long',
     year: 'numeric',
@@ -114,7 +109,7 @@ export async function downloadStaffOfMonthCertificate({
   doc.setTextColor('#1e6aa8');
   doc.setFont('times', 'bold');
   doc.setFontSize(30);
-  doc.text('OF ACHIEVEMENT', 74, 188);
+  doc.text('STAFF OF THE MONTH', 74, 188);
 
   doc.setTextColor('#1f2937');
   doc.setFont('helvetica', 'bold');
@@ -129,18 +124,18 @@ export async function downloadStaffOfMonthCertificate({
   doc.setTextColor('#1f2937');
   doc.setFont('times', 'normal');
   doc.setFontSize(18);
-  doc.text(experienceLine(businessName, awardTitle), 78, 395, { maxWidth: 610 });
+  doc.text(experienceLine(businessName), 78, 395, { maxWidth: 610 });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor('#1e6aa8');
-  doc.text(`${month} Performance`, 78, 452);
+  doc.text(`${month} Staff of the Month`, 78, 452);
 
   doc.setTextColor('#1f2937');
   doc.setFont('helvetica', 'normal');
-  doc.text(`Total sales: ${formatCurrency(performer.total_net_sales)}`, 78, 476);
-  doc.text(`Average week: ${formatCurrency(performer.avg_weekly_net)}`, 78, 496);
-  doc.text(`Weeks recorded: ${formatNumber(performer.weeks_recorded)}`, 78, 516);
+  doc.text(`Business: ${businessName}`, 78, 476);
+  doc.text(`Top performance sales: ${formatCurrency(performer.total_net_sales)}`, 78, 496);
+  doc.text(`Take-home earned: ${formatCurrency(performer.total_take_home)}`, 78, 516);
 
   doc.setDrawColor('#1f2937');
   doc.line(width - 360, height - 105, width - 120, height - 105);
@@ -152,5 +147,5 @@ export async function downloadStaffOfMonthCertificate({
   doc.setTextColor('#1e6aa8');
   doc.text('OWNER SIGNATURE', width - 240, height - 65, { align: 'center' });
 
-  doc.save(`${slug(businessName)}-${slug(performer.full_name)}-${slug(month)}-certificate.pdf`);
+  doc.save(`${slug(businessName)}-${slug(performer.full_name)}-${slug(month)}-staff-of-the-month.pdf`);
 }
