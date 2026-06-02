@@ -16,6 +16,7 @@ import { isProbationStaff } from '../utils/probation';
 
 export default function PerformancePage({ businessUnit, performanceSummary, staff }) {
   const [certificateError, setCertificateError] = useState('');
+  const [certificateLoading, setCertificateLoading] = useState(false);
   const staffById = useMemo(() => new Map(staff.map((member) => [member.id, member])), [staff]);
   const topPerformer = performanceSummary[0] || null;
   const totals = performanceSummary.reduce(
@@ -29,16 +30,19 @@ export default function PerformancePage({ businessUnit, performanceSummary, staf
     { adjustedWeeks: 0, netSales: 0, takeHome: 0, underMinimumWeeks: 0, weeks: 0 },
   );
 
-  function handleDownloadCertificate() {
+  async function handleDownloadCertificate() {
     setCertificateError('');
+    setCertificateLoading(true);
 
     try {
-      downloadStaffOfMonthCertificate({
+      await downloadStaffOfMonthCertificate({
         businessUnit,
         performer: topPerformer,
       });
     } catch (err) {
       setCertificateError(err.message || 'Unable to generate certificate.');
+    } finally {
+      setCertificateLoading(false);
     }
   }
 
@@ -73,12 +77,12 @@ export default function PerformancePage({ businessUnit, performanceSummary, staf
           </div>
           <button
             className="primary-button"
-            disabled={!topPerformer}
+            disabled={!topPerformer || certificateLoading}
             onClick={handleDownloadCertificate}
             type="button"
           >
             <Download size={17} />
-            Download PDF
+            {certificateLoading ? 'Generating...' : 'Download PDF'}
           </button>
         </div>
         {topPerformer ? (

@@ -1,6 +1,21 @@
 import { jsPDF } from 'jspdf';
 import { formatCurrency, formatNumber } from './formatters';
 
+const RTB_LOGO_URL = '/assets/rtb-logo.jpg';
+
+async function imageToDataUrl(url) {
+  const response = await fetch(url);
+  if (!response.ok) return null;
+
+  const blob = await response.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+}
+
 function slug(value) {
   return String(value || 'certificate')
     .toLowerCase()
@@ -17,7 +32,7 @@ function drawDiagonalBand(doc, x, y, width, height, color) {
   doc.triangle(x, y, x + width, y, x + width - height, y + height, 'F');
 }
 
-function drawSeal(doc, x, y, businessUnitName) {
+function drawSeal(doc, x, y, businessUnitName, logoDataUrl) {
   doc.setFillColor('#08090d');
   doc.circle(x, y, 58, 'F');
   doc.setDrawColor('#d6a84f');
@@ -25,11 +40,15 @@ function drawSeal(doc, x, y, businessUnitName) {
   doc.circle(x, y, 54, 'S');
   doc.circle(x, y, 46, 'S');
 
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'JPEG', x - 46, y - 46, 92, 92);
+    return;
+  }
+
   doc.setTextColor('#d6a84f');
   doc.setFont('times', 'bold');
   doc.setFontSize(36);
   doc.text('RTB', x, y - 8, { align: 'center' });
-
   doc.setTextColor('#f8fafc');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -42,7 +61,7 @@ function drawSeal(doc, x, y, businessUnitName) {
   doc.text('NAILS | LASHES | BROWS', x, y + 38, { align: 'center' });
 }
 
-export function downloadStaffOfMonthCertificate({
+export async function downloadStaffOfMonthCertificate({
   businessUnit,
   generatedAt = new Date(),
   performer,
@@ -60,6 +79,7 @@ export function downloadStaffOfMonthCertificate({
     month: 'long',
     year: 'numeric',
   }).format(generatedAt);
+  const logoDataUrl = await imageToDataUrl(RTB_LOGO_URL);
 
   doc.setFillColor('#f8fafc');
   doc.rect(0, 0, width, height, 'F');
@@ -79,7 +99,7 @@ export function downloadStaffOfMonthCertificate({
   doc.setLineWidth(1);
   doc.rect(46, 46, width - 92, height - 92, 'S');
 
-  drawSeal(doc, width - 150, 150, businessName);
+  drawSeal(doc, width - 150, 150, businessName, logoDataUrl);
 
   doc.setTextColor('#1f2937');
   doc.setFont('times', 'normal');
