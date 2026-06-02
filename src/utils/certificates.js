@@ -27,6 +27,11 @@ function staffTitle(businessUnitName) {
   return businessUnitName === 'RTB Beauty Lounge' ? 'Nail Tech of the Month' : 'Barber of the Month';
 }
 
+function experienceLine(businessUnitName, awardTitle) {
+  const unitLabel = businessUnitName === 'RTB Beauty Lounge' ? 'RTB Beauty Lounge' : 'RTB Lounge';
+  return `In recognition of outstanding performance, dedication, and contribution to the ${unitLabel} experience as ${awardTitle}.`;
+}
+
 function drawDiagonalBand(doc, x, y, width, height, color) {
   doc.setFillColor(color);
   doc.triangle(x, y, x + width, y, x + width - height, y + height, 'F');
@@ -124,12 +129,7 @@ export async function downloadStaffOfMonthCertificate({
   doc.setTextColor('#1f2937');
   doc.setFont('times', 'normal');
   doc.setFontSize(18);
-  doc.text(
-    `In recognition of outstanding performance, dedication, and excellence as ${awardTitle} at ${businessName}.`,
-    78,
-    395,
-    { maxWidth: 610 },
-  );
+  doc.text(experienceLine(businessName, awardTitle), 78, 395, { maxWidth: 610 });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -143,22 +143,14 @@ export async function downloadStaffOfMonthCertificate({
   doc.text(`Weeks recorded: ${formatNumber(performer.weeks_recorded)}`, 78, 516);
 
   doc.setDrawColor('#1f2937');
-  doc.line(120, height - 105, 310, height - 105);
-  doc.line(width - 330, height - 105, width - 140, height - 105);
-
-  doc.setFont('times', 'italic');
-  doc.setFontSize(18);
-  doc.text('Gwen Bouchard', 215, height - 112, { align: 'center' });
-  doc.text('Ricardo Joseph', width - 235, height - 112, { align: 'center' });
+  doc.line(width - 360, height - 105, width - 120, height - 105);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text('RTB LOUNGE', 215, height - 82, { align: 'center' });
-  doc.text('RTB LOUNGE', width - 235, height - 82, { align: 'center' });
+  doc.text('RTB LOUNGE', width - 240, height - 82, { align: 'center' });
 
   doc.setTextColor('#1e6aa8');
-  doc.text('SALON MANAGER', 215, height - 65, { align: 'center' });
-  doc.text('OWNER', width - 235, height - 65, { align: 'center' });
+  doc.text('OWNER SIGNATURE', width - 240, height - 65, { align: 'center' });
 
   doc.save(`${slug(businessName)}-${slug(performer.full_name)}-${slug(month)}-certificate.pdf`);
 }
