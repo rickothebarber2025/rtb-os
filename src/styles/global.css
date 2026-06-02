@@ -1468,6 +1468,16 @@ select {
   width: auto;
 }
 
+.invite-actions {
+  align-items: end;
+  display: flex;
+  grid-column: span 2;
+}
+
+.invite-actions .primary-button {
+  width: 100%;
+}
+
 .empty-state {
   align-items: center;
   border: 1px dashed var(--line-strong);
@@ -1680,7 +1690,8 @@ select {
     grid-template-columns: 1fr;
   }
 
-  .form-grid.compact .field {
+  .form-grid.compact .field,
+  .invite-actions {
     grid-column: 1 / -1;
   }
 

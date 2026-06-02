@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, RefreshCw, ShieldCheck, Users } from 'lucide-react';
+import { Check, MailPlus, RefreshCw, ShieldCheck, Users } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
-import { getUserProfiles, updateUserProfile } from '../services/rtbService';
+import { getUserProfiles, inviteUserProfile, updateUserProfile } from '../services/rtbService';
 import { getRoleLabel, ROLE_OPTIONS } from '../utils/access';
+
+const INVITE_ROLES = ROLE_OPTIONS.filter((role) => role.value !== 'pending');
+const blankInvite = {
+  business_unit_id: '',
+  email: '',
+  full_name: '',
+  role: 'manager',
+};
 
 function getDraft(profile, drafts) {
   return drafts[profile.id] || profile;
@@ -13,6 +21,8 @@ function getDraft(profile, drafts) {
 export default function AccessPage({ businessUnits, currentUserId }) {
   const [drafts, setDrafts] = useState({});
   const [error, setError] = useState('');
+  const [inviteForm, setInviteForm] = useState(blankInvite);
+  const [inviting, setInviting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [profiles, setProfiles] = useState([]);
@@ -53,6 +63,33 @@ export default function AccessPage({ businessUnits, currentUserId }) {
     });
   }
 
+  function updateInvite(field, value) {
+    setInviteForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function sendInvite(event) {
+    event.preventDefault();
+    setInviting(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const result = await inviteUserProfile(inviteForm);
+      const profile = result.profile || inviteForm;
+      setMessage(
+        result.invited
+          ? `Invite sent to ${profile.email}.`
+          : `${profile.email} already has a login. Access was updated to ${getRoleLabel(profile.role)}.`,
+      );
+      setInviteForm(blankInvite);
+      await loadProfiles();
+    } catch (err) {
+      setError(err.message || 'Unable to send invite.');
+    } finally {
+      setInviting(false);
+    }
+  }
+
   async function saveProfile(profile) {
     const draft = getDraft(profile, drafts);
 
@@ -83,14 +120,83 @@ export default function AccessPage({ businessUnits, currentUserId }) {
           <span className="eyebrow">Users & access</span>
           <h2>Admin and manager roles</h2>
           <p>
-            Admins control payroll and staff changes. Managers can view operations, update booth
-            rent, and manage appointment imports.
+            Admins control payroll and access. Managers can manage roster, booth rent, reports,
+            and appointment imports.
           </p>
         </div>
         <div className="hero-meta">
           <strong>{pendingCount}</strong>
           <span>pending or inactive</span>
         </div>
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div>
+            <span>Invite</span>
+            <h2>Add team login</h2>
+          </div>
+        </div>
+
+        <form className="form-grid compact access-invite-form" onSubmit={sendInvite}>
+          <label className="field">
+            <span>Name</span>
+            <input
+              onChange={(event) => updateInvite('full_name', event.target.value)}
+              placeholder="Full name"
+              value={inviteForm.full_name}
+            />
+          </label>
+          <label className="field">
+            <span>Email</span>
+            <input
+              onChange={(event) => updateInvite('email', event.target.value)}
+              placeholder="name@example.com"
+              required
+              type="email"
+              value={inviteForm.email}
+            />
+          </label>
+          <label className="field">
+            <span>Role</span>
+            <select
+              onChange={(event) => updateInvite('role', event.target.value)}
+              value={inviteForm.role}
+            >
+              {INVITE_ROLES.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Business unit</span>
+            <select
+              onChange={(event) => updateInvite('business_unit_id', event.target.value)}
+              value={inviteForm.business_unit_id}
+            >
+              <option value="">All business units</option>
+              {businessUnits.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="invite-actions">
+            <button className="primary-button" disabled={inviting} type="submit">
+              {inviting ? (
+                'Sending...'
+              ) : (
+                <>
+                  <MailPlus size={17} />
+                  Send invite
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </section>
 
       <section className="panel full-span">

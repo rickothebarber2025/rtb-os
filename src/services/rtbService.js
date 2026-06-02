@@ -120,6 +120,16 @@ export async function updateUserProfile(profile) {
   );
 }
 
+export async function inviteUserProfile(invite) {
+  return invokeFunction('invite-user', {
+    business_unit_id: invite.business_unit_id || null,
+    email: invite.email,
+    full_name: invite.full_name,
+    redirectTo: window.location.origin,
+    role: invite.role || 'manager',
+  });
+}
+
 export async function getStaff(businessUnitId, includeInactive = true) {
   const client = requireClient();
   let query = client

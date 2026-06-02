@@ -1,0 +1,176 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Origin": "*",
+};
+
+const ROLE_VALUES = new Set(["admin", "manager", "staff", "pending"]);
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status,
+  });
+}
+
+function getSecretKey() {
+  const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (legacy) return legacy;
+
+  const secretKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (!secretKeys) return "";
+
+  const parsed = JSON.parse(secretKeys);
+  return parsed.default || Object.values(parsed)[0] || "";
+}
+
+function getAdminClient() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = getSecretKey();
+
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error("Supabase function secrets are missing.");
+  }
+
+  return createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false },
+  });
+}
+
+function normalizeEmail(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function cleanRedirectTo(value: unknown, origin: string | null) {
+  const fallback = "https://rtb-os.netlify.app/";
+  const raw = String(value || origin || fallback);
+
+  try {
+    const url = new URL(raw);
+    const allowedOrigins = new Set([
+      "http://localhost:5173",
+      "https://rtb-os.netlify.app",
+    ]);
+
+    return allowedOrigins.has(url.origin) ? url.origin : fallback;
+  } catch (_err) {
+    return fallback;
+  }
+}
+
+async function requireAdmin(admin: ReturnType<typeof createClient>, req: Request) {
+  const authHeader = req.headers.get("Authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+
+  if (!token) {
+    return { error: "Missing authorization.", status: 401 };
+  }
+
+  const { data: authData, error: authError } = await admin.auth.getUser(token);
+  if (authError || !authData.user) {
+    return { error: "Invalid authorization.", status: 401 };
+  }
+
+  const { data: profile, error: profileError } = await admin
+    .from("user_profiles")
+    .select("id,role,active")
+    .eq("id", authData.user.id)
+    .maybeSingle();
+
+  if (profileError) throw profileError;
+  if (!profile?.active || profile.role !== "admin") {
+    return { error: "Only admins can invite team members.", status: 403 };
+  }
+
+  return { user: authData.user };
+}
+
+async function findUserByEmail(admin: ReturnType<typeof createClient>, email: string) {
+  for (let page = 1; page <= 10; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+
+    const found = data.users.find((user) => normalizeEmail(user.email) === email);
+    if (found) return found;
+    if (data.users.length < 1000) return null;
+  }
+
+  return null;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    if (req.method !== "POST") {
+      return jsonResponse({ error: "Method not allowed." }, 405);
+    }
+
+    const admin = getAdminClient();
+    const adminCheck = await requireAdmin(admin, req);
+    if ("error" in adminCheck) {
+      return jsonResponse({ error: adminCheck.error }, adminCheck.status);
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const email = normalizeEmail(body.email);
+    const fullName = String(body.full_name || email).trim();
+    const role = String(body.role || "manager").trim().toLowerCase();
+    const businessUnitId = body.business_unit_id ? String(body.business_unit_id) : null;
+    const redirectTo = cleanRedirectTo(body.redirectTo, req.headers.get("Origin"));
+
+    if (!email || !email.includes("@")) {
+      return jsonResponse({ error: "Enter a valid email address." }, 400);
+    }
+
+    if (!ROLE_VALUES.has(role)) {
+      return jsonResponse({ error: "Choose a valid role." }, 400);
+    }
+
+    let invited = false;
+    let targetUser = await findUserByEmail(admin, email);
+
+    if (!targetUser) {
+      const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
+        data: { full_name: fullName },
+        redirectTo,
+      });
+
+      if (error) throw error;
+      targetUser = data.user;
+      invited = true;
+    }
+
+    if (!targetUser?.id) {
+      throw new Error("Supabase did not return an invited user.");
+    }
+
+    const { data: profile, error: profileError } = await admin
+      .from("user_profiles")
+      .upsert(
+        {
+          active: role !== "pending",
+          business_unit_id: businessUnitId,
+          email,
+          full_name: fullName || email,
+          id: targetUser.id,
+          role,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" },
+      )
+      .select()
+      .single();
+
+    if (profileError) throw profileError;
+
+    return jsonResponse({ invited, profile });
+  } catch (err) {
+    return jsonResponse({ error: err.message || "Unable to invite team member." }, 400);
+  }
+});
