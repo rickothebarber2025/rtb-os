@@ -4,6 +4,7 @@ import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { deleteBoothRent, saveBoothRent, toggleBoothRentPaid } from '../services/rtbService';
+import { canDeleteBoothRent, canManageBoothRent } from '../utils/access';
 import { getDefaultPayrollWeek } from '../utils/dates';
 import { formatCurrency, formatDate } from '../utils/formatters';
 
@@ -19,7 +20,9 @@ function blankRecord(businessUnitId) {
   };
 }
 
-export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staff }) {
+export default function BoothRentPage({ accessProfile, boothRent, businessUnit, onRefresh, staff }) {
+  const canDelete = canDeleteBoothRent(accessProfile);
+  const canManage = canManageBoothRent(accessProfile);
   const [form, setForm] = useState(() => blankRecord(businessUnit?.id));
   const [editingId, setEditingId] = useState('');
   const [error, setError] = useState('');
@@ -57,6 +60,7 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
   }
 
   function editRecord(record) {
+    if (!canManage) return;
     setEditingId(record.id);
     setForm({
       ...record,
@@ -76,6 +80,7 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (!canManage) return;
     setSaving(true);
     setError('');
 
@@ -95,6 +100,7 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
   }
 
   async function handleTogglePaid(record) {
+    if (!canManage) return;
     setSaving(true);
     setError('');
 
@@ -109,6 +115,7 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
   }
 
   async function handleDeleteRecord(record) {
+    if (!canDelete) return;
     const confirmed = window.confirm(`Delete booth rent record for ${record.renter_name}?`);
     if (!confirmed) return;
 
@@ -128,6 +135,7 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
 
   return (
     <div className="page-grid booth-layout">
+      {canManage ? (
       <section className="panel">
         <div className="section-header">
           <div>
@@ -201,6 +209,7 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
           </button>
         </form>
       </section>
+      ) : null}
 
       <section className="panel booth-records">
         <div className="section-header">
@@ -222,7 +231,7 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
                   <th>Status</th>
                   <th>Paid at</th>
                   <th>Notes</th>
-                  <th>Actions</th>
+                  {canManage ? <th>Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -238,30 +247,34 @@ export default function BoothRentPage({ boothRent, businessUnit, onRefresh, staf
                     </td>
                     <td>{record.paid_at ? formatDate(record.paid_at) : 'Not paid'}</td>
                     <td>{record.notes || 'No notes'}</td>
-                    <td>
-                      <div className="row-actions">
-                        <button className="ghost-button small" type="button" onClick={() => editRecord(record)}>
-                          Edit
-                        </button>
-                        <button
-                          className="secondary-button small"
-                          disabled={saving}
-                          type="button"
-                          onClick={() => handleTogglePaid(record)}
-                        >
-                          {record.paid ? 'Reopen' : 'Mark paid'}
-                        </button>
-                        <button
-                          className="icon-button danger small"
-                          disabled={saving}
-                          type="button"
-                          onClick={() => handleDeleteRecord(record)}
-                          aria-label={`Delete booth rent record for ${record.renter_name}`}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
+                    {canManage ? (
+                      <td>
+                        <div className="row-actions">
+                          <button className="ghost-button small" type="button" onClick={() => editRecord(record)}>
+                            Edit
+                          </button>
+                          <button
+                            className="secondary-button small"
+                            disabled={saving}
+                            type="button"
+                            onClick={() => handleTogglePaid(record)}
+                          >
+                            {record.paid ? 'Reopen' : 'Mark paid'}
+                          </button>
+                          {canDelete ? (
+                            <button
+                              className="icon-button danger small"
+                              disabled={saving}
+                              type="button"
+                              onClick={() => handleDeleteRecord(record)}
+                              aria-label={`Delete booth rent record for ${record.renter_name}`}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

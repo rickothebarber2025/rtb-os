@@ -50,11 +50,27 @@ function formatPeriod(dates) {
 }
 
 function parseDelimited(text) {
-  const delimiter = (text.match(/\t/g) || []).length > (text.match(/,/g) || []).length ? '\t' : ',';
+  const tabCount = (text.match(/\t/g) || []).length;
+  const commaCount = (text.match(/,/g) || []).length;
+  const lineCount = Math.max(1, (text.match(/\n/g) || []).length + 1);
+  const delimiter = tabCount ? '\t' : commaCount > lineCount ? ',' : null;
   const rows = [];
   let cell = '';
   let row = [];
   let quoted = false;
+
+  if (!delimiter) {
+    const looseRows = text
+      .split(/\r?\n/)
+      .map((line) => line.trim().split(/\s{2,}|\t/).map((value) => value.trim()))
+      .filter((values) => values.some(Boolean));
+
+    if (looseRows.length < 2) {
+      throw new Error('The report did not contain enough rows to import.');
+    }
+
+    return rowsFromTable(looseRows);
+  }
 
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
@@ -96,8 +112,31 @@ function parseDelimited(text) {
     throw new Error('The report did not contain enough rows to import.');
   }
 
-  const headers = rows[0];
-  return rows.slice(1).map((values) =>
+  return rowsFromTable(rows);
+}
+
+function rowsFromTable(rows) {
+  const headerIndex = Math.max(0, rows.findIndex((row) => {
+    const normalized = normalizeKey(row.join(' '));
+    const matches = [
+      'date',
+      'client',
+      'customer',
+      'service',
+      'staff',
+      'barber',
+      'provider',
+      'amount',
+      'price',
+      'total',
+      'status',
+    ].filter((term) => normalized.includes(term)).length;
+
+    return row.length >= 3 && matches >= 2;
+  }));
+  const headers = rows[headerIndex];
+
+  return rows.slice(headerIndex + 1).map((values) =>
     Object.fromEntries(headers.map((header, index) => [header, values[index] || ''])),
   );
 }
@@ -145,7 +184,7 @@ export function parseBooksyReport(text, fileName = 'Booksy report') {
   const usableRows = records.filter((record) => record.date || record.amount || record.service !== 'Unknown service');
 
   if (!usableRows.length) {
-    throw new Error('No appointment rows were found. Export the Booksy appointments or sales report as CSV.');
+    throw new Error('No appointment rows were found. Import a Booksy appointments or sales report as PDF, CSV, or TSV.');
   }
 
   const dates = usableRows.map((record) => record.date).filter(Boolean);
@@ -251,7 +290,7 @@ export function parseBooksyReport(text, fileName = 'Booksy report') {
         staffer: record.staff,
       })),
     services: serviceRows,
-    source: 'Booksy CSV Import',
+    source: 'Booksy File Import',
     staff: staffRows,
     summary: {
       allTimeBookings: usableRows.length,

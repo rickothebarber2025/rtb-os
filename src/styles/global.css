@@ -461,7 +461,8 @@ select {
 }
 
 .ghost-button.small,
-.secondary-button.small {
+.secondary-button.small,
+.primary-button.small {
   font-size: 0.78rem;
   min-height: 32px;
   padding: 0 0.62rem;
@@ -484,6 +485,11 @@ select {
 
 .icon-button.danger {
   color: var(--red);
+}
+
+.success-action {
+  border-color: rgba(85, 214, 146, 0.3);
+  color: var(--green);
 }
 
 .primary-button:hover,
@@ -763,6 +769,61 @@ select {
   background: var(--green-soft);
   border: 1px solid rgba(85, 214, 146, 0.22);
   color: #9ef0c5;
+}
+
+.global-alert {
+  margin-bottom: 1rem;
+}
+
+.role-pill {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 0 0.72rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.role-pill.admin {
+  background: var(--gold-soft);
+  border-color: rgba(214, 168, 79, 0.3);
+  color: var(--gold-strong);
+}
+
+.role-pill.manager {
+  background: rgba(122, 183, 255, 0.13);
+  border-color: rgba(122, 183, 255, 0.26);
+  color: var(--blue);
+}
+
+.access-gate {
+  background: rgba(18, 21, 29, 0.9);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 1rem;
+  margin: 0 auto;
+  max-width: 620px;
+  padding: 1.2rem;
+}
+
+.access-gate h1 {
+  font-size: clamp(2rem, 6vw, 3.8rem);
+  line-height: 1;
+  margin: 0;
+}
+
+.access-gate p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0.75rem 0 0;
 }
 
 .form-grid {
@@ -1250,6 +1311,163 @@ select {
   gap: 0.5rem;
 }
 
+.probation-section {
+  border-color: rgba(214, 168, 79, 0.22);
+}
+
+.probation-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.probation-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(214, 168, 79, 0.22);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: 0.9rem;
+}
+
+.probation-card.success {
+  border-color: rgba(85, 214, 146, 0.32);
+}
+
+.probation-card.danger {
+  border-color: rgba(255, 113, 109, 0.36);
+}
+
+.probation-card__main {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.7rem;
+  justify-content: space-between;
+}
+
+.probation-card__main span,
+.probation-card__meta span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.probation-card h3 {
+  font-size: 1.05rem;
+  line-height: 1.2;
+  margin: 0.18rem 0 0;
+}
+
+.probation-progress {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.probation-progress div {
+  background: linear-gradient(90deg, var(--gold), var(--gold-strong));
+  border-radius: inherit;
+  height: 100%;
+}
+
+.probation-card.success .probation-progress div {
+  background: linear-gradient(90deg, #24b56f, var(--green));
+}
+
+.probation-card.danger .probation-progress div {
+  background: linear-gradient(90deg, #dd3e38, var(--red));
+}
+
+.probation-card__meta {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.probation-card__meta span {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.probation-card__actions {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.probation-edit {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.performance-profile-cell {
+  min-width: 320px;
+  white-space: normal;
+}
+
+.performance-profile-cell .probation-card {
+  box-shadow: none;
+  margin-bottom: 0.75rem;
+  min-width: 280px;
+}
+
+.certificate-panel {
+  border-color: rgba(122, 183, 255, 0.18);
+}
+
+.certificate-preview {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  gap: 0.85rem;
+  padding: 0.9rem;
+}
+
+.certificate-preview strong,
+.certificate-preview span {
+  display: block;
+}
+
+.certificate-preview strong {
+  font-size: 1.1rem;
+}
+
+.certificate-preview span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin-top: 0.2rem;
+}
+
+.certificate-seal {
+  align-items: center;
+  background: var(--gold-soft);
+  border: 1px solid rgba(214, 168, 79, 0.26);
+  border-radius: 50%;
+  color: var(--gold-strong);
+  display: flex;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.access-toggle {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+}
+
+.access-toggle input {
+  accent-color: var(--gold);
+  min-height: auto;
+  width: auto;
+}
+
 .empty-state {
   align-items: center;
   border: 1px dashed var(--line-strong);
@@ -1360,7 +1578,8 @@ select {
   }
 
   .snapshot-grid,
-  .staff-insight-grid {
+  .staff-insight-grid,
+  .probation-grid {
     grid-template-columns: 1fr;
   }
 

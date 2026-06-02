@@ -7,6 +7,7 @@ import {
   getPerformanceSummary,
   getStaff,
 } from '../services/rtbService';
+import { canUsePayroll } from '../utils/access';
 
 const EMPTY_STATE = {
   boothRent: [],
@@ -17,7 +18,7 @@ const EMPTY_STATE = {
   staff: [],
 };
 
-export function useRtbData(selectedBusinessUnitId, enabled = true) {
+export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile = null) {
   const [data, setData] = useState(EMPTY_STATE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,10 +52,11 @@ export function useRtbData(selectedBusinessUnitId, enabled = true) {
         return;
       }
 
+      const shouldLoadPayroll = canUsePayroll(accessProfile);
       const [staff, payrollRuns, boothRent, performanceSummary, masterDashboard] =
         await Promise.all([
           getStaff(activeUnit.id, true),
-          getPayrollRuns(activeUnit.id),
+          shouldLoadPayroll ? getPayrollRuns(activeUnit.id) : Promise.resolve([]),
           getBoothRent(activeUnit.id),
           getPerformanceSummary(activeUnit.name),
           activeUnit.name === 'RTB Lounge'
@@ -75,7 +77,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true) {
     } finally {
       setLoading(false);
     }
-  }, [enabled, selectedBusinessUnitId]);
+  }, [accessProfile, enabled, selectedBusinessUnitId]);
 
   useEffect(() => {
     refresh();

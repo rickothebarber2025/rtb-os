@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { calculateEntryValues } from '../utils/payroll';
+import { PROBATION_RATE, toDateKey } from '../utils/probation';
 
 function requireClient() {
   if (!supabase) {
@@ -53,6 +54,72 @@ export async function getBusinessUnits() {
   );
 }
 
+export async function getCurrentUserProfile(userId) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('user_profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
+export async function createPendingUserProfile(user) {
+  const client = requireClient();
+  const fullName =
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email ||
+    'Pending user';
+
+  return requireData(
+    await client
+      .from('user_profiles')
+      .insert({
+        active: false,
+        email: user.email,
+        full_name: fullName,
+        id: user.id,
+        role: 'pending',
+      })
+      .select()
+      .single(),
+  );
+}
+
+export async function getUserProfiles() {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('user_profiles')
+      .select('*')
+      .order('role', { ascending: true })
+      .order('full_name', { ascending: true }),
+  );
+}
+
+export async function updateUserProfile(profile) {
+  const client = requireClient();
+  const payload = cleanObject({
+    active: Boolean(profile.active),
+    business_unit_id: profile.business_unit_id || null,
+    full_name: profile.full_name || profile.email,
+    role: profile.role || 'pending',
+    updated_at: new Date().toISOString(),
+  });
+
+  return requireData(
+    await client
+      .from('user_profiles')
+      .update(payload)
+      .eq('id', profile.id)
+      .select()
+      .single(),
+  );
+}
+
 export async function getStaff(businessUnitId, includeInactive = true) {
   const client = requireClient();
   let query = client
@@ -70,17 +137,18 @@ export async function getStaff(businessUnitId, includeInactive = true) {
 
 export async function saveStaff(staff) {
   const client = requireClient();
+  const isProbation = staff.tier === 'probation';
   const payload = cleanObject({
     active: staff.active ?? true,
     business_unit_id: staff.business_unit_id,
-    commission_rate: Number(staff.commission_rate || 0),
+    commission_rate: isProbation ? PROBATION_RATE : Number(staff.commission_rate || 0),
     email: staff.email || null,
-    fixed_rate: Boolean(staff.fixed_rate),
+    fixed_rate: isProbation ? false : Boolean(staff.fixed_rate),
     full_name: staff.full_name,
     notes: staff.notes || null,
     phone: staff.phone || null,
     role: staff.role || 'Staff',
-    start_date: staff.start_date || null,
+    start_date: isProbation ? staff.start_date || toDateKey() : staff.start_date || null,
     tier: staff.tier || 'standard',
     updated_at: new Date().toISOString(),
   });

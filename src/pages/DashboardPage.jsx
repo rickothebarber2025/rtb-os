@@ -11,6 +11,7 @@ import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
+import { canUsePayroll } from '../utils/access';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -20,6 +21,7 @@ import {
 } from '../utils/formatters';
 
 export default function DashboardPage({
+  accessProfile,
   boothRent,
   businessUnit,
   masterDashboard,
@@ -28,6 +30,7 @@ export default function DashboardPage({
   setActivePage,
   staff,
 }) {
+  const payrollAllowed = canUsePayroll(accessProfile);
   const activeStaff = staff.filter((member) => member.active);
   const fixedRateStaff = activeStaff.filter((member) => member.fixed_rate);
   const latestRun = payrollRuns[0];
@@ -55,9 +58,11 @@ export default function DashboardPage({
             business unit.
           </p>
         </div>
-        <button className="primary-button" type="button" onClick={() => setActivePage('payroll')}>
-          New payroll run
-        </button>
+        {payrollAllowed ? (
+          <button className="primary-button" type="button" onClick={() => setActivePage('payroll')}>
+            New payroll run
+          </button>
+        ) : null}
       </section>
 
       <section className="metrics-grid">
@@ -169,6 +174,7 @@ export default function DashboardPage({
         </section>
       ) : null}
 
+      {payrollAllowed ? (
       <section className="panel two-thirds">
         <div className="section-header">
           <div>
@@ -224,6 +230,7 @@ export default function DashboardPage({
           />
         )}
       </section>
+      ) : null}
 
       <section className="panel">
         <div className="section-header">

@@ -1,7 +1,6 @@
 import { Scissors, X } from 'lucide-react';
-import { NAV_ITEMS } from '../utils/constants';
 
-export default function Sidebar({ activePage, isOpen, onClose, setActivePage }) {
+export default function Sidebar({ activePage, isOpen, navItems, onClose, setActivePage }) {
   return (
     <aside className={`sidebar ${isOpen ? 'is-open' : ''}`}>
       <div className="sidebar__brand">
@@ -18,7 +17,7 @@ export default function Sidebar({ activePage, isOpen, onClose, setActivePage }) 
       </div>
 
       <nav className="sidebar__nav" aria-label="Main navigation">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const active = activePage === item.id;
 

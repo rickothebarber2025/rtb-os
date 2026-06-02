@@ -4,6 +4,7 @@ import {
   CircleDollarSign,
   LayoutDashboard,
   ReceiptText,
+  ShieldCheck,
   Users,
 } from 'lucide-react';
 
@@ -14,6 +15,7 @@ export const NAV_ITEMS = [
   { id: 'performance', label: 'Performance', icon: BarChart3 },
   { id: 'insights', label: 'Appointment Insights', icon: CalendarDays },
   { id: 'booth-rent', label: 'Booth Rent', icon: ReceiptText },
+  { id: 'access', label: 'Access', icon: ShieldCheck },
 ];
 
 export const LOW_SALES_THRESHOLD = 500;

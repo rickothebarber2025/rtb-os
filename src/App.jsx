@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AppShell from './components/AppShell';
 import LoadingState from './components/LoadingState';
+import AccessPage from './pages/AccessPage';
+import AccessPendingPage from './pages/AccessPendingPage';
 import AuthPage from './pages/AuthPage';
 import BooksyInsightsPage from './pages/BooksyInsightsPage';
 import BoothRentPage from './pages/BoothRentPage';
@@ -10,6 +12,9 @@ import PerformancePage from './pages/PerformancePage';
 import StaffPage from './pages/StaffPage';
 import { useAuth } from './hooks/useAuth';
 import { useRtbData } from './hooks/useRtbData';
+import { saveStaff } from './services/rtbService';
+import { canAccessPage, canManageStaff, canUseApp, getAllowedNavItems } from './utils/access';
+import { shouldAutoGraduate, toGraduationPayload } from './utils/probation';
 
 const STORAGE_KEY = 'rtb-os-business-unit';
 
@@ -19,7 +24,11 @@ export default function App() {
   const [selectedBusinessUnitId, setSelectedBusinessUnitId] = useState(() =>
     window.localStorage.getItem(STORAGE_KEY),
   );
-  const data = useRtbData(selectedBusinessUnitId, auth.isConfigured && Boolean(auth.session));
+  const [probationBanner, setProbationBanner] = useState('');
+  const autoGraduatingRef = useRef(false);
+  const appEnabled = auth.isConfigured && Boolean(auth.session) && canUseApp(auth.profile);
+  const data = useRtbData(selectedBusinessUnitId, appEnabled, auth.profile);
+  const navItems = useMemo(() => getAllowedNavItems(auth.profile), [auth.profile]);
 
   useEffect(() => {
     const selectedExists = data.businessUnits.some((unit) => unit.id === selectedBusinessUnitId);
@@ -34,6 +43,39 @@ export default function App() {
     }
   }, [selectedBusinessUnitId]);
 
+  useEffect(() => {
+    if (auth.profile && !canAccessPage(auth.profile, activePage)) {
+      setActivePage('dashboard');
+    }
+  }, [activePage, auth.profile]);
+
+  useEffect(() => {
+    async function graduateDueProbationStaff() {
+      if (!['dashboard', 'staff'].includes(activePage)) return;
+      if (!canManageStaff(auth.profile) || data.loading || autoGraduatingRef.current) return;
+
+      const dueStaff = data.staff.filter((member) => shouldAutoGraduate(member));
+      if (!dueStaff.length) return;
+
+      autoGraduatingRef.current = true;
+      setProbationBanner('');
+
+      try {
+        await Promise.all(dueStaff.map((member) => saveStaff(toGraduationPayload(member))));
+        setProbationBanner(
+          `${dueStaff.map((member) => member.full_name).join(', ')} graduated to Standard RTB automatically.`,
+        );
+        await data.refresh();
+      } catch (_err) {
+        setProbationBanner('');
+      } finally {
+        autoGraduatingRef.current = false;
+      }
+    }
+
+    graduateDueProbationStaff();
+  }, [activePage, auth.profile, data]);
+
   const pageProps = useMemo(
     () => ({
       boothRent: data.boothRent,
@@ -44,9 +86,10 @@ export default function App() {
       performanceSummary: data.performanceSummary,
       setActivePage,
       staff: data.staff,
+      accessProfile: auth.profile,
       user: auth.user,
     }),
-    [auth.user, data],
+    [auth.profile, auth.user, data],
   );
 
   function renderPage() {
@@ -66,6 +109,13 @@ export default function App() {
     }
 
     switch (activePage) {
+      case 'access':
+        return (
+          <AccessPage
+            businessUnits={data.businessUnits}
+            currentUserId={auth.user?.id}
+          />
+        );
       case 'payroll':
         return <PayrollPage {...pageProps} />;
       case 'staff':
@@ -98,17 +148,31 @@ export default function App() {
     );
   }
 
+  if (!canUseApp(auth.profile)) {
+    return (
+      <AccessPendingPage
+        error={auth.profileError}
+        profile={auth.profile}
+        refreshProfile={auth.refreshProfile}
+        signOut={auth.signOut}
+      />
+    );
+  }
+
   return (
     <AppShell
       activePage={activePage}
       businessUnits={data.businessUnits}
+      navItems={navItems}
       onRefresh={data.refresh}
+      profile={auth.profile}
       selectedBusinessUnitId={selectedBusinessUnitId}
       setActivePage={setActivePage}
       setSelectedBusinessUnitId={setSelectedBusinessUnitId}
       signOut={auth.signOut}
       user={auth.user}
     >
+      {probationBanner ? <div className="alert success global-alert">{probationBanner}</div> : null}
       {renderPage()}
     </AppShell>
   );

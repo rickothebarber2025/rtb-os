@@ -18,6 +18,7 @@ import {
   formatCurrency,
   formatNumber,
 } from '../utils/formatters';
+import { extractPdfText } from '../utils/pdfText';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -28,6 +29,18 @@ const TABS = [
 ];
 
 const SQUARE_APPOINTMENTS_DASHBOARD_URL = 'https://app.squareup.com/appointments/calendar';
+
+function isPdfFile(file) {
+  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+}
+
+async function readBooksyImportFile(file) {
+  if (isPdfFile(file)) {
+    return extractPdfText(file);
+  }
+
+  return file.text();
+}
 
 function getRows(rows) {
   return Array.isArray(rows) ? rows : [];
@@ -110,7 +123,7 @@ function OverviewTab({ data, setActiveTab, sourceName }) {
             <>
               <strong>Booksy report imported</strong>
               <span>
-                This view is built from the latest CSV or TSV report uploaded into RTB OS.
+                This view is built from the latest PDF, CSV, or TSV report uploaded into RTB OS.
               </span>
             </>
           ) : sourceName === 'Square Appointments' ? (
@@ -648,7 +661,7 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
     setActionLoading('booksy');
 
     try {
-      const text = await file.text();
+      const text = await readBooksyImportFile(file);
       const dashboard = parseBooksyReport(text, file.name);
       await saveAppSetting('rtb_master_dashboard', dashboard);
       setActionMessage(`Booksy imported ${formatNumber(dashboard.summary.allTimeBookings)} rows.`);
@@ -671,7 +684,7 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
           ref={booksyInputRef}
           className="sr-only"
           type="file"
-          accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
+          accept=".pdf,.csv,.tsv,.txt,application/pdf,text/csv,text/tab-separated-values"
           onChange={handleBooksyImport}
         />
         <div className="action-row">
@@ -683,7 +696,7 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
           >
             {actionLoading === 'booksy' ? 'Importing...' : 'Import Booksy Report'}
           </button>
-          <span className="subtle-text">CSV or TSV export</span>
+          <span className="subtle-text">PDF, CSV, or TSV export</span>
         </div>
       </div>
     ) : null;

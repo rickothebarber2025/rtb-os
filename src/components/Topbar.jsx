@@ -1,11 +1,13 @@
 import { LogOut, Menu, RefreshCw } from 'lucide-react';
 import BusinessUnitSelector from './BusinessUnitSelector';
+import { getRoleLabel } from '../utils/access';
 
 export default function Topbar({
   businessUnits,
   onMenuClick,
   onRefresh,
   pageTitle,
+  profile,
   selectedBusinessUnitId,
   setSelectedBusinessUnitId,
   signOut,
@@ -29,6 +31,9 @@ export default function Topbar({
           selectedBusinessUnitId={selectedBusinessUnitId}
           setSelectedBusinessUnitId={setSelectedBusinessUnitId}
         />
+        {profile ? (
+          <span className={`role-pill ${profile.role}`}>{getRoleLabel(profile.role)}</span>
+        ) : null}
         <button className="icon-button" type="button" onClick={onRefresh} aria-label="Refresh data">
           <RefreshCw size={18} />
         </button>

@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import { NAV_ITEMS } from '../utils/constants';
 
 export default function AppShell({
   activePage,
   businessUnits,
   children,
   onRefresh,
+  navItems,
+  profile,
   selectedBusinessUnitId,
   setActivePage,
   setSelectedBusinessUnitId,
@@ -16,8 +17,8 @@ export default function AppShell({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pageTitle = useMemo(
-    () => NAV_ITEMS.find((item) => item.id === activePage)?.label || 'Dashboard',
-    [activePage],
+    () => navItems.find((item) => item.id === activePage)?.label || 'Dashboard',
+    [activePage, navItems],
   );
 
   return (
@@ -25,6 +26,7 @@ export default function AppShell({
       <Sidebar
         activePage={activePage}
         isOpen={sidebarOpen}
+        navItems={navItems}
         onClose={() => setSidebarOpen(false)}
         setActivePage={setActivePage}
       />
@@ -37,6 +39,7 @@ export default function AppShell({
           onMenuClick={() => setSidebarOpen(true)}
           onRefresh={onRefresh}
           pageTitle={pageTitle}
+          profile={profile}
           selectedBusinessUnitId={selectedBusinessUnitId}
           setSelectedBusinessUnitId={setSelectedBusinessUnitId}
           signOut={signOut}
