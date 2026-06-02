@@ -664,7 +664,11 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
       const text = await readBooksyImportFile(file);
       const dashboard = parseBooksyReport(text, file.name);
       await saveAppSetting('rtb_master_dashboard', dashboard);
-      setActionMessage(`Booksy imported ${formatNumber(dashboard.summary.allTimeBookings)} rows.`);
+      const importLabel =
+        dashboard.summary?.reportKind === 'summary' ? 'appointments from summary' : 'rows';
+      setActionMessage(
+        `Booksy imported ${formatNumber(dashboard.summary.allTimeBookings)} ${importLabel}.`,
+      );
       setActiveTab('overview');
       await onRefresh?.();
     } catch (err) {

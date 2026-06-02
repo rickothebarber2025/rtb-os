@@ -1,10 +1,36 @@
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
-
-GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-
 const LINE_Y_TOLERANCE = 3;
 const TAB_GAP = 18;
+let pdfjsPromise;
+
+function ensurePdfJsBrowserSupport() {
+  if (typeof Promise.withResolvers !== 'function') {
+    Promise.withResolvers = function withResolvers() {
+      let resolve;
+      let reject;
+      const promise = new Promise((promiseResolve, promiseReject) => {
+        resolve = promiseResolve;
+        reject = promiseReject;
+      });
+
+      return { promise, resolve, reject };
+    };
+  }
+}
+
+async function loadPdfJs() {
+  if (!pdfjsPromise) {
+    ensurePdfJsBrowserSupport();
+    pdfjsPromise = Promise.all([
+      import('pdfjs-dist/legacy/build/pdf.mjs'),
+      import('pdfjs-dist/legacy/build/pdf.worker.mjs?url'),
+    ]).then(([pdfjs, worker]) => {
+      pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+      return pdfjs;
+    });
+  }
+
+  return pdfjsPromise;
+}
 
 function findLine(lines, y) {
   return lines.find((line) => Math.abs(line.y - y) <= LINE_Y_TOLERANCE);
@@ -43,7 +69,8 @@ function buildLineText(items) {
 
 export async function extractPdfText(file) {
   const buffer = await file.arrayBuffer();
-  const pdf = await getDocument({ data: buffer }).promise;
+  const { getDocument } = await loadPdfJs();
+  const pdf = await getDocument({ data: new Uint8Array(buffer) }).promise;
   const pages = [];
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {

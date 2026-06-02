@@ -27,6 +27,11 @@ function parseMoney(value) {
   return negative ? -number : number;
 }
 
+function parseInteger(value) {
+  const number = Number(String(value || '').replace(/[^\d-]/g, ''));
+  return Number.isFinite(number) ? number : 0;
+}
+
 function parseDate(value) {
   if (!value) return null;
   const parsed = new Date(value);
@@ -47,6 +52,140 @@ function formatPeriod(dates) {
   });
 
   return `${formatter.format(first)} - ${formatter.format(last)}`;
+}
+
+function normalizeReportText(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function percentage(part, total) {
+  if (!total) return 0;
+  return Math.round((Number(part || 0) / Number(total || 1)) * 100);
+}
+
+function parseStatsPeriod(text) {
+  const match = text.match(/Stats and reports\s+([A-Za-z]{3,9}\s+\d{4})/i);
+  return match?.[1] || 'Booksy Stats & Reports';
+}
+
+function getPeriodMonth(periodLabel) {
+  const monthText = periodLabel.match(/[A-Za-z]{3,9}/)?.[0]?.toLowerCase();
+  if (!monthText) return 'Report';
+
+  return MONTHS.find((month) => month.toLowerCase() === monthText.slice(0, 3)) || 'Report';
+}
+
+function parseBooksyStatsReport(text, fileName) {
+  const reportText = normalizeReportText(text);
+  const markerCount = [
+    'Stats and reports',
+    'Appointments & Occupancy',
+    'Dashboard Appointments Clients Revenue',
+  ].filter((marker) => reportText.toLowerCase().includes(marker.toLowerCase())).length;
+
+  if (markerCount < 2) return null;
+
+  const appointmentMatch = reportText.match(
+    /APPOINTMENTS(?:\s+TIME\s+BOOKED)?\s+([\d,]+)(?:\s+[\d.]+%)?(?:\s+([\d,]+)(?:\s+[\d.]+%)?)?/i,
+  );
+  const statusMatch = reportText.match(/CONFIRMED\s+FINISHED\s+([\d,]+)\s+([\d,]+)/i);
+  const noShowMatch = reportText.match(/NO[-\s]?SHOWS\s+CANCELLED\s+([\d,]+)\s+([\d,]+)/i);
+  const revenueMatch = reportText.match(/\bRevenue\s+\$?([\d,]+(?:\.\d{2})?)/i);
+  const serviceProductMatch = reportText.match(
+    /SERVICES\s+PRODUCTS\s+\$?([\d,]+(?:\.\d{2})?)\s+\$?([\d,]+(?:\.\d{2})?)/i,
+  );
+  const tipsGiftMatch = reportText.match(
+    /TIPS\s+GIFT\s+CARDS\s+\$?([\d,]+(?:\.\d{2})?)\s+\$?([\d,]+(?:\.\d{2})?)/i,
+  );
+  const membershipsPackagesMatch = reportText.match(
+    /MEMBERSHIPS\s+PACKAGES\s+\$?([\d,]+(?:\.\d{2})?)\s+\$?([\d,]+(?:\.\d{2})?)/i,
+  );
+  const clientsMatch = reportText.match(
+    /\bClients\s+([\d,]+)(?:\s+[\d.]+%)?\s+NEW\s+RETURNING\s+([\d,]+)\s+([\d,]+)/i,
+  );
+
+  if (!appointmentMatch && !revenueMatch && !clientsMatch) return null;
+
+  const periodLabel = parseStatsPeriod(reportText);
+  const month = getPeriodMonth(periodLabel);
+  const appointments = parseInteger(appointmentMatch?.[1]);
+  const timeBooked = parseInteger(appointmentMatch?.[2]);
+  const confirmed = parseInteger(statusMatch?.[1]);
+  const finished = parseInteger(statusMatch?.[2]);
+  const noShows = parseInteger(noShowMatch?.[1]);
+  const canceled = parseInteger(noShowMatch?.[2]);
+  const ytdRevenue = parseMoney(revenueMatch?.[1]);
+  const servicesRevenue = parseMoney(serviceProductMatch?.[1]);
+  const productsRevenue = parseMoney(serviceProductMatch?.[2]);
+  const tipsRevenue = parseMoney(tipsGiftMatch?.[1]);
+  const giftCardsRevenue = parseMoney(tipsGiftMatch?.[2]);
+  const membershipsRevenue = parseMoney(membershipsPackagesMatch?.[1]);
+  const packagesRevenue = parseMoney(membershipsPackagesMatch?.[2]);
+  const allTimeClients = parseInteger(clientsMatch?.[1]);
+  const newClients = parseInteger(clientsMatch?.[2]);
+  const returningClients = parseInteger(clientsMatch?.[3]);
+  const completedAppointments = finished || Math.max(appointments - noShows - canceled, 0);
+  const serviceRows = [
+    ['Services', servicesRevenue, completedAppointments, canceled],
+    ['Products', productsRevenue, 0, 0],
+    ['Tips', tipsRevenue, 0, 0],
+    ['Gift cards', giftCardsRevenue, 0, 0],
+    ['Memberships', membershipsRevenue, 0, 0],
+    ['Packages', packagesRevenue, 0, 0],
+  ]
+    .filter(([, revenue, count]) => revenue || count)
+    .map(([name, revenue, count, cancelled]) => ({
+      cancelRate: count ? percentage(cancelled, count + cancelled) : 0,
+      cancelled,
+      count,
+      fullName: name,
+      name,
+      revenue: Number(revenue.toFixed(2)),
+    }));
+
+  return {
+    businessUnit: 'RTB Lounge',
+    clientSegments: [
+      { appointments: newClients, color: '#5B9BE0', count: newClients, label: 'New' },
+      { appointments: returningClients, color: '#4CAF7D', count: returningClients, label: 'Returning' },
+      { appointments: canceled, color: '#E05252', count: canceled, label: 'Canceled' },
+      { appointments: noShows, color: '#E09040', count: noShows, label: 'No-show' },
+    ],
+    importedFrom: fileName,
+    location: 'Booksy Stats & Reports import',
+    monthlyRevenue: [
+      {
+        appointments,
+        month,
+        revenue: Number(ytdRevenue.toFixed(2)),
+      },
+    ],
+    recentTransactions: [],
+    services: serviceRows,
+    source: 'Booksy Stats & Reports PDF',
+    staff: [],
+    summary: {
+      allTimeBookings: appointments,
+      allTimeClients,
+      completedAppointments,
+      confirmedAppointments: confirmed,
+      newClients,
+      newRevenueShare: percentage(newClients, allTimeClients),
+      noShows,
+      periodLabel,
+      reportKind: 'summary',
+      reportMode: 'booksy_file_import',
+      returningBase: returningClients,
+      returningClients,
+      returningRevenueShare: percentage(returningClients, allTimeClients),
+      slippingAwayClients: 0,
+      timeBooked,
+      ytdRevenue: Number(ytdRevenue.toFixed(2)),
+    },
+    topClients: [],
+    upcomingAppointments: [],
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 function parseDelimited(text) {
@@ -179,6 +318,9 @@ function toArray(map, mapper) {
 }
 
 export function parseBooksyReport(text, fileName = 'Booksy report') {
+  const statsReport = parseBooksyStatsReport(text, fileName);
+  if (statsReport) return statsReport;
+
   const rawRows = parseDelimited(text);
   const records = rawRows.map(toRecord);
   const usableRows = records.filter((record) => record.date || record.amount || record.service !== 'Unknown service');
@@ -266,6 +408,8 @@ export function parseBooksyReport(text, fileName = 'Booksy report') {
   const returningClients = clientRows.filter((client) => client.bookings > 1).length;
   const firstVisitClients = clientRows.filter((client) => client.bookings === 1).length;
   const totalClients = clientRows.length;
+  const newRevenueShare = percentage(firstVisitClients, totalClients);
+  const returningRevenueShare = percentage(returningClients, totalClients);
 
   return {
     businessUnit: 'RTB Lounge',
@@ -296,10 +440,15 @@ export function parseBooksyReport(text, fileName = 'Booksy report') {
       allTimeBookings: usableRows.length,
       allTimeClients: totalClients,
       completedAppointments: usableRows.length - canceled,
+      newClients: firstVisitClients,
+      newRevenueShare,
       noShows,
       periodLabel: formatPeriod(dates),
+      reportKind: 'appointments',
       reportMode: 'booksy_file_import',
       returningBase: returningClients,
+      returningClients,
+      returningRevenueShare,
       slippingAwayClients: 0,
       ytdRevenue: Number(totalRevenue.toFixed(2)),
     },
