@@ -11,7 +11,7 @@ import {
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'payroll', label: 'Payroll', icon: CircleDollarSign },
-  { id: 'staff', label: 'Staff', icon: Users },
+  { id: 'staff', label: 'Roster', icon: Users },
   { id: 'performance', label: 'Performance', icon: BarChart3 },
   { id: 'insights', label: 'Appointment Insights', icon: CalendarDays },
   { id: 'booth-rent', label: 'Booth Rent', icon: ReceiptText },
