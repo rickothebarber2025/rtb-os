@@ -7,7 +7,7 @@ export const ROLE_OPTIONS = [
     value: 'admin',
   },
   {
-    description: 'Can view reports, manage booth rent, and sync or import appointment data.',
+    description: 'Can manage roster, booth rent, reports, and appointment imports.',
     label: 'Manager',
     value: 'manager',
   },
@@ -68,6 +68,10 @@ export function canManageAccess(profile) {
 }
 
 export function canManageStaff(profile) {
+  return isAdmin(profile) || isManager(profile);
+}
+
+export function canDeleteStaff(profile) {
   return isAdmin(profile);
 }
 

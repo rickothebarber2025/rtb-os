@@ -6,7 +6,7 @@ import Modal from '../components/Modal';
 import ProbationProgressCard from '../components/ProbationProgressCard';
 import StatusBadge from '../components/StatusBadge';
 import { deactivateStaff, deleteStaff, saveStaff } from '../services/rtbService';
-import { canManageStaff } from '../utils/access';
+import { canDeleteStaff, canManageStaff } from '../utils/access';
 import { formatDate, formatPercent } from '../utils/formatters';
 import {
   isProbationStaff,
@@ -32,6 +32,7 @@ const blankStaff = {
 
 export default function StaffPage({ accessProfile, businessUnit, onRefresh, staff }) {
   const canManage = canManageStaff(accessProfile);
+  const canDelete = canDeleteStaff(accessProfile);
   const [filter, setFilter] = useState('active');
   const [editing, setEditing] = useState(null);
   const [editingProbationId, setEditingProbationId] = useState('');
@@ -158,7 +159,7 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
   }
 
   async function handleDelete(member) {
-    if (!canManage) return;
+    if (!canDelete) return;
     const confirmed = window.confirm(
       `Delete ${member.full_name}? This only works when the profile is not tied to payroll, performance, or booth rent records.`,
     );
@@ -383,15 +384,17 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
                               <UserMinus size={16} />
                             </button>
                           ) : null}
-                          <button
-                            className="icon-button danger"
-                            disabled={saving}
-                            type="button"
-                            onClick={() => handleDelete(member)}
-                            aria-label={`Delete ${member.full_name}`}
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {canDelete ? (
+                            <button
+                              className="icon-button danger"
+                              disabled={saving}
+                              type="button"
+                              onClick={() => handleDelete(member)}
+                              aria-label={`Delete ${member.full_name}`}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     ) : null}
