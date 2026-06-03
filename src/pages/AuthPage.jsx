@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { LockKeyhole, Mail, Scissors } from 'lucide-react';
 
 export default function AuthPage({
+  authError,
   isConfigured,
   sendMagicLink,
   signInWithGoogle,
@@ -75,6 +76,8 @@ export default function AuthPage({
               Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to your environment.
             </div>
           ) : null}
+
+          {authError ? <div className="alert danger">{authError}</div> : null}
 
           <div className="segmented-control" aria-label="Authentication mode">
             <button

@@ -139,6 +139,7 @@ export default function App() {
   if (!auth.session) {
     return (
       <AuthPage
+        authError={auth.authError}
         isConfigured={auth.isConfigured}
         sendMagicLink={auth.sendMagicLink}
         signInWithGoogle={auth.signInWithGoogle}

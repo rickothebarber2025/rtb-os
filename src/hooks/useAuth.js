@@ -5,8 +5,81 @@ import {
   getCurrentUserProfile,
 } from '../services/rtbService';
 
+const EMAIL_AUTH_TYPES = new Set(['email', 'email_change', 'invite', 'magiclink', 'recovery', 'signup']);
+
+function readAuthRedirectParams() {
+  const url = new URL(window.location.href);
+  const searchParams = url.searchParams;
+  const hashParams = new URLSearchParams(url.hash.startsWith('#') ? url.hash.slice(1) : url.hash);
+  const get = (key) => searchParams.get(key) || hashParams.get(key) || '';
+
+  return {
+    accessToken: get('access_token'),
+    code: get('code'),
+    error: get('error_description') || get('error'),
+    refreshToken: get('refresh_token'),
+    tokenHash: get('token_hash'),
+    type: get('type'),
+  };
+}
+
+function clearAuthRedirectParams() {
+  window.history.replaceState(window.history.state, '', window.location.origin);
+}
+
+function getAuthRedirectErrorMessage(error) {
+  const message = error?.message || String(error || '');
+
+  if (/expired|invalid|used|otp|token/i.test(message)) {
+    return 'That invite link is expired or already used. Ask an admin to send a new invite, or use a magic link to sign in.';
+  }
+
+  return message || 'Unable to finish the invite sign-in.';
+}
+
+async function completeAuthRedirect() {
+  const params = readAuthRedirectParams();
+
+  if (params.error) {
+    throw new Error(params.error);
+  }
+
+  if (params.accessToken && params.refreshToken) {
+    const { data, error } = await supabase.auth.setSession({
+      access_token: params.accessToken,
+      refresh_token: params.refreshToken,
+    });
+
+    if (error) throw error;
+    clearAuthRedirectParams();
+    return data.session || null;
+  }
+
+  if (params.code) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
+
+    if (error) throw error;
+    clearAuthRedirectParams();
+    return data.session || null;
+  }
+
+  if (params.tokenHash && EMAIL_AUTH_TYPES.has(params.type)) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash: params.tokenHash,
+      type: params.type,
+    });
+
+    if (error) throw error;
+    clearAuthRedirectParams();
+    return data.session || null;
+  }
+
+  return null;
+}
+
 export function useAuth() {
   const [session, setSession] = useState(null);
+  const [authError, setAuthError] = useState('');
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [profileError, setProfileError] = useState('');
@@ -20,15 +93,31 @@ export function useAuth() {
       return undefined;
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      setLoading(false);
-    });
+    async function loadSession() {
+      try {
+        setAuthError('');
+        await completeAuthRedirect();
+
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+
+        if (!active) return;
+        setSession(data.session);
+      } catch (err) {
+        if (!active) return;
+        setAuthError(getAuthRedirectErrorMessage(err));
+        setSession(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadSession();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (nextSession) setAuthError('');
       setSession(nextSession);
       setLoading(false);
     });
@@ -147,6 +236,7 @@ export function useAuth() {
   return useMemo(
     () => ({
       isConfigured: isSupabaseConfigured,
+      authError,
       loading: loading || profileLoading || Boolean(session && !profile && !profileError),
       profile,
       profileError,
@@ -160,6 +250,7 @@ export function useAuth() {
       user: session?.user ?? null,
     }),
     [
+      authError,
       loading,
       profile,
       profileError,
