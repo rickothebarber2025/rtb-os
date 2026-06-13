@@ -6,7 +6,7 @@ import AccessPendingPage from './pages/AccessPendingPage';
 import AuthPage from './pages/AuthPage';
 import BooksyInsightsPage from './pages/BooksyInsightsPage';
 import BoothRentPage from './pages/BoothRentPage';
-import DashboardPage from './pages/DashboardPage';
+import MasterDashboardPage from './pages/MasterDashboardPage';
 import PayrollPage from './pages/PayrollPage';
 import PerformancePage from './pages/PerformancePage';
 import StaffPage from './pages/StaffPage';
@@ -128,7 +128,7 @@ export default function App() {
         return <BoothRentPage {...pageProps} />;
       case 'dashboard':
       default:
-        return <DashboardPage {...pageProps} />;
+        return <MasterDashboardPage {...pageProps} />;
     }
   }
 
