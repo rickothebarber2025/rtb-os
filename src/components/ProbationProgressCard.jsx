@@ -21,7 +21,9 @@ export default function ProbationProgressCard({
   setStartDateDraft,
   showActions = false,
 }) {
-  const previewMember = startDateDraft ? { ...member, start_date: startDateDraft } : member;
+  const previewMember = startDateDraft
+    ? { ...member, probation_start_date: startDateDraft }
+    : member;
   const info = getProbationInfo(previewMember);
 
   return (

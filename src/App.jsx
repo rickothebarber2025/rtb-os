@@ -6,7 +6,7 @@ import AccessPendingPage from './pages/AccessPendingPage';
 import AuthPage from './pages/AuthPage';
 import BooksyInsightsPage from './pages/BooksyInsightsPage';
 import BoothRentPage from './pages/BoothRentPage';
-import MasterDashboardPage from './pages/MasterDashboardPage';
+import DashboardPage from './pages/DashboardPage';
 import PayrollPage from './pages/PayrollPage';
 import PerformancePage from './pages/PerformancePage';
 import StaffPage from './pages/StaffPage';
@@ -83,6 +83,7 @@ export default function App() {
       masterDashboard: data.masterDashboard,
       onRefresh: data.refresh,
       payrollRuns: data.payrollRuns,
+      monthlyPerformanceSummary: data.monthlyPerformanceSummary,
       performanceSummary: data.performanceSummary,
       setActivePage,
       staff: data.staff,
@@ -128,7 +129,7 @@ export default function App() {
         return <BoothRentPage {...pageProps} />;
       case 'dashboard':
       default:
-        return <MasterDashboardPage {...pageProps} />;
+        return <DashboardPage {...pageProps} />;
     }
   }
 

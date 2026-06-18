@@ -33,6 +33,9 @@ export default function DashboardPage({
   const payrollAllowed = canUsePayroll(accessProfile);
   const activeStaff = staff.filter((member) => member.active);
   const fixedRateStaff = activeStaff.filter((member) => member.fixed_rate);
+  const autoAdjustEligible = activeStaff.filter(
+    (member) => !member.fixed_rate && member.tier !== 'probation',
+  );
   const latestRun = payrollRuns[0];
   const openBoothRent = boothRent.filter((record) => !record.paid);
   const boothBalance = openBoothRent.reduce(
@@ -47,15 +50,16 @@ export default function DashboardPage({
   const isBeautyLounge = businessUnit?.name === 'RTB Beauty Lounge';
   const booksySummary = businessUnit?.name === 'RTB Lounge' ? masterDashboard?.summary : null;
   const squareSummary = isBeautyLounge ? masterDashboard?.summary : null;
+  const appointmentSummary = booksySummary || squareSummary;
 
   return (
     <div className="page-grid">
       <section className="hero-panel">
         <div>
-          <h2>RTB operations snapshot</h2>
+          <h2>{businessUnit?.name || 'RTB'} operations snapshot</h2>
           <p>
-            Payroll, performance, booth rent, and roster activity across the selected
-            business unit.
+            Live roster, performance, booth rent, and appointment activity for the selected
+            business.
           </p>
         </div>
         {payrollAllowed ? (
@@ -74,9 +78,19 @@ export default function DashboardPage({
         />
         <MetricCard
           icon={CircleDollarSign}
-          label="Latest payroll"
-          trend={latestRun ? latestRun.week_label : 'No runs yet'}
-          value={latestRun ? formatCompactCurrency(latestRun.total_net_sales) : '$0'}
+          label={payrollAllowed ? 'Latest payroll' : 'Appointment revenue'}
+          trend={
+            payrollAllowed
+              ? latestRun?.week_label || 'No runs yet'
+              : appointmentSummary?.periodLabel || 'Import appointment data'
+          }
+          value={
+            payrollAllowed
+              ? latestRun
+                ? formatCompactCurrency(latestRun.total_net_sales)
+                : '$0'
+              : formatCompactCurrency(appointmentSummary?.ytdRevenue)
+          }
         />
         <MetricCard
           icon={ReceiptText}
@@ -285,7 +299,7 @@ export default function DashboardPage({
           </div>
           <div>
             <span>Auto-adjust eligible</span>
-            <strong>{activeStaff.length - fixedRateStaff.length}</strong>
+            <strong>{autoAdjustEligible.length}</strong>
           </div>
           <div>
             <span>Inactive profiles</span>

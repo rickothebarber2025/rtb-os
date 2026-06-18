@@ -3,6 +3,7 @@ import {
   getAppSetting,
   getBoothRent,
   getBusinessUnits,
+  getMonthlyPerformanceSummary,
   getPayrollRuns,
   getPerformanceSummary,
   getStaff,
@@ -13,6 +14,7 @@ const EMPTY_STATE = {
   boothRent: [],
   businessUnits: [],
   masterDashboard: null,
+  monthlyPerformanceSummary: [],
   payrollRuns: [],
   performanceSummary: [],
   staff: [],
@@ -53,12 +55,20 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
       }
 
       const shouldLoadPayroll = canUsePayroll(accessProfile);
-      const [staff, payrollRuns, boothRent, performanceSummary, masterDashboard] =
+      const [
+        staff,
+        payrollRuns,
+        boothRent,
+        performanceSummary,
+        monthlyPerformanceSummary,
+        masterDashboard,
+      ] =
         await Promise.all([
           getStaff(activeUnit.id, true),
           shouldLoadPayroll ? getPayrollRuns(activeUnit.id) : Promise.resolve([]),
           getBoothRent(activeUnit.id),
           getPerformanceSummary(activeUnit.name),
+          getMonthlyPerformanceSummary(activeUnit.id),
           activeUnit.name === 'RTB Lounge'
             ? getAppSetting('rtb_master_dashboard')
             : getAppSetting('rtb_beauty_square_appointments'),
@@ -68,6 +78,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         boothRent,
         businessUnits,
         masterDashboard,
+        monthlyPerformanceSummary,
         payrollRuns,
         performanceSummary,
         staff,

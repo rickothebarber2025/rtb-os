@@ -18,6 +18,7 @@ Set `VITE_SUPABASE_ANON_KEY` in `.env.local` or in the host environment. Do not 
 npm run dev
 npm run build
 npm run preview
+npm test
 ```
 
 ## Supabase
@@ -32,9 +33,14 @@ The app expects the existing Supabase tables and RPC functions:
 - `performance_history`
 - `app_settings`
 - `staff_performance_summary`
+- `staff_monthly_performance_summary`
 - `calculate_staff_take_home()`
+- `save_payroll_draft()`
 - `lock_payroll_run()`
 - `save_performance_from_run()`
+
+Database changes are versioned in `supabase/migrations`. Apply pending migrations before
+publishing a frontend that depends on new columns, views, or RPC functions.
 
 ## Appointment data
 
@@ -64,6 +70,7 @@ supabase secrets set SQUARE_SYNC_MAX_BOOKINGS=500
 For OAuth instead, add the Square app credentials:
 
 ```bash
+supabase secrets set APP_URL=https://rtb-os.netlify.app/
 supabase secrets set SQUARE_APPLICATION_ID=your_square_application_id
 supabase secrets set SQUARE_APPLICATION_SECRET=your_square_application_secret
 supabase secrets set SQUARE_REDIRECT_URL=https://qbeficojfoqgzjxrzxyg.supabase.co/functions/v1/square-oauth-callback
@@ -72,3 +79,6 @@ supabase secrets set SQUARE_REDIRECT_URL=https://qbeficojfoqgzjxrzxyg.supabase.c
 Register the same redirect URL in the Square Developer Console for the production
 application. After that, open RTB Beauty Lounge in RTB OS, go to Appointment
 Insights, choose Connect Square, approve access, then run Sync Square.
+
+Rotate any Square token or application secret that was previously pasted into chat,
+logs, tickets, or source code before enabling production sync.

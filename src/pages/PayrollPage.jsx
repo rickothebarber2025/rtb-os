@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, LockKeyhole, Save, SendToBack, Sparkles } from 'lucide-react';
+import {
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  LockKeyhole,
+  ReceiptText,
+  Save,
+  SendToBack,
+  Sparkles,
+} from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
@@ -16,6 +25,11 @@ import {
   recalculateEntry,
   toMoneyNumber,
 } from '../utils/payroll';
+import {
+  downloadPayrollRunCsv,
+  downloadPayrollRunPdf,
+  downloadPaystubPdf,
+} from '../utils/payrollDocuments';
 
 function createInitialRun(businessUnitId) {
   const week = getDefaultPayrollWeek();
@@ -42,6 +56,7 @@ export default function PayrollPage({
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState('');
   const previousBusinessUnitId = useRef(null);
 
   useEffect(() => {
@@ -64,6 +79,17 @@ export default function PayrollPage({
   const totals = useMemo(
     () => calculateRunTotals({ entries, ownerNetSales: currentRun.owner_net_sales }),
     [currentRun.owner_net_sales, entries],
+  );
+  const documentRun = useMemo(
+    () => ({
+      ...currentRun,
+      payroll_entries: entries,
+      rtb_net: totals.rtbNet,
+      total_deductions: totals.totalDeductions,
+      total_net_sales: totals.totalNetSales,
+      total_staff_payout: totals.totalStaffPayout,
+    }),
+    [currentRun, entries, totals],
   );
 
   function resetDraft() {
@@ -187,6 +213,26 @@ export default function PayrollPage({
     }
   }
 
+  async function handleExport(kind, entry = null) {
+    if (!currentRun.id) return;
+    setExporting(entry ? `paystub-${entry.staff_id || entry.staff_name_snapshot}` : kind);
+    setError('');
+
+    try {
+      if (kind === 'csv') {
+        downloadPayrollRunCsv(documentRun, businessUnit);
+      } else if (kind === 'paystub') {
+        await downloadPaystubPdf(documentRun, entry, businessUnit);
+      } else {
+        await downloadPayrollRunPdf(documentRun, businessUnit);
+      }
+    } catch (err) {
+      setError(err.message || 'Unable to generate payroll document.');
+    } finally {
+      setExporting('');
+    }
+  }
+
   return (
     <div className="page-grid payroll-layout">
       <section className="panel payroll-builder">
@@ -289,6 +335,7 @@ export default function PayrollPage({
                   <th>Deduction</th>
                   <th>Take home</th>
                   <th>Notes</th>
+                  <th>Paystub</th>
                 </tr>
               </thead>
               <tbody>
@@ -343,6 +390,21 @@ export default function PayrollPage({
                         value={entry.notes || ''}
                       />
                     </td>
+                    <td>
+                      <button
+                        aria-label={`Download ${entry.staff_name_snapshot} paystub`}
+                        className="icon-button small"
+                        disabled={
+                          !currentRun.id ||
+                          exporting === `paystub-${entry.staff_id || entry.staff_name_snapshot}`
+                        }
+                        onClick={() => handleExport('paystub', entry)}
+                        title="Download paystub"
+                        type="button"
+                      >
+                        <ReceiptText size={15} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -390,6 +452,28 @@ export default function PayrollPage({
             <SendToBack size={17} />
             Save performance
           </button>
+          {currentRun.id ? (
+            <>
+              <button
+                className="ghost-button"
+                disabled={Boolean(exporting)}
+                onClick={() => handleExport('pdf')}
+                type="button"
+              >
+                <Download size={17} />
+                Payroll PDF
+              </button>
+              <button
+                className="ghost-button"
+                disabled={Boolean(exporting)}
+                onClick={() => handleExport('csv')}
+                type="button"
+              >
+                <FileSpreadsheet size={17} />
+                Payroll CSV
+              </button>
+            </>
+          ) : null}
         </div>
       </section>
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Award, BarChart3, Download, TrendingDown, TrendingUp, WalletCards } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
@@ -14,11 +14,33 @@ import {
 } from '../utils/formatters';
 import { isProbationStaff } from '../utils/probation';
 
-export default function PerformancePage({ businessUnit, performanceSummary, staff }) {
+function monthLabel(value) {
+  if (!value) return 'No month selected';
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${value}T12:00:00`));
+}
+
+export default function PerformancePage({
+  businessUnit,
+  monthlyPerformanceSummary,
+  performanceSummary,
+  staff,
+}) {
   const [certificateError, setCertificateError] = useState('');
   const [certificateLoading, setCertificateLoading] = useState(false);
+  const availableMonths = useMemo(
+    () => [...new Set(monthlyPerformanceSummary.map((row) => row.month_start))],
+    [monthlyPerformanceSummary],
+  );
+  const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || '');
   const staffById = useMemo(() => new Map(staff.map((member) => [member.id, member])), [staff]);
-  const topPerformer = performanceSummary[0] || null;
+  const monthlyRows = useMemo(
+    () => monthlyPerformanceSummary.filter((row) => row.month_start === selectedMonth),
+    [monthlyPerformanceSummary, selectedMonth],
+  );
+  const topPerformer = monthlyRows[0] || null;
   const totals = performanceSummary.reduce(
     (acc, row) => ({
       adjustedWeeks: acc.adjustedWeeks + Number(row.adjusted_weeks || 0),
@@ -30,6 +52,12 @@ export default function PerformancePage({ businessUnit, performanceSummary, staf
     { adjustedWeeks: 0, netSales: 0, takeHome: 0, underMinimumWeeks: 0, weeks: 0 },
   );
 
+  useEffect(() => {
+    if (!availableMonths.includes(selectedMonth)) {
+      setSelectedMonth(availableMonths[0] || '');
+    }
+  }, [availableMonths, selectedMonth]);
+
   async function handleDownloadCertificate() {
     setCertificateError('');
     setCertificateLoading(true);
@@ -37,6 +65,7 @@ export default function PerformancePage({ businessUnit, performanceSummary, staf
     try {
       await downloadStaffOfMonthCertificate({
         businessUnit,
+        generatedAt: new Date(`${selectedMonth}T12:00:00`),
         performer: topPerformer,
       });
     } catch (err) {
@@ -75,30 +104,62 @@ export default function PerformancePage({ businessUnit, performanceSummary, staf
             <span>Staff of the month</span>
             <h2>Top performance certificate</h2>
           </div>
-          <button
-            className="primary-button"
-            disabled={!topPerformer || certificateLoading}
-            onClick={handleDownloadCertificate}
-            type="button"
-          >
-            <Download size={17} />
-            {certificateLoading ? 'Generating...' : 'Download PDF'}
-          </button>
+          <div className="section-header__controls">
+            <label className="field month-field">
+              <span>Performance month</span>
+              <select
+                disabled={!availableMonths.length}
+                onChange={(event) => setSelectedMonth(event.target.value)}
+                value={selectedMonth}
+              >
+                {!availableMonths.length ? <option value="">No saved months</option> : null}
+                {availableMonths.map((month) => (
+                  <option key={month} value={month}>
+                    {monthLabel(month)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="primary-button"
+              disabled={!topPerformer || certificateLoading}
+              onClick={handleDownloadCertificate}
+              type="button"
+            >
+              <Download size={17} />
+              {certificateLoading ? 'Generating...' : 'Download PDF'}
+            </button>
+          </div>
         </div>
         {topPerformer ? (
-          <div className="certificate-preview">
-            <div className="certificate-seal">
-              <Award size={24} />
+          <div className="award-layout">
+            <div className="certificate-preview">
+              <div className="certificate-seal">
+                <Award size={24} />
+              </div>
+              <div>
+                <strong>{topPerformer.full_name}</strong>
+                <span>
+                  {monthLabel(selectedMonth)} · {businessUnit?.name || topPerformer.business_unit}
+                  {' · '}
+                  {formatCurrency(topPerformer.total_net_sales)} sales
+                </span>
+              </div>
             </div>
-            <div>
-              <strong>{topPerformer.full_name}</strong>
-              <span>
-                {businessUnit?.name || topPerformer.business_unit} · {formatCurrency(topPerformer.total_net_sales)} total sales
-              </span>
+            <div className="monthly-ranking">
+              {monthlyRows.slice(0, 3).map((row, index) => (
+                <div key={row.staff_id}>
+                  <span>#{index + 1}</span>
+                  <strong>{row.full_name}</strong>
+                  <b>{formatCurrency(row.total_net_sales)}</b>
+                </div>
+              ))}
             </div>
           </div>
         ) : (
-          <p className="subtle-text">Save performance from payroll before generating a staff-of-the-month certificate.</p>
+          <p className="subtle-text">
+            Save performance from a locked payroll run before generating a monthly certificate.
+          </p>
         )}
         {certificateError ? <div className="alert danger">{certificateError}</div> : null}
       </section>

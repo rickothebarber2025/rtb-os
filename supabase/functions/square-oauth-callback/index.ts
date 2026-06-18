@@ -50,6 +50,8 @@ function getSquareConfig() {
 }
 
 function page(title: string, message: string) {
+  const appUrl = Deno.env.get("APP_URL") || "https://rtb-os.netlify.app/";
+
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -83,7 +85,7 @@ function page(title: string, message: string) {
     <main>
       <h1>${title}</h1>
       <p>${message}</p>
-      <p><a href="http://localhost:5173/">Return to RTB OS</a></p>
+      <p><a href="${appUrl}">Return to RTB OS</a></p>
     </main>
   </body>
 </html>`;

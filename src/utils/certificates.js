@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf';
 import { formatCurrency } from './formatters';
 
 const RTB_LOGO_URL = '/assets/rtb-logo.jpg';
@@ -71,6 +70,7 @@ export async function downloadStaffOfMonthCertificate({
     throw new Error('No staff performance record is available for a certificate.');
   }
 
+  const { jsPDF } = await import('jspdf');
   const businessName = businessUnit?.name || performer.business_unit || 'RTB Lounge';
   const doc = new jsPDF({ format: 'letter', orientation: 'landscape', unit: 'pt' });
   const width = doc.internal.pageSize.getWidth();

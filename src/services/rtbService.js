@@ -157,8 +157,11 @@ export async function saveStaff(staff) {
     full_name: staff.full_name,
     notes: staff.notes || null,
     phone: staff.phone || null,
+    probation_start_date: isProbation
+      ? staff.probation_start_date || staff.start_date || toDateKey()
+      : staff.probation_start_date || null,
     role: staff.role || 'Staff',
-    start_date: isProbation ? staff.start_date || toDateKey() : staff.start_date || null,
+    start_date: staff.start_date || null,
     tier: staff.tier || 'standard',
     updated_at: new Date().toISOString(),
   });
@@ -281,7 +284,7 @@ async function calculateEntries(entries) {
     entries.map(async (entry) => ({
       ...entry,
       ...(await calculateTakeHomeOnServer(entry)),
-      deduction: Number(entry.deduction || 5),
+      deduction: Number(entry.deduction ?? 5),
     })),
   );
 }
@@ -310,11 +313,11 @@ function toEntryPayload(entry, payrollRunId) {
     adjusted: Boolean(entry.adjusted),
     applied_commission_rate: Number(entry.applied_commission_rate || 0),
     base_commission_rate: Number(entry.base_commission_rate || 0),
-    deduction: Number(entry.deduction || 5),
+    deduction: Number(entry.deduction ?? 5),
     fixed_rate_snapshot: Boolean(entry.fixed_rate_snapshot),
     net_sales: Number(entry.net_sales || 0),
     notes: entry.notes || null,
-    payroll_run_id: payrollRunId,
+    payroll_run_id: payrollRunId || undefined,
     paystub_status: entry.paystub_status || 'pending',
     role_snapshot: entry.role_snapshot || null,
     staff_id: entry.staff_id || null,
@@ -328,32 +331,16 @@ function toEntryPayload(entry, payrollRunId) {
 export async function savePayrollDraft(run, entries) {
   const client = requireClient();
   const calculatedEntries = await calculateEntries(entries);
-  const payload = toRunPayload(run);
-  let savedRun;
+  const { data, error } = await client.rpc('save_payroll_draft', {
+    p_entries: calculatedEntries.map((entry) => toEntryPayload(entry)),
+    p_run: {
+      ...toRunPayload(run),
+      id: run.id || null,
+    },
+  });
 
-  if (run.id) {
-    savedRun = requireData(
-      await client.from('payroll_runs').update(payload).eq('id', run.id).select().single(),
-    );
-
-    requireData(
-      await client.from('payroll_entries').delete().eq('payroll_run_id', savedRun.id),
-    );
-  } else {
-    savedRun = requireData(
-      await client.from('payroll_runs').insert(payload).select().single(),
-    );
-  }
-
-  if (calculatedEntries.length) {
-    requireData(
-      await client
-        .from('payroll_entries')
-        .insert(calculatedEntries.map((entry) => toEntryPayload(entry, savedRun.id))),
-    );
-  }
-
-  return savedRun;
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : data;
 }
 
 export async function lockPayrollRun(runId) {
@@ -380,6 +367,18 @@ export async function getPerformanceSummary(businessUnitName) {
   }
 
   return requireData(await query);
+}
+
+export async function getMonthlyPerformanceSummary(businessUnitId) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('staff_monthly_performance_summary')
+      .select('*')
+      .eq('business_unit_id', businessUnitId)
+      .order('month_start', { ascending: false })
+      .order('total_net_sales', { ascending: false }),
+  );
 }
 
 export async function getBoothRent(businessUnitId) {

@@ -25,6 +25,7 @@ const blankStaff = {
   full_name: '',
   notes: '',
   phone: '',
+  probation_start_date: '',
   role: 'Staff',
   start_date: '',
   tier: 'standard',
@@ -73,6 +74,7 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
       email: member.email || '',
       notes: member.notes || '',
       phone: member.phone || '',
+      probation_start_date: member.probation_start_date || '',
       start_date: member.start_date || '',
     });
     setError('');
@@ -96,7 +98,7 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
           ...current,
           commission_rate: PROBATION_RATE,
           fixed_rate: false,
-          start_date: current.start_date || toDateKey(),
+          probation_start_date: current.probation_start_date || toDateKey(),
           tier,
         };
       }
@@ -120,7 +122,7 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
     try {
       const staffPayload =
         form.tier === 'probation'
-          ? toProbationPayload(form, form.start_date || toDateKey())
+          ? toProbationPayload(form, form.probation_start_date || toDateKey())
           : form;
 
       const saved = await saveStaff({
@@ -269,7 +271,9 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
                 }}
                 onEdit={() => {
                   setEditingProbationId(member.id);
-                  setProbationDraftStart(member.start_date || toDateKey());
+                  setProbationDraftStart(
+                    member.probation_start_date || member.start_date || toDateKey(),
+                  );
                 }}
                 onGraduate={() => handleGraduate(member)}
                 onSaveDate={(startDate) => handleSaveProbationDate(member, startDate)}
@@ -474,13 +478,23 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
                   value={form.phone}
                 />
               </label>
+              <label className="field">
+                <span>Employment start date</span>
+                <input
+                  onChange={(event) => updateField('start_date', event.target.value)}
+                  type="date"
+                  value={form.start_date || ''}
+                />
+              </label>
               {form.tier === 'probation' ? (
                 <label className="field">
                   <span>Probation start date</span>
                   <input
-                    onChange={(event) => updateField('start_date', event.target.value)}
+                    onChange={(event) =>
+                      updateField('probation_start_date', event.target.value)
+                    }
                     type="date"
-                    value={form.start_date || toDateKey()}
+                    value={form.probation_start_date || toDateKey()}
                   />
                 </label>
               ) : null}

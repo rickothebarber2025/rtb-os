@@ -6,17 +6,17 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test"
   },
   "dependencies": {
     "@supabase/supabase-js": "latest",
     "@vitejs/plugin-react": "latest",
     "jspdf": "^4.2.1",
     "lucide-react": "latest",
-    "papaparse": "^5.5.3",
     "pdfjs-dist": "^6.0.227",
     "react": "latest",
     "react-dom": "latest",
-    "vite": "latest"
+    "vite": "^8.0.16"
   }
 }

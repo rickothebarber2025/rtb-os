@@ -2,6 +2,7 @@ node_modules
 dist
 .netlify
 .playwright-cli
+supabase/.temp
 .env
 .env.local
 .env.*.local

@@ -38,7 +38,12 @@ export function isProbationStaff(member) {
 }
 
 export function getProbationStartDate(member) {
-  return parseDateKey(member?.start_date) || parseDateKey(member?.created_at) || new Date();
+  return (
+    parseDateKey(member?.probation_start_date) ||
+    parseDateKey(member?.start_date) ||
+    parseDateKey(member?.created_at) ||
+    new Date()
+  );
 }
 
 export function getProbationInfo(member, today = new Date()) {
@@ -91,7 +96,7 @@ export function toProbationPayload(member, startDate = toDateKey()) {
     ...member,
     commission_rate: PROBATION_RATE,
     fixed_rate: false,
-    start_date: startDate || toDateKey(),
+    probation_start_date: startDate || toDateKey(),
     tier: 'probation',
   };
 }

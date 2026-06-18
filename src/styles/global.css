@@ -1419,6 +1419,26 @@ select {
   border-color: rgba(122, 183, 255, 0.18);
 }
 
+.section-header__controls {
+  align-items: end;
+  display: flex;
+  gap: 0.7rem;
+}
+
+.month-field {
+  min-width: 190px;
+}
+
+.month-field select {
+  min-height: 40px;
+}
+
+.award-layout {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+}
+
 .certificate-preview {
   align-items: center;
   background: rgba(255, 255, 255, 0.035);
@@ -1454,6 +1474,34 @@ select {
   height: 48px;
   justify-content: center;
   width: 48px;
+}
+
+.monthly-ranking {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+}
+
+.monthly-ranking div {
+  align-items: center;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  padding: 0.72rem 0.8rem;
+}
+
+.monthly-ranking div + div {
+  border-top: 1px solid var(--line);
+}
+
+.monthly-ranking span {
+  color: var(--gold-strong);
+  font-weight: 800;
+}
+
+.monthly-ranking b {
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .access-toggle {
@@ -1697,6 +1745,20 @@ select {
 
   .payroll-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .award-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .section-header__controls {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .month-field {
+    min-width: 0;
   }
 
   .mini-stats,

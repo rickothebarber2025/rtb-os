@@ -2,7 +2,7 @@ import {
   ADJUSTED_COMMISSION_RATE,
   ENTRY_DEDUCTION,
   LOW_SALES_THRESHOLD,
-} from './constants';
+} from './constants.js';
 
 export function toMoneyNumber(value) {
   const parsed = Number(value);
@@ -26,13 +26,15 @@ export function calculateEntryValues({
     !fixedRate && net < LOW_SALES_THRESHOLD && baseRate > ADJUSTED_COMMISSION_RATE;
   const appliedRate = adjusted ? ADJUSTED_COMMISSION_RATE : baseRate;
   const commissionAmount = roundMoney(net * (appliedRate / 100));
-  const takeHome = roundMoney(commissionAmount + tipAmount - ENTRY_DEDUCTION);
+  const grossPay = roundMoney(commissionAmount + tipAmount);
+  const deduction = roundMoney(Math.min(ENTRY_DEDUCTION, Math.max(0, grossPay)));
+  const takeHome = roundMoney(grossPay - deduction);
 
   return {
     adjusted,
     appliedCommissionRate: appliedRate,
     commissionAmount,
-    deduction: ENTRY_DEDUCTION,
+    deduction,
     takeHome,
   };
 }
@@ -49,7 +51,7 @@ export function createDraftEntry(staffMember) {
     adjusted: calculated.adjusted,
     applied_commission_rate: calculated.appliedCommissionRate,
     base_commission_rate: toMoneyNumber(staffMember.commission_rate || 60),
-    deduction: ENTRY_DEDUCTION,
+    deduction: calculated.deduction,
     fixed_rate_snapshot: Boolean(staffMember.fixed_rate),
     net_sales: 0,
     notes: '',
@@ -75,7 +77,7 @@ export function recalculateEntry(entry) {
     ...entry,
     adjusted: calculated.adjusted,
     applied_commission_rate: calculated.appliedCommissionRate,
-    deduction: ENTRY_DEDUCTION,
+    deduction: calculated.deduction,
     take_home: calculated.takeHome,
   };
 }
