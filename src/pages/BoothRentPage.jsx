@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, ReceiptText, Trash2 } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
@@ -25,13 +26,16 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
   const canManage = canManageBoothRent(accessProfile);
   const [form, setForm] = useState(() => blankRecord(businessUnit?.id));
   const [editingId, setEditingId] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setEditingId('');
     setForm(blankRecord(businessUnit?.id));
     setError('');
+    setNotice('');
   }, [businessUnit?.id]);
 
   const totals = useMemo(
@@ -70,6 +74,7 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
       week_label: record.week_label || '',
     });
     setError('');
+    setNotice('');
   }
 
   function resetForm() {
@@ -91,6 +96,7 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
         id: editingId || undefined,
       });
       await onRefresh();
+      setNotice(editingId ? 'Booth rent record updated.' : 'Booth rent record saved.');
       resetForm();
     } catch (err) {
       setError(err.message || 'Unable to save booth rent.');
@@ -103,10 +109,16 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
     if (!canManage) return;
     setSaving(true);
     setError('');
+    setNotice('');
 
     try {
       await toggleBoothRentPaid(record);
       await onRefresh();
+      setNotice(
+        record.paid
+          ? `${record.renter_name}'s rent was reopened.`
+          : `${record.renter_name}'s rent was marked paid.`,
+      );
     } catch (err) {
       setError(err.message || 'Unable to update booth rent status.');
     } finally {
@@ -116,9 +128,6 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
 
   async function handleDeleteRecord(record) {
     if (!canDelete) return;
-    const confirmed = window.confirm(`Delete booth rent record for ${record.renter_name}?`);
-    if (!confirmed) return;
-
     setSaving(true);
     setError('');
 
@@ -126,6 +135,8 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
       await deleteBoothRent(record.id);
       if (editingId === record.id) resetForm();
       await onRefresh();
+      setNotice(`Booth rent record for ${record.renter_name} was deleted.`);
+      setDeleteTarget(null);
     } catch (err) {
       setError(err.message || 'Unable to delete booth rent record.');
     } finally {
@@ -202,6 +213,7 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
           </label>
 
           {error ? <div className="alert danger">{error}</div> : null}
+          {notice ? <div className="alert success">{notice}</div> : null}
 
           <button className="primary-button" disabled={saving} type="submit">
             <Plus size={17} />
@@ -263,13 +275,13 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
                           </button>
                           {canDelete ? (
                             <button
-                              className="icon-button danger small"
+                              className="ghost-button small danger-action"
                               disabled={saving}
                               type="button"
-                              onClick={() => handleDeleteRecord(record)}
-                              aria-label={`Delete booth rent record for ${record.renter_name}`}
+                              onClick={() => setDeleteTarget(record)}
                             >
-                              <Trash2 size={15} />
+                              <Trash2 size={14} />
+                              Delete
                             </button>
                           ) : null}
                         </div>
@@ -288,6 +300,19 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
           />
         )}
       </section>
+
+      {deleteTarget ? (
+        <ConfirmDialog
+          busy={saving}
+          confirmLabel="Delete record"
+          description={`Delete the ${deleteTarget.week_label || 'selected'} booth rent record for ${deleteTarget.renter_name}? This cannot be undone.`}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => handleDeleteRecord(deleteTarget)}
+          title="Delete booth rent"
+        >
+          {error ? <div className="alert danger">{error}</div> : null}
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

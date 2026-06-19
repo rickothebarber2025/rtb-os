@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, UserMinus, Users } from 'lucide-react';
+import { Pencil, Plus, RotateCcw, Trash2, UserMinus, Users } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import Modal from '../components/Modal';
@@ -37,7 +38,9 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
   const [filter, setFilter] = useState('active');
   const [editing, setEditing] = useState(null);
   const [editingProbationId, setEditingProbationId] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null);
   const [form, setForm] = useState(blankStaff);
+  const [probationTarget, setProbationTarget] = useState(null);
   const [probationDraftStart, setProbationDraftStart] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -142,9 +145,6 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
 
   async function handleDeactivate(member) {
     if (!canManage) return;
-    const confirmed = window.confirm(`Deactivate ${member.full_name}? They will move to the inactive staff view.`);
-    if (!confirmed) return;
-
     setSaving(true);
     setError('');
     setNotice('');
@@ -153,8 +153,10 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
       await deactivateStaff(member.id);
       await onRefresh();
       setNotice(`${member.full_name} was deactivated.`);
+      return true;
     } catch (err) {
       setError(err.message || 'Unable to deactivate staff profile.');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -162,11 +164,6 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
 
   async function handleDelete(member) {
     if (!canDelete) return;
-    const confirmed = window.confirm(
-      `Delete ${member.full_name}? This only works when the profile is not tied to payroll, performance, or booth rent records.`,
-    );
-    if (!confirmed) return;
-
     setSaving(true);
     setError('');
     setNotice('');
@@ -175,8 +172,10 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
       await deleteStaff(member.id);
       await onRefresh();
       setNotice(`${member.full_name} was deleted.`);
+      return true;
     } catch (err) {
       setError(err.message || 'Unable to delete staff profile.');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -184,9 +183,6 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
 
   async function handleGraduate(member) {
     if (!canManage) return;
-    const confirmed = window.confirm(`Graduate ${member.full_name} to Standard RTB at 60%?`);
-    if (!confirmed) return;
-
     setSaving(true);
     setError('');
     setNotice('');
@@ -195,8 +191,10 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
       await saveStaff(toGraduationPayload(member));
       await onRefresh();
       setNotice(`${member.full_name} graduated to Standard RTB.`);
+      return true;
     } catch (err) {
       setError(err.message || 'Unable to graduate staff profile.');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -223,26 +221,51 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
 
   async function handleMoveToProbation(member) {
     if (!canManage) return;
-    const enteredDate = window.prompt(
-      `Probation start date for ${member.full_name}`,
-      toDateKey(),
-    );
-
-    if (enteredDate === null) return;
-
     setSaving(true);
     setError('');
     setNotice('');
 
     try {
-      await saveStaff(toProbationPayload(member, enteredDate.trim() || toDateKey()));
+      await saveStaff(
+        toProbationPayload(member, probationDraftStart.trim() || toDateKey()),
+      );
       await onRefresh();
       setNotice(`${member.full_name} moved to probation at ${formatPercent(PROBATION_RATE)}.`);
+      setProbationTarget(null);
+      setProbationDraftStart('');
     } catch (err) {
       setError(err.message || 'Unable to move staff onto probation.');
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleRestore(member) {
+    if (!canManage) return;
+    setSaving(true);
+    setError('');
+    setNotice('');
+
+    try {
+      await saveStaff({ ...member, active: true });
+      await onRefresh();
+      setNotice(`${member.full_name} was restored to the active roster.`);
+    } catch (err) {
+      setError(err.message || 'Unable to restore staff profile.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleConfirmedAction() {
+    const action = confirmAction;
+    if (!action) return;
+
+    let completed = false;
+    if (action.type === 'deactivate') completed = await handleDeactivate(action.member);
+    if (action.type === 'delete') completed = await handleDelete(action.member);
+    if (action.type === 'graduate') completed = await handleGraduate(action.member);
+    if (completed) setConfirmAction(null);
   }
 
   const modalOpen = editing !== null || form.business_unit_id;
@@ -275,7 +298,9 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
                     member.probation_start_date || member.start_date || toDateKey(),
                   );
                 }}
-                onGraduate={() => handleGraduate(member)}
+                onGraduate={() => setConfirmAction({ member, type: 'graduate' })}
+                onDeactivate={() => setConfirmAction({ member, type: 'deactivate' })}
+                onEditProfile={() => openEdit(member)}
                 onSaveDate={(startDate) => handleSaveProbationDate(member, startDate)}
                 saving={saving}
                 setStartDateDraft={setProbationDraftStart}
@@ -364,7 +389,12 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
                     {canManage ? (
                       <td>
                         <div className="row-actions">
-                          <button className="ghost-button small" type="button" onClick={() => openEdit(member)}>
+                          <button
+                            className="ghost-button small"
+                            type="button"
+                            onClick={() => openEdit(member)}
+                          >
+                            <Pencil size={14} />
                             Edit
                           </button>
                           {member.active && !isProbationStaff(member) ? (
@@ -372,31 +402,46 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
                               className="ghost-button small"
                               disabled={saving}
                               type="button"
-                              onClick={() => handleMoveToProbation(member)}
+                              onClick={() => {
+                                setProbationTarget(member);
+                                setProbationDraftStart(toDateKey());
+                              }}
                             >
                               Prob
                             </button>
                           ) : null}
                           {member.active ? (
                             <button
-                              className="icon-button danger"
+                              className="ghost-button small danger-action"
                               disabled={saving}
                               type="button"
-                              onClick={() => handleDeactivate(member)}
-                              aria-label={`Deactivate ${member.full_name}`}
+                              onClick={() =>
+                                setConfirmAction({ member, type: 'deactivate' })
+                              }
                             >
-                              <UserMinus size={16} />
+                              <UserMinus size={14} />
+                              Deactivate
                             </button>
-                          ) : null}
+                          ) : (
+                            <button
+                              className="secondary-button small success-action"
+                              disabled={saving}
+                              type="button"
+                              onClick={() => handleRestore(member)}
+                            >
+                              <RotateCcw size={14} />
+                              Restore
+                            </button>
+                          )}
                           {canDelete ? (
                             <button
-                              className="icon-button danger"
+                              className="ghost-button small danger-action"
                               disabled={saving}
                               type="button"
-                              onClick={() => handleDelete(member)}
-                              aria-label={`Delete ${member.full_name}`}
+                              onClick={() => setConfirmAction({ member, type: 'delete' })}
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={14} />
+                              Delete
                             </button>
                           ) : null}
                         </div>
@@ -537,6 +582,79 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
             </div>
           </form>
         </Modal>
+      ) : null}
+
+      {probationTarget ? (
+        <Modal
+          title={`Move ${probationTarget.full_name} to probation`}
+          onClose={() => {
+            setProbationTarget(null);
+            setProbationDraftStart('');
+          }}
+        >
+          <div className="stack">
+            <p className="modal-description">
+              This sets commission to 50%, turns off fixed rate, and starts the 90-day clock.
+            </p>
+            <label className="field">
+              <span>Probation start date</span>
+              <input
+                onChange={(event) => setProbationDraftStart(event.target.value)}
+                type="date"
+                value={probationDraftStart || toDateKey()}
+              />
+            </label>
+            <div className="action-row end">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setProbationTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="primary-button"
+                disabled={saving}
+                type="button"
+                onClick={() => handleMoveToProbation(probationTarget)}
+              >
+                Start probation
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+
+      {confirmAction ? (
+        <ConfirmDialog
+          busy={saving}
+          confirmLabel={
+            confirmAction.type === 'delete'
+              ? 'Delete permanently'
+              : confirmAction.type === 'graduate'
+                ? 'Graduate staff'
+                : 'Deactivate staff'
+          }
+          description={
+            confirmAction.type === 'delete'
+              ? `Delete ${confirmAction.member.full_name}? Profiles linked to payroll, performance, or booth rent cannot be deleted and should be deactivated instead.`
+              : confirmAction.type === 'graduate'
+                ? `Graduate ${confirmAction.member.full_name} early to Standard RTB at 60%?`
+                : `Deactivate ${confirmAction.member.full_name}? Their history stays intact and you can restore them later.`
+          }
+          onClose={() => setConfirmAction(null)}
+          onConfirm={handleConfirmedAction}
+          title={
+            confirmAction.type === 'delete'
+              ? 'Delete staff profile'
+              : confirmAction.type === 'graduate'
+                ? 'Graduate staff'
+                : 'Deactivate staff'
+          }
+          tone={confirmAction.type === 'graduate' ? 'warning' : 'danger'}
+        >
+          {error ? <div className="alert danger">{error}</div> : null}
+        </ConfirmDialog>
       ) : null}
     </div>
   );

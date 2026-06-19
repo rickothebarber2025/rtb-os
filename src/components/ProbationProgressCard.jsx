@@ -1,4 +1,4 @@
-import { CalendarDays, CheckCircle2, Pencil } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Pencil, UserMinus, UserRoundPen } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import { formatDate } from '../utils/formatters';
 import { getProbationInfo } from '../utils/probation';
@@ -13,7 +13,9 @@ export default function ProbationProgressCard({
   editing = false,
   member,
   onCancelEdit,
+  onDeactivate,
   onEdit,
+  onEditProfile,
   onGraduate,
   onSaveDate,
   saving = false,
@@ -85,8 +87,24 @@ export default function ProbationProgressCard({
           <button className="secondary-button small success-action" type="button" onClick={onGraduate}>
             Graduate
           </button>
+          <button
+            className="ghost-button small"
+            type="button"
+            onClick={onEditProfile}
+          >
+            <UserRoundPen size={14} />
+            Edit
+          </button>
           <button className="icon-button small" type="button" onClick={onEdit} aria-label={`Edit ${member.full_name} probation date`}>
             <Pencil size={15} />
+          </button>
+          <button
+            className="icon-button small danger"
+            type="button"
+            onClick={onDeactivate}
+            aria-label={`Deactivate ${member.full_name}`}
+          >
+            <UserMinus size={15} />
           </button>
         </div>
       ) : null}

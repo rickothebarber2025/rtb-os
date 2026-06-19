@@ -111,3 +111,33 @@ export function calculateRunTotals({ entries, ownerNetSales }) {
     totalStaffPayout,
   };
 }
+
+export function createCorrectionDraft(run, entries, reason) {
+  const correctionEntries = (entries || []).map((entry) => {
+    const {
+      created_at: _createdAt,
+      id: _id,
+      payroll_run_id: _payrollRunId,
+      ...draftEntry
+    } = entry;
+
+    return {
+      ...draftEntry,
+      paystub_status: 'pending',
+    };
+  });
+
+  return {
+    entries: correctionEntries,
+    run: {
+      ...run,
+      corrected_from_run_id: run.id,
+      id: undefined,
+      notes: [run.notes, `Correction: ${reason}`].filter(Boolean).join('\n'),
+      performance_saved_at: null,
+      status: 'draft',
+      void_reason: '',
+      voided_at: null,
+    },
+  };
+}

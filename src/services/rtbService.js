@@ -340,13 +340,51 @@ export async function savePayrollDraft(run, entries) {
   });
 
   if (error) throw error;
-  return Array.isArray(data) ? data[0] : data;
+  const saved = Array.isArray(data) ? data[0] : data;
+
+  if (run.corrected_from_run_id && saved?.id) {
+    return requireData(
+      await client
+        .from('payroll_runs')
+        .update({ corrected_from_run_id: run.corrected_from_run_id })
+        .eq('id', saved.id)
+        .eq('status', 'draft')
+        .select()
+        .single(),
+    );
+  }
+
+  return saved;
 }
 
 export async function lockPayrollRun(runId) {
   const client = requireClient();
   const result = await client.rpc('lock_payroll_run', { p_run_id: runId });
   if (result.error) throw result.error;
+}
+
+export async function deletePayrollDraft(runId) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('payroll_runs')
+      .delete()
+      .eq('id', runId)
+      .eq('status', 'draft')
+      .select()
+      .single(),
+  );
+}
+
+export async function createPayrollCorrection(runId, reason) {
+  const client = requireClient();
+  const { data, error } = await client.rpc('create_payroll_correction', {
+    p_reason: reason,
+    p_run_id: runId,
+  });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : data;
 }
 
 export async function savePerformanceFromRun(runId) {
@@ -419,6 +457,10 @@ export async function saveAppSetting(key, value) {
 
   if (error) throw error;
   return data;
+}
+
+export async function clearAppSetting(key) {
+  return saveAppSetting(key, null);
 }
 
 export async function startSquareConnection(businessUnitId) {

@@ -4,15 +4,23 @@ import {
   CalendarDays,
   ExternalLink,
   Scissors,
+  Trash2,
   TrendingDown,
   TrendingUp,
   Users,
 } from 'lucide-react';
 import DataTable from '../components/DataTable';
+import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
-import { saveAppSetting, startSquareConnection, syncSquareAppointments } from '../services/rtbService';
+import {
+  clearAppSetting,
+  saveAppSetting,
+  startSquareConnection,
+  syncSquareAppointments,
+} from '../services/rtbService';
+import { canManageAppointments } from '../utils/access';
 import { parseBooksyReport } from '../utils/booksyReport';
 import {
   formatCompactCurrency,
@@ -613,6 +621,7 @@ function ScheduleTab({ data }) {
 }
 
 export default function BooksyInsightsPage({
+  accessProfile,
   businessUnit,
   masterDashboard,
   masterDashboardUpdatedAt,
@@ -623,9 +632,11 @@ export default function BooksyInsightsPage({
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const [clearImportOpen, setClearImportOpen] = useState(false);
   const booksyInputRef = useRef(null);
   const source = getAppointmentSource(businessUnit);
   const hasData = Boolean(masterDashboard);
+  const canManage = canManageAppointments(accessProfile);
   const squareConnected = Boolean(squareStatus?.connected);
 
   async function handleSquareConnect() {
@@ -688,6 +699,27 @@ export default function BooksyInsightsPage({
     }
   }
 
+  async function handleClearImport() {
+    const settingKey =
+      source.name === 'Booksy'
+        ? 'rtb_master_dashboard'
+        : 'rtb_beauty_square_appointments';
+    setActionError('');
+    setActionMessage('');
+    setActionLoading('clear');
+
+    try {
+      await clearAppSetting(settingKey);
+      await onRefresh?.();
+      setClearImportOpen(false);
+      setActionMessage(`${source.name} saved data was removed.`);
+    } catch (err) {
+      setActionError(err.message || 'Saved appointment data could not be removed.');
+    } finally {
+      setActionLoading('');
+    }
+  }
+
   const booksyActions =
     source.name === 'Booksy' ? (
       <div className="stack">
@@ -707,8 +739,23 @@ export default function BooksyInsightsPage({
             type="button"
             onClick={() => booksyInputRef.current?.click()}
           >
-            {actionLoading === 'booksy' ? 'Importing...' : 'Import Booksy Report'}
+            {actionLoading === 'booksy'
+              ? 'Importing...'
+              : hasData
+                ? 'Replace Booksy Report'
+                : 'Import Booksy Report'}
           </button>
+          {hasData && canManage ? (
+            <button
+              className="ghost-button danger-action"
+              disabled={Boolean(actionLoading)}
+              type="button"
+              onClick={() => setClearImportOpen(true)}
+            >
+              <Trash2 size={16} />
+              Remove saved report
+            </button>
+          ) : null}
           <span className="subtle-text">PDF, CSV, or TSV export</span>
         </div>
       </div>
@@ -749,6 +796,17 @@ export default function BooksyInsightsPage({
             <ExternalLink size={16} />
             Open Square Dashboard
           </a>
+          {hasData && canManage ? (
+            <button
+              className="ghost-button danger-action"
+              disabled={Boolean(actionLoading)}
+              type="button"
+              onClick={() => setClearImportOpen(true)}
+            >
+              <Trash2 size={16} />
+              Clear cached data
+            </button>
+          ) : null}
         </div>
       </div>
     ) : null;
@@ -873,6 +931,23 @@ export default function BooksyInsightsPage({
       {activeTab === 'services' ? <ServicesTab data={masterDashboard} /> : null}
       {activeTab === 'clients' ? <ClientsTab data={masterDashboard} /> : null}
       {activeTab === 'schedule' ? <ScheduleTab data={masterDashboard} /> : null}
+
+      {clearImportOpen ? (
+        <ConfirmDialog
+          busy={actionLoading === 'clear'}
+          confirmLabel={source.name === 'Booksy' ? 'Remove report' : 'Clear cached data'}
+          description={
+            source.name === 'Booksy'
+              ? 'Remove the current Booksy report from RTB OS? You can import a corrected report immediately afterward.'
+              : 'Clear the saved Square appointment snapshot? This does not disconnect Square, and you can sync again later.'
+          }
+          onClose={() => setClearImportOpen(false)}
+          onConfirm={handleClearImport}
+          title={source.name === 'Booksy' ? 'Remove Booksy report' : 'Clear Square data'}
+        >
+          {actionError ? <div className="alert danger">{actionError}</div> : null}
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

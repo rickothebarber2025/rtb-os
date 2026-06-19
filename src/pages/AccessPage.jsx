@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, MailPlus, RefreshCw, ShieldCheck, Users } from 'lucide-react';
+import {
+  Ban,
+  Check,
+  MailPlus,
+  RefreshCw,
+  RotateCcw,
+  ShieldCheck,
+  Undo2,
+  Users,
+} from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
@@ -20,6 +30,7 @@ function getDraft(profile, drafts) {
 
 export default function AccessPage({ businessUnits, currentUserId }) {
   const [drafts, setDrafts] = useState({});
+  const [accessTarget, setAccessTarget] = useState(null);
   const [error, setError] = useState('');
   const [inviteForm, setInviteForm] = useState(blankInvite);
   const [inviting, setInviting] = useState(false);
@@ -90,8 +101,8 @@ export default function AccessPage({ businessUnits, currentUserId }) {
     }
   }
 
-  async function saveProfile(profile) {
-    const draft = getDraft(profile, drafts);
+  async function saveProfile(profile, overrideDraft = null) {
+    const draft = overrideDraft || getDraft(profile, drafts);
 
     if (profile.id === currentUserId && (draft.role !== 'admin' || !draft.active)) {
       setError('You cannot remove admin access from the account you are using right now.');
@@ -106,11 +117,27 @@ export default function AccessPage({ businessUnits, currentUserId }) {
       await updateUserProfile(draft);
       setMessage(`${draft.full_name || draft.email} is now ${getRoleLabel(draft.role)}.`);
       await loadProfiles();
+      return true;
     } catch (err) {
       setError(err.message || 'Unable to save access changes.');
+      return false;
     } finally {
       setSavingId('');
     }
+  }
+
+  function resetDraft(profile) {
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[profile.id];
+      return next;
+    });
+  }
+
+  async function confirmAccessChange() {
+    if (!accessTarget) return;
+    const saved = await saveProfile(accessTarget.profile, accessTarget.next);
+    if (saved) setAccessTarget(null);
   }
 
   return (
@@ -295,21 +322,61 @@ export default function AccessPage({ businessUnits, currentUserId }) {
                         </label>
                       </td>
                       <td>
-                        <button
-                          className="primary-button"
-                          disabled={!isDirty || savingId === profile.id}
-                          onClick={() => saveProfile(profile)}
-                          type="button"
-                        >
-                          {savingId === profile.id ? (
-                            'Saving...'
-                          ) : (
-                            <>
-                              <Check size={17} />
-                              Save
-                            </>
-                          )}
-                        </button>
+                        <div className="row-actions">
+                          {isDirty ? (
+                            <button
+                              className="ghost-button small"
+                              disabled={savingId === profile.id}
+                              onClick={() => resetDraft(profile)}
+                              type="button"
+                            >
+                              <Undo2 size={14} />
+                              Undo
+                            </button>
+                          ) : null}
+                          <button
+                            className="primary-button small"
+                            disabled={!isDirty || savingId === profile.id}
+                            onClick={() => saveProfile(profile)}
+                            type="button"
+                          >
+                            {savingId === profile.id ? (
+                              'Saving...'
+                            ) : (
+                              <>
+                                <Check size={15} />
+                                Save changes
+                              </>
+                            )}
+                          </button>
+                          {!isCurrentUser ? (
+                            <button
+                              className={
+                                draft.active
+                                  ? 'ghost-button small danger-action'
+                                  : 'secondary-button small success-action'
+                              }
+                              disabled={savingId === profile.id}
+                              onClick={() =>
+                                setAccessTarget({
+                                  next: {
+                                    ...draft,
+                                    active: !draft.active,
+                                    role:
+                                      !draft.active && draft.role === 'pending'
+                                        ? 'manager'
+                                        : draft.role,
+                                  },
+                                  profile,
+                                })
+                              }
+                              type="button"
+                            >
+                              {draft.active ? <Ban size={14} /> : <RotateCcw size={14} />}
+                              {draft.active ? 'Revoke' : 'Restore'}
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -329,6 +396,24 @@ export default function AccessPage({ businessUnits, currentUserId }) {
           />
         )}
       </section>
+
+      {accessTarget ? (
+        <ConfirmDialog
+          busy={savingId === accessTarget.profile.id}
+          confirmLabel={accessTarget.next.active ? 'Restore access' : 'Revoke access'}
+          description={
+            accessTarget.next.active
+              ? `Restore RTB OS access for ${accessTarget.profile.full_name || accessTarget.profile.email}?`
+              : `Revoke RTB OS access for ${accessTarget.profile.full_name || accessTarget.profile.email}? Their login account remains available to restore later.`
+          }
+          onClose={() => setAccessTarget(null)}
+          onConfirm={confirmAccessChange}
+          title={accessTarget.next.active ? 'Restore user access' : 'Revoke user access'}
+          tone={accessTarget.next.active ? 'warning' : 'danger'}
+        >
+          {error ? <div className="alert danger">{error}</div> : null}
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

@@ -66,7 +66,9 @@ export default function DashboardPage({
   const appointmentSummary = booksySummary || squareSummary;
   const operationalChecks = buildOperationalChecks({
     activeStaffCount: activeStaff.length,
-    appointmentUpdatedAt: masterDashboardUpdatedAt || masterDashboard?.updatedAt,
+    appointmentUpdatedAt: masterDashboard
+      ? masterDashboardUpdatedAt || masterDashboard.updatedAt
+      : null,
     boothRentCount: boothRent.length,
     businessUnitName: businessUnit?.name,
     latestRun,

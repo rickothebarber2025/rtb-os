@@ -2,16 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Download,
+  FilePenLine,
   FileSpreadsheet,
   LockKeyhole,
   ReceiptText,
   Save,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import {
+  createPayrollCorrection,
+  deletePayrollDraft,
   lockPayrollRun,
   savePayrollDraft,
 } from '../services/rtbService';
@@ -19,6 +24,7 @@ import { getDefaultPayrollWeek } from '../utils/dates';
 import { formatCurrency, formatDate, formatPercent } from '../utils/formatters';
 import {
   calculateRunTotals,
+  createCorrectionDraft,
   createDraftEntry,
   recalculateEntry,
   toMoneyNumber,
@@ -45,6 +51,8 @@ export default function PayrollPage({
 }) {
   const activeStaff = useMemo(() => staff.filter((member) => member.active), [staff]);
   const [currentRun, setCurrentRun] = useState(() => createInitialRun(businessUnit?.id));
+  const [confirmAction, setConfirmAction] = useState('');
+  const [correctionReason, setCorrectionReason] = useState('');
   const [entries, setEntries] = useState([]);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -68,7 +76,8 @@ export default function PayrollPage({
     }
   }, [activeStaff, businessUnit?.id, currentRun.id, entries.length]);
 
-  const locked = currentRun.status === 'locked';
+  const readOnly = currentRun.status !== 'draft';
+  const finalized = ['locked', 'sent'].includes(currentRun.status);
   const totals = useMemo(
     () => calculateRunTotals({ entries, ownerNetSales: currentRun.owner_net_sales }),
     [currentRun.owner_net_sales, entries],
@@ -112,12 +121,15 @@ export default function PayrollPage({
   function loadRun(run) {
     setCurrentRun({
       business_unit_id: run.business_unit_id,
+      corrected_from_run_id: run.corrected_from_run_id || null,
       id: run.id,
       notes: run.notes || '',
       owner_net_sales: Number(run.owner_net_sales || 0),
       owner_tips: Number(run.owner_tips || 0),
       performance_saved_at: run.performance_saved_at || null,
       status: run.status,
+      void_reason: run.void_reason || '',
+      voided_at: run.voided_at || null,
       week_end: run.week_end || '',
       week_label: run.week_label,
       week_start: run.week_start || '',
@@ -133,7 +145,7 @@ export default function PayrollPage({
         tips: Number(entry.tips || 0),
       };
 
-      return run.status === 'locked' ? normalized : recalculateEntry(normalized);
+      return run.status === 'draft' ? recalculateEntry(normalized) : normalized;
     }));
     setError('');
     setNotice(`Loaded ${run.week_label}.`);
@@ -199,6 +211,47 @@ export default function PayrollPage({
     }
   }
 
+  async function handleDeleteDraft() {
+    if (!currentRun.id || currentRun.status !== 'draft') return;
+    setSaving(true);
+    setError('');
+    setNotice('');
+
+    try {
+      await deletePayrollDraft(currentRun.id);
+      await onRefresh();
+      resetDraft();
+      setNotice('Payroll draft deleted.');
+      setConfirmAction('');
+    } catch (err) {
+      setError(err.message || 'Unable to delete payroll draft.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCorrectRun() {
+    if (!currentRun.id || !finalized) return;
+    setSaving(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const correction = createCorrectionDraft(currentRun, entries, correctionReason);
+      const savedCorrection = await createPayrollCorrection(currentRun.id, correctionReason);
+      await onRefresh();
+      setCurrentRun({ ...correction.run, id: savedCorrection.id });
+      setEntries(correction.entries);
+      setConfirmAction('');
+      setCorrectionReason('');
+      setNotice('Original payroll was voided. Update this correction draft, then finalize it.');
+    } catch (err) {
+      setError(err.message || 'Unable to start payroll correction.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleExport(kind, entry = null) {
     if (!currentRun.id) return;
     setExporting(entry ? `paystub-${entry.staff_id || entry.staff_name_snapshot}` : kind);
@@ -228,14 +281,36 @@ export default function PayrollPage({
             <span>Payroll</span>
             <h2>Draft run</h2>
           </div>
-          <StatusBadge tone={locked ? 'success' : 'warning'}>{currentRun.status}</StatusBadge>
+          <StatusBadge
+            tone={
+              currentRun.status === 'voided'
+                ? 'danger'
+                : currentRun.status === 'draft'
+                  ? 'warning'
+                  : 'success'
+            }
+          >
+            {currentRun.status}
+          </StatusBadge>
         </div>
+
+        {currentRun.corrected_from_run_id && currentRun.status === 'draft' ? (
+          <div className="alert warning">
+            <strong>Correction draft</strong>
+            <span>Review every amount before finalizing this replacement payroll.</span>
+          </div>
+        ) : null}
+        {currentRun.status === 'voided' ? (
+          <div className="alert danger">
+            Voided for correction: {currentRun.void_reason || 'No reason recorded'}
+          </div>
+        ) : null}
 
         <div className="form-grid compact">
           <label className="field">
             <span>Week label</span>
             <input
-              disabled={locked}
+              disabled={readOnly}
               onChange={(event) => updateRunField('week_label', event.target.value)}
               value={currentRun.week_label || ''}
             />
@@ -243,7 +318,7 @@ export default function PayrollPage({
           <label className="field">
             <span>Week start</span>
             <input
-              disabled={locked}
+              disabled={readOnly}
               onChange={(event) => updateRunField('week_start', event.target.value)}
               type="date"
               value={currentRun.week_start || ''}
@@ -252,7 +327,7 @@ export default function PayrollPage({
           <label className="field">
             <span>Week end</span>
             <input
-              disabled={locked}
+              disabled={readOnly}
               onChange={(event) => updateRunField('week_end', event.target.value)}
               type="date"
               value={currentRun.week_end || ''}
@@ -261,7 +336,7 @@ export default function PayrollPage({
           <label className="field">
             <span>Owner net sales</span>
             <input
-              disabled={locked}
+              disabled={readOnly}
               min="0"
               onChange={(event) => updateRunField('owner_net_sales', toMoneyNumber(event.target.value))}
               step="0.01"
@@ -272,7 +347,7 @@ export default function PayrollPage({
           <label className="field">
             <span>Owner tips</span>
             <input
-              disabled={locked}
+              disabled={readOnly}
               min="0"
               onChange={(event) => updateRunField('owner_tips', toMoneyNumber(event.target.value))}
               step="0.01"
@@ -283,7 +358,7 @@ export default function PayrollPage({
           <label className="field wide">
             <span>Notes</span>
             <input
-              disabled={locked}
+              disabled={readOnly}
               onChange={(event) => updateRunField('notes', event.target.value)}
               placeholder="Internal payroll notes"
               value={currentRun.notes || ''}
@@ -343,7 +418,7 @@ export default function PayrollPage({
                     </td>
                     <td>
                       <input
-                        disabled={locked}
+                        disabled={readOnly}
                         min="0"
                         onChange={(event) => updateEntry(index, 'net_sales', event.target.value)}
                         step="0.01"
@@ -353,7 +428,7 @@ export default function PayrollPage({
                     </td>
                     <td>
                       <input
-                        disabled={locked}
+                        disabled={readOnly}
                         min="0"
                         onChange={(event) => updateEntry(index, 'tips', event.target.value)}
                         step="0.01"
@@ -371,7 +446,7 @@ export default function PayrollPage({
                     </td>
                     <td>
                       <input
-                        disabled={locked}
+                        disabled={readOnly}
                         onChange={(event) => updateEntry(index, 'notes', event.target.value)}
                         placeholder="Optional"
                         value={entry.notes || ''}
@@ -414,7 +489,7 @@ export default function PayrollPage({
           </button>
           <button
             className="secondary-button"
-            disabled={saving || locked || !entries.length}
+            disabled={saving || readOnly || !entries.length}
             type="button"
             onClick={handleSave}
           >
@@ -423,13 +498,38 @@ export default function PayrollPage({
           </button>
           <button
             className="primary-button"
-            disabled={saving || locked || !entries.length}
+            disabled={saving || readOnly || !entries.length}
             type="button"
             onClick={handleLock}
           >
             <LockKeyhole size={17} />
             {saving ? 'Finalizing...' : 'Finalize payroll'}
           </button>
+          {currentRun.id && currentRun.status === 'draft' ? (
+            <button
+              className="ghost-button danger-action"
+              disabled={saving}
+              onClick={() => setConfirmAction('delete-draft')}
+              type="button"
+            >
+              <Trash2 size={17} />
+              Delete draft
+            </button>
+          ) : null}
+          {currentRun.id && finalized ? (
+            <button
+              className="secondary-button"
+              disabled={saving}
+              onClick={() => {
+                setCorrectionReason('');
+                setConfirmAction('correct-run');
+              }}
+              type="button"
+            >
+              <FilePenLine size={17} />
+              Correct this run
+            </button>
+          ) : null}
           {currentRun.id ? (
             <>
               <button
@@ -470,7 +570,15 @@ export default function PayrollPage({
                 <strong>{run.week_label}</strong>
                 <span>{formatDate(run.created_at)}</span>
               </div>
-              <StatusBadge tone={run.status === 'locked' ? 'success' : 'warning'}>
+              <StatusBadge
+                tone={
+                  run.status === 'voided'
+                    ? 'danger'
+                    : run.status === 'draft'
+                      ? 'warning'
+                      : 'success'
+                }
+              >
                 {run.status}
               </StatusBadge>
               <b>{formatCurrency(run.total_net_sales)}</b>
@@ -490,6 +598,44 @@ export default function PayrollPage({
           ) : null}
         </div>
       </aside>
+
+      {confirmAction === 'delete-draft' ? (
+        <ConfirmDialog
+          busy={saving}
+          confirmLabel="Delete draft"
+          description={`Delete the draft for ${currentRun.week_label}? Its payroll entries will also be removed.`}
+          onClose={() => setConfirmAction('')}
+          onConfirm={handleDeleteDraft}
+          title="Delete payroll draft"
+        >
+          {error ? <div className="alert danger">{error}</div> : null}
+        </ConfirmDialog>
+      ) : null}
+
+      {confirmAction === 'correct-run' ? (
+        <ConfirmDialog
+          busy={saving}
+          confirmDisabled={correctionReason.trim().length < 5}
+          confirmLabel="Void and create correction"
+          description="The finalized run will remain in history as voided. Its performance data will be removed and a replacement draft will open with the same amounts."
+          onClose={() => setConfirmAction('')}
+          onConfirm={handleCorrectRun}
+          title="Correct finalized payroll"
+          tone="warning"
+        >
+          <label className="field">
+            <span>Reason for correction</span>
+            <textarea
+              autoFocus
+              onChange={(event) => setCorrectionReason(event.target.value)}
+              placeholder="Example: Entered the wrong sales amount for one staff member"
+              rows="3"
+              value={correctionReason}
+            />
+          </label>
+          {error ? <div className="alert danger">{error}</div> : null}
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 }

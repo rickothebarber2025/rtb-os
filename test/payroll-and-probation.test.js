@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateEntryValues, calculateRunTotals } from '../src/utils/payroll.js';
+import {
+  calculateEntryValues,
+  calculateRunTotals,
+  createCorrectionDraft,
+} from '../src/utils/payroll.js';
 import { buildOperationalChecks, daysSince } from '../src/utils/operations.js';
 import {
   getProbationInfo,
@@ -96,4 +100,35 @@ test('operational checks flag stale payroll and disconnected Square', () => {
   assert.equal(daysSince('2026-06-07', now), 12);
   assert.equal(checks.find((check) => check.label === 'Payroll').tone, 'warning');
   assert.equal(checks.find((check) => check.label === 'Square Appointments').tone, 'danger');
+});
+
+test('payroll correction keeps values but removes saved record identifiers', () => {
+  const correction = createCorrectionDraft(
+    {
+      id: 'run-1',
+      notes: 'Original note',
+      performance_saved_at: '2026-06-01T00:00:00Z',
+      status: 'locked',
+      week_label: 'Jun 1 - Jun 7',
+    },
+    [
+      {
+        id: 'entry-1',
+        net_sales: 750,
+        payroll_run_id: 'run-1',
+        paystub_status: 'sent',
+        staff_id: 'staff-1',
+      },
+    ],
+    'Wrong sales amount',
+  );
+
+  assert.equal(correction.run.id, undefined);
+  assert.equal(correction.run.corrected_from_run_id, 'run-1');
+  assert.equal(correction.run.status, 'draft');
+  assert.match(correction.run.notes, /Wrong sales amount/);
+  assert.equal(correction.entries[0].id, undefined);
+  assert.equal(correction.entries[0].payroll_run_id, undefined);
+  assert.equal(correction.entries[0].net_sales, 750);
+  assert.equal(correction.entries[0].paystub_status, 'pending');
 });

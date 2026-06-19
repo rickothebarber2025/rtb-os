@@ -423,6 +423,7 @@ select {
 .primary-button,
 .secondary-button,
 .ghost-button,
+.danger-button,
 .icon-button {
   align-items: center;
   border-radius: var(--radius);
@@ -460,9 +461,17 @@ select {
   padding: 0 0.9rem;
 }
 
+.danger-button {
+  background: var(--red);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #190a09;
+  padding: 0 1rem;
+}
+
 .ghost-button.small,
 .secondary-button.small,
-.primary-button.small {
+.primary-button.small,
+.danger-button.small {
   font-size: 0.78rem;
   min-height: 32px;
   padding: 0 0.62rem;
@@ -487,6 +496,11 @@ select {
   color: var(--red);
 }
 
+.danger-action {
+  border-color: rgba(255, 113, 109, 0.25);
+  color: var(--red);
+}
+
 .success-action {
   border-color: rgba(85, 214, 146, 0.3);
   color: var(--green);
@@ -495,6 +509,7 @@ select {
 .primary-button:hover,
 .secondary-button:hover,
 .ghost-button:hover,
+.danger-button:hover,
 .icon-button:hover {
   border-color: rgba(214, 168, 79, 0.42);
   transform: translateY(-1px);
@@ -1691,6 +1706,48 @@ select {
 }
 
 .modal-header h2 {
+  margin: 0;
+}
+
+.modal-description {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.confirm-dialog {
+  display: grid;
+  gap: 1rem;
+}
+
+.confirm-dialog__message {
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.85rem;
+}
+
+.confirm-dialog__message.danger {
+  background: var(--red-soft);
+  border-color: rgba(255, 113, 109, 0.22);
+  color: #ffb7b4;
+}
+
+.confirm-dialog__message.warning {
+  background: rgba(241, 199, 104, 0.12);
+  border-color: rgba(241, 199, 104, 0.24);
+  color: var(--gold-strong);
+}
+
+.confirm-dialog__message svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.confirm-dialog__message p {
+  line-height: 1.5;
   margin: 0;
 }
 
