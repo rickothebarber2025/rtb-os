@@ -35,3 +35,11 @@ export function formatDate(value) {
     year: 'numeric',
   }).format(new Date(value));
 }
+
+export function formatDateTime(value) {
+  if (!value) return 'Not set';
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}

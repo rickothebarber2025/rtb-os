@@ -5,7 +5,6 @@ import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import ProbationProgressCard from '../components/ProbationProgressCard';
 import StatusBadge from '../components/StatusBadge';
-import { downloadStaffOfMonthCertificate } from '../utils/certificates';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -63,6 +62,7 @@ export default function PerformancePage({
     setCertificateLoading(true);
 
     try {
+      const { downloadStaffOfMonthCertificate } = await import('../utils/certificates');
       await downloadStaffOfMonthCertificate({
         businessUnit,
         generatedAt: new Date(`${selectedMonth}T12:00:00`),
@@ -158,7 +158,7 @@ export default function PerformancePage({
           </div>
         ) : (
           <p className="subtle-text">
-            Save performance from a locked payroll run before generating a monthly certificate.
+            Finalize payroll to add performance data before generating a monthly certificate.
           </p>
         )}
         {certificateError ? <div className="alert danger">{certificateError}</div> : null}

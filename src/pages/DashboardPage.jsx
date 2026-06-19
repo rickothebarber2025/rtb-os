@@ -1,8 +1,11 @@
 import {
+  AlertCircle,
   AlertTriangle,
   BadgeDollarSign,
   CalendarDays,
+  CheckCircle2,
   CircleDollarSign,
+  Clock3,
   ReceiptText,
   TrendingUp,
   Users,
@@ -19,15 +22,25 @@ import {
   formatNumber,
   formatPercent,
 } from '../utils/formatters';
+import { buildOperationalChecks } from '../utils/operations';
+
+const OPERATION_ICONS = {
+  danger: AlertCircle,
+  muted: Clock3,
+  success: CheckCircle2,
+  warning: AlertTriangle,
+};
 
 export default function DashboardPage({
   accessProfile,
   boothRent,
   businessUnit,
   masterDashboard,
+  masterDashboardUpdatedAt,
   payrollRuns,
   performanceSummary,
   setActivePage,
+  squareStatus,
   staff,
 }) {
   const payrollAllowed = canUsePayroll(accessProfile);
@@ -51,6 +64,15 @@ export default function DashboardPage({
   const booksySummary = businessUnit?.name === 'RTB Lounge' ? masterDashboard?.summary : null;
   const squareSummary = isBeautyLounge ? masterDashboard?.summary : null;
   const appointmentSummary = booksySummary || squareSummary;
+  const operationalChecks = buildOperationalChecks({
+    activeStaffCount: activeStaff.length,
+    appointmentUpdatedAt: masterDashboardUpdatedAt || masterDashboard?.updatedAt,
+    boothRentCount: boothRent.length,
+    businessUnitName: businessUnit?.name,
+    latestRun,
+    payrollAllowed,
+    squareStatus,
+  });
 
   return (
     <div className="page-grid">
@@ -104,6 +126,34 @@ export default function DashboardPage({
           trend={`${performanceSummary.length} staff profiles`}
           value={formatCompactCurrency(performanceTotal)}
         />
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div>
+            <span>Operations</span>
+            <h2>Readiness checks</h2>
+          </div>
+        </div>
+        <div className="operations-grid">
+          {operationalChecks.map((check) => {
+            const Icon = OPERATION_ICONS[check.tone] || Clock3;
+            return (
+              <button
+                className={`operation-check ${check.tone}`}
+                key={check.label}
+                onClick={() => setActivePage(check.action)}
+                type="button"
+              >
+                <Icon size={18} />
+                <span>
+                  <strong>{check.label}</strong>
+                  <small>{check.detail}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       {booksySummary ? (

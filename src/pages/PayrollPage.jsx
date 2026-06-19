@@ -6,7 +6,6 @@ import {
   LockKeyhole,
   ReceiptText,
   Save,
-  SendToBack,
   Sparkles,
 } from 'lucide-react';
 import DataTable from '../components/DataTable';
@@ -15,7 +14,6 @@ import StatusBadge from '../components/StatusBadge';
 import {
   lockPayrollRun,
   savePayrollDraft,
-  savePerformanceFromRun,
 } from '../services/rtbService';
 import { getDefaultPayrollWeek } from '../utils/dates';
 import { formatCurrency, formatDate, formatPercent } from '../utils/formatters';
@@ -25,11 +23,6 @@ import {
   recalculateEntry,
   toMoneyNumber,
 } from '../utils/payroll';
-import {
-  downloadPayrollRunCsv,
-  downloadPayrollRunPdf,
-  downloadPaystubPdf,
-} from '../utils/payrollDocuments';
 
 function createInitialRun(businessUnitId) {
   const week = getDefaultPayrollWeek();
@@ -123,20 +116,25 @@ export default function PayrollPage({
       notes: run.notes || '',
       owner_net_sales: Number(run.owner_net_sales || 0),
       owner_tips: Number(run.owner_tips || 0),
+      performance_saved_at: run.performance_saved_at || null,
       status: run.status,
       week_end: run.week_end || '',
       week_label: run.week_label,
       week_start: run.week_start || '',
     });
-    setEntries(
-      (run.payroll_entries || []).map((entry) =>
-        recalculateEntry({
-          ...entry,
-          net_sales: Number(entry.net_sales || 0),
-          tips: Number(entry.tips || 0),
-        }),
-      ),
-    );
+    setEntries((run.payroll_entries || []).map((entry) => {
+      const normalized = {
+        ...entry,
+        applied_commission_rate: Number(entry.applied_commission_rate || 0),
+        base_commission_rate: Number(entry.base_commission_rate || 0),
+        deduction: Number(entry.deduction || 0),
+        net_sales: Number(entry.net_sales || 0),
+        take_home: Number(entry.take_home || 0),
+        tips: Number(entry.tips || 0),
+      };
+
+      return run.status === 'locked' ? normalized : recalculateEntry(normalized);
+    }));
     setError('');
     setNotice(`Loaded ${run.week_label}.`);
   }
@@ -184,30 +182,18 @@ export default function PayrollPage({
     setNotice('');
 
     try {
-      const saved = currentRun.id ? await persistDraft('draft') : await persistDraft('draft');
+      const saved = await persistDraft('draft');
       await lockPayrollRun(saved.id);
-      setCurrentRun((run) => ({ ...run, id: saved.id, status: 'locked' }));
+      setCurrentRun((run) => ({
+        ...run,
+        id: saved.id,
+        performance_saved_at: new Date().toISOString(),
+        status: 'locked',
+      }));
       await onRefresh();
-      setNotice('Payroll run locked.');
+      setNotice('Payroll finalized and performance history saved.');
     } catch (err) {
-      setError(err.message || 'Unable to lock payroll run.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleSavePerformance() {
-    if (!currentRun.id) return;
-    setSaving(true);
-    setError('');
-    setNotice('');
-
-    try {
-      await savePerformanceFromRun(currentRun.id);
-      await onRefresh();
-      setNotice('Performance saved from locked payroll.');
-    } catch (err) {
-      setError(err.message || 'Unable to save performance.');
+      setError(err.message || 'Unable to finalize payroll run.');
     } finally {
       setSaving(false);
     }
@@ -219,12 +205,13 @@ export default function PayrollPage({
     setError('');
 
     try {
+      const documents = await import('../utils/payrollDocuments');
       if (kind === 'csv') {
-        downloadPayrollRunCsv(documentRun, businessUnit);
+        documents.downloadPayrollRunCsv(documentRun, businessUnit);
       } else if (kind === 'paystub') {
-        await downloadPaystubPdf(documentRun, entry, businessUnit);
+        await documents.downloadPaystubPdf(documentRun, entry, businessUnit);
       } else {
-        await downloadPayrollRunPdf(documentRun, businessUnit);
+        await documents.downloadPayrollRunPdf(documentRun, businessUnit);
       }
     } catch (err) {
       setError(err.message || 'Unable to generate payroll document.');
@@ -435,22 +422,13 @@ export default function PayrollPage({
             Save draft
           </button>
           <button
-            className="secondary-button"
+            className="primary-button"
             disabled={saving || locked || !entries.length}
             type="button"
             onClick={handleLock}
           >
             <LockKeyhole size={17} />
-            Lock run
-          </button>
-          <button
-            className="primary-button"
-            disabled={saving || !currentRun.id || !locked}
-            type="button"
-            onClick={handleSavePerformance}
-          >
-            <SendToBack size={17} />
-            Save performance
+            {saving ? 'Finalizing...' : 'Finalize payroll'}
           </button>
           {currentRun.id ? (
             <>
@@ -496,6 +474,11 @@ export default function PayrollPage({
                 {run.status}
               </StatusBadge>
               <b>{formatCurrency(run.total_net_sales)}</b>
+              {run.status === 'locked' ? (
+                <small className={run.performance_saved_at ? 'success-text' : 'danger-text'}>
+                  {run.performance_saved_at ? 'Performance saved' : 'Performance missing'}
+                </small>
+              ) : null}
             </button>
           ))}
           {!payrollRuns.length ? (

@@ -11,14 +11,15 @@ import {
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
+import StatusBadge from '../components/StatusBadge';
 import { saveAppSetting, startSquareConnection, syncSquareAppointments } from '../services/rtbService';
 import { parseBooksyReport } from '../utils/booksyReport';
 import {
   formatCompactCurrency,
   formatCurrency,
+  formatDateTime,
   formatNumber,
 } from '../utils/formatters';
-import { extractPdfText } from '../utils/pdfText';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -36,6 +37,7 @@ function isPdfFile(file) {
 
 async function readBooksyImportFile(file) {
   if (isPdfFile(file)) {
+    const { extractPdfText } = await import('../utils/pdfText');
     return extractPdfText(file);
   }
 
@@ -610,7 +612,13 @@ function ScheduleTab({ data }) {
   );
 }
 
-export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRefresh }) {
+export default function BooksyInsightsPage({
+  businessUnit,
+  masterDashboard,
+  masterDashboardUpdatedAt,
+  onRefresh,
+  squareStatus,
+}) {
   const [activeTab, setActiveTab] = useState('overview');
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
@@ -618,6 +626,7 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
   const booksyInputRef = useRef(null);
   const source = getAppointmentSource(businessUnit);
   const hasData = Boolean(masterDashboard);
+  const squareConnected = Boolean(squareStatus?.connected);
 
   async function handleSquareConnect() {
     setActionError('');
@@ -717,11 +726,15 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
             type="button"
             onClick={handleSquareConnect}
           >
-            {actionLoading === 'connect' ? 'Opening Square...' : 'Connect Square'}
+            {actionLoading === 'connect'
+              ? 'Opening Square...'
+              : squareConnected
+                ? 'Reconnect Square'
+                : 'Connect Square'}
           </button>
           <button
             className="secondary-button"
-            disabled={Boolean(actionLoading)}
+            disabled={Boolean(actionLoading) || squareStatus?.connected === false}
             type="button"
             onClick={handleSquareSync}
           >
@@ -758,6 +771,24 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
         </section>
 
         <section className="panel full-span">
+          {source.name === 'Square Appointments' ? (
+            <div className="integration-status">
+              <div>
+                <StatusBadge tone={squareConnected ? 'success' : 'danger'}>
+                  {squareConnected ? 'Connected' : 'Not connected'}
+                </StatusBadge>
+                <span>
+                  {squareStatus?.sync?.nextSyncAt
+                    ? `Next sync available ${formatDateTime(squareStatus.sync.nextSyncAt)}`
+                    : 'Manual sync only'}
+                </span>
+              </div>
+              <small>
+                Limit: {squareStatus?.limits?.dailyLimit || 4} syncs/day, up to{' '}
+                {formatNumber(squareStatus?.limits?.maxBookings || 500)} bookings per sync
+              </small>
+            </div>
+          ) : null}
           <EmptyState
             icon={CalendarDays}
             title={source.emptyTitle}
@@ -793,6 +824,11 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
               <span>Booksy import</span>
               <h2>Upload a weekly or monthly report</h2>
             </div>
+            <StatusBadge tone="warning">
+              {masterDashboardUpdatedAt
+                ? `Updated ${formatDateTime(masterDashboardUpdatedAt)}`
+                : 'Update needed'}
+            </StatusBadge>
           </div>
           {booksyActions}
         </section>
@@ -805,6 +841,18 @@ export default function BooksyInsightsPage({ businessUnit, masterDashboard, onRe
               <span>Square Appointments</span>
               <h2>Sync data or open Square</h2>
             </div>
+            <StatusBadge tone={squareConnected ? 'success' : 'danger'}>
+              {squareConnected ? 'Connected' : 'Not connected'}
+            </StatusBadge>
+          </div>
+          <div className="integration-status">
+            <span>
+              Last data update: {formatDateTime(masterDashboardUpdatedAt || masterDashboard.updatedAt)}
+            </span>
+            <small>
+              Usage cap: {squareStatus?.limits?.dailyLimit || 4} syncs/day ·{' '}
+              {formatNumber(squareStatus?.limits?.maxBookings || 500)} bookings max
+            </small>
           </div>
           {squareActions}
         </section>

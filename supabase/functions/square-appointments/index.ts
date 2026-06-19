@@ -22,6 +22,15 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
 };
 
+class RequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -126,6 +135,46 @@ async function getBusinessUnit(admin: ReturnType<typeof createClient>, businessU
   const { data, error } = await query.single();
   if (error) throw error;
   return data;
+}
+
+async function authorizeRequest(
+  req: Request,
+  admin: ReturnType<typeof createClient>,
+  businessUnitId: string,
+) {
+  const authorization = req.headers.get("Authorization") || "";
+  const token = authorization.replace(/^Bearer\s+/i, "");
+
+  if (!token) {
+    throw new RequestError("Sign in to manage Square Appointments.", 401);
+  }
+
+  const { data: authData, error: authError } = await admin.auth.getUser(token);
+  if (authError || !authData.user) {
+    throw new RequestError("Your session is invalid or expired.", 401);
+  }
+
+  const { data: profile, error: profileError } = await admin
+    .from("user_profiles")
+    .select("active,business_unit_id,role")
+    .eq("id", authData.user.id)
+    .maybeSingle();
+
+  if (profileError) throw profileError;
+
+  const canManage =
+    profile?.active === true &&
+    (
+      profile.role === "admin" ||
+      (
+        profile.role === "manager" &&
+        (!profile.business_unit_id || profile.business_unit_id === businessUnitId)
+      )
+    );
+
+  if (!canManage) {
+    throw new RequestError("Admin or assigned manager access is required.", 403);
+  }
 }
 
 async function fetchSquare(path: string, accessToken: string, init: RequestInit = {}) {
@@ -581,6 +630,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = body.action || "status";
     const businessUnit = await getBusinessUnit(admin, body.businessUnitId);
+    await authorizeRequest(req, admin, businessUnit.id);
 
     if (businessUnit.name !== "RTB Beauty Lounge") {
       return jsonResponse({ error: "Square Appointments is only configured for RTB Beauty Lounge." }, 400);
@@ -625,6 +675,8 @@ Deno.serve(async (req) => {
 
       if (error) throw error;
       const directConnection = getDirectSquareConnection();
+      const budget = await getSyncBudget(admin);
+      const daily = budget.usage?.daily || {};
       return jsonResponse({
         connected: Boolean(data || directConnection),
         connection: data || (directConnection
@@ -636,6 +688,11 @@ Deno.serve(async (req) => {
           }
           : null),
         limits: getSyncLimits(),
+        sync: {
+          allowed: budget.allowed,
+          dailyCount: Number(daily.count || 0),
+          nextSyncAt: budget.nextSyncAt,
+        },
       });
     }
 
@@ -698,6 +755,7 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ error: "Unknown action." }, 400);
   } catch (err) {
-    return jsonResponse({ error: err.message || "Square request failed." }, 400);
+    const status = err instanceof RequestError ? err.status : 400;
+    return jsonResponse({ error: err.message || "Square request failed." }, status);
   }
 });

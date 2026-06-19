@@ -393,15 +393,20 @@ export async function getBoothRent(businessUnitId) {
 }
 
 export async function getAppSetting(key) {
+  const record = await getAppSettingRecord(key);
+  return record?.value || null;
+}
+
+export async function getAppSettingRecord(key) {
   const client = requireClient();
   const { data, error } = await client
     .from('app_settings')
-    .select('value')
+    .select('key, updated_at, value')
     .eq('key', key)
     .maybeSingle();
 
   if (error) throw error;
-  return data?.value || null;
+  return data || null;
 }
 
 export async function saveAppSetting(key, value) {
@@ -419,6 +424,13 @@ export async function saveAppSetting(key, value) {
 export async function startSquareConnection(businessUnitId) {
   return invokeFunction('square-appointments', {
     action: 'start',
+    businessUnitId,
+  });
+}
+
+export async function getSquareStatus(businessUnitId) {
+  return invokeFunction('square-appointments', {
+    action: 'status',
     businessUnitId,
   });
 }

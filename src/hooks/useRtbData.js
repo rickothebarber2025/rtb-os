@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  getAppSetting,
+  getAppSettingRecord,
   getBoothRent,
   getBusinessUnits,
   getMonthlyPerformanceSummary,
   getPayrollRuns,
   getPerformanceSummary,
+  getSquareStatus,
   getStaff,
 } from '../services/rtbService';
 import { canUsePayroll } from '../utils/access';
@@ -14,10 +15,23 @@ const EMPTY_STATE = {
   boothRent: [],
   businessUnits: [],
   masterDashboard: null,
+  masterDashboardUpdatedAt: null,
   monthlyPerformanceSummary: [],
   payrollRuns: [],
   performanceSummary: [],
+  squareStatus: null,
   staff: [],
+  warnings: [],
+};
+
+const LOAD_LABELS = {
+  boothRent: 'Booth rent records',
+  masterDashboardRecord: 'Appointment data',
+  monthlyPerformanceSummary: 'Monthly performance',
+  payrollRuns: 'Payroll history',
+  performanceSummary: 'Performance summary',
+  squareStatus: 'Square connection status',
+  staff: 'Staff roster',
 };
 
 export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile = null) {
@@ -55,33 +69,49 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
       }
 
       const shouldLoadPayroll = canUsePayroll(accessProfile);
-      const [
-        staff,
-        payrollRuns,
-        boothRent,
-        performanceSummary,
-        monthlyPerformanceSummary,
-        masterDashboard,
-      ] =
-        await Promise.all([
-          getStaff(activeUnit.id, true),
-          shouldLoadPayroll ? getPayrollRuns(activeUnit.id) : Promise.resolve([]),
-          getBoothRent(activeUnit.id),
-          getPerformanceSummary(activeUnit.name),
-          getMonthlyPerformanceSummary(activeUnit.id),
-          activeUnit.name === 'RTB Lounge'
-            ? getAppSetting('rtb_master_dashboard')
-            : getAppSetting('rtb_beauty_square_appointments'),
-        ]);
+      const isBeautyLounge = activeUnit.name === 'RTB Beauty Lounge';
+      const requests = {
+        boothRent: getBoothRent(activeUnit.id),
+        masterDashboardRecord: getAppSettingRecord(
+          isBeautyLounge ? 'rtb_beauty_square_appointments' : 'rtb_master_dashboard',
+        ),
+        monthlyPerformanceSummary: getMonthlyPerformanceSummary(activeUnit.id),
+        payrollRuns: shouldLoadPayroll ? getPayrollRuns(activeUnit.id) : Promise.resolve([]),
+        performanceSummary: getPerformanceSummary(activeUnit.name),
+        squareStatus: isBeautyLounge
+          ? getSquareStatus(activeUnit.id)
+          : Promise.resolve(null),
+        staff: getStaff(activeUnit.id, true),
+      };
+      const entries = Object.entries(requests);
+      const results = await Promise.allSettled(entries.map(([, request]) => request));
+      const loaded = {};
+      const warnings = [];
+
+      results.forEach((result, index) => {
+        const [key] = entries[index];
+        if (result.status === 'fulfilled') {
+          loaded[key] = result.value;
+          return;
+        }
+
+        loaded[key] = key === 'masterDashboardRecord' || key === 'squareStatus' ? null : [];
+        warnings.push(
+          `${LOAD_LABELS[key]} could not load: ${result.reason?.message || 'Unknown error'}`,
+        );
+      });
 
       setData({
-        boothRent,
+        boothRent: loaded.boothRent,
         businessUnits,
-        masterDashboard,
-        monthlyPerformanceSummary,
-        payrollRuns,
-        performanceSummary,
-        staff,
+        masterDashboard: loaded.masterDashboardRecord?.value || null,
+        masterDashboardUpdatedAt: loaded.masterDashboardRecord?.updated_at || null,
+        monthlyPerformanceSummary: loaded.monthlyPerformanceSummary,
+        payrollRuns: loaded.payrollRuns,
+        performanceSummary: loaded.performanceSummary,
+        squareStatus: loaded.squareStatus,
+        staff: loaded.staff,
+        warnings,
       });
     } catch (err) {
       setError(err.message || 'Unable to load RTB OS data.');

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { calculateEntryValues, calculateRunTotals } from '../src/utils/payroll.js';
+import { buildOperationalChecks, daysSince } from '../src/utils/operations.js';
 import {
   getProbationInfo,
   toGraduationPayload,
@@ -77,4 +78,22 @@ test('probation uses its own start date and preserves employment start', () => {
   assert.equal(graduated.tier, 'standard');
   assert.equal(graduated.commission_rate, 60);
   assert.match(graduated.notes, /Graduated from probation on 2026-07-01/);
+});
+
+test('operational checks flag stale payroll and disconnected Square', () => {
+  const now = new Date('2026-06-19T12:00:00Z');
+  const checks = buildOperationalChecks({
+    activeStaffCount: 4,
+    appointmentUpdatedAt: null,
+    boothRentCount: 0,
+    businessUnitName: 'RTB Beauty Lounge',
+    latestRun: { week_end: '2026-06-07', week_label: 'Jun 1 - Jun 7' },
+    payrollAllowed: true,
+    squareStatus: { connected: false },
+    now,
+  });
+
+  assert.equal(daysSince('2026-06-07', now), 12);
+  assert.equal(checks.find((check) => check.label === 'Payroll').tone, 'warning');
+  assert.equal(checks.find((check) => check.label === 'Square Appointments').tone, 'danger');
 });

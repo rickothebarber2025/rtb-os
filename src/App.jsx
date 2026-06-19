@@ -74,18 +74,20 @@ export default function App() {
     }
 
     graduateDueProbationStaff();
-  }, [activePage, auth.profile, data]);
+  }, [activePage, auth.profile, data.loading, data.refresh, data.staff]);
 
   const pageProps = useMemo(
     () => ({
       boothRent: data.boothRent,
       businessUnit: data.selectedBusinessUnit,
       masterDashboard: data.masterDashboard,
+      masterDashboardUpdatedAt: data.masterDashboardUpdatedAt,
       onRefresh: data.refresh,
       payrollRuns: data.payrollRuns,
       monthlyPerformanceSummary: data.monthlyPerformanceSummary,
       performanceSummary: data.performanceSummary,
       setActivePage,
+      squareStatus: data.squareStatus,
       staff: data.staff,
       accessProfile: auth.profile,
       user: auth.user,
@@ -175,6 +177,15 @@ export default function App() {
       user={auth.user}
     >
       {probationBanner ? <div className="alert success global-alert">{probationBanner}</div> : null}
+      {data.warnings.length ? (
+        <div className="alert warning global-alert">
+          <strong>Some live data could not load.</strong>
+          <span>{data.warnings.join(' ')}</span>
+          <button className="ghost-button small" type="button" onClick={data.refresh}>
+            Retry
+          </button>
+        </div>
+      ) : null}
       {renderPage()}
     </AppShell>
   );
