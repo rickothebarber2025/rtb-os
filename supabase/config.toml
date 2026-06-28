@@ -1,0 +1,4 @@
+project_id = "qbeficojfoqgzjxrzxyg"
+
+[functions.google-sheets-payroll-sync]
+verify_jwt = false
