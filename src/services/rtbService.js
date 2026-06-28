@@ -393,15 +393,15 @@ export async function savePerformanceFromRun(runId) {
   if (result.error) throw result.error;
 }
 
-export async function getPerformanceSummary(businessUnitName) {
+export async function getPerformanceSummary(businessUnitId) {
   const client = requireClient();
   let query = client
     .from('staff_performance_summary')
     .select('*')
     .order('total_net_sales', { ascending: false });
 
-  if (businessUnitName) {
-    query = query.eq('business_unit', businessUnitName);
+  if (businessUnitId) {
+    query = query.eq('business_unit_id', businessUnitId);
   }
 
   return requireData(await query);
@@ -409,14 +409,17 @@ export async function getPerformanceSummary(businessUnitName) {
 
 export async function getMonthlyPerformanceSummary(businessUnitId) {
   const client = requireClient();
-  return requireData(
-    await client
-      .from('staff_monthly_performance_summary')
-      .select('*')
-      .eq('business_unit_id', businessUnitId)
-      .order('month_start', { ascending: false })
-      .order('total_net_sales', { ascending: false }),
-  );
+  let query = client
+    .from('staff_monthly_performance_summary')
+    .select('*')
+    .order('month_start', { ascending: false })
+    .order('total_net_sales', { ascending: false });
+
+  if (businessUnitId) {
+    query = query.eq('business_unit_id', businessUnitId);
+  }
+
+  return requireData(await query);
 }
 
 export async function getBoothRent(businessUnitId) {

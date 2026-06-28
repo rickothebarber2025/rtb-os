@@ -3,6 +3,7 @@ import BusinessUnitSelector from './BusinessUnitSelector';
 import { getRoleLabel } from '../utils/access';
 
 export default function Topbar({
+  businessOptions,
   businessUnits,
   onMenuClick,
   onRefresh,
@@ -27,6 +28,7 @@ export default function Topbar({
 
       <div className="topbar__actions">
         <BusinessUnitSelector
+          businessOptions={businessOptions}
           businessUnits={businessUnits}
           selectedBusinessUnitId={selectedBusinessUnitId}
           setSelectedBusinessUnitId={setSelectedBusinessUnitId}

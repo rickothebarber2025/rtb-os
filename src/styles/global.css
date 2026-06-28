@@ -613,6 +613,19 @@ select {
   color: var(--muted);
 }
 
+.business-chip-list {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.checkbox-grid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .business-selector {
   align-items: center;
   background: var(--panel);
@@ -2597,6 +2610,10 @@ select {
   .business-selector {
     flex: 1 1 220px;
     min-width: 0;
+  }
+
+  .checkbox-grid {
+    grid-template-columns: 1fr;
   }
 
   .content {

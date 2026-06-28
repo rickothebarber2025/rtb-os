@@ -17,6 +17,7 @@ import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import { buildActionCenterItems, getActionCenterSummary, getPriorityIcon } from '../utils/actionCenter';
 import { canUsePayroll } from '../utils/access';
+import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -47,6 +48,9 @@ export default function DashboardPage({
   staff,
 }) {
   const payrollAllowed = canUsePayroll(accessProfile);
+  const allBusinessesView = isAllBusinessesUnit(businessUnit);
+  const canStartPayroll = payrollAllowed && !allBusinessesView;
+  const businessProfile = getBusinessProfile(businessUnit);
   const activeStaff = staff.filter((member) => member.active);
   const fixedRateStaff = activeStaff.filter((member) => member.fixed_rate);
   const autoAdjustEligible = activeStaff.filter(
@@ -81,7 +85,7 @@ export default function DashboardPage({
   const actionItems = buildActionCenterItems({
     accessProfile,
     actionCenter,
-    businessUnitId: businessUnit?.id,
+    businessUnitId: allBusinessesView ? null : businessUnit?.id,
     boothRent,
     payrollRuns,
     staff,
@@ -95,11 +99,12 @@ export default function DashboardPage({
         <div>
           <h2>{businessUnit?.name || 'RTB'} operations snapshot</h2>
           <p>
-            Live roster, performance, booth rent, and appointment activity for the selected
-            business.
+            {allBusinessesView
+              ? 'Combined owner view across RTB Lounge and RTB Beauty Lounge.'
+              : `Live roster, payroll, performance, booth rent, and ${businessProfile.booking_platform} activity for this business.`}
           </p>
         </div>
-        {payrollAllowed ? (
+        {canStartPayroll ? (
           <button className="primary-button" type="button" onClick={() => setActivePage('payroll')}>
             New payroll run
           </button>
@@ -141,6 +146,33 @@ export default function DashboardPage({
           trend={`${performanceSummary.length} staff profiles`}
           value={formatCompactCurrency(performanceTotal)}
         />
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div>
+            <span>{businessProfile.business_type}</span>
+            <h2>Business setup</h2>
+          </div>
+        </div>
+        <div className="snapshot-grid">
+          <div>
+            <CalendarDays size={18} />
+            <span>Booking</span>
+            <strong>{businessProfile.booking_platform || 'Manual'}</strong>
+          </div>
+          <div>
+            <CircleDollarSign size={18} />
+            <span>POS</span>
+            <strong>{businessProfile.pos_platform || 'Square'}</strong>
+          </div>
+          <div>
+            <Users size={18} />
+            <span>Instagram</span>
+            <strong>{businessProfile.instagram_format || 'Manual'}</strong>
+          </div>
+        </div>
+        <p className="subtle-text">{businessProfile.import_source}</p>
       </section>
 
       <section className="panel full-span">
@@ -205,7 +237,7 @@ export default function DashboardPage({
         ) : (
           <div className="empty-state compact">
             <h3>No open actions</h3>
-            <p>Action Center is clear for this business.</p>
+            <p>Action Center is clear for this view.</p>
           </div>
         )}
         <div className="action-center-snapshot__footer">

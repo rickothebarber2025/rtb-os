@@ -21,6 +21,7 @@ import {
   savePayrollDraft,
 } from '../services/rtbService';
 import { getDefaultPayrollWeek } from '../utils/dates';
+import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import { formatCurrency, formatDate, formatPercent } from '../utils/formatters';
 import {
   calculateRunTotals,
@@ -49,6 +50,7 @@ export default function PayrollPage({
   staff,
   user,
 }) {
+  const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const activeStaff = useMemo(() => staff.filter((member) => member.active), [staff]);
   const [currentRun, setCurrentRun] = useState(() => createInitialRun(businessUnit?.id));
   const [confirmAction, setConfirmAction] = useState('');
@@ -61,6 +63,13 @@ export default function PayrollPage({
   const previousBusinessUnitId = useRef(null);
 
   useEffect(() => {
+    if (allBusinessesView) {
+      previousBusinessUnitId.current = businessUnit?.id || null;
+      setCurrentRun(createInitialRun(''));
+      setEntries([]);
+      return;
+    }
+
     if (!businessUnit?.id) return;
 
     const businessChanged = previousBusinessUnitId.current !== businessUnit.id;
@@ -74,7 +83,7 @@ export default function PayrollPage({
     if (!currentRun.id && entries.length === 0 && activeStaff.length) {
       setEntries(activeStaff.map(createDraftEntry));
     }
-  }, [activeStaff, businessUnit?.id, currentRun.id, entries.length]);
+  }, [activeStaff, allBusinessesView, businessUnit?.id, currentRun.id, entries.length]);
 
   const readOnly = currentRun.status !== 'draft';
   const finalized = ['locked', 'sent'].includes(currentRun.status);
@@ -95,6 +104,7 @@ export default function PayrollPage({
   );
 
   function resetDraft() {
+    if (allBusinessesView) return;
     setCurrentRun(createInitialRun(businessUnit?.id));
     setEntries(activeStaff.map(createDraftEntry));
     setError('');
@@ -152,6 +162,10 @@ export default function PayrollPage({
   }
 
   async function persistDraft(statusOverride = currentRun.status) {
+    if (allBusinessesView) {
+      throw new Error('Select one business before creating or saving payroll.');
+    }
+
     const runPayload = {
       ...currentRun,
       business_unit_id: businessUnit?.id,
@@ -209,6 +223,70 @@ export default function PayrollPage({
     } finally {
       setSaving(false);
     }
+  }
+
+  if (allBusinessesView) {
+    return (
+      <div className="page-grid">
+        <section className="panel full-span">
+          <div className="section-header">
+            <div>
+              <span>Payroll</span>
+              <h2>Combined payroll history</h2>
+            </div>
+            <StatusBadge tone="warning">Read only</StatusBadge>
+          </div>
+          <div className="alert warning">
+            <strong>Select one business to run payroll.</strong>
+            <span>
+              All Businesses mode intentionally combines history only. Drafts, corrections,
+              payouts, and exports stay inside RTB Lounge or RTB Beauty Lounge.
+            </span>
+          </div>
+
+          {payrollRuns.length ? (
+            <DataTable>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Business</th>
+                    <th>Week</th>
+                    <th>Status</th>
+                    <th>Net sales</th>
+                    <th>Staff payout</th>
+                    <th>RTB net</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payrollRuns.map((run) => (
+                    <tr key={run.id}>
+                      <td>{run.business_name || 'RTB'}</td>
+                      <td>{run.week_label}</td>
+                      <td>
+                        <StatusBadge tone={run.status === 'draft' ? 'warning' : 'success'}>
+                          {run.status}
+                        </StatusBadge>
+                      </td>
+                      <td>{formatCurrency(run.total_net_sales)}</td>
+                      <td>{formatCurrency(run.total_staff_payout)}</td>
+                      <td>{formatCurrency(run.rtb_net)}</td>
+                      <td>{formatDate(run.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTable>
+          ) : (
+            <EmptyState
+              icon={CheckCircle2}
+              title="No payroll history"
+              message="Saved runs from each business will appear here after they are created."
+            />
+          )}
+        </section>
+      </div>
+    );
   }
 
   async function handleDeleteDraft() {

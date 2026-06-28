@@ -34,6 +34,10 @@ import {
   formatNumber,
 } from '../utils/formatters';
 import {
+  getBusinessProfile,
+  isAllBusinessesUnit,
+} from '../utils/businessProfiles';
+import {
   BOOKSY_IMPORT_MAPPINGS_KEY,
   applyBooksyImportReview,
   createBooksyImportReview,
@@ -104,6 +108,19 @@ function InsightTabs({ activeTab, setActiveTab }) {
 }
 
 function getAppointmentSource(businessUnit) {
+  if (isAllBusinessesUnit(businessUnit)) {
+    return {
+      dataLabel: 'Combined reporting',
+      emptyMessage:
+        'Select RTB Lounge for Booksy imports or RTB Beauty Lounge for Square Appointments sync.',
+      emptyTitle: 'Choose one business to import appointments',
+      name: 'All Businesses',
+      unit: 'All Businesses',
+    };
+  }
+
+  const profile = getBusinessProfile(businessUnit);
+
   if (businessUnit?.name === 'RTB Beauty Lounge') {
     return {
       dataLabel: 'Square Appointments data',
@@ -117,9 +134,11 @@ function getAppointmentSource(businessUnit) {
 
   return {
     dataLabel: 'Booksy data',
-    emptyMessage: 'RTB Lounge uses Booksy. Import the Booksy master dashboard data to fill this page.',
+    emptyMessage:
+      'RTB Lounge uses Booksy for appointments and Square POS for revenue tracking. Import the Booksy master dashboard data to fill this page.',
     emptyTitle: 'No Booksy insights loaded',
     name: 'Booksy',
+    posName: profile.pos_platform,
     unit: 'RTB Lounge',
   };
 }
@@ -1035,6 +1054,8 @@ export default function BooksyInsightsPage({
   const [importWizard, setImportWizard] = useState(null);
   const booksyInputRef = useRef(null);
   const source = getAppointmentSource(businessUnit);
+  const businessProfile = getBusinessProfile(businessUnit);
+  const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const hasData = Boolean(masterDashboard);
   const canManage = canManageAppointments(accessProfile);
   const existingServices = uniqueOptions(getRows(masterDashboard?.services).map((service) => service.name || service.fullName));
@@ -1056,6 +1077,7 @@ export default function BooksyInsightsPage({
   const squareSyncLimited = squareStatus?.sync?.allowed === false;
 
   async function handleSquareConnect() {
+    if (allBusinessesView) return;
     setActionError('');
     setActionMessage('');
     setActionLoading('connect');
@@ -1070,6 +1092,7 @@ export default function BooksyInsightsPage({
   }
 
   async function handleSquareSync() {
+    if (allBusinessesView) return;
     setActionError('');
     setActionMessage('');
     setActionLoading('sync');
@@ -1090,7 +1113,7 @@ export default function BooksyInsightsPage({
 
   async function handleBooksyImport(event) {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || allBusinessesView) return;
 
     setActionError('');
     setActionMessage('');
@@ -1349,9 +1372,7 @@ export default function BooksyInsightsPage({
           <div>
             <span className="eyebrow">{source.dataLabel}</span>
             <h2>{businessUnit?.name || source.unit}</h2>
-            <p>
-              {source.name} is the appointment source for {businessUnit?.name || source.unit}.
-            </p>
+            <p>{businessProfile.import_source || source.emptyMessage}</p>
           </div>
           <div className="hero-meta">
             <strong>{source.name}</strong>
@@ -1394,7 +1415,7 @@ export default function BooksyInsightsPage({
               icon={CalendarDays}
               title={source.emptyTitle}
               message={source.emptyMessage}
-              action={squareActions || booksyActions}
+              action={allBusinessesView ? null : squareActions || booksyActions}
             />
           </section>
         )}
@@ -1409,8 +1430,8 @@ export default function BooksyInsightsPage({
           <span className="eyebrow">{source.dataLabel}</span>
           <h2>{masterDashboard.businessUnit || businessUnit?.name || 'RTB Lounge'}</h2>
           <p>
-            Revenue, clients, services, staff activity, and schedule data from the master
-            dashboard import.
+            Revenue, clients, services, staff activity, and schedule data from the selected
+            business import.
           </p>
         </div>
         <div className="hero-meta">

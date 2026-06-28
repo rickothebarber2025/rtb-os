@@ -75,6 +75,12 @@ function syncToRtbOs() {
     return;
   }
 
+  const validationError = validateExportRows_(rows);
+  if (validationError) {
+    ui.alert(validationError);
+    return;
+  }
+
   const payload = {
     rows,
     sheetName: RTB_OS_EXPORT_SHEET,
@@ -133,6 +139,30 @@ function getExportRows_(sheet, timeZone) {
 
       return record;
     });
+}
+
+function validateExportRows_(rows) {
+  const missingBusinessRows = [];
+  const missingRequiredRows = [];
+
+  rows.forEach((row, index) => {
+    const rowNumber = index + 2;
+    const hasBusiness = Boolean(row.business || row.business_unit || row.business_unit_id);
+    const hasRequiredFields = Boolean(row.week_start && row.week_end && row.staff_name);
+
+    if (!hasBusiness) missingBusinessRows.push(rowNumber);
+    if (!hasRequiredFields) missingRequiredRows.push(rowNumber);
+  });
+
+  if (missingBusinessRows.length) {
+    return `RTB OS sync stopped. Add a business, business_unit, or business_unit_id value on row(s): ${missingBusinessRows.join(', ')}. Use "RTB Lounge" or "RTB Beauty Lounge".`;
+  }
+
+  if (missingRequiredRows.length) {
+    return `RTB OS sync stopped. week_start, week_end, and staff_name are required on row(s): ${missingRequiredRows.join(', ')}.`;
+  }
+
+  return '';
 }
 
 function normalizeHeader_(value) {

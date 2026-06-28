@@ -11,6 +11,7 @@ import {
   formatNumber,
   formatPercent,
 } from '../utils/formatters';
+import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import { isProbationStaff } from '../utils/probation';
 
 function monthLabel(value) {
@@ -27,6 +28,7 @@ export default function PerformancePage({
   performanceSummary,
   staff,
 }) {
+  const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const [certificateError, setCertificateError] = useState('');
   const [certificateLoading, setCertificateLoading] = useState(false);
   const availableMonths = useMemo(
@@ -77,6 +79,18 @@ export default function PerformancePage({
 
   return (
     <div className="page-grid">
+      {allBusinessesView ? (
+        <section className="panel full-span">
+          <div className="alert warning">
+            <strong>Combined performance view</strong>
+            <span>
+              Staff rankings and Staff of the Month are combined only because All Businesses is
+              selected. Choose one business to calculate awards separately.
+            </span>
+          </div>
+        </section>
+      ) : null}
+
       <section className="metrics-grid full-span">
         <MetricCard
           icon={TrendingUp}

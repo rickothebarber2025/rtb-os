@@ -7,6 +7,11 @@ import { useAuth } from './hooks/useAuth';
 import { useRtbData } from './hooks/useRtbData';
 import { saveStaff } from './services/rtbService';
 import { canAccessPage, canManageStaff, canUseApp, getAllowedNavItems } from './utils/access';
+import {
+  getBusinessSelectionOptions,
+  isAllBusinessesId,
+  isAllBusinessesUnit,
+} from './utils/businessProfiles';
 import { shouldAutoGraduate, toGraduationPayload } from './utils/probation';
 
 const AccessPage = lazy(() => import('./pages/AccessPage'));
@@ -33,13 +38,17 @@ export default function App() {
   const appEnabled = auth.isConfigured && Boolean(auth.session) && canUseApp(auth.profile);
   const data = useRtbData(selectedBusinessUnitId, appEnabled, auth.profile);
   const navItems = useMemo(() => getAllowedNavItems(auth.profile), [auth.profile]);
+  const businessOptions = useMemo(
+    () => getBusinessSelectionOptions(data.businessUnits, auth.profile),
+    [auth.profile, data.businessUnits],
+  );
 
   useEffect(() => {
-    const selectedExists = data.businessUnits.some((unit) => unit.id === selectedBusinessUnitId);
+    const selectedExists = businessOptions.some((unit) => unit.id === selectedBusinessUnitId);
     if (data.businessUnits.length && (!selectedBusinessUnitId || !selectedExists)) {
       setSelectedBusinessUnitId(data.businessUnits[0].id);
     }
-  }, [data.businessUnits, selectedBusinessUnitId]);
+  }, [businessOptions, data.businessUnits, selectedBusinessUnitId]);
 
   useEffect(() => {
     if (selectedBusinessUnitId) {
@@ -86,6 +95,8 @@ export default function App() {
       boothRent: data.boothRent,
       businessUnit: data.selectedBusinessUnit,
       businessUnits: data.businessUnits,
+      businessOptions,
+      isAllBusinessesView: isAllBusinessesUnit(data.selectedBusinessUnit),
       masterDashboard: data.masterDashboard,
       masterDashboardUpdatedAt: data.masterDashboardUpdatedAt,
       onRefresh: data.refresh,
@@ -95,11 +106,12 @@ export default function App() {
       setActivePage,
       squareStatus: data.squareStatus,
       staff: data.staff,
+      staffBusinessMetadata: data.staffBusinessMetadata,
       accessProfile: auth.profile,
       user: auth.user,
       warnings: data.warnings,
     }),
-    [auth.profile, auth.user, data],
+    [auth.profile, auth.user, businessOptions, data],
   );
 
   function renderPage() {
@@ -180,6 +192,7 @@ export default function App() {
     <AppShell
       activePage={activePage}
       businessUnits={data.businessUnits}
+      businessOptions={businessOptions}
       navItems={navItems}
       onRefresh={data.refresh}
       profile={auth.profile}
@@ -189,6 +202,15 @@ export default function App() {
       signOut={auth.signOut}
       user={auth.user}
     >
+      {isAllBusinessesId(selectedBusinessUnitId) ? (
+        <div className="alert warning global-alert">
+          <strong>All Businesses view is on.</strong>
+          <span>
+            Reports and rankings are intentionally combined. Select one business before adding
+            staff, booth rent, imports, or payroll.
+          </span>
+        </div>
+      ) : null}
       {probationBanner ? <div className="alert success global-alert">{probationBanner}</div> : null}
       {data.warnings.length ? (
         <div className="alert warning global-alert">

@@ -11,6 +11,21 @@ import {
 } from '../services/rtbService';
 import { ACTION_CENTER_SETTING_KEY, normalizeActionCenterState } from '../utils/actionCenter';
 import { canUsePayroll } from '../utils/access';
+import {
+  ALL_BUSINESSES_UNIT,
+  BUSINESS_PROFILES_KEY,
+  canUseAllBusinesses,
+  getAppointmentSettingKey,
+  hydrateBusinessUnits,
+  isAllBusinessesId,
+  usesSquareAppointments,
+} from '../utils/businessProfiles';
+import {
+  STAFF_BUSINESS_METADATA_KEY,
+  enrichStaffWithBusinessMetadata,
+  normalizeStaffBusinessMetadata,
+  staffBelongsToBusiness,
+} from '../utils/staffBusiness';
 
 const EMPTY_STATE = {
   actionCenter: normalizeActionCenterState(null),
@@ -23,6 +38,7 @@ const EMPTY_STATE = {
   performanceSummary: [],
   squareStatus: null,
   staff: [],
+  staffBusinessMetadata: {},
   warnings: [],
 };
 
@@ -33,9 +49,29 @@ const LOAD_LABELS = {
   monthlyPerformanceSummary: 'Monthly performance',
   payrollRuns: 'Payroll history',
   performanceSummary: 'Performance summary',
+  staffBusinessMetadataRecord: 'Staff business profile settings',
   squareStatus: 'Square connection status',
   staff: 'Staff roster',
 };
+
+function uniqueById(rows) {
+  const seen = new Map();
+  rows.forEach((row) => {
+    if (row?.id && !seen.has(row.id)) seen.set(row.id, row);
+  });
+  return [...seen.values()];
+}
+
+function sortByCreatedAtDesc(rows) {
+  return [...rows].sort(
+    (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+  );
+}
+
+async function loadAcrossBusinessUnits(businessUnits, loader) {
+  const nested = await Promise.all(businessUnits.map((unit) => loader(unit)));
+  return nested.flat();
+}
 
 export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile = null) {
   const [data, setData] = useState(EMPTY_STATE);
@@ -43,11 +79,18 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
   const [error, setError] = useState('');
 
   const selectedBusinessUnit = useMemo(
-    () =>
-      data.businessUnits.find((unit) => unit.id === selectedBusinessUnitId) ||
-      data.businessUnits[0] ||
-      null,
-    [data.businessUnits, selectedBusinessUnitId],
+    () => {
+      if (isAllBusinessesId(selectedBusinessUnitId) && canUseAllBusinesses(accessProfile)) {
+        return ALL_BUSINESSES_UNIT;
+      }
+
+      return (
+        data.businessUnits.find((unit) => unit.id === selectedBusinessUnitId) ||
+        data.businessUnits[0] ||
+        null
+      );
+    },
+    [accessProfile, data.businessUnits, selectedBusinessUnitId],
   );
 
   const refresh = useCallback(async () => {
@@ -60,11 +103,21 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
     setError('');
 
     try {
-      const businessUnits = await getBusinessUnits();
+      const [rawBusinessUnits, businessProfilesRecord] = await Promise.all([
+        getBusinessUnits(),
+        getAppSettingRecord(BUSINESS_PROFILES_KEY).catch(() => null),
+      ]);
+      const businessUnits = hydrateBusinessUnits(rawBusinessUnits, businessProfilesRecord?.value);
+      const isAllBusinesses =
+        canUseAllBusinesses(accessProfile) && isAllBusinessesId(selectedBusinessUnitId);
       const activeUnit =
-        businessUnits.find((unit) => unit.id === selectedBusinessUnitId) ||
-        businessUnits[0] ||
-        null;
+        isAllBusinesses
+          ? ALL_BUSINESSES_UNIT
+          : (
+              businessUnits.find((unit) => unit.id === selectedBusinessUnitId) ||
+              businessUnits[0] ||
+              null
+            );
 
       if (!activeUnit) {
         setData({ ...EMPTY_STATE, businessUnits });
@@ -72,20 +125,36 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
       }
 
       const shouldLoadPayroll = canUsePayroll(accessProfile);
-      const isBeautyLounge = activeUnit.name === 'RTB Beauty Lounge';
       const requests = {
         actionCenterRecord: getAppSettingRecord(ACTION_CENTER_SETTING_KEY),
-        boothRent: getBoothRent(activeUnit.id),
-        masterDashboardRecord: getAppSettingRecord(
-          isBeautyLounge ? 'rtb_beauty_square_appointments' : 'rtb_master_dashboard',
+        boothRent: isAllBusinesses
+          ? loadAcrossBusinessUnits(businessUnits, (unit) =>
+              getBoothRent(unit.id).then((rows) =>
+                rows.map((row) => ({ ...row, business_name: unit.name })),
+              ),
+            )
+          : getBoothRent(activeUnit.id),
+        masterDashboardRecord: isAllBusinesses
+          ? Promise.resolve(null)
+          : getAppSettingRecord(getAppointmentSettingKey(activeUnit)),
+        monthlyPerformanceSummary: getMonthlyPerformanceSummary(
+          isAllBusinesses ? null : activeUnit.id,
         ),
-        monthlyPerformanceSummary: getMonthlyPerformanceSummary(activeUnit.id),
-        payrollRuns: shouldLoadPayroll ? getPayrollRuns(activeUnit.id) : Promise.resolve([]),
-        performanceSummary: getPerformanceSummary(activeUnit.name),
-        squareStatus: isBeautyLounge
+        payrollRuns: shouldLoadPayroll
+          ? isAllBusinesses
+            ? loadAcrossBusinessUnits(businessUnits, (unit) =>
+                getPayrollRuns(unit.id).then((rows) =>
+                  rows.map((row) => ({ ...row, business_name: unit.name })),
+                ),
+              )
+            : getPayrollRuns(activeUnit.id)
+          : Promise.resolve([]),
+        performanceSummary: getPerformanceSummary(isAllBusinesses ? null : activeUnit.id),
+        squareStatus: !isAllBusinesses && usesSquareAppointments(activeUnit)
           ? getSquareStatus(activeUnit.id)
           : Promise.resolve(null),
-        staff: getStaff(activeUnit.id, true),
+        staff: loadAcrossBusinessUnits(businessUnits, (unit) => getStaff(unit.id, true)),
+        staffBusinessMetadataRecord: getAppSettingRecord(STAFF_BUSINESS_METADATA_KEY),
       };
       const entries = Object.entries(requests);
       const results = await Promise.allSettled(entries.map(([, request]) => request));
@@ -100,7 +169,10 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         }
 
         loaded[key] =
-          key === 'masterDashboardRecord' || key === 'squareStatus' || key === 'actionCenterRecord'
+          key === 'masterDashboardRecord' ||
+          key === 'squareStatus' ||
+          key === 'actionCenterRecord' ||
+          key === 'staffBusinessMetadataRecord'
             ? null
             : [];
         warnings.push(
@@ -108,17 +180,30 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         );
       });
 
+      const staffBusinessMetadata = normalizeStaffBusinessMetadata(
+        loaded.staffBusinessMetadataRecord?.value,
+      );
+      const allStaff = enrichStaffWithBusinessMetadata(
+        uniqueById(loaded.staff),
+        staffBusinessMetadata,
+        businessUnits,
+      );
+      const scopedStaff = isAllBusinesses
+        ? allStaff
+        : allStaff.filter((member) => staffBelongsToBusiness(member, activeUnit.id));
+
       setData({
         actionCenter: normalizeActionCenterState(loaded.actionCenterRecord?.value),
-        boothRent: loaded.boothRent,
+        boothRent: sortByCreatedAtDesc(loaded.boothRent),
         businessUnits,
         masterDashboard: loaded.masterDashboardRecord?.value || null,
         masterDashboardUpdatedAt: loaded.masterDashboardRecord?.updated_at || null,
         monthlyPerformanceSummary: loaded.monthlyPerformanceSummary,
-        payrollRuns: loaded.payrollRuns,
+        payrollRuns: sortByCreatedAtDesc(loaded.payrollRuns),
         performanceSummary: loaded.performanceSummary,
         squareStatus: loaded.squareStatus,
-        staff: loaded.staff,
+        staff: scopedStaff,
+        staffBusinessMetadata,
         warnings,
       });
     } catch (err) {

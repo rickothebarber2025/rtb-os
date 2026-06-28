@@ -6,6 +6,7 @@ import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { deleteBoothRent, saveBoothRent, toggleBoothRentPaid } from '../services/rtbService';
 import { canDeleteBoothRent, canManageBoothRent } from '../utils/access';
+import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import { getDefaultPayrollWeek } from '../utils/dates';
 import { formatCurrency, formatDate } from '../utils/formatters';
 
@@ -23,7 +24,8 @@ function blankRecord(businessUnitId) {
 
 export default function BoothRentPage({ accessProfile, boothRent, businessUnit, onRefresh, staff }) {
   const canDelete = canDeleteBoothRent(accessProfile);
-  const canManage = canManageBoothRent(accessProfile);
+  const allBusinessesView = isAllBusinessesUnit(businessUnit);
+  const canManage = canManageBoothRent(accessProfile) && !allBusinessesView;
   const [form, setForm] = useState(() => blankRecord(businessUnit?.id));
   const [editingId, setEditingId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -146,6 +148,17 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
 
   return (
     <div className="page-grid booth-layout">
+      {allBusinessesView ? (
+        <section className="panel full-span">
+          <div className="alert warning">
+            <strong>Combined booth rent view</strong>
+            <span>
+              Rent records are read-only in All Businesses mode. Select one business to add,
+              edit, mark paid, or delete a rent record.
+            </span>
+          </div>
+        </section>
+      ) : null}
       {canManage ? (
       <section className="panel">
         <div className="section-header">
@@ -238,6 +251,7 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
               <thead>
                 <tr>
                   <th>Renter</th>
+                  {allBusinessesView ? <th>Business</th> : null}
                   <th>Week</th>
                   <th>Amount</th>
                   <th>Status</th>
@@ -250,6 +264,7 @@ export default function BoothRentPage({ accessProfile, boothRent, businessUnit, 
                 {boothRent.map((record) => (
                   <tr key={record.id}>
                     <td>{record.renter_name}</td>
+                    {allBusinessesView ? <td>{record.business_name || 'RTB'}</td> : null}
                     <td>{record.week_label || 'Not set'}</td>
                     <td>{formatCurrency(record.rent_amount)}</td>
                     <td>

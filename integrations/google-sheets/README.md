@@ -6,7 +6,7 @@ This Apps Script bridge keeps Google Sheets as the payroll calculation engine an
 
 Create a sheet named `RTB_OS_EXPORT` with one header row. Supported headers include:
 
-- `business` or `business_unit`
+- `business`, `business_unit`, or `business_unit_id`
 - `week_start`
 - `week_end`
 - `week_label`
@@ -24,7 +24,9 @@ Create a sheet named `RTB_OS_EXPORT` with one header row. Supported headers incl
 - `owner_net_sales`
 - `owner_tips`
 
-Required fields per row are `business` or `business_unit_id`, `week_start`, `week_end`, and `staff_name`. Amount fields may be numbers or currency-formatted strings.
+Required fields per row are `business`/`business_unit`/`business_unit_id`, `week_start`, `week_end`, and `staff_name`. Use `RTB Lounge` for barbershop payroll rows and `RTB Beauty Lounge` for beauty payroll rows. Amount fields may be numbers or currency-formatted strings.
+
+The Apps Script validates that every exported row has a business value before sending data to RTB OS. The Edge Function upserts by `business + week_start + week_end + staff_name`, so the same staff name can exist in both businesses without overwriting the other business.
 
 ## Apps Script setup
 

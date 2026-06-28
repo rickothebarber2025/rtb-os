@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import { saveAppSetting } from '../services/rtbService';
+import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import {
   ACTION_CENTER_SETTING_KEY,
   buildActionCenterItems,
@@ -107,6 +108,7 @@ export default function ActionCenterPage({
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const scopedBusinessUnitId = isAllBusinessesUnit(businessUnit) ? null : businessUnit?.id;
   const staffOptions = useMemo(() => getStaffOptions(staff), [staff]);
   const staffIds = useMemo(() => new Set(staff.map((member) => member.id).filter(Boolean)), [staff]);
 
@@ -128,12 +130,12 @@ export default function ActionCenterPage({
       buildActionCenterItems({
         accessProfile,
         actionCenter: localState,
-        businessUnitId: businessUnit?.id,
+        businessUnitId: scopedBusinessUnitId,
         boothRent,
         payrollRuns,
         staff,
       }),
-    [accessProfile, boothRent, businessUnit?.id, localState, payrollRuns, staff],
+    [accessProfile, boothRent, localState, payrollRuns, scopedBusinessUnitId, staff],
   );
   const summary = getActionCenterSummary(items);
   const filteredItems = items.filter((item) => {
@@ -143,11 +145,11 @@ export default function ActionCenterPage({
   });
   const activeWarnings = localState.warnings.filter(
     (warning) =>
-      !warning.resolved_at && matchesCurrentStaff(warning, staffIds, businessUnit?.id),
+      !warning.resolved_at && matchesCurrentStaff(warning, staffIds, scopedBusinessUnitId),
   );
   const activeDocuments = localState.documents.filter(
     (document) =>
-      !document.resolved_at && matchesCurrentStaff(document, staffIds, businessUnit?.id),
+      !document.resolved_at && matchesCurrentStaff(document, staffIds, scopedBusinessUnitId),
   );
 
   async function persist(nextState, message) {

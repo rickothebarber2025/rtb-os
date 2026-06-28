@@ -34,6 +34,17 @@ import {
   mergeRememberedImportMappings,
   normalizeImportName,
 } from '../src/utils/importMappings.js';
+import {
+  ALL_BUSINESSES_ID,
+  canUseAllBusinesses,
+  getBusinessProfile,
+  getBusinessSelectionOptions,
+  suggestInstagramHandle,
+} from '../src/utils/businessProfiles.js';
+import {
+  enrichStaffWithBusinessMetadata,
+  staffBelongsToBusiness,
+} from '../src/utils/staffBusiness.js';
 
 test('commission drops to 55% below $500 for non-fixed staff', () => {
   const result = calculateEntryValues({
@@ -392,4 +403,57 @@ test('booksy import remembers aliases and applies them to dashboard rows', () =>
   assert.equal(dashboard.recentTransactions[0].staffer, 'Sara');
   assert.equal(dashboard.recentTransactions[0].service, 'Men Haircut');
   assert.equal(mappings.staff.sarahairstylist.targetName, 'Sara');
+});
+
+test('business profiles define separate platform and branding rules', () => {
+  const lounge = getBusinessProfile({ name: 'RTB Lounge' });
+  const beauty = getBusinessProfile({ name: 'RTB Beauty Lounge' });
+  const options = getBusinessSelectionOptions([{ id: 'rtb', name: 'RTB Lounge' }], {
+    active: true,
+    role: 'admin',
+  });
+
+  assert.equal(lounge.booking_platform, 'Booksy');
+  assert.equal(lounge.pos_platform, 'Square');
+  assert.equal(beauty.booking_platform, 'Square Appointments');
+  assert.equal(beauty.pos_platform, 'Square');
+  assert.equal(suggestInstagramHandle('Josh Smith', lounge.instagram_format), 'josh.rtb_lounge');
+  assert.equal(suggestInstagramHandle('Josh Smith', 'firstnamelastname'), 'joshsmith');
+  assert.equal(canUseAllBusinesses({ active: true, role: 'manager' }), false);
+  assert.equal(options[0].id, ALL_BUSINESSES_ID);
+});
+
+test('staff metadata supports both-business assignment without duplicating staff', () => {
+  const businessUnits = [
+    { id: 'lounge', name: 'RTB Lounge' },
+    { id: 'beauty', name: 'RTB Beauty Lounge' },
+  ];
+  const [member] = enrichStaffWithBusinessMetadata(
+    [
+      {
+        active: true,
+        business_unit_id: 'lounge',
+        fixed_rate: false,
+        full_name: 'Sara Hairstylist',
+        id: 'staff-sara',
+        tier: 'standard',
+      },
+    ],
+    {
+      'staff-sara': {
+        assigned_business_ids: ['lounge', 'beauty'],
+        booking_platform_profile: 'Sara | Hairstylist',
+        instagram_rule: 'firstnamelastname',
+        pos_profile: 'Sara Square',
+      },
+    },
+    businessUnits,
+  );
+
+  assert.equal(member.instagram_handle, 'sarahairstylist');
+  assert.equal(member.booking_platform_profile, 'Sara | Hairstylist');
+  assert.equal(member.pos_profile, 'Sara Square');
+  assert.equal(staffBelongsToBusiness(member, 'lounge'), true);
+  assert.equal(staffBelongsToBusiness(member, 'beauty'), true);
+  assert.deepEqual(member.assigned_business_names, ['RTB Lounge', 'RTB Beauty Lounge']);
 });

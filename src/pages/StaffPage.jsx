@@ -6,8 +6,13 @@ import EmptyState from '../components/EmptyState';
 import Modal from '../components/Modal';
 import ProbationProgressCard from '../components/ProbationProgressCard';
 import StatusBadge from '../components/StatusBadge';
-import { deactivateStaff, deleteStaff, saveStaff } from '../services/rtbService';
+import { deactivateStaff, deleteStaff, saveAppSetting, saveStaff } from '../services/rtbService';
 import { canDeleteStaff, canManageStaff } from '../utils/access';
+import {
+  getBusinessProfile,
+  isAllBusinessesUnit,
+  suggestInstagramHandle,
+} from '../utils/businessProfiles';
 import { formatDate, formatPercent } from '../utils/formatters';
 import {
   isProbationStaff,
@@ -17,24 +22,44 @@ import {
   toGraduationPayload,
   toProbationPayload,
 } from '../utils/probation';
+import {
+  STAFF_BUSINESS_METADATA_KEY,
+  mergeStaffBusinessMetadata,
+  staffBusinessIds,
+} from '../utils/staffBusiness';
 
 const blankStaff = {
   active: true,
+  assigned_business_ids: [],
+  booking_platform_profile: '',
   commission_rate: STANDARD_RTB_RATE,
+  commission_type: 'Commission',
   email: '',
   fixed_rate: false,
   full_name: '',
+  instagram_handle: '',
+  instagram_manual_override: false,
+  instagram_rule: 'firstname.rtb_lounge',
   notes: '',
   phone: '',
+  pos_profile: '',
   probation_start_date: '',
   role: 'Staff',
   start_date: '',
   tier: 'standard',
 };
 
-export default function StaffPage({ accessProfile, businessUnit, onRefresh, staff }) {
+export default function StaffPage({
+  accessProfile,
+  businessUnit,
+  businessUnits,
+  onRefresh,
+  staff,
+  staffBusinessMetadata,
+}) {
   const canManage = canManageStaff(accessProfile);
   const canDelete = canDeleteStaff(accessProfile);
+  const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const [filter, setFilter] = useState('active');
   const [editing, setEditing] = useState(null);
   const [editingProbationId, setEditingProbationId] = useState('');
@@ -45,6 +70,7 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
+  const selectedBusinessProfile = getBusinessProfile(businessUnit);
 
   const activeProbationStaff = useMemo(
     () => staff.filter((member) => member.active && isProbationStaff(member)),
@@ -61,22 +87,37 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
   }, [filter, staff]);
 
   function openCreate() {
-    if (!canManage) return;
+    if (!canManage || allBusinessesView) return;
     setEditing(null);
-    setForm({ ...blankStaff, business_unit_id: businessUnit?.id });
+    setForm({
+      ...blankStaff,
+      assigned_business_ids: [businessUnit?.id].filter(Boolean),
+      business_unit_id: businessUnit?.id,
+      instagram_rule: selectedBusinessProfile.instagram_format,
+      role: selectedBusinessProfile.staff_roles[0] || 'Staff',
+    });
     setError('');
     setNotice('');
   }
 
   function openEdit(member) {
     if (!canManage) return;
+    const primaryBusiness = businessUnits.find((unit) => unit.id === member.business_unit_id);
+    const primaryProfile = getBusinessProfile(primaryBusiness);
     setEditing(member);
     setForm({
       ...member,
+      assigned_business_ids: staffBusinessIds(member),
+      booking_platform_profile: member.booking_platform_profile || member.full_name || '',
       commission_rate: Number(member.commission_rate || 0),
+      commission_type: member.commission_type || (member.fixed_rate ? 'Fixed rate' : 'Commission'),
       email: member.email || '',
+      instagram_handle: member.instagram_handle || '',
+      instagram_manual_override: Boolean(member.instagram_manual_override),
+      instagram_rule: member.instagram_rule || primaryProfile.instagram_format,
       notes: member.notes || '',
       phone: member.phone || '',
+      pos_profile: member.pos_profile || member.full_name || '',
       probation_start_date: member.probation_start_date || '',
       start_date: member.start_date || '',
     });
@@ -91,7 +132,61 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
   }
 
   function updateField(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => {
+      const next = { ...current, [field]: value };
+      if (field === 'full_name' && !current.instagram_manual_override) {
+        next.instagram_handle = suggestInstagramHandle(value, current.instagram_rule);
+      }
+      return next;
+    });
+  }
+
+  function updatePrimaryBusiness(businessUnitId) {
+    const nextBusiness = businessUnits.find((unit) => unit.id === businessUnitId);
+    const profile = getBusinessProfile(nextBusiness);
+    setForm((current) => {
+      const next = {
+        ...current,
+        assigned_business_ids: [
+          ...new Set([businessUnitId, ...(current.assigned_business_ids || [])]),
+        ],
+        business_unit_id: businessUnitId,
+        instagram_rule: current.instagram_rule || profile.instagram_format,
+        role: current.role || profile.staff_roles[0] || 'Staff',
+      };
+      if (!current.instagram_manual_override) {
+        next.instagram_handle = suggestInstagramHandle(current.full_name, next.instagram_rule);
+      }
+      return next;
+    });
+  }
+
+  function updateInstagramRule(rule) {
+    setForm((current) => ({
+      ...current,
+      instagram_handle: current.instagram_manual_override
+        ? current.instagram_handle
+        : suggestInstagramHandle(current.full_name, rule),
+      instagram_rule: rule,
+    }));
+  }
+
+  function updateInstagramHandle(value) {
+    setForm((current) => ({
+      ...current,
+      instagram_handle: value,
+      instagram_manual_override: true,
+    }));
+  }
+
+  function toggleBusinessAssignment(businessUnitId, checked) {
+    setForm((current) => {
+      const currentIds = new Set(current.assigned_business_ids || []);
+      if (checked) currentIds.add(businessUnitId);
+      if (!checked && businessUnitId !== current.business_unit_id) currentIds.delete(businessUnitId);
+      currentIds.add(current.business_unit_id);
+      return { ...current, assigned_business_ids: [...currentIds] };
+    });
   }
 
   function updateTier(tier) {
@@ -128,11 +223,29 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
           ? toProbationPayload(form, form.probation_start_date || toDateKey())
           : form;
 
+      const primaryBusinessId = form.business_unit_id || businessUnit?.id;
       const saved = await saveStaff({
         ...staffPayload,
-        business_unit_id: businessUnit?.id,
+        business_unit_id: primaryBusinessId,
         id: editing?.id,
       });
+      await saveAppSetting(
+        STAFF_BUSINESS_METADATA_KEY,
+        mergeStaffBusinessMetadata(staffBusinessMetadata, saved.id, {
+          assigned_business_ids: [
+            primaryBusinessId,
+            ...(form.assigned_business_ids || []),
+          ],
+          booking_platform_profile: form.booking_platform_profile || saved.full_name,
+          commission_type: form.commission_type || (saved.fixed_rate ? 'Fixed rate' : 'Commission'),
+          instagram_handle:
+            form.instagram_handle ||
+            suggestInstagramHandle(saved.full_name, form.instagram_rule),
+          instagram_manual_override: Boolean(form.instagram_manual_override),
+          instagram_rule: form.instagram_rule || selectedBusinessProfile.instagram_format,
+          pos_profile: form.pos_profile || saved.full_name,
+        }),
+      );
       await onRefresh();
       setNotice(`${saved.full_name} was saved.`);
       closeModal();
@@ -270,9 +383,27 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
 
   const modalOpen = editing !== null || form.business_unit_id;
   const showProbationSection = filter !== 'inactive' && activeProbationStaff.length > 0;
+  const formBusiness = businessUnits.find((unit) => unit.id === form.business_unit_id) || businessUnit;
+  const formBusinessProfile = getBusinessProfile(formBusiness);
+  const roleOptions = [
+    ...new Set([form.role, ...(formBusinessProfile.staff_roles || ['Staff'])].filter(Boolean)),
+  ];
+  const instagramFormats = formBusinessProfile.instagram_formats || ['firstname.rtb_lounge'];
 
   return (
     <div className="page-grid">
+      {allBusinessesView ? (
+        <section className="panel full-span">
+          <div className="alert warning">
+            <strong>All Businesses roster view</strong>
+            <span>
+              Staff are listed across both businesses. Select RTB Lounge or RTB Beauty Lounge
+              before adding a new staff profile.
+            </span>
+          </div>
+        </section>
+      ) : null}
+
       {showProbationSection ? (
         <section className="panel full-span probation-section">
           <div className="section-header">
@@ -318,7 +449,7 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
             <span>Roster</span>
             <h2>Staff profiles</h2>
           </div>
-          {canManage ? (
+          {canManage && !allBusinessesView ? (
             <button className="primary-button" type="button" onClick={openCreate}>
               <Plus size={17} />
               Add staff
@@ -348,8 +479,10 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Business</th>
                   <th>Role</th>
-                  <th>Tier</th>
+                  <th>Platforms</th>
+                  <th>Instagram</th>
                   <th>Commission</th>
                   <th>Status</th>
                   <th>Contact</th>
@@ -363,16 +496,38 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
                     <td>
                       <div className="person-cell">
                         <strong>{member.full_name}</strong>
-                        <span>{member.notes || 'No notes'}</span>
+                        <span>{member.notes || member.primary_business_name || 'No notes'}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="business-chip-list">
+                        {(member.assigned_business_names || [member.primary_business_name])
+                          .filter(Boolean)
+                          .map((name) => (
+                            <StatusBadge
+                              key={name}
+                              tone={name === member.primary_business_name ? 'gold' : 'muted'}
+                            >
+                              {name}
+                            </StatusBadge>
+                          ))}
                       </div>
                     </td>
                     <td>{member.role}</td>
-                    <td>{member.tier}</td>
                     <td>
-                      <strong>{formatPercent(member.commission_rate)}</strong>
-                      {member.fixed_rate ? (
-                        <StatusBadge tone="gold">Fixed rate</StatusBadge>
-                      ) : null}
+                      <div className="person-cell">
+                        <span>{member.booking_platform_profile || 'No booking profile'}</span>
+                        <span>{member.pos_profile || 'No POS profile'}</span>
+                      </div>
+                    </td>
+                    <td>{member.instagram_handle ? `@${member.instagram_handle}` : 'Not set'}</td>
+                    <td>
+                      <div className="business-chip-list">
+                        <strong>{formatPercent(member.commission_rate)}</strong>
+                        <StatusBadge tone="muted">{member.commission_type || member.tier}</StatusBadge>
+                        {member.fixed_rate ? <StatusBadge tone="gold">Fixed rate</StatusBadge> : null}
+                        {isProbationStaff(member) ? <StatusBadge tone="warning">Probation</StatusBadge> : null}
+                      </div>
                     </td>
                     <td>
                       <StatusBadge tone={member.active ? 'success' : 'muted'}>
@@ -457,7 +612,7 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
             icon={Users}
             title="No staff in this view"
             message="Switch filters or add a staff profile."
-            action={canManage ? (
+            action={canManage && !allBusinessesView ? (
               <button className="ghost-button" type="button" onClick={openCreate}>
                 Add staff
               </button>
@@ -471,6 +626,21 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
           <form className="stack" onSubmit={handleSubmit}>
             <div className="form-grid">
               <label className="field">
+                <span>Primary business</span>
+                <select
+                  onChange={(event) => updatePrimaryBusiness(event.target.value)}
+                  required
+                  value={form.business_unit_id || ''}
+                >
+                  <option value="">Choose business</option>
+                  {businessUnits.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
                 <span>Full name</span>
                 <input
                   onChange={(event) => updateField('full_name', event.target.value)}
@@ -480,11 +650,17 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
               </label>
               <label className="field">
                 <span>Role</span>
-                <input
+                <select
                   onChange={(event) => updateField('role', event.target.value)}
                   required
                   value={form.role}
-                />
+                >
+                  {roleOptions.map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="field">
                 <span>Tier</span>
@@ -515,6 +691,57 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
                   type="email"
                   value={form.email}
                 />
+              </label>
+              <label className="field">
+                <span>Booking platform profile</span>
+                <input
+                  onChange={(event) =>
+                    updateField('booking_platform_profile', event.target.value)
+                  }
+                  placeholder={`${formBusinessProfile.booking_platform} name`}
+                  value={form.booking_platform_profile || ''}
+                />
+              </label>
+              <label className="field">
+                <span>POS profile</span>
+                <input
+                  onChange={(event) => updateField('pos_profile', event.target.value)}
+                  placeholder={`${formBusinessProfile.pos_platform} name`}
+                  value={form.pos_profile || ''}
+                />
+              </label>
+              <label className="field">
+                <span>Instagram rule</span>
+                <select
+                  onChange={(event) => updateInstagramRule(event.target.value)}
+                  value={form.instagram_rule}
+                >
+                  {instagramFormats.map((format) => (
+                    <option key={format} value={format}>
+                      {format}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Instagram handle</span>
+                <input
+                  onChange={(event) => updateInstagramHandle(event.target.value)}
+                  placeholder={suggestInstagramHandle(form.full_name, form.instagram_rule)}
+                  value={form.instagram_handle || ''}
+                />
+              </label>
+              <label className="field">
+                <span>Commission type</span>
+                <select
+                  onChange={(event) => updateField('commission_type', event.target.value)}
+                  value={form.commission_type}
+                >
+                  <option value="Commission">Commission</option>
+                  <option value="Fixed rate">Fixed rate</option>
+                  <option value="Booth rent">Booth rent</option>
+                  <option value="Probation">Probation</option>
+                </select>
               </label>
               <label className="field">
                 <span>Phone</span>
@@ -560,6 +787,24 @@ export default function StaffPage({ accessProfile, businessUnit, onRefresh, staf
                 />
                 <span>Active profile</span>
               </label>
+              <div className="field wide">
+                <span>Assigned businesses</span>
+                <div className="checkbox-grid">
+                  {businessUnits.map((unit) => (
+                    <label className="check-row" key={unit.id}>
+                      <input
+                        checked={(form.assigned_business_ids || []).includes(unit.id)}
+                        disabled={unit.id === form.business_unit_id}
+                        onChange={(event) =>
+                          toggleBusinessAssignment(unit.id, event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      <span>{unit.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
               <label className="field wide">
                 <span>Notes</span>
                 <textarea

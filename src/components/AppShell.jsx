@@ -4,6 +4,7 @@ import Topbar from './Topbar';
 
 export default function AppShell({
   activePage,
+  businessOptions,
   businessUnits,
   children,
   onRefresh,
@@ -36,6 +37,7 @@ export default function AppShell({
       <div className="main-area">
         <Topbar
           businessUnits={businessUnits}
+          businessOptions={businessOptions}
           onMenuClick={() => setSidebarOpen(true)}
           onRefresh={onRefresh}
           pageTitle={pageTitle}

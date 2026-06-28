@@ -52,10 +52,14 @@ export function buildOperationalChecks({
 
   const sourceAge = daysSince(appointmentUpdatedAt, now);
   const isBeauty = businessUnitName === 'RTB Beauty Lounge';
+  const isAllBusinesses = businessUnitName === 'All Businesses';
   let appointmentDetail = ageLabel(sourceAge);
   let appointmentTone = sourceAge === null ? 'danger' : sourceAge > 14 ? 'warning' : 'success';
 
-  if (isBeauty && squareStatus?.connected === false) {
+  if (isAllBusinesses) {
+    appointmentDetail = 'Select one business to import appointment data';
+    appointmentTone = 'muted';
+  } else if (isBeauty && squareStatus?.connected === false) {
     appointmentDetail = squareStatus?.setup?.message || 'Square production token setup is needed';
     appointmentTone = 'danger';
   } else if (isBeauty && squareStatus === null) {
@@ -66,7 +70,7 @@ export function buildOperationalChecks({
   checks.push({
     action: 'insights',
     detail: appointmentDetail,
-    label: isBeauty ? 'Square Appointments' : 'Booksy report',
+    label: isAllBusinesses ? 'Appointment imports' : isBeauty ? 'Square Appointments' : 'Booksy report',
     tone: appointmentTone,
   });
 
