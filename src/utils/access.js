@@ -1,4 +1,4 @@
-import { NAV_ITEMS } from './constants';
+import { NAV_ITEMS } from './constants.js';
 
 export const ROLE_OPTIONS = [
   {
@@ -30,6 +30,7 @@ const ROLE_LABELS = ROLE_OPTIONS.reduce(
 
 const PAGE_ACCESS = {
   access: ['admin'],
+  'action-center': ['admin', 'manager'],
   'booth-rent': ['admin', 'manager'],
   dashboard: ['admin', 'manager'],
   insights: ['admin', 'manager'],

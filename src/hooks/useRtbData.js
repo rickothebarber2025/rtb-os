@@ -9,9 +9,11 @@ import {
   getSquareStatus,
   getStaff,
 } from '../services/rtbService';
+import { ACTION_CENTER_SETTING_KEY, normalizeActionCenterState } from '../utils/actionCenter';
 import { canUsePayroll } from '../utils/access';
 
 const EMPTY_STATE = {
+  actionCenter: normalizeActionCenterState(null),
   boothRent: [],
   businessUnits: [],
   masterDashboard: null,
@@ -25,6 +27,7 @@ const EMPTY_STATE = {
 };
 
 const LOAD_LABELS = {
+  actionCenterRecord: 'Action Center',
   boothRent: 'Booth rent records',
   masterDashboardRecord: 'Appointment data',
   monthlyPerformanceSummary: 'Monthly performance',
@@ -71,6 +74,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
       const shouldLoadPayroll = canUsePayroll(accessProfile);
       const isBeautyLounge = activeUnit.name === 'RTB Beauty Lounge';
       const requests = {
+        actionCenterRecord: getAppSettingRecord(ACTION_CENTER_SETTING_KEY),
         boothRent: getBoothRent(activeUnit.id),
         masterDashboardRecord: getAppSettingRecord(
           isBeautyLounge ? 'rtb_beauty_square_appointments' : 'rtb_master_dashboard',
@@ -95,13 +99,17 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
           return;
         }
 
-        loaded[key] = key === 'masterDashboardRecord' || key === 'squareStatus' ? null : [];
+        loaded[key] =
+          key === 'masterDashboardRecord' || key === 'squareStatus' || key === 'actionCenterRecord'
+            ? null
+            : [];
         warnings.push(
           `${LOAD_LABELS[key]} could not load: ${result.reason?.message || 'Unknown error'}`,
         );
       });
 
       setData({
+        actionCenter: normalizeActionCenterState(loaded.actionCenterRecord?.value),
         boothRent: loaded.boothRent,
         businessUnits,
         masterDashboard: loaded.masterDashboardRecord?.value || null,

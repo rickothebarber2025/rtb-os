@@ -10,6 +10,7 @@ import { canAccessPage, canManageStaff, canUseApp, getAllowedNavItems } from './
 import { shouldAutoGraduate, toGraduationPayload } from './utils/probation';
 
 const AccessPage = lazy(() => import('./pages/AccessPage'));
+const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
 const BooksyInsightsPage = lazy(() => import('./pages/BooksyInsightsPage'));
 const BoothRentPage = lazy(() => import('./pages/BoothRentPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -81,6 +82,7 @@ export default function App() {
 
   const pageProps = useMemo(
     () => ({
+      actionCenter: data.actionCenter,
       boothRent: data.boothRent,
       businessUnit: data.selectedBusinessUnit,
       businessUnits: data.businessUnits,
@@ -124,6 +126,8 @@ export default function App() {
             currentUserId={auth.user?.id}
           />
         );
+      case 'action-center':
+        return <ActionCenterPage {...pageProps} />;
       case 'payroll':
         return <PayrollPage {...pageProps} />;
       case 'staff':

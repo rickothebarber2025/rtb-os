@@ -1,5 +1,6 @@
   import {
   BarChart3,
+  BellRing,
   CalendarDays,
   CircleDollarSign,
   ClipboardCheck,
@@ -12,6 +13,7 @@
 
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'action-center', label: 'Action Center', icon: BellRing },
   { id: 'payroll', label: 'Payroll', icon: CircleDollarSign },
   { id: 'staff', label: 'Roster', icon: Users },
   { id: 'performance', label: 'Performance', icon: BarChart3 },

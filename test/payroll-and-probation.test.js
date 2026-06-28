@@ -19,6 +19,11 @@ import {
   toCsv,
 } from '../src/utils/systemTools.js';
 import {
+  buildActionCenterItems,
+  getActionCenterSummary,
+  normalizeActionCenterState,
+} from '../src/utils/actionCenter.js';
+import {
   getProbationInfo,
   toGraduationPayload,
   toProbationPayload,
@@ -222,4 +227,86 @@ test('system checks flag overdue probation and missing appointment source', () =
   assert.equal(checks.find((check) => check.label === 'Probation').tone, 'warning');
   assert.equal(checks.find((check) => check.label === 'Square connection').tone, 'danger');
   assert.equal(checks.find((check) => check.label === 'Square appointments').tone, 'warning');
+});
+
+test('action center surfaces automatic operational work', () => {
+  const items = buildActionCenterItems({
+    accessProfile: { active: true, role: 'admin' },
+    boothRent: [
+      {
+        created_at: '2026-06-10T12:00:00Z',
+        paid: false,
+        rent_amount: 200,
+        renter_name: 'Tara',
+      },
+    ],
+    payrollRuns: [
+      {
+        status: 'draft',
+        week_label: 'Jun 22 - Jun 28',
+      },
+    ],
+    staff: [
+      {
+        active: true,
+        full_name: 'Josh',
+        id: 'staff-josh',
+        probation_start_date: '2026-04-04',
+        tier: 'probation',
+      },
+    ],
+    now: new Date('2026-06-28T12:00:00Z'),
+  });
+
+  assert.equal(items.some((item) => item.category === 'probation'), true);
+  assert.equal(items.some((item) => item.category === 'payroll'), true);
+  assert.equal(items.some((item) => item.category === 'booth'), true);
+  assert.match(items.find((item) => item.category === 'probation').title, /Josh/);
+});
+
+test('action center tracks warnings and missing documents for the selected roster', () => {
+  const actionCenter = normalizeActionCenterState({
+    documents: [
+      {
+        document_name: 'Commission agreement',
+        due_date: '2026-06-20',
+        id: 'doc-steph',
+        staff_id: 'staff-steph',
+        staff_name: 'Steph',
+      },
+      {
+        document_name: 'Other business document',
+        due_date: '2026-06-20',
+        id: 'doc-other',
+        staff_id: 'staff-other-business',
+        staff_name: 'Other Business Staff',
+      },
+    ],
+    warnings: [
+      {
+        date: '2026-06-01',
+        id: 'warning-1',
+        staff_id: 'staff-steph',
+        staff_name: 'Steph',
+      },
+      {
+        date: '2026-06-18',
+        id: 'warning-2',
+        staff_id: 'staff-steph',
+        staff_name: 'Steph',
+      },
+    ],
+  });
+  const items = buildActionCenterItems({
+    actionCenter,
+    staff: [{ active: true, full_name: 'Steph', id: 'staff-steph' }],
+    now: new Date('2026-06-28T12:00:00Z'),
+  });
+  const summary = getActionCenterSummary(items);
+
+  assert.equal(items.filter((item) => item.category === 'warning').length, 1);
+  assert.equal(items.filter((item) => item.category === 'docs').length, 1);
+  assert.equal(items.some((item) => item.title.includes('Other Business Staff')), false);
+  assert.equal(summary.total, 2);
+  assert.equal(summary.manual, 2);
 });

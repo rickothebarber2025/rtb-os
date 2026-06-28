@@ -2,6 +2,7 @@ import {
   AlertCircle,
   AlertTriangle,
   BadgeDollarSign,
+  BellRing,
   CalendarDays,
   CheckCircle2,
   CircleDollarSign,
@@ -14,6 +15,7 @@ import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
+import { buildActionCenterItems, getActionCenterSummary, getPriorityIcon } from '../utils/actionCenter';
 import { canUsePayroll } from '../utils/access';
 import {
   formatCompactCurrency,
@@ -33,6 +35,7 @@ const OPERATION_ICONS = {
 
 export default function DashboardPage({
   accessProfile,
+  actionCenter,
   boothRent,
   businessUnit,
   masterDashboard,
@@ -75,6 +78,16 @@ export default function DashboardPage({
     payrollAllowed,
     squareStatus,
   });
+  const actionItems = buildActionCenterItems({
+    accessProfile,
+    actionCenter,
+    businessUnitId: businessUnit?.id,
+    boothRent,
+    payrollRuns,
+    staff,
+  });
+  const actionSummary = getActionCenterSummary(actionItems);
+  const topActions = actionItems.slice(0, 4);
 
   return (
     <div className="page-grid">
@@ -155,6 +168,51 @@ export default function DashboardPage({
               </button>
             );
           })}
+        </div>
+      </section>
+
+      <section className="panel full-span action-center-snapshot">
+        <div className="section-header">
+          <div>
+            <span>Action Center</span>
+            <h2>Needs attention</h2>
+          </div>
+          <button className="ghost-button" type="button" onClick={() => setActivePage('action-center')}>
+            <BellRing size={16} />
+            Open Action Center
+          </button>
+        </div>
+        {topActions.length ? (
+          <div className="dashboard-action-list">
+            {topActions.map((item) => {
+              const Icon = getPriorityIcon(item.category);
+              return (
+                <button
+                  className={`dashboard-action-item ${item.priority}`}
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActivePage(item.page)}
+                >
+                  <Icon size={18} />
+                  <span>
+                    <strong>{item.title}</strong>
+                    <small>{item.detail}</small>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-state compact">
+            <h3>No open actions</h3>
+            <p>Action Center is clear for this business.</p>
+          </div>
+        )}
+        <div className="action-center-snapshot__footer">
+          <StatusBadge tone={actionSummary.urgent ? 'warning' : actionSummary.total ? 'gold' : 'success'}>
+            {actionSummary.total ? `${actionSummary.total} open actions` : 'Clear'}
+          </StatusBadge>
+          <span>{actionSummary.automatic} automatic / {actionSummary.manual} manual</span>
         </div>
       </section>
 
