@@ -28,6 +28,12 @@ import {
   toGraduationPayload,
   toProbationPayload,
 } from '../src/utils/probation.js';
+import {
+  applyBooksyImportReview,
+  createBooksyImportReview,
+  mergeRememberedImportMappings,
+  normalizeImportName,
+} from '../src/utils/importMappings.js';
 
 test('commission drops to 55% below $500 for non-fixed staff', () => {
   const result = calculateEntryValues({
@@ -309,4 +315,81 @@ test('action center tracks warnings and missing documents for the selected roste
   assert.equal(items.some((item) => item.title.includes('Other Business Staff')), false);
   assert.equal(summary.total, 2);
   assert.equal(summary.manual, 2);
+});
+
+test('booksy import matching ignores case spaces and punctuation', () => {
+  assert.equal(normalizeImportName('Ricko Joseph'), 'rickojoseph');
+  assert.equal(normalizeImportName(' RICKO-JOSEPH '), 'rickojoseph');
+
+  const review = createBooksyImportReview({
+    dashboard: {
+      services: [{ name: 'Hair Cut', revenue: 100 }],
+      staff: [{ name: 'RICKO-JOSEPH', revenue: 100 }],
+    },
+    existingDashboard: {
+      services: [{ name: 'Haircut' }],
+    },
+    mappings: null,
+    staff: [{ active: true, full_name: 'Ricko Joseph', id: 'staff-ricko' }],
+  });
+
+  assert.equal(review.staffReview[0].matchType, 'exact');
+  assert.equal(review.staffReview[0].targetId, 'staff-ricko');
+  assert.equal(review.serviceReview[0].matchType, 'exact');
+  assert.equal(review.serviceReview[0].targetName, 'Haircut');
+});
+
+test('booksy import remembers aliases and applies them to dashboard rows', () => {
+  const review = createBooksyImportReview({
+    dashboard: {
+      recentTransactions: [
+        { service: 'Mens Cut', staffer: 'Sara | Hairstylist' },
+      ],
+      services: [
+        { cancelled: 0, count: 1, name: 'Mens Cut', revenue: 50 },
+      ],
+      staff: [
+        { appointments: 1, mayAppointments: 0, name: 'Sara | Hairstylist', revenue: 50 },
+      ],
+    },
+    existingDashboard: {
+      services: [{ name: 'Men Haircut' }],
+    },
+    mappings: {
+      services: {
+        menscut: {
+          action: 'match',
+          sourceName: 'Mens Cut',
+          targetName: 'Men Haircut',
+        },
+      },
+      staff: {
+        sarahairstylist: {
+          action: 'match',
+          sourceName: 'Sara | Hairstylist',
+          targetId: 'staff-sara',
+          targetName: 'Sara',
+        },
+      },
+    },
+    staff: [{ active: true, full_name: 'Sara', id: 'staff-sara' }],
+  });
+
+  const dashboard = applyBooksyImportReview(
+    review.dashboard,
+    review.staffReview,
+    review.serviceReview,
+  );
+  const mappings = mergeRememberedImportMappings(
+    review.mappings,
+    review.staffReview,
+    review.serviceReview,
+  );
+
+  assert.equal(review.staffReview[0].matchType, 'remembered');
+  assert.equal(dashboard.staff[0].name, 'Sara');
+  assert.equal(dashboard.services[0].name, 'Men Haircut');
+  assert.equal(dashboard.recentTransactions[0].staffer, 'Sara');
+  assert.equal(dashboard.recentTransactions[0].service, 'Men Haircut');
+  assert.equal(mappings.staff.sarahairstylist.targetName, 'Sara');
 });

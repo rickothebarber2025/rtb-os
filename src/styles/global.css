@@ -1323,6 +1323,116 @@ select {
   font-size: 0.78rem;
 }
 
+.import-wizard {
+  display: grid;
+  gap: 1rem;
+}
+
+.wizard-steps {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0.35rem;
+}
+
+.wizard-steps button {
+  background: transparent;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  min-height: 38px;
+}
+
+.wizard-steps button.active {
+  background: rgba(241, 199, 104, 0.16);
+  color: var(--gold-strong);
+}
+
+.wizard-panel {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.import-review-summary {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: space-between;
+  padding: 0.78rem;
+}
+
+.import-review-summary strong {
+  color: var(--text);
+}
+
+.import-review-summary span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.import-wizard select,
+.import-wizard input[type='text'],
+.import-wizard td input:not([type]) {
+  min-width: 170px;
+}
+
+.inline-check {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.inline-check input {
+  accent-color: var(--gold);
+  height: 16px;
+  width: 16px;
+}
+
+.import-summary-grid {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.import-summary-grid > div {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.35rem;
+  min-height: 110px;
+  padding: 0.9rem;
+}
+
+.import-summary-grid svg {
+  color: var(--gold);
+}
+
+.import-summary-grid strong {
+  color: var(--text);
+  font-size: 1.35rem;
+}
+
+.import-summary-grid span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .insights-hero {
   min-height: 188px;
 }
@@ -2546,7 +2656,8 @@ select {
   }
 
   .mini-stats,
-  .split-stats {
+  .split-stats,
+  .import-summary-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2586,6 +2697,15 @@ select {
 
   .action-card {
     grid-template-columns: 1fr;
+  }
+
+  .wizard-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .import-review-summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .manual-record {

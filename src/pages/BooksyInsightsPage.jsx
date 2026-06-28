@@ -1,8 +1,11 @@
 import { useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Ban,
   CalendarDays,
   ExternalLink,
+  Link2,
+  Plus,
   Scissors,
   Trash2,
   TrendingDown,
@@ -16,7 +19,9 @@ import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import {
   clearAppSetting,
+  getAppSetting,
   saveAppSetting,
+  saveStaff,
   startSquareConnection,
   syncSquareAppointments,
 } from '../services/rtbService';
@@ -28,6 +33,12 @@ import {
   formatDateTime,
   formatNumber,
 } from '../utils/formatters';
+import {
+  BOOKSY_IMPORT_MAPPINGS_KEY,
+  applyBooksyImportReview,
+  createBooksyImportReview,
+  mergeRememberedImportMappings,
+} from '../utils/importMappings';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -125,6 +136,379 @@ function formatSquareActionError(message) {
   }
 
   return message;
+}
+
+function uniqueOptions(values) {
+  const seen = new Map();
+
+  values.forEach((value) => {
+    const label = String(value || '').trim();
+    const key = label.toLowerCase();
+    if (label && !seen.has(key)) seen.set(key, label);
+  });
+
+  return [...seen.values()];
+}
+
+function ReviewBadge({ choice }) {
+  if (choice.matchType === 'exact') {
+    return <StatusBadge tone="success">Auto-linked</StatusBadge>;
+  }
+
+  if (choice.matchType === 'remembered') {
+    return <StatusBadge tone="success">Remembered</StatusBadge>;
+  }
+
+  return <StatusBadge tone="warning">Needs review</StatusBadge>;
+}
+
+function BooksyImportWizard({
+  actionLoading,
+  existingServices,
+  onCancel,
+  onConfirm,
+  onUpdateService,
+  onUpdateStaff,
+  staff,
+  wizard,
+}) {
+  const [step, setStep] = useState('staff');
+  const activeStaff = getRows(staff).filter((member) => member.active !== false);
+  const serviceOptions = uniqueOptions([
+    ...existingServices,
+    ...wizard.serviceReview.map((choice) => choice.targetName),
+  ]);
+  const pendingStaff = wizard.staffReview.filter((choice) => choice.matchType === 'pending');
+  const pendingServices = wizard.serviceReview.filter((choice) => choice.matchType === 'pending');
+  const invalidStaff = wizard.staffReview.some(
+    (choice) =>
+      (choice.action === 'match' && !choice.targetId) ||
+      (choice.action === 'create' && !String(choice.targetName || '').trim()),
+  );
+  const invalidServices = wizard.serviceReview.some(
+    (choice) =>
+      (choice.action === 'match' && !String(choice.targetName || '').trim()) ||
+      (choice.action === 'create' && !String(choice.targetName || '').trim()),
+  );
+  const canConfirm = !invalidStaff && !invalidServices && actionLoading !== 'confirm-booksy';
+
+  function setStaffAction(choice, action) {
+    if (action === 'match') {
+      const target = activeStaff.find((member) => member.id === choice.targetId) || activeStaff[0];
+      onUpdateStaff(choice.key, {
+        action,
+        targetId: target?.id || '',
+        targetName: target?.full_name || '',
+      });
+      return;
+    }
+
+    if (action === 'create') {
+      onUpdateStaff(choice.key, {
+        action,
+        targetId: '',
+        targetName: choice.sourceName,
+      });
+      return;
+    }
+
+    onUpdateStaff(choice.key, {
+      action,
+      targetId: '',
+      targetName: '',
+    });
+  }
+
+  function setServiceAction(choice, action) {
+    if (action === 'match') {
+      onUpdateService(choice.key, {
+        action,
+        targetName: serviceOptions.includes(choice.targetName)
+          ? choice.targetName
+          : serviceOptions[0] || '',
+      });
+      return;
+    }
+
+    if (action === 'create') {
+      onUpdateService(choice.key, {
+        action,
+        targetName: choice.sourceName,
+      });
+      return;
+    }
+
+    onUpdateService(choice.key, {
+      action,
+      targetName: '',
+    });
+  }
+
+  return (
+    <section className="panel full-span import-wizard">
+      <div className="section-header">
+        <div>
+          <span>Booksy import wizard</span>
+          <h2>Review names before saving</h2>
+        </div>
+        <StatusBadge tone="warning">
+          {formatNumber(pendingStaff.length + pendingServices.length)} need review
+        </StatusBadge>
+      </div>
+
+      <div className="wizard-steps" role="tablist" aria-label="Booksy import steps">
+        {[
+          ['staff', '1. Staff'],
+          ['services', '2. Services'],
+          ['summary', '3. Confirm'],
+        ].map(([key, label]) => (
+          <button
+            className={step === key ? 'active' : ''}
+            key={key}
+            type="button"
+            onClick={() => setStep(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {step === 'staff' ? (
+        <div className="wizard-panel">
+          <div className="import-review-summary">
+            <strong>{formatNumber(pendingStaff.length)} new staff names found</strong>
+            <span>
+              Exact matches are linked automatically. Unmatched names can create staff, match an
+              existing staff member, or be ignored.
+            </span>
+          </div>
+          <DataTable>
+            <table>
+              <thead>
+                <tr>
+                  <th>Booksy name</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                  <th>RTB OS staff</th>
+                  <th>Remember</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wizard.staffReview.map((choice) => (
+                  <tr key={choice.key}>
+                    <td>{choice.sourceName}</td>
+                    <td><ReviewBadge choice={choice} /></td>
+                    <td>
+                      <select
+                        value={choice.action}
+                        onChange={(event) => setStaffAction(choice, event.target.value)}
+                      >
+                        <option value="create">Create Staff</option>
+                        <option value="match">Match Existing</option>
+                        <option value="ignore">Ignore</option>
+                      </select>
+                    </td>
+                    <td>
+                      {choice.action === 'match' ? (
+                        <select
+                          value={choice.targetId || ''}
+                          onChange={(event) => {
+                            const target = activeStaff.find(
+                              (member) => member.id === event.target.value,
+                            );
+                            onUpdateStaff(choice.key, {
+                              targetId: target?.id || '',
+                              targetName: target?.full_name || '',
+                            });
+                          }}
+                        >
+                          <option value="">Choose staff</option>
+                          {activeStaff.map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {member.full_name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                      {choice.action === 'create' ? (
+                        <input
+                          value={choice.targetName || ''}
+                          onChange={(event) =>
+                            onUpdateStaff(choice.key, { targetName: event.target.value })
+                          }
+                        />
+                      ) : null}
+                      {choice.action === 'ignore' ? <span className="subtle-text">No staff link</span> : null}
+                    </td>
+                    <td>
+                      <label className="inline-check">
+                        <input
+                          checked={Boolean(choice.remember)}
+                          type="checkbox"
+                          onChange={(event) =>
+                            onUpdateStaff(choice.key, { remember: event.target.checked })
+                          }
+                        />
+                        Save alias
+                      </label>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DataTable>
+        </div>
+      ) : null}
+
+      {step === 'services' ? (
+        <div className="wizard-panel">
+          <div className="import-review-summary">
+            <strong>{formatNumber(pendingServices.length)} new services found</strong>
+            <span>
+              Service mappings keep Booksy service labels from creating duplicate report lines.
+            </span>
+          </div>
+          <DataTable>
+            <table>
+              <thead>
+                <tr>
+                  <th>Booksy service</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                  <th>RTB OS service</th>
+                  <th>Remember</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wizard.serviceReview.map((choice) => (
+                  <tr key={choice.key}>
+                    <td>{choice.sourceName}</td>
+                    <td><ReviewBadge choice={choice} /></td>
+                    <td>
+                      <select
+                        value={choice.action}
+                        onChange={(event) => setServiceAction(choice, event.target.value)}
+                      >
+                        <option value="create">Create Service</option>
+                        <option value="match">Match Existing</option>
+                        <option value="ignore">Ignore</option>
+                      </select>
+                    </td>
+                    <td>
+                      {choice.action === 'match' ? (
+                        <select
+                          value={choice.targetName || ''}
+                          onChange={(event) =>
+                            onUpdateService(choice.key, { targetName: event.target.value })
+                          }
+                        >
+                          <option value="">Choose service</option>
+                          {serviceOptions.map((service) => (
+                            <option key={service} value={service}>
+                              {service}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                      {choice.action === 'create' ? (
+                        <input
+                          value={choice.targetName || ''}
+                          onChange={(event) =>
+                            onUpdateService(choice.key, { targetName: event.target.value })
+                          }
+                        />
+                      ) : null}
+                      {choice.action === 'ignore' ? <span className="subtle-text">No service link</span> : null}
+                    </td>
+                    <td>
+                      <label className="inline-check">
+                        <input
+                          checked={Boolean(choice.remember)}
+                          type="checkbox"
+                          onChange={(event) =>
+                            onUpdateService(choice.key, { remember: event.target.checked })
+                          }
+                        />
+                        Save alias
+                      </label>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DataTable>
+        </div>
+      ) : null}
+
+      {step === 'summary' ? (
+        <div className="wizard-panel">
+          <div className="import-summary-grid">
+            <div>
+              <Plus size={18} />
+              <strong>{formatNumber(wizard.staffReview.filter((choice) => choice.action === 'create').length)}</strong>
+              <span>staff to create</span>
+            </div>
+            <div>
+              <Link2 size={18} />
+              <strong>{formatNumber(wizard.staffReview.filter((choice) => choice.action === 'match').length)}</strong>
+              <span>staff links</span>
+            </div>
+            <div>
+              <Scissors size={18} />
+              <strong>{formatNumber(wizard.serviceReview.filter((choice) => choice.action !== 'ignore').length)}</strong>
+              <span>services mapped</span>
+            </div>
+            <div>
+              <Ban size={18} />
+              <strong>
+                {formatNumber(
+                  wizard.staffReview.filter((choice) => choice.action === 'ignore').length +
+                    wizard.serviceReview.filter((choice) => choice.action === 'ignore').length,
+                )}
+              </strong>
+              <span>ignored names</span>
+            </div>
+          </div>
+          <div className="alert warning">
+            <AlertTriangle size={16} />
+            <span>
+              Confirming will save the Booksy dashboard, create selected staff profiles, and save
+              checked aliases for the next import.
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="action-row end">
+        <button
+          className="ghost-button"
+          disabled={Boolean(actionLoading)}
+          type="button"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+        {step !== 'summary' ? (
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => setStep(step === 'staff' ? 'services' : 'summary')}
+          >
+            Continue
+          </button>
+        ) : (
+          <button
+            className="primary-button"
+            disabled={!canConfirm}
+            type="button"
+            onClick={onConfirm}
+          >
+            {actionLoading === 'confirm-booksy' ? 'Saving...' : 'Confirm import'}
+          </button>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function OverviewTab({ data, setActiveTab, sourceName }) {
@@ -641,16 +1025,19 @@ export default function BooksyInsightsPage({
   masterDashboardUpdatedAt,
   onRefresh,
   squareStatus,
+  staff,
 }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState('');
   const [clearImportOpen, setClearImportOpen] = useState(false);
+  const [importWizard, setImportWizard] = useState(null);
   const booksyInputRef = useRef(null);
   const source = getAppointmentSource(businessUnit);
   const hasData = Boolean(masterDashboard);
   const canManage = canManageAppointments(accessProfile);
+  const existingServices = uniqueOptions(getRows(masterDashboard?.services).map((service) => service.name || service.fullName));
   const squareConnected = Boolean(squareStatus?.connected);
   const squareSetupMode = squareStatus?.setup?.mode || squareStatus?.connection?.status || 'missing';
   const usesDirectSquareToken = squareSetupMode === 'direct_token';
@@ -712,19 +1099,128 @@ export default function BooksyInsightsPage({
     try {
       const text = await readBooksyImportFile(file);
       const dashboard = parseBooksyReport(text, file.name);
-      await saveAppSetting('rtb_master_dashboard', dashboard);
-      const importLabel =
-        dashboard.summary?.reportKind === 'summary' ? 'appointments from summary' : 'rows';
+      const mappings = await getAppSetting(BOOKSY_IMPORT_MAPPINGS_KEY);
+      const review = createBooksyImportReview({
+        dashboard,
+        existingDashboard: masterDashboard,
+        mappings,
+        staff,
+      });
+      const reviewCount =
+        review.staffReview.filter((choice) => choice.matchType === 'pending').length +
+        review.serviceReview.filter((choice) => choice.matchType === 'pending').length;
+
+      setImportWizard({
+        ...review,
+        fileName: file.name,
+      });
       setActionMessage(
-        `Booksy imported ${formatNumber(dashboard.summary.allTimeBookings)} ${importLabel}.`,
+        reviewCount
+          ? `Booksy file is ready. Review ${formatNumber(reviewCount)} unmatched names before saving.`
+          : 'Booksy file is ready. Review the summary and confirm the import.',
       );
-      setActiveTab('overview');
-      await onRefresh?.();
     } catch (err) {
       setActionError(err.message || 'Booksy import failed.');
     } finally {
       setActionLoading('');
       event.target.value = '';
+    }
+  }
+
+  function updateBooksyStaffChoice(key, updates) {
+    setImportWizard((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        staffReview: current.staffReview.map((choice) =>
+          choice.key === key
+            ? {
+                ...choice,
+                ...updates,
+                matchType: choice.matchType === 'exact' ? 'manual' : choice.matchType,
+              }
+            : choice,
+        ),
+      };
+    });
+  }
+
+  function updateBooksyServiceChoice(key, updates) {
+    setImportWizard((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        serviceReview: current.serviceReview.map((choice) =>
+          choice.key === key
+            ? {
+                ...choice,
+                ...updates,
+                matchType: choice.matchType === 'exact' ? 'manual' : choice.matchType,
+              }
+            : choice,
+        ),
+      };
+    });
+  }
+
+  async function handleConfirmBooksyImport() {
+    if (!importWizard || !businessUnit?.id) return;
+
+    setActionError('');
+    setActionMessage('');
+    setActionLoading('confirm-booksy');
+
+    try {
+      const staffReview = [];
+
+      for (const choice of importWizard.staffReview) {
+        if (choice.action !== 'create') {
+          staffReview.push(choice);
+          continue;
+        }
+
+        const created = await saveStaff({
+          active: true,
+          business_unit_id: businessUnit.id,
+          commission_rate: 60,
+          fixed_rate: false,
+          full_name: choice.targetName || choice.sourceName,
+          notes: `Created from Booksy import ${importWizard.fileName}.`,
+          role: 'Staff',
+          tier: 'standard',
+        });
+
+        staffReview.push({
+          ...choice,
+          action: 'match',
+          targetId: created.id,
+          targetName: created.full_name,
+        });
+      }
+
+      const dashboard = applyBooksyImportReview(
+        importWizard.dashboard,
+        staffReview,
+        importWizard.serviceReview,
+      );
+      const mappings = mergeRememberedImportMappings(
+        importWizard.mappings,
+        staffReview,
+        importWizard.serviceReview,
+      );
+
+      await saveAppSetting('rtb_master_dashboard', dashboard);
+      await saveAppSetting(BOOKSY_IMPORT_MAPPINGS_KEY, mappings);
+      await onRefresh?.();
+      setImportWizard(null);
+      setActiveTab('overview');
+      setActionMessage(
+        `Booksy imported ${formatNumber(dashboard.summary?.allTimeBookings)} appointments with reviewed staff and service mappings.`,
+      );
+    } catch (err) {
+      setActionError(err.message || 'Booksy import could not be saved.');
+    } finally {
+      setActionLoading('');
     }
   }
 
@@ -863,32 +1359,45 @@ export default function BooksyInsightsPage({
           </div>
         </section>
 
-        <section className="panel full-span">
-          {source.name === 'Square Appointments' ? (
-            <div className="integration-status">
-              <div>
-                <StatusBadge tone={squareStatusTone}>
-                  {squareStatusLabel}
-                </StatusBadge>
-                <span>
-                  {squareSyncLimited && squareStatus?.sync?.nextSyncAt
-                    ? `Next sync available ${formatDateTime(squareStatus.sync.nextSyncAt)}`
-                    : squareStatusDetail}
-                </span>
-              </div>
-              <small>
-                Limit: {squareStatus?.limits?.dailyLimit || 4} syncs/day, up to{' '}
-                {formatNumber(squareStatus?.limits?.maxBookings || 500)} bookings per sync
-              </small>
-            </div>
-          ) : null}
-          <EmptyState
-            icon={CalendarDays}
-            title={source.emptyTitle}
-            message={source.emptyMessage}
-            action={squareActions || booksyActions}
+        {source.name === 'Booksy' && importWizard ? (
+          <BooksyImportWizard
+            actionLoading={actionLoading}
+            existingServices={existingServices}
+            onCancel={() => setImportWizard(null)}
+            onConfirm={handleConfirmBooksyImport}
+            onUpdateService={updateBooksyServiceChoice}
+            onUpdateStaff={updateBooksyStaffChoice}
+            staff={staff}
+            wizard={importWizard}
           />
-        </section>
+        ) : (
+          <section className="panel full-span">
+            {source.name === 'Square Appointments' ? (
+              <div className="integration-status">
+                <div>
+                  <StatusBadge tone={squareStatusTone}>
+                    {squareStatusLabel}
+                  </StatusBadge>
+                  <span>
+                    {squareSyncLimited && squareStatus?.sync?.nextSyncAt
+                      ? `Next sync available ${formatDateTime(squareStatus.sync.nextSyncAt)}`
+                      : squareStatusDetail}
+                  </span>
+                </div>
+                <small>
+                  Limit: {squareStatus?.limits?.dailyLimit || 4} syncs/day, up to{' '}
+                  {formatNumber(squareStatus?.limits?.maxBookings || 500)} bookings per sync
+                </small>
+              </div>
+            ) : null}
+            <EmptyState
+              icon={CalendarDays}
+              title={source.emptyTitle}
+              message={source.emptyMessage}
+              action={squareActions || booksyActions}
+            />
+          </section>
+        )}
       </div>
     );
   }
@@ -925,6 +1434,19 @@ export default function BooksyInsightsPage({
           </div>
           {booksyActions}
         </section>
+      ) : null}
+
+      {source.name === 'Booksy' && importWizard ? (
+        <BooksyImportWizard
+          actionLoading={actionLoading}
+          existingServices={existingServices}
+          onCancel={() => setImportWizard(null)}
+          onConfirm={handleConfirmBooksyImport}
+          onUpdateService={updateBooksyServiceChoice}
+          onUpdateStaff={updateBooksyStaffChoice}
+          staff={staff}
+          wizard={importWizard}
+        />
       ) : null}
 
       {source.name === 'Square Appointments' ? (
