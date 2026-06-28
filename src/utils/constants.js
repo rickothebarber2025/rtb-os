@@ -6,6 +6,7 @@
   LayoutDashboard,
   ReceiptText,
   ShieldCheck,
+  SlidersHorizontal,
   Users,
 } from 'lucide-react';
 
@@ -17,6 +18,7 @@ export const NAV_ITEMS = [
   { id: 'insights', label: 'Appointment Insights', icon: CalendarDays },
   { id: 'booth-rent', label: 'Booth Rent', icon: ReceiptText },
   { id: 'operations', label: 'Operations', icon: ClipboardCheck },
+  { id: 'system', label: 'System Tools', icon: SlidersHorizontal },
   { id: 'access', label: 'Access', icon: ShieldCheck },
 ];
 

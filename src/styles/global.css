@@ -1937,6 +1937,119 @@ select {
   padding-left: 1.1rem;
 }
 
+.system-page .hero-panel {
+  overflow: hidden;
+}
+
+.system-check-grid,
+.system-export-grid,
+.system-action-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.system-check-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.system-export-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.system-action-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.system-check-card,
+.system-action-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  min-height: 92px;
+  padding: 0.85rem;
+  text-align: left;
+}
+
+.system-check-card {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.system-check-card strong,
+.system-check-card span,
+.system-action-card strong,
+.system-action-card small {
+  display: block;
+}
+
+.system-check-card span,
+.system-action-card small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.system-check-card.success {
+  border-color: rgba(85, 214, 146, 0.24);
+}
+
+.system-check-card.warning {
+  border-color: rgba(241, 199, 104, 0.28);
+}
+
+.system-check-card.danger {
+  background: var(--red-soft);
+  border-color: rgba(255, 113, 109, 0.26);
+}
+
+.system-check-card.muted {
+  color: var(--text);
+}
+
+.system-action-card {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.72rem;
+}
+
+.system-action-card svg {
+  color: var(--gold-strong);
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.system-summary {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.system-summary div {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.72rem;
+}
+
+.system-summary span,
+.system-summary strong {
+  display: block;
+}
+
+.system-summary span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.system-summary strong {
+  margin-top: 0.25rem;
+}
+
+.full-width {
+  width: 100%;
+}
+
 .access-toggle {
   align-items: center;
   display: flex;
@@ -2120,7 +2233,9 @@ select {
   .probation-grid,
   .ops-checklist-grid,
   .ops-form-grid,
-  .ops-tier-grid {
+  .ops-tier-grid,
+  .system-check-grid,
+  .system-action-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2130,7 +2245,8 @@ select {
   .ops-two-column,
   .ops-reference-layout,
   .ops-training-grid,
-  .ops-step-grid {
+  .ops-step-grid,
+  .system-export-grid {
     grid-template-columns: 1fr;
   }
 

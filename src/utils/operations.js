@@ -84,5 +84,12 @@ export function buildOperationalChecks({
     tone: 'muted',
   });
 
+  checks.push({
+    action: 'system',
+    detail: 'Health checks, backups, exports, and recovery shortcuts',
+    label: 'System tools',
+    tone: 'success',
+  });
+
   return checks;
 }

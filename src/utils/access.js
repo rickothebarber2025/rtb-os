@@ -37,6 +37,7 @@ const PAGE_ACCESS = {
   payroll: ['admin'],
   performance: ['admin', 'manager'],
   staff: ['admin', 'manager'],
+  system: ['admin', 'manager'],
 };
 
 export function getRoleLabel(role) {

@@ -13,6 +13,12 @@ import {
   normalizeOperationsState,
 } from '../src/utils/operationsManual.js';
 import {
+  buildSystemChecks,
+  createBackupSnapshot,
+  flattenPayrollEntries,
+  toCsv,
+} from '../src/utils/systemTools.js';
+import {
   getProbationInfo,
   toGraduationPayload,
   toProbationPayload,
@@ -158,4 +164,62 @@ test('operations extension normalizes saved checklist data', () => {
   assert.equal(normalized.checklists.opening[1], false);
   assert.equal(normalized.hires[0].name, 'Test Staff');
   assert.equal(openingProgress.done, 1);
+});
+
+test('system tools create backups and CSV exports without leaking secrets', () => {
+  const snapshot = createBackupSnapshot({
+    accessProfile: { role: 'admin' },
+    boothRent: [{ renter_name: 'Tara', rent_amount: 200 }],
+    businessUnit: { name: 'RTB Lounge' },
+    businessUnits: [{ name: 'RTB Lounge' }],
+    payrollRuns: [
+      {
+        payroll_entries: [
+          {
+            applied_commission_rate: 60,
+            deduction: 5,
+            net_sales: 1000,
+            staff_name_snapshot: 'Ricko',
+            take_home: 595,
+          },
+        ],
+        status: 'locked',
+        week_label: 'Jun 1 - Jun 7',
+      },
+    ],
+    staff: [{ active: true, full_name: 'Ricko' }],
+    user: { email: 'owner@example.com' },
+  });
+  const entries = flattenPayrollEntries(snapshot.tables.payrollRuns);
+  const csv = toCsv([{ name: 'A, B', note: 'quoted "value"' }]);
+
+  assert.equal(snapshot.kind, 'rtb-os-backup-v1');
+  assert.equal(snapshot.summary.activeStaff, 1);
+  assert.equal(entries[0].run_week, 'Jun 1 - Jun 7');
+  assert.match(csv, /"A, B"/);
+  assert.match(csv, /"quoted ""value"""/);
+  assert.equal(JSON.stringify(snapshot).includes('service_role'), false);
+});
+
+test('system checks flag overdue probation and missing appointment source', () => {
+  const checks = buildSystemChecks({
+    accessProfile: { role: 'admin' },
+    businessUnit: { name: 'RTB Beauty Lounge' },
+    masterDashboard: null,
+    payrollRuns: [],
+    squareStatus: { connected: false },
+    staff: [
+      {
+        active: true,
+        full_name: 'Probation Staff',
+        probation_start_date: '2026-01-01',
+        tier: 'probation',
+      },
+    ],
+    now: new Date('2026-06-28T12:00:00Z'),
+  });
+
+  assert.equal(checks.find((check) => check.label === 'Probation').tone, 'warning');
+  assert.equal(checks.find((check) => check.label === 'Square connection').tone, 'danger');
+  assert.equal(checks.find((check) => check.label === 'Square appointments').tone, 'warning');
 });

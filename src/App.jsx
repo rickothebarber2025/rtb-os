@@ -1,21 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import AppShell from './components/AppShell';
 import LoadingState from './components/LoadingState';
-import AccessPage from './pages/AccessPage';
 import AccessPendingPage from './pages/AccessPendingPage';
 import AuthPage from './pages/AuthPage';
-import BooksyInsightsPage from './pages/BooksyInsightsPage';
-import BoothRentPage from './pages/BoothRentPage';
-import DashboardPage from './pages/DashboardPage';
-import OperationsPage from './pages/OperationsPage';
-import PayrollPage from './pages/PayrollPage';
-import PerformancePage from './pages/PerformancePage';
-import StaffPage from './pages/StaffPage';
 import { useAuth } from './hooks/useAuth';
 import { useRtbData } from './hooks/useRtbData';
 import { saveStaff } from './services/rtbService';
 import { canAccessPage, canManageStaff, canUseApp, getAllowedNavItems } from './utils/access';
 import { shouldAutoGraduate, toGraduationPayload } from './utils/probation';
+
+const AccessPage = lazy(() => import('./pages/AccessPage'));
+const BooksyInsightsPage = lazy(() => import('./pages/BooksyInsightsPage'));
+const BoothRentPage = lazy(() => import('./pages/BoothRentPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const OperationsPage = lazy(() => import('./pages/OperationsPage'));
+const PayrollPage = lazy(() => import('./pages/PayrollPage'));
+const PerformancePage = lazy(() => import('./pages/PerformancePage'));
+const StaffPage = lazy(() => import('./pages/StaffPage'));
+const SystemPage = lazy(() => import('./pages/SystemPage'));
 
 const STORAGE_KEY = 'rtb-os-business-unit';
 
@@ -81,6 +83,7 @@ export default function App() {
     () => ({
       boothRent: data.boothRent,
       businessUnit: data.selectedBusinessUnit,
+      businessUnits: data.businessUnits,
       masterDashboard: data.masterDashboard,
       masterDashboardUpdatedAt: data.masterDashboardUpdatedAt,
       onRefresh: data.refresh,
@@ -92,6 +95,7 @@ export default function App() {
       staff: data.staff,
       accessProfile: auth.profile,
       user: auth.user,
+      warnings: data.warnings,
     }),
     [auth.profile, auth.user, data],
   );
@@ -132,6 +136,8 @@ export default function App() {
         return <BoothRentPage {...pageProps} />;
       case 'operations':
         return <OperationsPage {...pageProps} />;
+      case 'system':
+        return <SystemPage {...pageProps} />;
       case 'dashboard':
       default:
         return <DashboardPage {...pageProps} />;
@@ -189,7 +195,9 @@ export default function App() {
           </button>
         </div>
       ) : null}
-      {renderPage()}
+      <Suspense fallback={<LoadingState label="Loading page" />}>
+        {renderPage()}
+      </Suspense>
     </AppShell>
   );
 }
