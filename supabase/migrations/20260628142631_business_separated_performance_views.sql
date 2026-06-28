@@ -3,7 +3,10 @@ begin;
 -- Attribute performance to the payroll/performance business, not only the
 -- staff member's primary roster business. This keeps Staff of the Month and
 -- rankings separate when a staff member works in both RTB businesses.
-create or replace view public.staff_performance_summary
+drop view if exists public.staff_monthly_performance_summary;
+drop view if exists public.staff_performance_summary;
+
+create view public.staff_performance_summary
 with (security_invoker = true)
 as
 select
@@ -36,7 +39,7 @@ group by
   s.commission_rate,
   s.fixed_rate;
 
-create or replace view public.staff_monthly_performance_summary
+create view public.staff_monthly_performance_summary
 with (security_invoker = true)
 as
 select
