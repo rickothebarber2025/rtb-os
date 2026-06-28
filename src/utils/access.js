@@ -33,6 +33,7 @@ const PAGE_ACCESS = {
   'booth-rent': ['admin', 'manager'],
   dashboard: ['admin', 'manager'],
   insights: ['admin', 'manager'],
+  operations: ['admin', 'manager'],
   payroll: ['admin'],
   performance: ['admin', 'manager'],
   staff: ['admin', 'manager'],

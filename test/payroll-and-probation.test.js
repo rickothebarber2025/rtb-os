@@ -7,6 +7,12 @@ import {
 } from '../src/utils/payroll.js';
 import { buildOperationalChecks, daysSince } from '../src/utils/operations.js';
 import {
+  OPERATION_CHECKLISTS,
+  createDefaultOperationsState,
+  getChecklistProgress,
+  normalizeOperationsState,
+} from '../src/utils/operationsManual.js';
+import {
   getProbationInfo,
   toGraduationPayload,
   toProbationPayload,
@@ -131,4 +137,25 @@ test('payroll correction keeps values but removes saved record identifiers', () 
   assert.equal(correction.entries[0].payroll_run_id, undefined);
   assert.equal(correction.entries[0].net_sales, 750);
   assert.equal(correction.entries[0].paystub_status, 'pending');
+});
+
+test('operations extension normalizes saved checklist data', () => {
+  const defaults = createDefaultOperationsState();
+  const normalized = normalizeOperationsState({
+    changelog: [{ date: 'Jun 2026', note: 'Imported extension' }],
+    checklists: {
+      opening: [true],
+    },
+    hires: [{ id: 'hire-1', name: 'Test Staff' }],
+  });
+  const openingProgress = getChecklistProgress(
+    OPERATION_CHECKLISTS.opening.items,
+    normalized.checklists.opening,
+  );
+
+  assert.equal(defaults.checklists.opening.length, OPERATION_CHECKLISTS.opening.items.length);
+  assert.equal(normalized.checklists.opening[0], true);
+  assert.equal(normalized.checklists.opening[1], false);
+  assert.equal(normalized.hires[0].name, 'Test Staff');
+  assert.equal(openingProgress.done, 1);
 });

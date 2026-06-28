@@ -1612,6 +1612,331 @@ select {
   font-size: 0.82rem;
 }
 
+.operations-page .hero-panel {
+  overflow: hidden;
+}
+
+.ops-tabs button {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.45rem;
+  justify-content: center;
+}
+
+.ops-two-column,
+.ops-reference-layout,
+.ops-training-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ops-checklist-grid,
+.ops-form-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ops-checklist-card,
+.ops-form-card,
+.ops-hire-card,
+.ops-tier-card,
+.ops-log-item {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.ops-checklist-card,
+.ops-form-card,
+.ops-hire-card,
+.ops-tier-card {
+  padding: 1rem;
+}
+
+.ops-progress {
+  background: rgba(0, 0, 0, 0.34);
+  border-radius: 999px;
+  height: 8px;
+  margin-top: 0.85rem;
+  overflow: hidden;
+}
+
+.ops-progress span {
+  background: linear-gradient(90deg, var(--gold), var(--gold-strong));
+  display: block;
+  height: 100%;
+  transition: width 160ms ease;
+}
+
+.ops-progress-meta {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.55rem;
+}
+
+.ops-progress-meta strong {
+  font-size: 0.82rem;
+}
+
+.ops-progress-meta span,
+.ops-form-card > div > span,
+.ops-hire-card__top span,
+.ops-reference-row span,
+.ops-log-item span,
+.ops-tier-card span,
+.ops-tier-card small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.ops-checklist-items {
+  display: grid;
+  gap: 0.52rem;
+  margin-top: 1rem;
+}
+
+.ops-check-item {
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: flex;
+  gap: 0.65rem;
+  line-height: 1.35;
+  min-height: 42px;
+  padding: 0.7rem;
+  text-align: left;
+}
+
+.ops-check-item span {
+  align-items: center;
+  border: 1px solid rgba(214, 168, 79, 0.48);
+  border-radius: 5px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 20px;
+  justify-content: center;
+  margin-top: 0.02rem;
+  width: 20px;
+}
+
+.ops-check-item.done {
+  background: var(--gold-soft);
+  border-color: rgba(214, 168, 79, 0.28);
+}
+
+.ops-check-item.done span {
+  background: var(--gold);
+  color: #15100a;
+}
+
+.ops-hire-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.ops-hire-card__top {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.ops-hire-card__top strong,
+.ops-hire-card__top span,
+.ops-form-card h2,
+.ops-form-card p,
+.ops-tier-card h3,
+.ops-tier-card strong,
+.ops-tier-card small {
+  display: block;
+}
+
+.ops-form-card {
+  display: grid;
+  gap: 1rem;
+  grid-template-rows: 1fr auto;
+}
+
+.ops-form-card h2,
+.ops-tier-card h3 {
+  font-size: 1rem;
+  margin: 0.25rem 0 0;
+}
+
+.ops-form-card p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0.55rem 0 0;
+}
+
+.ops-step-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.ops-step {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.72rem;
+  text-align: left;
+}
+
+.ops-step > span {
+  align-items: center;
+  background: rgba(214, 168, 79, 0.12);
+  border-radius: 50%;
+  color: var(--gold-strong);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 900;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.ops-step small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.ops-step.done {
+  background: var(--green-soft);
+  border-color: rgba(85, 214, 146, 0.25);
+}
+
+.ops-step.done > span {
+  background: var(--green);
+  color: #06130c;
+}
+
+.ops-reference-list {
+  display: grid;
+  gap: 0.65rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ops-reference-list li,
+.ops-reference-row {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: grid;
+  gap: 0.26rem;
+  line-height: 1.45;
+  padding: 0.72rem;
+}
+
+.ops-tier-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ops-tier-card {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.ops-tier-card strong {
+  color: var(--gold-strong);
+  font-size: 1.3rem;
+  margin-top: 0.35rem;
+}
+
+.ops-tier-card ul {
+  color: var(--muted);
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.ops-tier-card.success {
+  border-color: rgba(85, 214, 146, 0.2);
+}
+
+.ops-tier-card.warning {
+  border-color: rgba(241, 199, 104, 0.22);
+}
+
+.ops-tier-card.blue {
+  border-color: rgba(122, 183, 255, 0.22);
+}
+
+.ops-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+}
+
+.ops-chip-list span {
+  background: var(--gold-soft);
+  border: 1px solid rgba(214, 168, 79, 0.2);
+  border-radius: 999px;
+  color: var(--gold-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.36rem 0.62rem;
+}
+
+.ops-log-list,
+.ops-template-preview {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ops-log-item {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.85rem;
+}
+
+.ops-log-item p {
+  line-height: 1.45;
+  margin: 0.25rem 0 0;
+}
+
+.ops-template-preview {
+  margin: 1rem 0;
+}
+
+.ops-template-preview section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.85rem;
+}
+
+.ops-template-preview h3 {
+  color: var(--gold-strong);
+  font-size: 0.9rem;
+  margin: 0 0 0.55rem;
+}
+
+.ops-template-preview ul {
+  color: var(--muted);
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
 .access-toggle {
   align-items: center;
   display: flex;
@@ -1646,6 +1971,10 @@ select {
   min-height: 220px;
   padding: 1.25rem;
   text-align: center;
+}
+
+.empty-state.compact {
+  min-height: 150px;
 }
 
 .empty-state h3 {
@@ -1788,13 +2117,20 @@ select {
   .snapshot-grid,
   .operations-grid,
   .staff-insight-grid,
-  .probation-grid {
+  .probation-grid,
+  .ops-checklist-grid,
+  .ops-form-grid,
+  .ops-tier-grid {
     grid-template-columns: 1fr;
   }
 
   .page-grid,
   .payroll-layout,
-  .booth-layout {
+  .booth-layout,
+  .ops-two-column,
+  .ops-reference-layout,
+  .ops-training-grid,
+  .ops-step-grid {
     grid-template-columns: 1fr;
   }
 

@@ -77,5 +77,12 @@ export function buildOperationalChecks({
     tone: boothRentCount ? 'success' : 'muted',
   });
 
+  checks.push({
+    action: 'operations',
+    detail: 'SOPs, hiring workflows, forms, training, and change log',
+    label: 'Operating system',
+    tone: 'muted',
+  });
+
   return checks;
 }

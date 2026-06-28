@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage';
 import BooksyInsightsPage from './pages/BooksyInsightsPage';
 import BoothRentPage from './pages/BoothRentPage';
 import DashboardPage from './pages/DashboardPage';
+import OperationsPage from './pages/OperationsPage';
 import PayrollPage from './pages/PayrollPage';
 import PerformancePage from './pages/PerformancePage';
 import StaffPage from './pages/StaffPage';
@@ -129,6 +130,8 @@ export default function App() {
         return <BooksyInsightsPage {...pageProps} />;
       case 'booth-rent':
         return <BoothRentPage {...pageProps} />;
+      case 'operations':
+        return <OperationsPage {...pageProps} />;
       case 'dashboard':
       default:
         return <DashboardPage {...pageProps} />;

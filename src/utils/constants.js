@@ -2,6 +2,7 @@
   BarChart3,
   CalendarDays,
   CircleDollarSign,
+  ClipboardCheck,
   LayoutDashboard,
   ReceiptText,
   ShieldCheck,
@@ -15,6 +16,7 @@ export const NAV_ITEMS = [
   { id: 'performance', label: 'Performance', icon: BarChart3 },
   { id: 'insights', label: 'Appointment Insights', icon: CalendarDays },
   { id: 'booth-rent', label: 'Booth Rent', icon: ReceiptText },
+  { id: 'operations', label: 'Operations', icon: ClipboardCheck },
   { id: 'access', label: 'Access', icon: ShieldCheck },
 ];
 
