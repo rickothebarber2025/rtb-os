@@ -5,6 +5,10 @@ const SQUARE_API_BASE = "https://connect.squareup.com";
 const SQUARE_OAUTH_BASE = "https://connect.squareup.com/oauth2";
 const SQUARE_VERSION = Deno.env.get("SQUARE_VERSION") || "2026-05-20";
 const SYNC_USAGE_KEY = "square_sync_usage";
+const DIRECT_TOKEN_SETUP_MESSAGE =
+  "Add SQUARE_ACCESS_TOKEN as a Supabase Edge Function secret, then run Sync Square.";
+const OAUTH_SETUP_MESSAGE =
+  "Square OAuth secrets are missing. Add SQUARE_APPLICATION_ID and SQUARE_APPLICATION_SECRET, or use SQUARE_ACCESS_TOKEN for manual sync.";
 const SCOPES = [
   "APPOINTMENTS_READ",
   "APPOINTMENTS_ALL_READ",
@@ -70,10 +74,20 @@ function getSquareConfig(requireSecret = false) {
     `${Deno.env.get("SUPABASE_URL")}/functions/v1/square-oauth-callback`;
 
   if (!applicationId || !redirectUrl || (requireSecret && !applicationSecret)) {
-    throw new Error("Square function secrets are missing.");
+    throw new Error(OAUTH_SETUP_MESSAGE);
   }
 
   return { applicationId, applicationSecret, redirectUrl };
+}
+
+function hasSquareOAuthConfig(requireSecret = false) {
+  const applicationId = Deno.env.get("SQUARE_APPLICATION_ID");
+  const applicationSecret = Deno.env.get("SQUARE_APPLICATION_SECRET");
+  const redirectUrl =
+    Deno.env.get("SQUARE_REDIRECT_URL") ||
+    `${Deno.env.get("SUPABASE_URL")}/functions/v1/square-oauth-callback`;
+
+  return Boolean(applicationId && redirectUrl && (!requireSecret || applicationSecret));
 }
 
 function getDirectSquareConnection() {
@@ -500,7 +514,7 @@ async function getValidSquareConnection(admin: ReturnType<typeof createClient>, 
   if (!data) {
     const directConnection = getDirectSquareConnection();
     if (directConnection) return directConnection;
-    throw new Error("Square is not connected yet. Add SQUARE_ACCESS_TOKEN as a Supabase Function secret or use Connect Square.");
+    throw new Error(`Square is not connected yet. ${DIRECT_TOKEN_SETUP_MESSAGE}`);
   }
 
   const expiresAt = data.expires_at ? new Date(data.expires_at).getTime() : 0;
@@ -637,6 +651,14 @@ Deno.serve(async (req) => {
     }
 
     if (action === "start") {
+      const directConnection = getDirectSquareConnection();
+      if (directConnection && !hasSquareOAuthConfig(false)) {
+        return jsonResponse({
+          directToken: true,
+          error: "Square is already set up for production-token sync. Use Sync Square instead of OAuth Connect.",
+        }, 409);
+      }
+
       const { applicationId, redirectUrl } = getSquareConfig(false);
       const state = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
@@ -677,6 +699,7 @@ Deno.serve(async (req) => {
       const directConnection = getDirectSquareConnection();
       const budget = await getSyncBudget(admin);
       const daily = budget.usage?.daily || {};
+      const oauthConfigured = hasSquareOAuthConfig(true);
       return jsonResponse({
         connected: Boolean(data || directConnection),
         connection: data || (directConnection
@@ -688,6 +711,16 @@ Deno.serve(async (req) => {
           }
           : null),
         limits: getSyncLimits(),
+        setup: {
+          directTokenConfigured: Boolean(directConnection),
+          message: directConnection
+            ? "Production token sync ready."
+            : data
+              ? "Square OAuth connection saved."
+              : DIRECT_TOKEN_SETUP_MESSAGE,
+          mode: directConnection ? "direct_token" : data ? "oauth" : "missing",
+          oauthConfigured,
+        },
         sync: {
           allowed: budget.allowed,
           dailyCount: Number(daily.count || 0),

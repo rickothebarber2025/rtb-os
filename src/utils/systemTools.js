@@ -180,11 +180,15 @@ export function buildSystemChecks({
   });
 
   if (isBeauty) {
+    const squareConnectionDetail = squareStatus?.connected
+      ? squareStatus.connection?.status === 'direct_token'
+        ? 'Square production token sync is ready'
+        : 'Square connection is active'
+      : squareStatus?.setup?.message || 'Square production token setup is needed';
+
     addCheck(checks, {
       action: 'insights',
-      detail: squareStatus?.connected
-        ? 'Square connection is active'
-        : 'Square connection needs attention',
+      detail: squareConnectionDetail,
       label: 'Square connection',
       tone: squareStatus?.connected ? 'success' : 'danger',
     });

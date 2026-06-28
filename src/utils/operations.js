@@ -56,7 +56,7 @@ export function buildOperationalChecks({
   let appointmentTone = sourceAge === null ? 'danger' : sourceAge > 14 ? 'warning' : 'success';
 
   if (isBeauty && squareStatus?.connected === false) {
-    appointmentDetail = 'Square is not connected';
+    appointmentDetail = squareStatus?.setup?.message || 'Square production token setup is needed';
     appointmentTone = 'danger';
   } else if (isBeauty && squareStatus === null) {
     appointmentDetail = 'Square status could not be verified';

@@ -3,6 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SQUARE_OAUTH_BASE = "https://connect.squareup.com/oauth2";
 const SQUARE_VERSION = Deno.env.get("SQUARE_VERSION") || "2026-05-20";
+const OAUTH_SETUP_MESSAGE =
+  "Square OAuth secrets are missing. Add SQUARE_APPLICATION_ID and SQUARE_APPLICATION_SECRET, or use SQUARE_ACCESS_TOKEN with Sync Square instead.";
 
 function htmlResponse(body: string, status = 200) {
   return new Response(body, {
@@ -43,7 +45,7 @@ function getSquareConfig() {
     `${Deno.env.get("SUPABASE_URL")}/functions/v1/square-oauth-callback`;
 
   if (!applicationId || !applicationSecret || !redirectUrl) {
-    throw new Error("Square function secrets are missing.");
+    throw new Error(OAUTH_SETUP_MESSAGE);
   }
 
   return { applicationId, applicationSecret, redirectUrl };

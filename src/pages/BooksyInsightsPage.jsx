@@ -97,7 +97,7 @@ function getAppointmentSource(businessUnit) {
     return {
       dataLabel: 'Square Appointments data',
       emptyMessage:
-        'RTB Beauty Lounge uses Square Appointments. Import Square Appointments data to fill this page.',
+        'RTB Beauty Lounge uses Square Appointments. Sync Square Appointments data to fill this page.',
       emptyTitle: 'Square Appointments data not loaded yet',
       name: 'Square Appointments',
       unit: 'RTB Beauty Lounge',
@@ -111,6 +111,20 @@ function getAppointmentSource(businessUnit) {
     name: 'Booksy',
     unit: 'RTB Lounge',
   };
+}
+
+function formatSquareActionError(message) {
+  if (!message) return 'Square request failed.';
+
+  if (/Square function secrets are missing/i.test(message)) {
+    return 'Square OAuth secrets are missing. For this setup, add SQUARE_ACCESS_TOKEN in Supabase Edge Function secrets, then click Sync Square. Use OAuth Connect only after adding SQUARE_APPLICATION_ID and SQUARE_APPLICATION_SECRET.';
+  }
+
+  if (/Square is not connected yet/i.test(message)) {
+    return 'Square is not connected yet. Add SQUARE_ACCESS_TOKEN in Supabase Edge Function secrets, refresh RTB OS, then click Sync Square.';
+  }
+
+  return message;
 }
 
 function OverviewTab({ data, setActiveTab, sourceName }) {
@@ -638,6 +652,21 @@ export default function BooksyInsightsPage({
   const hasData = Boolean(masterDashboard);
   const canManage = canManageAppointments(accessProfile);
   const squareConnected = Boolean(squareStatus?.connected);
+  const squareSetupMode = squareStatus?.setup?.mode || squareStatus?.connection?.status || 'missing';
+  const usesDirectSquareToken = squareSetupMode === 'direct_token';
+  const squareStatusLabel = squareConnected
+    ? usesDirectSquareToken
+      ? 'Token ready'
+      : 'Connected'
+    : 'Setup needed';
+  const squareStatusTone = squareConnected ? 'success' : 'warning';
+  const squareStatusDetail = squareConnected
+    ? usesDirectSquareToken
+      ? 'Production token sync ready'
+      : 'Square OAuth connected'
+    : squareStatus?.setup?.message ||
+      'Add SQUARE_ACCESS_TOKEN in Supabase Edge Function secrets, then click Sync Square.';
+  const squareSyncLimited = squareStatus?.sync?.allowed === false;
 
   async function handleSquareConnect() {
     setActionError('');
@@ -648,7 +677,7 @@ export default function BooksyInsightsPage({
       const result = await startSquareConnection(businessUnit.id);
       window.location.assign(result.authorizationUrl);
     } catch (err) {
-      setActionError(err.message || 'Square connection could not start.');
+      setActionError(formatSquareActionError(err.message || 'Square connection could not start.'));
       setActionLoading('');
     }
   }
@@ -666,7 +695,7 @@ export default function BooksyInsightsPage({
       );
       await onRefresh?.();
     } catch (err) {
-      setActionError(err.message || 'Square sync failed.');
+      setActionError(formatSquareActionError(err.message || 'Square sync failed.'));
     } finally {
       setActionLoading('');
     }
@@ -766,26 +795,32 @@ export default function BooksyInsightsPage({
       <div className="stack">
         {actionError ? <div className="alert danger">{actionError}</div> : null}
         {actionMessage ? <div className="alert success">{actionMessage}</div> : null}
+        {!squareConnected ? (
+          <div className="alert warning">
+            <AlertTriangle size={16} />
+            <span>{squareStatusDetail}</span>
+          </div>
+        ) : null}
         <div className="action-row">
           <button
             className="primary-button"
+            disabled={Boolean(actionLoading) || squareSyncLimited}
+            type="button"
+            onClick={handleSquareSync}
+          >
+            {actionLoading === 'sync' ? 'Syncing...' : 'Sync Square'}
+          </button>
+          <button
+            className="secondary-button"
             disabled={Boolean(actionLoading)}
             type="button"
             onClick={handleSquareConnect}
           >
             {actionLoading === 'connect'
               ? 'Opening Square...'
-              : squareConnected
+              : squareConnected && !usesDirectSquareToken
                 ? 'Reconnect Square'
-                : 'Connect Square'}
-          </button>
-          <button
-            className="secondary-button"
-            disabled={Boolean(actionLoading) || squareStatus?.connected === false}
-            type="button"
-            onClick={handleSquareSync}
-          >
-            {actionLoading === 'sync' ? 'Syncing...' : 'Sync Square'}
+                : 'OAuth Connect'}
           </button>
           <a
             className="secondary-button"
@@ -832,13 +867,13 @@ export default function BooksyInsightsPage({
           {source.name === 'Square Appointments' ? (
             <div className="integration-status">
               <div>
-                <StatusBadge tone={squareConnected ? 'success' : 'danger'}>
-                  {squareConnected ? 'Connected' : 'Not connected'}
+                <StatusBadge tone={squareStatusTone}>
+                  {squareStatusLabel}
                 </StatusBadge>
                 <span>
-                  {squareStatus?.sync?.nextSyncAt
+                  {squareSyncLimited && squareStatus?.sync?.nextSyncAt
                     ? `Next sync available ${formatDateTime(squareStatus.sync.nextSyncAt)}`
-                    : 'Manual sync only'}
+                    : squareStatusDetail}
                 </span>
               </div>
               <small>
@@ -899,8 +934,8 @@ export default function BooksyInsightsPage({
               <span>Square Appointments</span>
               <h2>Sync data or open Square</h2>
             </div>
-            <StatusBadge tone={squareConnected ? 'success' : 'danger'}>
-              {squareConnected ? 'Connected' : 'Not connected'}
+            <StatusBadge tone={squareStatusTone}>
+              {squareStatusLabel}
             </StatusBadge>
           </div>
           <div className="integration-status">
@@ -908,7 +943,7 @@ export default function BooksyInsightsPage({
               Last data update: {formatDateTime(masterDashboardUpdatedAt || masterDashboard.updatedAt)}
             </span>
             <small>
-              Usage cap: {squareStatus?.limits?.dailyLimit || 4} syncs/day ·{' '}
+              {squareStatusDetail} · Usage cap: {squareStatus?.limits?.dailyLimit || 4} syncs/day ·{' '}
               {formatNumber(squareStatus?.limits?.maxBookings || 500)} bookings max
             </small>
           </div>
