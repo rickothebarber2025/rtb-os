@@ -755,6 +755,11 @@ select {
   gap: 0.38rem;
 }
 
+.compact-field {
+  min-width: 160px;
+  width: auto;
+}
+
 .field > span,
 .check-row span {
   color: var(--muted);
@@ -951,6 +956,10 @@ select {
 
 .action-row.end {
   justify-content: flex-end;
+}
+
+.square-sync-range {
+  margin-top: 0.25rem;
 }
 
 .payroll-layout {

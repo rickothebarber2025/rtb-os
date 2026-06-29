@@ -54,6 +54,21 @@ const TABS = [
 
 const SQUARE_APPOINTMENTS_DASHBOARD_URL = 'https://app.squareup.com/appointments/calendar';
 
+function toDateInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getDefaultSquareSyncRange() {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+
+  return {
+    endDate: toDateInputValue(end),
+    startDate: toDateInputValue(start),
+  };
+}
+
 function isPdfFile(file) {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 }
@@ -1052,6 +1067,7 @@ export default function BooksyInsightsPage({
   const [actionLoading, setActionLoading] = useState('');
   const [clearImportOpen, setClearImportOpen] = useState(false);
   const [importWizard, setImportWizard] = useState(null);
+  const [squareRange, setSquareRange] = useState(getDefaultSquareSyncRange);
   const booksyInputRef = useRef(null);
   const source = getAppointmentSource(businessUnit);
   const businessProfile = getBusinessProfile(businessUnit);
@@ -1098,7 +1114,11 @@ export default function BooksyInsightsPage({
     setActionLoading('sync');
 
     try {
-      const result = await syncSquareAppointments(businessUnit.id);
+      if (squareRange.startDate && squareRange.endDate && squareRange.startDate > squareRange.endDate) {
+        throw new Error('Choose a Square sync end date after the start date.');
+      }
+
+      const result = await syncSquareAppointments(businessUnit.id, squareRange);
       setActionMessage(
         result.message ||
           `Square synced ${formatNumber(result.bookingsSynced)} bookings.`
@@ -1320,6 +1340,30 @@ export default function BooksyInsightsPage({
             <span>{squareStatusDetail}</span>
           </div>
         ) : null}
+        <div className="action-row square-sync-range">
+          <label className="field compact-field">
+            <span>Sync start</span>
+            <input
+              disabled={Boolean(actionLoading)}
+              type="date"
+              value={squareRange.startDate}
+              onChange={(event) =>
+                setSquareRange((current) => ({ ...current, startDate: event.target.value }))
+              }
+            />
+          </label>
+          <label className="field compact-field">
+            <span>Sync end</span>
+            <input
+              disabled={Boolean(actionLoading)}
+              type="date"
+              value={squareRange.endDate}
+              onChange={(event) =>
+                setSquareRange((current) => ({ ...current, endDate: event.target.value }))
+              }
+            />
+          </label>
+        </div>
         <div className="action-row">
           <button
             className="primary-button"

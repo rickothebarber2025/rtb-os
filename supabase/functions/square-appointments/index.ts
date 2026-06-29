@@ -5,6 +5,7 @@ const SQUARE_API_BASE = "https://connect.squareup.com";
 const SQUARE_OAUTH_BASE = "https://connect.squareup.com/oauth2";
 const SQUARE_VERSION = Deno.env.get("SQUARE_VERSION") || "2026-05-20";
 const SYNC_USAGE_KEY = "square_sync_usage";
+const MAX_SQUARE_RANGE_DAYS = 31;
 const DIRECT_TOKEN_SETUP_MESSAGE =
   "Add SQUARE_ACCESS_TOKEN as a Supabase Edge Function secret, then run Sync Square.";
 const OAUTH_SETUP_MESSAGE =
@@ -116,12 +117,6 @@ function getSyncLimits() {
   };
 }
 
-function addMonths(date: Date, months: number) {
-  const copy = new Date(date);
-  copy.setUTCMonth(copy.getUTCMonth() + months);
-  return copy;
-}
-
 function moneyToNumber(amount?: number) {
   return Number(((amount || 0) / 100).toFixed(2));
 }
@@ -132,11 +127,51 @@ function monthLabel(value: string) {
   );
 }
 
-function getPeriod() {
+function parseDateInput(value?: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getDefaultPeriod() {
   const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0));
-  const end = addMonths(start, 12);
+  const end = now;
+  const start = new Date(now);
+  start.setUTCDate(start.getUTCDate() - 30);
   return { end, start };
+}
+
+function getPeriod(body: Record<string, any> = {}) {
+  const providedStart = parseDateInput(body.start_date || body.startDate);
+  const providedEnd = parseDateInput(body.end_date || body.endDate);
+
+  if (providedStart && providedEnd && providedStart < providedEnd) {
+    return {
+      end: providedEnd,
+      start: providedStart,
+    };
+  }
+
+  return getDefaultPeriod();
+}
+
+function splitIntoSquareRanges(start: Date, end: Date) {
+  const ranges: { start: Date; end: Date }[] = [];
+  let cursor = new Date(start);
+
+  while (cursor < end) {
+    const chunkEnd = new Date(cursor);
+    chunkEnd.setUTCDate(chunkEnd.getUTCDate() + MAX_SQUARE_RANGE_DAYS);
+    chunkEnd.setUTCMilliseconds(chunkEnd.getUTCMilliseconds() - 1);
+    ranges.push({
+      end: chunkEnd < end ? chunkEnd : new Date(end),
+      start: new Date(cursor),
+    });
+    cursor = new Date(chunkEnd);
+    cursor.setUTCMilliseconds(cursor.getUTCMilliseconds() + 1);
+  }
+
+  return ranges;
 }
 
 async function getBusinessUnit(admin: ReturnType<typeof createClient>, businessUnitId?: string) {
@@ -235,6 +270,43 @@ async function fetchAllBookings(accessToken: string, start: Date, end: Date, max
   return {
     bookings: bookings.slice(0, maxBookings),
     limited,
+  };
+}
+
+async function fetchAllBookingsChunked(
+  accessToken: string,
+  start: Date,
+  end: Date,
+  maxBookings: number,
+) {
+  const allBookings: Record<string, unknown>[] = [];
+  let limited = false;
+  const ranges = splitIntoSquareRanges(start, end);
+
+  for (const range of ranges) {
+    if (allBookings.length >= maxBookings) {
+      limited = true;
+      break;
+    }
+
+    const remainingLimit = maxBookings - allBookings.length;
+    const result = await fetchAllBookings(
+      accessToken,
+      range.start,
+      range.end,
+      remainingLimit,
+    );
+    allBookings.push(...result.bookings);
+
+    if (result.limited) {
+      limited = true;
+      break;
+    }
+  }
+
+  return {
+    bookings: allBookings.slice(0, maxBookings),
+    limited: limited || allBookings.length >= maxBookings,
   };
 }
 
@@ -434,6 +506,7 @@ function buildDashboard(
     .filter((row) => new Date(row.startAt) < now)
     .reverse()
     .slice(0, 20);
+  const periodLabel = `${start.toISOString().slice(0, 10)} to ${end.toISOString().slice(0, 10)}`;
 
   return {
     businessUnit: "RTB Beauty Lounge",
@@ -454,7 +527,7 @@ function buildDashboard(
       allTimeClients: clients.size,
       completedAppointments,
       noShows,
-      periodLabel: `${start.getUTCFullYear()} YTD`,
+      periodLabel,
       revenueMode: "catalog_price_estimate",
       ytdRevenue: moneyToNumber(totalRevenueCents),
     },
@@ -742,8 +815,8 @@ Deno.serve(async (req) => {
       }
 
       const connection = await getValidSquareConnection(admin, businessUnit.id);
-      const { start, end } = getPeriod();
-      const { bookings, limited } = await fetchAllBookings(
+      const { start, end } = getPeriod(body);
+      const { bookings, limited } = await fetchAllBookingsChunked(
         String(connection.access_token),
         start,
         end,

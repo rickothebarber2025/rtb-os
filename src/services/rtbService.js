@@ -480,10 +480,12 @@ export async function getSquareStatus(businessUnitId) {
   });
 }
 
-export async function syncSquareAppointments(businessUnitId) {
+export async function syncSquareAppointments(businessUnitId, options = {}) {
   return invokeFunction('square-appointments', {
     action: 'sync',
     businessUnitId,
+    endDate: options.endDate,
+    startDate: options.startDate,
   });
 }
 
