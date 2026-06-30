@@ -75,11 +75,13 @@ export default function SurveyPage({ token }) {
   const businessName = request?.businessName || 'RTB';
   const completed = submitted || request?.status === 'completed';
   const expired = request?.status === 'expired';
+  const unavailable = Boolean(error && !request);
   const heading = useMemo(() => {
     if (completed) return 'Thank you for the feedback';
     if (expired) return 'This feedback link expired';
+    if (unavailable) return 'This feedback link is unavailable';
     return `How was your visit to ${businessName}?`;
-  }, [businessName, completed, expired]);
+  }, [businessName, completed, expired, unavailable]);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,7 +151,9 @@ export default function SurveyPage({ token }) {
               ? 'Your response was saved and will be reviewed by the RTB team.'
               : expired
                 ? 'This survey is no longer accepting responses.'
-                : `Hi ${request?.customerName || 'there'}, your answers help ${businessName} improve the customer experience.`}
+                : unavailable
+                  ? 'Please ask the RTB team for a new survey link.'
+                  : `Hi ${request?.customerName || 'there'}, your answers help ${businessName} improve the customer experience.`}
           </p>
         </div>
 
@@ -163,7 +167,7 @@ export default function SurveyPage({ token }) {
           </div>
         ) : null}
 
-        {!completed && !expired ? (
+        {!completed && !expired && !unavailable ? (
           <form className="survey-form" onSubmit={submitSurvey}>
             <StarRating
               label="Overall experience"
