@@ -31,7 +31,9 @@ const ROLE_LABELS = ROLE_OPTIONS.reduce(
 const PAGE_ACCESS = {
   access: ['admin'],
   'action-center': ['admin', 'manager'],
+  'ai-consultant': ['admin', 'manager'],
   'booth-rent': ['admin', 'manager'],
+  'customer-intelligence': ['admin', 'manager'],
   dashboard: ['admin', 'manager'],
   insights: ['admin', 'manager'],
   operations: ['admin', 'manager'],

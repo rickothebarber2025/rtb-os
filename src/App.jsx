@@ -16,19 +16,31 @@ import { shouldAutoGraduate, toGraduationPayload } from './utils/probation';
 
 const AccessPage = lazy(() => import('./pages/AccessPage'));
 const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
+const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
 const BooksyInsightsPage = lazy(() => import('./pages/BooksyInsightsPage'));
 const BoothRentPage = lazy(() => import('./pages/BoothRentPage'));
+const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const OperationsPage = lazy(() => import('./pages/OperationsPage'));
 const PayrollPage = lazy(() => import('./pages/PayrollPage'));
 const PerformancePage = lazy(() => import('./pages/PerformancePage'));
 const StaffPage = lazy(() => import('./pages/StaffPage'));
+const SurveyPage = lazy(() => import('./pages/SurveyPage'));
 const SystemPage = lazy(() => import('./pages/SystemPage'));
 
 const STORAGE_KEY = 'rtb-os-business-unit';
 
+function getSurveyTokenFromLocation() {
+  const pathMatch = /^\/survey\/([^/]+)\/?$/.exec(window.location.pathname);
+  if (pathMatch?.[1]) return decodeURIComponent(pathMatch[1]);
+
+  const params = new URLSearchParams(window.location.search);
+  return params.get('survey') || params.get('survey_token') || '';
+}
+
 export default function App() {
   const auth = useAuth();
+  const surveyToken = getSurveyTokenFromLocation();
   const [activePage, setActivePage] = useState('dashboard');
   const [selectedBusinessUnitId, setSelectedBusinessUnitId] = useState(() =>
     window.localStorage.getItem(STORAGE_KEY),
@@ -140,6 +152,8 @@ export default function App() {
         );
       case 'action-center':
         return <ActionCenterPage {...pageProps} />;
+      case 'ai-consultant':
+        return <AiConsultantPage {...pageProps} />;
       case 'payroll':
         return <PayrollPage {...pageProps} />;
       case 'staff':
@@ -148,6 +162,8 @@ export default function App() {
         return <PerformancePage {...pageProps} />;
       case 'insights':
         return <BooksyInsightsPage {...pageProps} />;
+      case 'customer-intelligence':
+        return <CustomerIntelligencePage {...pageProps} />;
       case 'booth-rent':
         return <BoothRentPage {...pageProps} />;
       case 'operations':
@@ -162,6 +178,14 @@ export default function App() {
 
   if (auth.loading) {
     return <LoadingState />;
+  }
+
+  if (surveyToken) {
+    return (
+      <Suspense fallback={<LoadingState label="Loading feedback survey" />}>
+        <SurveyPage token={surveyToken} />
+      </Suspense>
+    );
   }
 
   if (!auth.session) {

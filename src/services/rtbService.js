@@ -47,6 +47,31 @@ async function invokeFunction(name, body) {
   return data;
 }
 
+function getPublicFunctionUrl(name, params = null) {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!baseUrl) {
+    throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL.');
+  }
+
+  const url = new URL(`/functions/v1/${name}`, baseUrl);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        url.searchParams.set(key, value);
+      }
+    });
+  }
+  return url.toString();
+}
+
+async function parseFunctionResponse(response) {
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body?.error) {
+    throw new Error(body?.error || body?.message || 'Request failed.');
+  }
+  return body;
+}
+
 export async function getBusinessUnits() {
   const client = requireClient();
   return requireData(
@@ -527,4 +552,231 @@ export async function toggleBoothRentPaid(record) {
 export async function deleteBoothRent(recordId) {
   const client = requireClient();
   return requireData(await client.from('booth_rent').delete().eq('id', recordId));
+}
+
+export async function getPublicFeedbackSurvey(token) {
+  const response = await fetch(getPublicFunctionUrl('feedback-public', { token }), {
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+    },
+  });
+
+  return parseFunctionResponse(response);
+}
+
+export async function submitPublicFeedbackSurvey(token, surveyResponse) {
+  const response = await fetch(getPublicFunctionUrl('feedback-public'), {
+    body: JSON.stringify({ response: surveyResponse, token }),
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+      'Content-Type': 'application/json',
+    },
+    method: 'POST',
+  });
+
+  return parseFunctionResponse(response);
+}
+
+export async function createFeedbackRequest(request) {
+  return invokeFunction('feedback-admin', {
+    action: 'create-request',
+    request,
+  });
+}
+
+export async function dispatchDueFeedbackRequests(businessId = null) {
+  return invokeFunction('feedback-admin', {
+    action: 'dispatch-due',
+    businessId,
+  });
+}
+
+export async function expireOldFeedbackRequests(businessId = null) {
+  return invokeFunction('feedback-admin', {
+    action: 'expire-old',
+    businessId,
+  });
+}
+
+export async function processFeedbackQueue(businessId = null, maxJobs = 5) {
+  return invokeFunction('feedback-worker', {
+    action: 'process',
+    businessId,
+    maxJobs,
+  });
+}
+
+export async function runBusinessConsultantAnalysis(businessId) {
+  return invokeFunction('feedback-worker', {
+    action: 'consultant-report',
+    businessId,
+  });
+}
+
+function scopedByBusiness(query, field, businessUnitId) {
+  return businessUnitId ? query.eq(field, businessUnitId) : query;
+}
+
+export async function getFeedbackDashboard(businessUnitId = null) {
+  const client = requireClient();
+  const summaryQuery = scopedByBusiness(
+    client.from('customer_feedback_summary').select('*'),
+    'business_id',
+    businessUnitId,
+  );
+  const feedbackQuery = scopedByBusiness(
+    client
+      .from('customer_feedback_enriched')
+      .select('*')
+      .order('request_created_at', { ascending: false })
+      .limit(150),
+    'business_id',
+    businessUnitId,
+  );
+  const requestsQuery = scopedByBusiness(
+    client
+      .from('feedback_requests')
+      .select('id,business_id,staff_id,service_name,customer_name,customer_email,customer_phone,status,send_after,sent_at,completed_at,expires_at,created_at')
+      .order('created_at', { ascending: false })
+      .limit(150),
+    'business_id',
+    businessUnitId,
+  );
+  const projectsQuery = scopedByBusiness(
+    client
+      .from('business_improvement_projects')
+      .select('*,tasks:business_improvement_tasks(*)')
+      .order('updated_at', { ascending: false })
+      .limit(100),
+    'business_id',
+    businessUnitId,
+  );
+  const recurringQuery = scopedByBusiness(
+    client
+      .from('feedback_recurring_issues')
+      .select('*')
+      .order('mention_count', { ascending: false }),
+    'business_id',
+    businessUnitId,
+  );
+
+  const [summary, feedback, requests, projects, recurringIssues] = await Promise.all([
+    requireData(await summaryQuery),
+    requireData(await feedbackQuery),
+    requireData(await requestsQuery),
+    requireData(await projectsQuery),
+    requireData(await recurringQuery),
+  ]);
+
+  return {
+    feedback,
+    projects,
+    recurringIssues,
+    requests,
+    summary: businessUnitId ? summary[0] || null : null,
+    summaries: summary,
+  };
+}
+
+export async function getBusinessConsultantData(businessUnitId = null) {
+  const client = requireClient();
+  const sourcesQuery = scopedByBusiness(
+    client
+      .from('business_intelligence_sources')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(150),
+    'business_id',
+    businessUnitId,
+  );
+  const reportsQuery = scopedByBusiness(
+    client
+      .from('ai_business_consultant_reports')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20),
+    'business_id',
+    businessUnitId,
+  );
+  const dashboard = await getFeedbackDashboard(businessUnitId);
+  const [sources, reports] = await Promise.all([
+    requireData(await sourcesQuery),
+    requireData(await reportsQuery),
+  ]);
+
+  return {
+    ...dashboard,
+    latestReport: reports[0] || null,
+    reports,
+    sources,
+  };
+}
+
+export async function saveBusinessIntelligenceSource(source) {
+  const client = requireClient();
+  const payload = cleanObject({
+    body: source.body,
+    business_id: source.business_id,
+    metadata: source.metadata || {},
+    source_date: source.source_date || null,
+    source_type: source.source_type || 'other',
+    title: source.title,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (source.id) {
+    return requireData(
+      await client
+        .from('business_intelligence_sources')
+        .update(payload)
+        .eq('id', source.id)
+        .select()
+        .single(),
+    );
+  }
+
+  return requireData(
+    await client
+      .from('business_intelligence_sources')
+      .insert(payload)
+      .select()
+      .single(),
+  );
+}
+
+export async function deleteBusinessIntelligenceSource(sourceId) {
+  const client = requireClient();
+  return requireData(
+    await client.from('business_intelligence_sources').delete().eq('id', sourceId),
+  );
+}
+
+export async function updateImprovementProject(projectId, updates) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('business_improvement_projects')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', projectId)
+      .select('*,tasks:business_improvement_tasks(*)')
+      .single(),
+  );
+}
+
+export async function updateImprovementTask(taskId, updates) {
+  const client = requireClient();
+  const payload = {
+    ...updates,
+    completed_at: updates.status === 'done' ? new Date().toISOString() : null,
+    updated_at: new Date().toISOString(),
+  };
+
+  return requireData(
+    await client
+      .from('business_improvement_tasks')
+      .update(payload)
+      .eq('id', taskId)
+      .select()
+      .single(),
+  );
 }

@@ -42,6 +42,11 @@ import {
   suggestInstagramHandle,
 } from '../src/utils/businessProfiles.js';
 import {
+  buildConsultantRecommendations,
+  calculateFeedbackMetrics,
+  groupRecurringIssues,
+} from '../src/utils/customerIntelligence.js';
+import {
   enrichStaffWithBusinessMetadata,
   staffBelongsToBusiness,
 } from '../src/utils/staffBusiness.js';
@@ -456,4 +461,70 @@ test('staff metadata supports both-business assignment without duplicating staff
   assert.equal(staffBelongsToBusiness(member, 'lounge'), true);
   assert.equal(staffBelongsToBusiness(member, 'beauty'), true);
   assert.deepEqual(member.assigned_business_names, ['RTB Lounge', 'RTB Beauty Lounge']);
+});
+
+test('customer intelligence calculates satisfaction, NPS, and response rate', () => {
+  const metrics = calculateFeedbackMetrics({
+    requests: [{ id: 'r1' }, { id: 'r2' }, { id: 'r3' }, { id: 'r4' }],
+    responses: [
+      { feedback_response_id: 'f1', overall_rating: 5, recommend_business: 10 },
+      { feedback_response_id: 'f2', overall_rating: 4, recommend_business: 9 },
+      { feedback_response_id: 'f3', overall_rating: 2, recommend_business: 4 },
+    ],
+  });
+
+  assert.equal(metrics.completedResponses, 3);
+  assert.equal(metrics.responseRate, 75);
+  assert.equal(metrics.customerSatisfaction, 66.7);
+  assert.equal(metrics.npsScore, 33.3);
+});
+
+test('customer intelligence groups recurring issues from feedback analysis', () => {
+  const issues = groupRecurringIssues([
+    {
+      main_category: 'Reception Experience',
+      priority: 'medium',
+      response_created_at: '2026-06-01T12:00:00Z',
+      summary: 'Reception was confusing.',
+    },
+    {
+      main_category: 'Reception Experience',
+      priority: 'high',
+      response_created_at: '2026-06-10T12:00:00Z',
+      summary: 'No one greeted the customer.',
+    },
+    {
+      main_category: 'Atmosphere',
+      priority: 'low',
+      response_created_at: '2026-06-10T12:00:00Z',
+      summary: 'Music was good.',
+    },
+  ]);
+
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].title, 'Reception Experience');
+  assert.equal(issues[0].count, 2);
+  assert.equal(issues[0].priority, 'high');
+});
+
+test('AI consultant fallback prioritizes recurring projects and delegation', () => {
+  const recommendation = buildConsultantRecommendations({
+    feedback: [],
+    projects: [
+      {
+        estimated_cost: 'Low',
+        estimated_revenue_impact: 'High',
+        priority: 'high',
+        reason: 'Mentioned by 12 customers.',
+        status: 'open',
+        title: 'Improve Reception Experience',
+      },
+    ],
+    sources: [{ source_type: 'meeting_note', title: 'Team meeting note' }],
+  });
+
+  assert.equal(recommendation.fixFirst, 'Improve Reception Experience');
+  assert.equal(recommendation.highestRoi, 'Improve Reception Experience');
+  assert.equal(recommendation.lowestCost, 'Improve Reception Experience');
+  assert.equal(recommendation.delegateRecommendations.length, 1);
 });
