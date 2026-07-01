@@ -3,6 +3,12 @@
   publish = "dist"
 
 [[redirects]]
+  from = "https://rtb-os.netlify.app/*"
+  to = "https://rtbheadquaters.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
