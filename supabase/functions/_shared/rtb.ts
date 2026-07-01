@@ -60,7 +60,7 @@ export function getSiteUrl() {
     Deno.env.get("RTB_OS_PUBLIC_URL") ||
     Deno.env.get("SITE_URL") ||
     Deno.env.get("APP_URL") ||
-    "https://rtb-os.netlify.app"
+    "https://rtbheadquaters.com"
   ).replace(/\/+$/, "");
 }
 

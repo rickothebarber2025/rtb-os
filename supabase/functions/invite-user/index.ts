@@ -97,15 +97,23 @@ function hasPermission(profile: { active?: boolean | null; email?: string | null
 }
 
 function cleanRedirectTo(value: unknown, origin: string | null) {
-  const fallback = "https://rtb-os.netlify.app/";
+  const configuredAppUrl =
+    Deno.env.get("RTB_OS_PUBLIC_URL") ||
+    Deno.env.get("SITE_URL") ||
+    Deno.env.get("APP_URL") ||
+    "https://rtbheadquaters.com/";
+  const fallback = configuredAppUrl.endsWith("/") ? configuredAppUrl : `${configuredAppUrl}/`;
   const raw = String(value || origin || fallback);
 
   try {
     const url = new URL(raw);
     const allowedOrigins = new Set([
       "http://localhost:5173",
+      "https://rtbheadquaters.com",
+      "https://www.rtbheadquaters.com",
       "https://rtb-os.netlify.app",
     ]);
+    allowedOrigins.add(new URL(fallback).origin);
 
     return allowedOrigins.has(url.origin) ? url.origin : fallback;
   } catch (_err) {

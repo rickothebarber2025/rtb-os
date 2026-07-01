@@ -52,7 +52,11 @@ function getSquareConfig() {
 }
 
 function page(title: string, message: string) {
-  const appUrl = Deno.env.get("APP_URL") || "https://rtb-os.netlify.app/";
+  const appUrl =
+    Deno.env.get("RTB_OS_PUBLIC_URL") ||
+    Deno.env.get("SITE_URL") ||
+    Deno.env.get("APP_URL") ||
+    "https://rtbheadquaters.com/";
 
   return `<!doctype html>
 <html lang="en">

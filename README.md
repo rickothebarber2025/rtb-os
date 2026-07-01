@@ -70,7 +70,7 @@ supabase secrets set SQUARE_SYNC_MAX_BOOKINGS=500
 For OAuth instead, add the Square app credentials:
 
 ```bash
-supabase secrets set APP_URL=https://rtb-os.netlify.app/
+supabase secrets set RTB_OS_PUBLIC_URL=https://rtbheadquaters.com APP_URL=https://rtbheadquaters.com/
 supabase secrets set SQUARE_APPLICATION_ID=your_square_application_id
 supabase secrets set SQUARE_APPLICATION_SECRET=your_square_application_secret
 supabase secrets set SQUARE_REDIRECT_URL=https://qbeficojfoqgzjxrzxyg.supabase.co/functions/v1/square-oauth-callback
