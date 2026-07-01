@@ -41,6 +41,14 @@ import {
   getBusinessSelectionOptions,
   suggestInstagramHandle,
 } from '../src/utils/businessProfiles.js';
+import { createModulePermissions } from '../src/lib/permissions.js';
+import {
+  canAccessPage,
+  canDeleteBoothRent,
+  canManageAccess,
+  canUseApp,
+  canUsePayroll,
+} from '../src/utils/access.js';
 import {
   buildConsultantRecommendations,
   calculateFeedbackMetrics,
@@ -50,6 +58,38 @@ import {
   enrichStaffWithBusinessMetadata,
   staffBelongsToBusiness,
 } from '../src/utils/staffBusiness.js';
+
+function profileWithPermissions(modules, extra = {}) {
+  return {
+    active: true,
+    permissions: {
+      modules: {
+        ...createModulePermissions(),
+        ...modules,
+      },
+    },
+    ...extra,
+  };
+}
+
+test('explicit permissions are required for app and page access', () => {
+  const dashboardViewer = profileWithPermissions({ dashboard: 'view' });
+  const accessEditor = profileWithPermissions({ access: 'edit' });
+  const accessAdmin = profileWithPermissions({ access: 'admin' });
+  const payrollViewer = profileWithPermissions({ payroll: 'view' });
+  const boothEditor = profileWithPermissions({ booth_rent: 'edit' });
+  const boothAdmin = profileWithPermissions({ booth_rent: 'admin' });
+
+  assert.equal(canUseApp({ active: true, role: 'manager' }), false);
+  assert.equal(canUseApp(dashboardViewer), true);
+  assert.equal(canAccessPage(dashboardViewer, 'dashboard'), true);
+  assert.equal(canAccessPage(dashboardViewer, 'access'), false);
+  assert.equal(canManageAccess(accessEditor), false);
+  assert.equal(canManageAccess(accessAdmin), true);
+  assert.equal(canUsePayroll(payrollViewer), true);
+  assert.equal(canDeleteBoothRent(boothEditor), false);
+  assert.equal(canDeleteBoothRent(boothAdmin), true);
+});
 
 test('commission drops to 55% below $500 for non-fixed staff', () => {
   const result = calculateEntryValues({
@@ -195,7 +235,7 @@ test('operations extension normalizes saved checklist data', () => {
 
 test('system tools create backups and CSV exports without leaking secrets', () => {
   const snapshot = createBackupSnapshot({
-    accessProfile: { role: 'admin' },
+    accessProfile: profileWithPermissions({ access: 'admin' }, { role: 'admin' }),
     boothRent: [{ renter_name: 'Tara', rent_amount: 200 }],
     businessUnit: { name: 'RTB Lounge' },
     businessUnits: [{ name: 'RTB Lounge' }],
@@ -230,7 +270,7 @@ test('system tools create backups and CSV exports without leaking secrets', () =
 
 test('system checks flag overdue probation and missing appointment source', () => {
   const checks = buildSystemChecks({
-    accessProfile: { role: 'admin' },
+    accessProfile: profileWithPermissions({ payroll: 'view' }),
     businessUnit: { name: 'RTB Beauty Lounge' },
     masterDashboard: null,
     payrollRuns: [],
@@ -253,7 +293,7 @@ test('system checks flag overdue probation and missing appointment source', () =
 
 test('action center surfaces automatic operational work', () => {
   const items = buildActionCenterItems({
-    accessProfile: { active: true, role: 'admin' },
+    accessProfile: profileWithPermissions({ payroll: 'view' }),
     boothRent: [
       {
         created_at: '2026-06-10T12:00:00Z',
@@ -414,8 +454,7 @@ test('business profiles define separate platform and branding rules', () => {
   const lounge = getBusinessProfile({ name: 'RTB Lounge' });
   const beauty = getBusinessProfile({ name: 'RTB Beauty Lounge' });
   const options = getBusinessSelectionOptions([{ id: 'rtb', name: 'RTB Lounge' }], {
-    active: true,
-    role: 'admin',
+    ...profileWithPermissions({ access: 'admin' }),
   });
 
   assert.equal(lounge.booking_platform, 'Booksy');
@@ -424,7 +463,7 @@ test('business profiles define separate platform and branding rules', () => {
   assert.equal(beauty.pos_platform, 'Square');
   assert.equal(suggestInstagramHandle('Josh Smith', lounge.instagram_format), 'josh.rtb_lounge');
   assert.equal(suggestInstagramHandle('Josh Smith', 'firstnamelastname'), 'joshsmith');
-  assert.equal(canUseAllBusinesses({ active: true, role: 'manager' }), false);
+  assert.equal(canUseAllBusinesses(profileWithPermissions({ access: 'edit' })), false);
   assert.equal(options[0].id, ALL_BUSINESSES_ID);
 });
 

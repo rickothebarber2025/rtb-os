@@ -22,6 +22,7 @@ import {
 } from '../services/rtbService';
 import { getDefaultPayrollWeek } from '../utils/dates';
 import { isAllBusinessesUnit } from '../utils/businessProfiles';
+import { canAdminPayroll, canManagePayroll } from '../utils/access';
 import { formatCurrency, formatDate, formatPercent } from '../utils/formatters';
 import {
   calculateRunTotals,
@@ -44,6 +45,7 @@ function createInitialRun(businessUnitId) {
 }
 
 export default function PayrollPage({
+  accessProfile,
   businessUnit,
   onRefresh,
   payrollRuns,
@@ -51,6 +53,8 @@ export default function PayrollPage({
   user,
 }) {
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
+  const payrollEditable = canManagePayroll(accessProfile);
+  const payrollAdmin = canAdminPayroll(accessProfile);
   const activeStaff = useMemo(() => staff.filter((member) => member.active), [staff]);
   const [currentRun, setCurrentRun] = useState(() => createInitialRun(businessUnit?.id));
   const [confirmAction, setConfirmAction] = useState('');
@@ -85,7 +89,7 @@ export default function PayrollPage({
     }
   }, [activeStaff, allBusinessesView, businessUnit?.id, currentRun.id, entries.length]);
 
-  const readOnly = currentRun.status !== 'draft';
+  const readOnly = currentRun.status !== 'draft' || !payrollEditable;
   const finalized = ['locked', 'sent'].includes(currentRun.status);
   const totals = useMemo(
     () => calculateRunTotals({ entries, ownerNetSales: currentRun.owner_net_sales }),
@@ -104,7 +108,7 @@ export default function PayrollPage({
   );
 
   function resetDraft() {
-    if (allBusinessesView) return;
+    if (allBusinessesView || !payrollEditable) return;
     setCurrentRun(createInitialRun(businessUnit?.id));
     setEntries(activeStaff.map(createDraftEntry));
     setError('');
@@ -112,10 +116,12 @@ export default function PayrollPage({
   }
 
   function updateRunField(field, value) {
+    if (readOnly) return;
     setCurrentRun((run) => ({ ...run, [field]: value }));
   }
 
   function updateEntry(index, field, value) {
+    if (readOnly) return;
     setEntries((rows) =>
       rows.map((entry, rowIndex) =>
         rowIndex === index
@@ -162,6 +168,10 @@ export default function PayrollPage({
   }
 
   async function persistDraft(statusOverride = currentRun.status) {
+    if (!payrollEditable) {
+      throw new Error('Payroll edit access is required to save payroll.');
+    }
+
     if (allBusinessesView) {
       throw new Error('Select one business before creating or saving payroll.');
     }
@@ -203,6 +213,11 @@ export default function PayrollPage({
   }
 
   async function handleLock() {
+    if (!payrollAdmin) {
+      setError('Payroll admin access is required to finalize payroll.');
+      return;
+    }
+
     setSaving(true);
     setError('');
     setNotice('');
@@ -290,7 +305,7 @@ export default function PayrollPage({
   }
 
   async function handleDeleteDraft() {
-    if (!currentRun.id || currentRun.status !== 'draft') return;
+    if (!payrollAdmin || !currentRun.id || currentRun.status !== 'draft') return;
     setSaving(true);
     setError('');
     setNotice('');
@@ -309,7 +324,7 @@ export default function PayrollPage({
   }
 
   async function handleCorrectRun() {
-    if (!currentRun.id || !finalized) return;
+    if (!payrollAdmin || !currentRun.id || !finalized) return;
     setSaving(true);
     setError('');
     setNotice('');
@@ -562,12 +577,19 @@ export default function PayrollPage({
         {notice ? <div className="alert success">{notice}</div> : null}
 
         <div className="action-row">
-          <button className="ghost-button" type="button" onClick={resetDraft}>
+          <button
+            className="ghost-button"
+            disabled={!payrollEditable}
+            title={!payrollEditable ? 'Payroll edit access is required.' : undefined}
+            type="button"
+            onClick={resetDraft}
+          >
             New draft
           </button>
           <button
             className="secondary-button"
             disabled={saving || readOnly || !entries.length}
+            title={!payrollEditable ? 'Payroll edit access is required.' : undefined}
             type="button"
             onClick={handleSave}
           >
@@ -576,7 +598,8 @@ export default function PayrollPage({
           </button>
           <button
             className="primary-button"
-            disabled={saving || readOnly || !entries.length}
+            disabled={saving || !payrollAdmin || currentRun.status !== 'draft' || !entries.length}
+            title={!payrollAdmin ? 'Payroll admin access is required.' : undefined}
             type="button"
             onClick={handleLock}
           >
@@ -586,7 +609,8 @@ export default function PayrollPage({
           {currentRun.id && currentRun.status === 'draft' ? (
             <button
               className="ghost-button danger-action"
-              disabled={saving}
+              disabled={saving || !payrollAdmin}
+              title={!payrollAdmin ? 'Payroll admin access is required.' : undefined}
               onClick={() => setConfirmAction('delete-draft')}
               type="button"
             >
@@ -597,7 +621,8 @@ export default function PayrollPage({
           {currentRun.id && finalized ? (
             <button
               className="secondary-button"
-              disabled={saving}
+              disabled={saving || !payrollAdmin}
+              title={!payrollAdmin ? 'Payroll admin access is required.' : undefined}
               onClick={() => {
                 setCorrectionReason('');
                 setConfirmAction('correct-run');

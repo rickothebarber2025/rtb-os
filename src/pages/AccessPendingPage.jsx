@@ -1,8 +1,8 @@
 import { LogOut, RefreshCw, ShieldAlert } from 'lucide-react';
-import { getRoleLabel } from '../utils/access';
+import { getProfileRoleTitle } from '../lib/permissions.js';
 
 export default function AccessPendingPage({ error, profile, refreshProfile, signOut }) {
-  const roleLabel = profile ? getRoleLabel(profile.role) : 'Pending';
+  const roleLabel = profile ? getProfileRoleTitle(profile) : 'Pending';
 
   return (
     <div className="auth-page">
@@ -15,7 +15,7 @@ export default function AccessPendingPage({ error, profile, refreshProfile, sign
           <h1>{error ? 'Access check failed' : 'Waiting for admin approval'}</h1>
           <p>
             {error ||
-              `This login is saved as ${roleLabel}. An admin needs to activate this account before the dashboard opens.`}
+              `This login is saved as ${roleLabel}. An access admin needs to activate it and assign module permissions before the dashboard opens.`}
           </p>
         </div>
         <div className="action-row">

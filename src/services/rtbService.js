@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
+import { normalizePermissionsPayload } from '../lib/permissions.js';
+import { buildPermissionsFromTemplate } from '../lib/roleTemplates.js';
 import { calculateEntryValues } from '../utils/payroll';
 import { PROBATION_RATE, toDateKey } from '../utils/probation';
 
@@ -83,7 +85,7 @@ export async function getCurrentUserProfile(userId) {
   const client = requireClient();
   const { data, error } = await client
     .from('user_profiles')
-    .select('*')
+    .select('id,email,full_name,role,active,business_unit_id,permissions')
     .eq('id', userId)
     .maybeSingle();
 
@@ -107,6 +109,7 @@ export async function createPendingUserProfile(user) {
         email: user.email,
         full_name: fullName,
         id: user.id,
+        permissions: buildPermissionsFromTemplate('custom'),
         role: 'pending',
       })
       .select()
@@ -119,7 +122,7 @@ export async function getUserProfiles() {
   return requireData(
     await client
       .from('user_profiles')
-      .select('*')
+      .select('id,email,full_name,role,active,business_unit_id,permissions,created_at,updated_at')
       .order('role', { ascending: true })
       .order('full_name', { ascending: true }),
   );
@@ -131,6 +134,7 @@ export async function updateUserProfile(profile) {
     active: Boolean(profile.active),
     business_unit_id: profile.business_unit_id || null,
     full_name: profile.full_name || profile.email,
+    permissions: normalizePermissionsPayload(profile.permissions),
     role: profile.role || 'pending',
     updated_at: new Date().toISOString(),
   });
@@ -150,8 +154,10 @@ export async function inviteUserProfile(invite) {
     business_unit_id: invite.business_unit_id || null,
     email: invite.email,
     full_name: invite.full_name,
+    active: Boolean(invite.active),
+    permissions: normalizePermissionsPayload(invite.permissions),
     redirectTo: window.location.origin,
-    role: invite.role || 'manager',
+    role: invite.role || 'staff',
   });
 }
 

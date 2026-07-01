@@ -1,0 +1,207 @@
+export const OWNER_EMAIL = 'rickothebarber@gmail.com';
+
+export const PERMISSION_LEVELS = ['none', 'view', 'edit', 'admin'];
+
+export const MODULE_IDS = [
+  'dashboard',
+  'roster',
+  'payroll',
+  'performance',
+  'appointments',
+  'booth_rent',
+  'operations',
+  'access',
+  'settings',
+];
+
+export const MODULE_LABELS = {
+  access: 'Access',
+  appointments: 'Appointments',
+  booth_rent: 'Booth Rent',
+  dashboard: 'Dashboard',
+  operations: 'Operations',
+  payroll: 'Payroll',
+  performance: 'Performance',
+  roster: 'Roster',
+  settings: 'Settings',
+};
+
+export const PAGE_MODULE_MAP = {
+  access: 'access',
+  'action-center': 'operations',
+  'ai-consultant': 'operations',
+  'booth-rent': 'booth_rent',
+  'customer-intelligence': 'performance',
+  dashboard: 'dashboard',
+  insights: 'appointments',
+  'my-role': 'profile',
+  operations: 'operations',
+  payroll: 'payroll',
+  performance: 'performance',
+  staff: 'roster',
+  system: 'settings',
+};
+
+const DEFAULT_PAYLOAD_META = {
+  responsibilities: [],
+  restrictions: ['No module access has been assigned yet.'],
+  role_description: 'Custom access profile.',
+  role_template: 'custom',
+  role_title: 'Custom Role',
+};
+
+function titleCase(value) {
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(' ');
+}
+
+function safeArray(value) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+}
+
+function safeObject(value) {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_err) {
+      return {};
+    }
+  }
+
+  return typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+export function normalizePermissionLevel(value) {
+  const normalized = String(value || 'none').trim().toLowerCase();
+  return PERMISSION_LEVELS.includes(normalized) ? normalized : 'none';
+}
+
+export function createModulePermissions(level = 'none') {
+  return MODULE_IDS.reduce(
+    (permissions, moduleId) => ({
+      ...permissions,
+      [moduleId]: level,
+    }),
+    {},
+  );
+}
+
+export function normalizeModulePermissions(value) {
+  const raw = safeObject(value);
+  return MODULE_IDS.reduce(
+    (permissions, moduleId) => ({
+      ...permissions,
+      [moduleId]: normalizePermissionLevel(raw[moduleId]),
+    }),
+    createModulePermissions(),
+  );
+}
+
+export function normalizePermissionsPayload(value) {
+  const raw = safeObject(value);
+  const modules = normalizeModulePermissions(raw.modules || raw);
+
+  return {
+    modules,
+    responsibilities: safeArray(raw.responsibilities),
+    restrictions: safeArray(raw.restrictions),
+    role_description: String(raw.role_description || DEFAULT_PAYLOAD_META.role_description),
+    role_template: String(raw.role_template || DEFAULT_PAYLOAD_META.role_template),
+    role_title: String(raw.role_title || DEFAULT_PAYLOAD_META.role_title),
+  };
+}
+
+export function buildPermissionsPayload(value = {}) {
+  const base = normalizePermissionsPayload(value);
+  return {
+    ...base,
+    modules: normalizeModulePermissions({
+      ...base.modules,
+      ...(value.modules || {}),
+    }),
+    responsibilities: safeArray(value.responsibilities || base.responsibilities),
+    restrictions: safeArray(value.restrictions || base.restrictions),
+    role_description: String(value.role_description || base.role_description),
+    role_template: String(value.role_template || base.role_template),
+    role_title: String(value.role_title || base.role_title),
+  };
+}
+
+export function isOwnerEmail(email) {
+  return String(email || '').trim().toLowerCase() === OWNER_EMAIL;
+}
+
+export function isOwnerProfile(profile) {
+  return Boolean(
+    profile?.is_owner ||
+      profile?.owner ||
+      profile?.owner_override ||
+      profile?.role === 'owner' ||
+      isOwnerEmail(profile?.email),
+  );
+}
+
+export function getEffectivePermissionsPayload(profile) {
+  if (isOwnerProfile(profile)) {
+    return buildPermissionsPayload({
+      modules: createModulePermissions('admin'),
+      responsibilities: [
+        'Own final business decisions',
+        'Manage user access',
+        'Approve payroll and operational changes',
+      ],
+      restrictions: ['Owner access cannot be restricted inside RTB OS.'],
+      role_description: 'Owner-level access across every RTB OS module.',
+      role_template: 'owner',
+      role_title: 'Owner',
+    });
+  }
+
+  const payload = normalizePermissionsPayload(profile?.permissions);
+  if (payload.role_title !== DEFAULT_PAYLOAD_META.role_title) return payload;
+
+  const role = String(profile?.role || '').trim();
+  return {
+    ...payload,
+    role_title: role ? titleCase(role) : payload.role_title,
+  };
+}
+
+export function getProfileRoleTitle(profile) {
+  return getEffectivePermissionsPayload(profile).role_title || 'Custom Role';
+}
+
+export function getProfileResponsibilities(profile) {
+  return getEffectivePermissionsPayload(profile).responsibilities;
+}
+
+export function getProfileRestrictions(profile) {
+  return getEffectivePermissionsPayload(profile).restrictions;
+}
+
+export function getModulePermission(profile, moduleId) {
+  return getEffectivePermissionsPayload(profile).modules[moduleId] || 'none';
+}
+
+export function isPermissionAtLeast(current, required) {
+  return PERMISSION_LEVELS.indexOf(current) >= PERMISSION_LEVELS.indexOf(required);
+}
+
+export function hasModulePermission(profile, moduleId, minimum = 'view') {
+  if (!profile) return false;
+  if (!isOwnerProfile(profile) && !profile.active) return false;
+  return isPermissionAtLeast(getModulePermission(profile, moduleId), minimum);
+}
+
+export function hasAnyModulePermission(profile, minimum = 'view') {
+  if (!profile) return false;
+  if (!isOwnerProfile(profile) && !profile.active) return false;
+  return MODULE_IDS.some((moduleId) => hasModulePermission(profile, moduleId, minimum));
+}

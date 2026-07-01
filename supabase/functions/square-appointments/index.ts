@@ -20,6 +20,18 @@ const SCOPES = [
   "PAYMENTS_READ",
   "ORDERS_READ",
 ];
+const OWNER_EMAIL = "rickothebarber@gmail.com";
+const MODULE_IDS = [
+  "dashboard",
+  "roster",
+  "payroll",
+  "performance",
+  "appointments",
+  "booth_rent",
+  "operations",
+  "access",
+  "settings",
+];
 
 const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -65,6 +77,37 @@ function getAdminClient() {
   return createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false },
   });
+}
+
+function normalizePermission(value: unknown) {
+  return typeof value === "string" ? value.toLowerCase() : "";
+}
+
+function normalizePermissionsPayload(value: unknown) {
+  const raw = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const source = raw.modules && typeof raw.modules === "object"
+    ? raw.modules as Record<string, unknown>
+    : raw;
+  return Object.fromEntries(
+    MODULE_IDS.map((moduleId) => {
+      const level = normalizePermission(source[moduleId]);
+      return [moduleId, ["none", "view", "edit", "admin"].includes(level) ? level : "none"];
+    }),
+  );
+}
+
+function hasPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown } | null, moduleId: string, minimum: string) {
+  if (String(profile?.email || "").trim().toLowerCase() === OWNER_EMAIL) return true;
+  if (!profile?.active) return false;
+
+  const permission = normalizePermission(normalizePermissionsPayload(profile.permissions)[moduleId]);
+  const levels = ["none", "view", "edit", "admin"];
+  const currentLevel = levels.indexOf(permission);
+  const requiredLevel = levels.indexOf(minimum);
+
+  return currentLevel >= requiredLevel;
 }
 
 function getSquareConfig(requireSecret = false) {
@@ -205,21 +248,15 @@ async function authorizeRequest(
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("active,business_unit_id,role")
+    .select("active,business_unit_id,email,permissions")
     .eq("id", authData.user.id)
     .maybeSingle();
 
   if (profileError) throw profileError;
 
   const canManage =
-    profile?.active === true &&
-    (
-      profile.role === "admin" ||
-      (
-        profile.role === "manager" &&
-        (!profile.business_unit_id || profile.business_unit_id === businessUnitId)
-      )
-    );
+    hasPermission(profile, "appointments", "edit") &&
+    (!profile?.business_unit_id || profile.business_unit_id === businessUnitId);
 
   if (!canManage) {
     throw new RequestError("Admin or assigned manager access is required.", 403);

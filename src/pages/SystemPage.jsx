@@ -13,6 +13,7 @@ import {
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import { isSupabaseConfigured } from '../lib/supabaseClient';
+import { getProfileRoleTitle } from '../lib/permissions.js';
 import { canAccessPage } from '../utils/access';
 import { formatDateTime, formatNumber } from '../utils/formatters';
 import {
@@ -254,7 +255,7 @@ export default function SystemPage({
           icon={ShieldCheck}
           label="Current access"
           trend={user?.email || 'Signed in'}
-          value={accessProfile?.role || 'active'}
+          value={getProfileRoleTitle(accessProfile)}
         />
         <MetricCard
           icon={Database}

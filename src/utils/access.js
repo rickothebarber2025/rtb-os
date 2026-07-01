@@ -1,23 +1,30 @@
 import { NAV_ITEMS } from './constants.js';
+import {
+  getModulePermission,
+  hasAnyModulePermission,
+  hasModulePermission,
+  isOwnerProfile,
+  PAGE_MODULE_MAP,
+} from '../lib/permissions.js';
 
 export const ROLE_OPTIONS = [
   {
-    description: 'Full access to payroll, staff changes, booth rent, imports, and user access.',
+    description: 'Label only. Actual access comes from module permissions.',
     label: 'Admin',
     value: 'admin',
   },
   {
-    description: 'Can manage roster, booth rent, reports, and appointment imports.',
+    description: 'Label only. Actual access comes from module permissions.',
     label: 'Manager',
     value: 'manager',
   },
   {
-    description: 'Signed in, but no dashboard access yet.',
+    description: 'Label only. Actual access comes from module permissions.',
     label: 'Staff',
     value: 'staff',
   },
   {
-    description: 'Waiting for an admin to activate access.',
+    description: 'Waiting for access setup.',
     label: 'Pending',
     value: 'pending',
   },
@@ -28,40 +35,27 @@ const ROLE_LABELS = ROLE_OPTIONS.reduce(
   {},
 );
 
-const PAGE_ACCESS = {
-  access: ['admin'],
-  'action-center': ['admin', 'manager'],
-  'ai-consultant': ['admin', 'manager'],
-  'booth-rent': ['admin', 'manager'],
-  'customer-intelligence': ['admin', 'manager'],
-  dashboard: ['admin', 'manager'],
-  insights: ['admin', 'manager'],
-  operations: ['admin', 'manager'],
-  payroll: ['admin'],
-  performance: ['admin', 'manager'],
-  staff: ['admin', 'manager'],
-  system: ['admin', 'manager'],
-};
-
 export function getRoleLabel(role) {
-  return ROLE_LABELS[role] || 'Pending';
+  return ROLE_LABELS[role] || 'Custom';
 }
 
 export function isAdmin(profile) {
-  return Boolean(profile?.active && profile.role === 'admin');
+  return isOwnerProfile(profile) || getModulePermission(profile, 'access') === 'admin';
 }
 
 export function isManager(profile) {
-  return Boolean(profile?.active && profile.role === 'manager');
+  return hasAnyModulePermission(profile, 'edit');
 }
 
 export function canUseApp(profile) {
-  return isAdmin(profile) || isManager(profile);
+  return hasAnyModulePermission(profile, 'view');
 }
 
 export function canAccessPage(profile, pageId) {
   if (!canUseApp(profile)) return false;
-  return (PAGE_ACCESS[pageId] || PAGE_ACCESS.dashboard).includes(profile.role);
+  const moduleId = PAGE_MODULE_MAP[pageId] || PAGE_MODULE_MAP.dashboard;
+  if (moduleId === 'profile') return true;
+  return hasModulePermission(profile, moduleId, 'view');
 }
 
 export function getAllowedNavItems(profile) {
@@ -69,29 +63,37 @@ export function getAllowedNavItems(profile) {
 }
 
 export function canManageAccess(profile) {
-  return isAdmin(profile);
+  return hasModulePermission(profile, 'access', 'admin');
 }
 
 export function canManageStaff(profile) {
-  return isAdmin(profile) || isManager(profile);
+  return hasModulePermission(profile, 'roster', 'edit');
 }
 
 export function canDeleteStaff(profile) {
-  return isAdmin(profile);
+  return hasModulePermission(profile, 'roster', 'admin');
 }
 
 export function canUsePayroll(profile) {
-  return isAdmin(profile);
+  return hasModulePermission(profile, 'payroll', 'view');
+}
+
+export function canManagePayroll(profile) {
+  return hasModulePermission(profile, 'payroll', 'edit');
+}
+
+export function canAdminPayroll(profile) {
+  return hasModulePermission(profile, 'payroll', 'admin');
 }
 
 export function canManageBoothRent(profile) {
-  return isAdmin(profile) || isManager(profile);
+  return hasModulePermission(profile, 'booth_rent', 'edit');
 }
 
 export function canDeleteBoothRent(profile) {
-  return isAdmin(profile);
+  return hasModulePermission(profile, 'booth_rent', 'admin');
 }
 
 export function canManageAppointments(profile) {
-  return isAdmin(profile) || isManager(profile);
+  return hasModulePermission(profile, 'appointments', 'edit');
 }

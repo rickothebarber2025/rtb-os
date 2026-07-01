@@ -10,29 +10,156 @@ import {
   Users,
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
-import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { getUserProfiles, inviteUserProfile, updateUserProfile } from '../services/rtbService';
-import { getRoleLabel, ROLE_OPTIONS } from '../utils/access';
+import {
+  getEffectivePermissionsPayload,
+  getModulePermission,
+  hasAnyModulePermission,
+  isOwnerEmail,
+  isOwnerProfile,
+  MODULE_IDS,
+  MODULE_LABELS,
+  normalizePermissionsPayload,
+} from '../lib/permissions.js';
+import {
+  buildPermissionsFromTemplate,
+  getRoleTemplate,
+  getTemplateRoleValue,
+  ROLE_TEMPLATES,
+} from '../lib/roleTemplates.js';
+import { canManageAccess, getRoleLabel, ROLE_OPTIONS } from '../utils/access';
 
-const INVITE_ROLES = ROLE_OPTIONS.filter((role) => role.value !== 'pending');
-const blankInvite = {
-  business_unit_id: '',
-  email: '',
-  full_name: '',
-  role: 'manager',
-};
-
-function getDraft(profile, drafts) {
-  return drafts[profile.id] || profile;
+function makeBlankInvite() {
+  return {
+    active: true,
+    business_unit_id: '',
+    email: '',
+    full_name: '',
+    permissions: buildPermissionsFromTemplate('custom'),
+    role: getTemplateRoleValue('custom'),
+  };
 }
 
-export default function AccessPage({ businessUnits, currentUserId }) {
+function getDraft(profile, drafts) {
+  const draft = drafts[profile.id] || profile;
+  return {
+    ...draft,
+    active: Boolean(draft.active),
+    business_unit_id: draft.business_unit_id || '',
+    permissions: normalizePermissionsPayload(draft.permissions),
+    role: draft.role || 'staff',
+  };
+}
+
+function comparable(profile) {
+  const payload = normalizePermissionsPayload(profile.permissions);
+  return {
+    active: Boolean(profile.active),
+    business_unit_id: profile.business_unit_id || '',
+    full_name: profile.full_name || profile.email || '',
+    permissions: payload,
+    role: profile.role || 'staff',
+  };
+}
+
+function listToText(items) {
+  return (items || []).join('\n');
+}
+
+function textToList(value) {
+  return String(value || '')
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function businessLabel(businessUnits, businessUnitId, owner) {
+  if (owner) return 'All Businesses';
+  return businessUnits.find((unit) => unit.id === businessUnitId)?.name || 'Business required';
+}
+
+function PermissionMatrix({ disabled, permissions, onChange }) {
+  const payload = normalizePermissionsPayload(permissions);
+
+  return (
+    <div className="permission-matrix">
+      {MODULE_IDS.map((moduleId) => (
+        <label className="permission-cell" key={moduleId}>
+          <span>{MODULE_LABELS[moduleId]}</span>
+          <select
+            disabled={disabled}
+            onChange={(event) => onChange(moduleId, event.target.value)}
+            value={payload.modules[moduleId]}
+          >
+            <option value="none">None</option>
+            <option value="view">View</option>
+            <option value="edit">Edit</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function ResponsibilitiesEditor({ disabled, permissions, onChange }) {
+  const payload = normalizePermissionsPayload(permissions);
+
+  return (
+    <div className="role-detail-grid">
+      <label className="field">
+        <span>Responsibilities checklist</span>
+        <textarea
+          disabled={disabled}
+          onChange={(event) => onChange('responsibilities', textToList(event.target.value))}
+          value={listToText(payload.responsibilities)}
+        />
+      </label>
+      <label className="field">
+        <span>Restrictions / cannot do</span>
+        <textarea
+          disabled={disabled}
+          onChange={(event) => onChange('restrictions', textToList(event.target.value))}
+          value={listToText(payload.restrictions)}
+        />
+      </label>
+    </div>
+  );
+}
+
+function RoleTemplatePreview({ permissions }) {
+  const payload = normalizePermissionsPayload(permissions);
+  const visibleModules = MODULE_IDS.filter((moduleId) => payload.modules[moduleId] !== 'none');
+
+  return (
+    <div className="template-preview">
+      <div>
+        <strong>{payload.role_title}</strong>
+        <span>{payload.role_description}</span>
+      </div>
+      <div className="business-chip-list">
+        {visibleModules.length ? (
+          visibleModules.map((moduleId) => (
+            <StatusBadge key={moduleId} tone={payload.modules[moduleId] === 'admin' ? 'gold' : 'muted'}>
+              {MODULE_LABELS[moduleId]}: {payload.modules[moduleId]}
+            </StatusBadge>
+          ))
+        ) : (
+          <StatusBadge tone="danger">No module access</StatusBadge>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function AccessPage({ accessProfile, businessUnits, currentUserId }) {
+  const accessAdmin = canManageAccess(accessProfile);
   const [drafts, setDrafts] = useState({});
   const [accessTarget, setAccessTarget] = useState(null);
   const [error, setError] = useState('');
-  const [inviteForm, setInviteForm] = useState(blankInvite);
+  const [inviteForm, setInviteForm] = useState(() => makeBlankInvite());
   const [inviting, setInviting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -40,7 +167,10 @@ export default function AccessPage({ businessUnits, currentUserId }) {
   const [savingId, setSavingId] = useState('');
 
   const pendingCount = useMemo(
-    () => profiles.filter((profile) => profile.role === 'pending' || !profile.active).length,
+    () =>
+      profiles.filter(
+        (profile) => !profile.active || (!isOwnerProfile(profile) && !hasAnyModulePermission(profile)),
+      ).length,
     [profiles],
   );
 
@@ -62,37 +192,133 @@ export default function AccessPage({ businessUnits, currentUserId }) {
     loadProfiles();
   }, []);
 
-  function updateDraft(profile, field, value) {
-    setDrafts((current) => {
-      const next = { ...getDraft(profile, current), [field]: value };
-
-      if (field === 'role') {
-        next.active = value !== 'pending';
-      }
-
-      return { ...current, [profile.id]: next };
-    });
+  function setInvite(next) {
+    setInviteForm((current) => ({ ...current, ...next }));
   }
 
   function updateInvite(field, value) {
-    setInviteForm((current) => ({ ...current, [field]: value }));
+    setInvite({ [field]: value });
+  }
+
+  function updateInvitePermissions(nextPermissions) {
+    setInvite({ permissions: nextPermissions });
+  }
+
+  function applyInviteTemplate(templateId) {
+    setInvite({
+      permissions: buildPermissionsFromTemplate(templateId),
+      role: getTemplateRoleValue(templateId),
+    });
+  }
+
+  function updateInviteModule(moduleId, permission) {
+    const payload = normalizePermissionsPayload(inviteForm.permissions);
+    updateInvitePermissions({
+      ...payload,
+      modules: {
+        ...payload.modules,
+        [moduleId]: permission,
+      },
+    });
+  }
+
+  function updateInviteList(field, value) {
+    const payload = normalizePermissionsPayload(inviteForm.permissions);
+    updateInvitePermissions({
+      ...payload,
+      [field]: value,
+    });
+  }
+
+  function updateDraft(profile, field, value) {
+    setDrafts((current) => ({
+      ...current,
+      [profile.id]: {
+        ...getDraft(profile, current),
+        [field]: value,
+      },
+    }));
+  }
+
+  function applyDraftTemplate(profile, templateId) {
+    setDrafts((current) => ({
+      ...current,
+      [profile.id]: {
+        ...getDraft(profile, current),
+        permissions: buildPermissionsFromTemplate(templateId),
+        role: getTemplateRoleValue(templateId),
+      },
+    }));
+  }
+
+  function updateDraftModule(profile, moduleId, permission) {
+    setDrafts((current) => {
+      const draft = getDraft(profile, current);
+      const payload = normalizePermissionsPayload(draft.permissions);
+      return {
+        ...current,
+        [profile.id]: {
+          ...draft,
+          permissions: {
+            ...payload,
+            modules: {
+              ...payload.modules,
+              [moduleId]: permission,
+            },
+          },
+        },
+      };
+    });
+  }
+
+  function updateDraftList(profile, field, value) {
+    setDrafts((current) => {
+      const draft = getDraft(profile, current);
+      return {
+        ...current,
+        [profile.id]: {
+          ...draft,
+          permissions: {
+            ...normalizePermissionsPayload(draft.permissions),
+            [field]: value,
+          },
+        },
+      };
+    });
   }
 
   async function sendInvite(event) {
     event.preventDefault();
+    if (!accessAdmin) return;
+
+    if (!inviteForm.business_unit_id && !isOwnerEmail(inviteForm.email)) {
+      setError('Choose a business unit before inviting this user.');
+      return;
+    }
+
     setInviting(true);
     setError('');
     setMessage('');
 
     try {
       const result = await inviteUserProfile(inviteForm);
+
+      if (result.profile?.id) {
+        await updateUserProfile({
+          ...result.profile,
+          ...inviteForm,
+          email: result.profile.email || inviteForm.email,
+          id: result.profile.id,
+        });
+      }
+
       const profile = result.profile || inviteForm;
       setMessage(
         result.invited
           ? `Invite sent to ${profile.email}.`
-          : `${profile.email} already has a login. Access was updated to ${getRoleLabel(profile.role)}.`,
+          : `${profile.email} already has a login. Access was updated to ${normalizePermissionsPayload(inviteForm.permissions).role_title}.`,
       );
-      setInviteForm(blankInvite);
+      setInviteForm(makeBlankInvite());
       await loadProfiles();
     } catch (err) {
       setError(err.message || 'Unable to send invite.');
@@ -102,11 +328,25 @@ export default function AccessPage({ businessUnits, currentUserId }) {
   }
 
   async function saveProfile(profile, overrideDraft = null) {
-    const draft = overrideDraft || getDraft(profile, drafts);
+    if (!accessAdmin) return false;
 
-    if (profile.id === currentUserId && (draft.role !== 'admin' || !draft.active)) {
-      setError('You cannot remove admin access from the account you are using right now.');
-      return;
+    const draft = overrideDraft || getDraft(profile, drafts);
+    const owner = isOwnerProfile(profile);
+    const self = profile.id === currentUserId;
+
+    if (owner) {
+      setError('Owner access cannot be restricted.');
+      return false;
+    }
+
+    if (!draft.business_unit_id && !isOwnerEmail(profile.email)) {
+      setError('Choose a business unit before saving this user.');
+      return false;
+    }
+
+    if (self && (!draft.active || getModulePermission(draft, 'access') !== 'admin')) {
+      setError('You cannot remove your own Access admin permission while using this account.');
+      return false;
     }
 
     setSavingId(profile.id);
@@ -115,7 +355,9 @@ export default function AccessPage({ businessUnits, currentUserId }) {
 
     try {
       await updateUserProfile(draft);
-      setMessage(`${draft.full_name || draft.email} is now ${getRoleLabel(draft.role)}.`);
+      setMessage(
+        `${draft.full_name || draft.email} is now ${normalizePermissionsPayload(draft.permissions).role_title}.`,
+      );
       await loadProfiles();
       return true;
     } catch (err) {
@@ -141,19 +383,19 @@ export default function AccessPage({ businessUnits, currentUserId }) {
   }
 
   return (
-    <div className="page-grid">
+    <div className="page-grid access-page">
       <section className="hero-panel access-hero">
         <div>
           <span className="eyebrow">Users & access</span>
-          <h2>Admin and manager roles</h2>
+          <h2>Role templates and module permissions</h2>
           <p>
-            Admins control payroll and access. Managers can manage roster, booth rent, reports,
-            and appointment imports.
+            Templates are quick presets. Permissions control access. Responsibilities explain the
+            work expected from each user.
           </p>
         </div>
         <div className="hero-meta">
           <strong>{pendingCount}</strong>
-          <span>pending or inactive</span>
+          <span>need setup</span>
         </div>
       </section>
 
@@ -163,56 +405,100 @@ export default function AccessPage({ businessUnits, currentUserId }) {
             <span>Invite</span>
             <h2>Add team login</h2>
           </div>
+          {!accessAdmin ? <StatusBadge tone="danger">Access admin required</StatusBadge> : null}
         </div>
 
-        <form className="form-grid compact access-invite-form" onSubmit={sendInvite}>
-          <label className="field">
-            <span>Name</span>
-            <input
-              onChange={(event) => updateInvite('full_name', event.target.value)}
-              placeholder="Full name"
-              value={inviteForm.full_name}
-            />
-          </label>
-          <label className="field">
-            <span>Email</span>
-            <input
-              onChange={(event) => updateInvite('email', event.target.value)}
-              placeholder="name@example.com"
-              required
-              type="email"
-              value={inviteForm.email}
-            />
-          </label>
-          <label className="field">
-            <span>Role</span>
-            <select
-              onChange={(event) => updateInvite('role', event.target.value)}
-              value={inviteForm.role}
-            >
-              {INVITE_ROLES.map((role) => (
-                <option key={role.value} value={role.value}>
-                  {role.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Business unit</span>
-            <select
-              onChange={(event) => updateInvite('business_unit_id', event.target.value)}
-              value={inviteForm.business_unit_id}
-            >
-              <option value="">All business units</option>
-              {businessUnits.map((unit) => (
-                <option key={unit.id} value={unit.id}>
-                  {unit.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="invite-actions">
-            <button className="primary-button" disabled={inviting} type="submit">
+        <form className="access-template-form" onSubmit={sendInvite}>
+          <div className="form-grid compact">
+            <label className="field">
+              <span>Name</span>
+              <input
+                disabled={!accessAdmin}
+                onChange={(event) => updateInvite('full_name', event.target.value)}
+                placeholder="Full name"
+                value={inviteForm.full_name}
+              />
+            </label>
+            <label className="field">
+              <span>Email</span>
+              <input
+                disabled={!accessAdmin}
+                onChange={(event) => updateInvite('email', event.target.value)}
+                placeholder="name@example.com"
+                required
+                type="email"
+                value={inviteForm.email}
+              />
+            </label>
+            <label className="field">
+              <span>Business unit</span>
+              <select
+                disabled={!accessAdmin}
+                onChange={(event) => updateInvite('business_unit_id', event.target.value)}
+                required={!isOwnerEmail(inviteForm.email)}
+                value={inviteForm.business_unit_id}
+              >
+                <option value="">Choose business unit</option>
+                {businessUnits.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Choose role template</span>
+              <select
+                disabled={!accessAdmin}
+                onChange={(event) => applyInviteTemplate(event.target.value)}
+                value={normalizePermissionsPayload(inviteForm.permissions).role_template}
+              >
+                {ROLE_TEMPLATES.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Role label</span>
+              <select
+                disabled={!accessAdmin}
+                onChange={(event) => updateInvite('role', event.target.value)}
+                value={inviteForm.role}
+              >
+                {ROLE_OPTIONS.map((role) => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="check-row">
+              <input
+                checked={Boolean(inviteForm.active)}
+                disabled={!accessAdmin}
+                onChange={(event) => updateInvite('active', event.target.checked)}
+                type="checkbox"
+              />
+              <span>Active login</span>
+            </label>
+          </div>
+
+          <RoleTemplatePreview permissions={inviteForm.permissions} />
+          <PermissionMatrix
+            disabled={!accessAdmin}
+            onChange={updateInviteModule}
+            permissions={inviteForm.permissions}
+          />
+          <ResponsibilitiesEditor
+            disabled={!accessAdmin}
+            onChange={updateInviteList}
+            permissions={inviteForm.permissions}
+          />
+
+          <div className="action-row">
+            <button className="primary-button" disabled={!accessAdmin || inviting} type="submit">
               {inviting ? (
                 'Sending...'
               ) : (
@@ -242,148 +528,176 @@ export default function AccessPage({ businessUnits, currentUserId }) {
         {message ? <div className="alert success">{message}</div> : null}
 
         {profiles.length ? (
-          <DataTable>
-            <table>
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Role</th>
-                  <th>Business unit</th>
-                  <th>Status</th>
-                  <th>Access</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {profiles.map((profile) => {
-                  const draft = getDraft(profile, drafts);
-                  const isCurrentUser = profile.id === currentUserId;
-                  const isDirty = JSON.stringify(draft) !== JSON.stringify(profile);
+          <div className="access-card-list">
+            {profiles.map((profile) => {
+              const draft = getDraft(profile, drafts);
+              const owner = isOwnerProfile(profile);
+              const isCurrentUser = profile.id === currentUserId;
+              const disabled = !accessAdmin || owner;
+              const payload = getEffectivePermissionsPayload(draft);
+              const template = getRoleTemplate(payload.role_template);
+              const isDirty =
+                JSON.stringify(comparable(draft)) !==
+                JSON.stringify(comparable({ ...profile, permissions: normalizePermissionsPayload(profile.permissions) }));
 
-                  return (
-                    <tr key={profile.id}>
-                      <td>
-                        <div className="person-cell">
-                          <input
-                            disabled={isCurrentUser}
-                            onChange={(event) =>
-                              updateDraft(profile, 'full_name', event.target.value)
-                            }
-                            value={draft.full_name || ''}
-                          />
-                          <span>{profile.email}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <select
-                          disabled={isCurrentUser}
-                          onChange={(event) => updateDraft(profile, 'role', event.target.value)}
-                          value={draft.role}
-                        >
-                          {ROLE_OPTIONS.map((role) => (
-                            <option key={role.value} value={role.value}>
-                              {role.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <select
-                          disabled={isCurrentUser}
-                          onChange={(event) =>
-                            updateDraft(profile, 'business_unit_id', event.target.value)
-                          }
-                          value={draft.business_unit_id || ''}
-                        >
-                          <option value="">All business units</option>
-                          {businessUnits.map((unit) => (
-                            <option key={unit.id} value={unit.id}>
-                              {unit.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <StatusBadge tone={draft.active ? 'success' : 'muted'}>
-                          {draft.active ? 'Active' : 'Inactive'}
-                        </StatusBadge>
-                      </td>
-                      <td>
-                        <label className="access-toggle">
-                          <input
-                            checked={Boolean(draft.active)}
-                            disabled={isCurrentUser}
-                            onChange={(event) =>
-                              updateDraft(profile, 'active', event.target.checked)
-                            }
-                            type="checkbox"
-                          />
-                          <span>{getRoleLabel(draft.role)}</span>
-                        </label>
-                      </td>
-                      <td>
-                        <div className="row-actions">
-                          {isDirty ? (
-                            <button
-                              className="ghost-button small"
-                              disabled={savingId === profile.id}
-                              onClick={() => resetDraft(profile)}
-                              type="button"
-                            >
-                              <Undo2 size={14} />
-                              Undo
-                            </button>
-                          ) : null}
-                          <button
-                            className="primary-button small"
-                            disabled={!isDirty || savingId === profile.id}
-                            onClick={() => saveProfile(profile)}
-                            type="button"
-                          >
-                            {savingId === profile.id ? (
-                              'Saving...'
-                            ) : (
-                              <>
-                                <Check size={15} />
-                                Save changes
-                              </>
-                            )}
-                          </button>
-                          {!isCurrentUser ? (
-                            <button
-                              className={
-                                draft.active
-                                  ? 'ghost-button small danger-action'
-                                  : 'secondary-button small success-action'
-                              }
-                              disabled={savingId === profile.id}
-                              onClick={() =>
-                                setAccessTarget({
-                                  next: {
-                                    ...draft,
-                                    active: !draft.active,
-                                    role:
-                                      !draft.active && draft.role === 'pending'
-                                        ? 'manager'
-                                        : draft.role,
-                                  },
-                                  profile,
-                                })
-                              }
-                              type="button"
-                            >
-                              {draft.active ? <Ban size={14} /> : <RotateCcw size={14} />}
-                              {draft.active ? 'Revoke' : 'Restore'}
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </DataTable>
+              return (
+                <article className="access-card" key={profile.id}>
+                  <div className="access-card__header">
+                    <div className="person-cell">
+                      <input
+                        disabled={disabled}
+                        onChange={(event) => updateDraft(profile, 'full_name', event.target.value)}
+                        value={draft.full_name || ''}
+                      />
+                      <span>{profile.email}</span>
+                    </div>
+                    <div className="business-chip-list">
+                      <StatusBadge tone={draft.active || owner ? 'success' : 'muted'}>
+                        {draft.active || owner ? 'Active' : 'Inactive'}
+                      </StatusBadge>
+                      <StatusBadge tone={owner ? 'gold' : 'muted'}>{payload.role_title}</StatusBadge>
+                      <StatusBadge tone="muted">
+                        {businessLabel(businessUnits, draft.business_unit_id, owner)}
+                      </StatusBadge>
+                    </div>
+                  </div>
+
+                  <div className="access-card__controls">
+                    <label className="field">
+                      <span>Choose role template</span>
+                      <select
+                        disabled={disabled}
+                        onChange={(event) => applyDraftTemplate(profile, event.target.value)}
+                        value={payload.role_template}
+                      >
+                        {ROLE_TEMPLATES.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Role label</span>
+                      <select
+                        disabled={disabled}
+                        onChange={(event) => updateDraft(profile, 'role', event.target.value)}
+                        value={draft.role}
+                      >
+                        {ROLE_OPTIONS.map((role) => (
+                          <option key={role.value} value={role.value}>
+                            {role.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Business unit</span>
+                      <select
+                        disabled={disabled}
+                        onChange={(event) =>
+                          updateDraft(profile, 'business_unit_id', event.target.value)
+                        }
+                        required={!owner}
+                        value={draft.business_unit_id || ''}
+                      >
+                        <option value="">{owner ? 'All Businesses' : 'Choose business unit'}</option>
+                        {businessUnits.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="check-row">
+                      <input
+                        checked={Boolean(draft.active || owner)}
+                        disabled={disabled || isCurrentUser}
+                        onChange={(event) => updateDraft(profile, 'active', event.target.checked)}
+                        type="checkbox"
+                      />
+                      <span>Active login</span>
+                    </label>
+                  </div>
+
+                  <div className="template-preview">
+                    <div>
+                      <strong>{payload.role_title}</strong>
+                      <span>{template.description}</span>
+                    </div>
+                    <StatusBadge tone={owner ? 'gold' : 'muted'}>
+                      {owner ? 'Owner override' : getRoleLabel(draft.role)}
+                    </StatusBadge>
+                  </div>
+
+                  <PermissionMatrix
+                    disabled={disabled}
+                    onChange={(moduleId, permission) =>
+                      updateDraftModule(profile, moduleId, permission)
+                    }
+                    permissions={payload}
+                  />
+                  <ResponsibilitiesEditor
+                    disabled={disabled}
+                    onChange={(field, value) => updateDraftList(profile, field, value)}
+                    permissions={payload}
+                  />
+
+                  <div className="row-actions">
+                    {isDirty ? (
+                      <button
+                        className="ghost-button small"
+                        disabled={savingId === profile.id}
+                        onClick={() => resetDraft(profile)}
+                        type="button"
+                      >
+                        <Undo2 size={14} />
+                        Undo
+                      </button>
+                    ) : null}
+                    <button
+                      className="primary-button small"
+                      disabled={disabled || !isDirty || savingId === profile.id}
+                      onClick={() => saveProfile(profile)}
+                      type="button"
+                    >
+                      {savingId === profile.id ? (
+                        'Saving...'
+                      ) : (
+                        <>
+                          <Check size={15} />
+                          Save changes
+                        </>
+                      )}
+                    </button>
+                    {!owner && !isCurrentUser ? (
+                      <button
+                        className={
+                          draft.active
+                            ? 'ghost-button small danger-action'
+                            : 'secondary-button small success-action'
+                        }
+                        disabled={!accessAdmin || savingId === profile.id}
+                        onClick={() =>
+                          setAccessTarget({
+                            next: {
+                              ...draft,
+                              active: !draft.active,
+                            },
+                            profile,
+                          })
+                        }
+                        type="button"
+                      >
+                        {draft.active ? <Ban size={14} /> : <RotateCcw size={14} />}
+                        {draft.active ? 'Revoke' : 'Restore'}
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         ) : (
           <EmptyState
             icon={loading ? ShieldCheck : Users}

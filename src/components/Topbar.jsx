@@ -1,6 +1,6 @@
 import { LogOut, Menu, RefreshCw } from 'lucide-react';
 import BusinessUnitSelector from './BusinessUnitSelector';
-import { getRoleLabel } from '../utils/access';
+import { getProfileRoleTitle, isOwnerProfile } from '../lib/permissions.js';
 
 export default function Topbar({
   businessOptions,
@@ -34,7 +34,9 @@ export default function Topbar({
           setSelectedBusinessUnitId={setSelectedBusinessUnitId}
         />
         {profile ? (
-          <span className={`role-pill ${profile.role}`}>{getRoleLabel(profile.role)}</span>
+          <span className={`role-pill ${isOwnerProfile(profile) ? 'admin' : profile.role}`}>
+            {getProfileRoleTitle(profile)}
+          </span>
         ) : null}
         <button className="icon-button" type="button" onClick={onRefresh} aria-label="Refresh data">
           <RefreshCw size={18} />

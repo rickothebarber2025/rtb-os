@@ -7,6 +7,7 @@
   ClipboardCheck,
   LayoutDashboard,
   MessageSquareText,
+  UserCog,
   ReceiptText,
   ShieldCheck,
   SlidersHorizontal,
@@ -26,6 +27,7 @@ export const NAV_ITEMS = [
   { id: 'operations', label: 'Operations', icon: ClipboardCheck },
   { id: 'system', label: 'System Tools', icon: SlidersHorizontal },
   { id: 'access', label: 'Access', icon: ShieldCheck },
+  { id: 'my-role', label: 'My Role', icon: UserCog },
 ];
 
 export const LOW_SALES_THRESHOLD = 500;

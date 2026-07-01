@@ -16,7 +16,7 @@ import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import { buildActionCenterItems, getActionCenterSummary, getPriorityIcon } from '../utils/actionCenter';
-import { canUsePayroll } from '../utils/access';
+import { canManagePayroll, canUsePayroll } from '../utils/access';
 import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
 import {
   formatCompactCurrency,
@@ -48,8 +48,9 @@ export default function DashboardPage({
   staff,
 }) {
   const payrollAllowed = canUsePayroll(accessProfile);
+  const payrollEditable = canManagePayroll(accessProfile);
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
-  const canStartPayroll = payrollAllowed && !allBusinessesView;
+  const canStartPayroll = payrollEditable && !allBusinessesView;
   const businessProfile = getBusinessProfile(businessUnit);
   const activeStaff = staff.filter((member) => member.active);
   const fixedRateStaff = activeStaff.filter((member) => member.fixed_rate);

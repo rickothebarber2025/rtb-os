@@ -8,6 +8,18 @@ const corsHeaders = {
 };
 
 const ROLE_VALUES = new Set(["admin", "manager", "staff", "pending"]);
+const OWNER_EMAIL = "rickothebarber@gmail.com";
+const MODULE_IDS = [
+  "dashboard",
+  "roster",
+  "payroll",
+  "performance",
+  "appointments",
+  "booth_rent",
+  "operations",
+  "access",
+  "settings",
+];
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -44,6 +56,46 @@ function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizePermission(value: unknown) {
+  return typeof value === "string" ? value.toLowerCase() : "";
+}
+
+function normalizePermissionsPayload(value: unknown) {
+  const raw = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const source = raw.modules && typeof raw.modules === "object"
+    ? raw.modules as Record<string, unknown>
+    : raw;
+  const modules = Object.fromEntries(
+    MODULE_IDS.map((moduleId) => {
+      const level = normalizePermission(source[moduleId]);
+      return [moduleId, ["none", "view", "edit", "admin"].includes(level) ? level : "none"];
+    }),
+  );
+
+  return {
+    modules,
+    responsibilities: Array.isArray(raw.responsibilities) ? raw.responsibilities : [],
+    restrictions: Array.isArray(raw.restrictions) ? raw.restrictions : [],
+    role_description: String(raw.role_description || "Custom access profile."),
+    role_template: String(raw.role_template || "custom"),
+    role_title: String(raw.role_title || "Custom Role"),
+  };
+}
+
+function hasPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown } | null, minimum: string) {
+  if (normalizeEmail(profile?.email) === OWNER_EMAIL) return true;
+  if (!profile?.active) return false;
+
+  const permission = normalizePermission(normalizePermissionsPayload(profile.permissions).modules.access);
+  const levels = ["none", "view", "edit", "admin"];
+  const currentLevel = levels.indexOf(permission);
+  const requiredLevel = levels.indexOf(minimum);
+
+  return currentLevel >= requiredLevel;
+}
+
 function cleanRedirectTo(value: unknown, origin: string | null) {
   const fallback = "https://rtb-os.netlify.app/";
   const raw = String(value || origin || fallback);
@@ -76,12 +128,12 @@ async function requireAdmin(admin: ReturnType<typeof createClient>, req: Request
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("id,role,active")
+    .select("id,email,active,permissions")
     .eq("id", authData.user.id)
     .maybeSingle();
 
   if (profileError) throw profileError;
-  if (!profile?.active || profile.role !== "admin") {
+  if (!hasPermission(profile, "admin")) {
     return { error: "Only admins can invite team members.", status: 403 };
   }
 
@@ -120,8 +172,9 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const email = normalizeEmail(body.email);
     const fullName = String(body.full_name || email).trim();
-    const role = String(body.role || "manager").trim().toLowerCase();
+    const role = String(body.role || "staff").trim().toLowerCase();
     const businessUnitId = body.business_unit_id ? String(body.business_unit_id) : null;
+    const permissions = normalizePermissionsPayload(body.permissions);
     const redirectTo = cleanRedirectTo(body.redirectTo, req.headers.get("Origin"));
 
     if (!email || !email.includes("@")) {
@@ -130,6 +183,10 @@ Deno.serve(async (req) => {
 
     if (!ROLE_VALUES.has(role)) {
       return jsonResponse({ error: "Choose a valid role." }, 400);
+    }
+
+    if (!businessUnitId && email !== OWNER_EMAIL) {
+      return jsonResponse({ error: "Choose a business unit for this user." }, 400);
     }
 
     let invited = false;
@@ -154,11 +211,12 @@ Deno.serve(async (req) => {
       .from("user_profiles")
       .upsert(
         {
-          active: role !== "pending",
+          active: Boolean(body.active),
           business_unit_id: businessUnitId,
           email,
           full_name: fullName || email,
           id: targetUser.id,
+          permissions,
           role,
           updated_at: new Date().toISOString(),
         },

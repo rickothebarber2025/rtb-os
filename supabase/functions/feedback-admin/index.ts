@@ -11,6 +11,8 @@ import {
   readJson,
 } from "../_shared/rtb.ts";
 
+const OWNER_EMAIL = "rickothebarber@gmail.com";
+
 function parseDelayHours(value: unknown) {
   const number = Number(value ?? Deno.env.get("FEEDBACK_DEFAULT_DELAY_HOURS") ?? 2);
   if (!Number.isFinite(number) || number < 0 || number > 168) return 2;
@@ -225,7 +227,10 @@ Deno.serve(async (req) => {
 
       const results = [];
       for (const request of requests || []) {
-        if (auth.profile.role !== "admin" && auth.profile.business_unit_id && auth.profile.business_unit_id !== request.business_id) {
+        if (!auth.profile?.active && String(auth.profile?.email || "").toLowerCase() !== OWNER_EMAIL) {
+          continue;
+        }
+        if (auth.profile.business_unit_id && auth.profile.business_unit_id !== request.business_id) {
           continue;
         }
         results.push(await dispatchOne(admin, request));

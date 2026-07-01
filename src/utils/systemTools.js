@@ -1,3 +1,5 @@
+import { getProfileRoleTitle, hasModulePermission } from '../lib/permissions.js';
+
 const BACKUP_VERSION = 'rtb-os-backup-v1';
 
 export function csvEscape(value) {
@@ -59,7 +61,7 @@ export function createBackupSnapshot({
     exportedAt: new Date().toISOString(),
     exportedBy: {
       email: user?.email || null,
-      role: accessProfile?.role || null,
+      role: getProfileRoleTitle(accessProfile),
     },
     kind: BACKUP_VERSION,
     selectedBusiness: businessUnit?.name || null,
@@ -154,7 +156,7 @@ export function buildSystemChecks({
     tone: overdueProbation.length ? 'warning' : 'success',
   });
 
-  if (accessProfile?.role === 'admin') {
+  if (hasModulePermission(accessProfile, 'payroll', 'view')) {
     const latestRun = payrollRuns[0];
     addCheck(checks, {
       action: 'payroll',

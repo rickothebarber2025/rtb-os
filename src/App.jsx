@@ -1,6 +1,8 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import AppShell from './components/AppShell';
 import LoadingState from './components/LoadingState';
+import ModuleGate from './components/ModuleGate.jsx';
+import { useSyncAuthProfile } from './contexts/AuthProfileContext.jsx';
 import AccessPendingPage from './pages/AccessPendingPage';
 import AuthPage from './pages/AuthPage';
 import { useAuth } from './hooks/useAuth';
@@ -22,6 +24,7 @@ const BoothRentPage = lazy(() => import('./pages/BoothRentPage'));
 const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const OperationsPage = lazy(() => import('./pages/OperationsPage'));
+const MyRolePage = lazy(() => import('./pages/MyRolePage'));
 const PayrollPage = lazy(() => import('./pages/PayrollPage'));
 const PerformancePage = lazy(() => import('./pages/PerformancePage'));
 const StaffPage = lazy(() => import('./pages/StaffPage'));
@@ -40,6 +43,7 @@ function getSurveyTokenFromLocation() {
 
 export default function App() {
   const auth = useAuth();
+  useSyncAuthProfile(auth.profile, auth.loading);
   const surveyToken = getSurveyTokenFromLocation();
   const [activePage, setActivePage] = useState('dashboard');
   const [selectedBusinessUnitId, setSelectedBusinessUnitId] = useState(() =>
@@ -70,9 +74,9 @@ export default function App() {
 
   useEffect(() => {
     if (auth.profile && !canAccessPage(auth.profile, activePage)) {
-      setActivePage('dashboard');
+      setActivePage(navItems[0]?.id || 'my-role');
     }
-  }, [activePage, auth.profile]);
+  }, [activePage, auth.profile, navItems]);
 
   useEffect(() => {
     async function graduateDueProbationStaff() {
@@ -145,34 +149,83 @@ export default function App() {
     switch (activePage) {
       case 'access':
         return (
-          <AccessPage
-            businessUnits={data.businessUnits}
-            currentUserId={auth.user?.id}
-          />
+          <ModuleGate module="access">
+            <AccessPage
+              accessProfile={auth.profile}
+              businessUnits={data.businessUnits}
+              currentUserId={auth.user?.id}
+            />
+          </ModuleGate>
         );
       case 'action-center':
-        return <ActionCenterPage {...pageProps} />;
+        return (
+          <ModuleGate module="operations">
+            <ActionCenterPage {...pageProps} />
+          </ModuleGate>
+        );
       case 'ai-consultant':
-        return <AiConsultantPage {...pageProps} />;
+        return (
+          <ModuleGate module="operations">
+            <AiConsultantPage {...pageProps} />
+          </ModuleGate>
+        );
       case 'payroll':
-        return <PayrollPage {...pageProps} />;
+        return (
+          <ModuleGate module="payroll">
+            <PayrollPage {...pageProps} />
+          </ModuleGate>
+        );
       case 'staff':
-        return <StaffPage {...pageProps} />;
+        return (
+          <ModuleGate module="roster">
+            <StaffPage {...pageProps} />
+          </ModuleGate>
+        );
       case 'performance':
-        return <PerformancePage {...pageProps} />;
+        return (
+          <ModuleGate module="performance">
+            <PerformancePage {...pageProps} />
+          </ModuleGate>
+        );
       case 'insights':
-        return <BooksyInsightsPage {...pageProps} />;
+        return (
+          <ModuleGate module="appointments">
+            <BooksyInsightsPage {...pageProps} />
+          </ModuleGate>
+        );
       case 'customer-intelligence':
-        return <CustomerIntelligencePage {...pageProps} />;
+        return (
+          <ModuleGate module="performance">
+            <CustomerIntelligencePage {...pageProps} />
+          </ModuleGate>
+        );
       case 'booth-rent':
-        return <BoothRentPage {...pageProps} />;
+        return (
+          <ModuleGate module="booth_rent">
+            <BoothRentPage {...pageProps} />
+          </ModuleGate>
+        );
       case 'operations':
-        return <OperationsPage {...pageProps} />;
+        return (
+          <ModuleGate module="operations">
+            <OperationsPage {...pageProps} />
+          </ModuleGate>
+        );
       case 'system':
-        return <SystemPage {...pageProps} />;
+        return (
+          <ModuleGate module="settings">
+            <SystemPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'my-role':
+        return <MyRolePage {...pageProps} />;
       case 'dashboard':
       default:
-        return <DashboardPage {...pageProps} />;
+        return (
+          <ModuleGate module="dashboard">
+            <DashboardPage {...pageProps} />
+          </ModuleGate>
+        );
     }
   }
 

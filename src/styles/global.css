@@ -2373,6 +2373,128 @@ select {
   width: auto;
 }
 
+.access-denied-panel {
+  align-items: center;
+  display: flex;
+  gap: 0.9rem;
+}
+
+.access-template-form,
+.access-card-list,
+.access-card,
+.template-preview,
+.role-summary-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.access-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.access-card__header,
+.access-card__controls,
+.template-preview {
+  align-items: start;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.access-card__header {
+  grid-template-columns: minmax(220px, 1fr) auto;
+}
+
+.access-card__controls {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.template-preview {
+  background: rgba(214, 168, 79, 0.08);
+  border: 1px solid rgba(214, 168, 79, 0.16);
+  border-radius: var(--radius);
+  grid-template-columns: minmax(240px, 1fr) auto;
+  padding: 0.85rem;
+}
+
+.template-preview strong,
+.role-summary-list strong {
+  display: block;
+}
+
+.template-preview span,
+.role-summary-list span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin-top: 0.2rem;
+}
+
+.permission-matrix,
+.permission-overview-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.permission-cell,
+.permission-overview-card,
+.role-summary-list > div {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.72rem;
+}
+
+.permission-cell {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.permission-cell span,
+.permission-overview-card span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.permission-cell select {
+  min-height: 36px;
+  padding: 0 0.65rem;
+}
+
+.role-detail-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.role-detail-grid textarea {
+  min-height: 118px;
+}
+
+.permission-overview-card {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.role-list {
+  color: var(--muted);
+  display: grid;
+  gap: 0.55rem;
+  line-height: 1.45;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.role-list.columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .invite-actions {
   align-items: end;
   display: flex;
@@ -2550,7 +2672,11 @@ select {
   .system-check-grid,
   .system-action-grid,
   .intelligence-grid,
-  .consultant-answer-grid {
+  .consultant-answer-grid,
+  .access-card__controls,
+  .permission-matrix,
+  .permission-overview-grid,
+  .role-detail-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2571,6 +2697,11 @@ select {
   .booth-layout > .panel,
   .booth-records {
     grid-column: 1 / -1;
+  }
+
+  .access-card__header,
+  .template-preview {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2663,6 +2794,16 @@ select {
   .form-grid.compact .field,
   .invite-actions {
     grid-column: 1 / -1;
+  }
+
+  .access-denied-panel,
+  .permission-overview-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .role-list.columns {
+    grid-template-columns: 1fr;
   }
 
   .payroll-summary {
