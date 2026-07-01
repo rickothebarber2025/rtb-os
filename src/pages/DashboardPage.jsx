@@ -26,6 +26,7 @@ import {
   formatPercent,
 } from '../utils/formatters';
 import { buildOperationalChecks } from '../utils/operations';
+import { buildRoleWorkspace } from '../utils/workspaces';
 
 const OPERATION_ICONS = {
   danger: AlertCircle,
@@ -41,6 +42,7 @@ export default function DashboardPage({
   businessUnit,
   masterDashboard,
   masterDashboardUpdatedAt,
+  navItems,
   payrollRuns,
   performanceSummary,
   setActivePage,
@@ -93,6 +95,7 @@ export default function DashboardPage({
   });
   const actionSummary = getActionCenterSummary(actionItems);
   const topActions = actionItems.slice(0, 4);
+  const workspace = buildRoleWorkspace(accessProfile, navItems, businessUnit);
 
   return (
     <div className="page-grid">
@@ -110,6 +113,62 @@ export default function DashboardPage({
             New payroll run
           </button>
         ) : null}
+      </section>
+
+      <section className="panel full-span workspace-panel">
+        <div className="section-header">
+          <div>
+            <span>{workspace.roleTitle}</span>
+            <h2>{workspace.title}</h2>
+          </div>
+          <StatusBadge tone={workspace.editableModules.length ? 'gold' : 'muted'}>
+            {workspace.editableModules.length
+              ? `${workspace.editableModules.length} edit areas`
+              : 'View only'}
+          </StatusBadge>
+        </div>
+        <p className="subtle-text">{workspace.description}</p>
+        <div className="workspace-grid">
+          <div className="workspace-card">
+            <span>Start here</span>
+            <div className="workspace-actions">
+              {workspace.focusPages.map((page) => (
+                <button
+                  className="secondary-button small"
+                  key={page.id}
+                  type="button"
+                  onClick={() => setActivePage(page.id)}
+                >
+                  {page.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="workspace-card">
+            <span>Onboarding</span>
+            <div className="workspace-checklist">
+              {workspace.onboarding.map((item) => (
+                <div className={item.complete ? 'complete' : 'open'} key={item.label}>
+                  <CheckCircle2 size={16} />
+                  <strong>{item.label}</strong>
+                  <small>{item.detail}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="workspace-card">
+            <span>Responsibilities</span>
+            {workspace.responsibilities.length ? (
+              <ul className="compact-list">
+                {workspace.responsibilities.slice(0, 4).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="subtle-text">No responsibilities assigned yet.</p>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className="metrics-grid">

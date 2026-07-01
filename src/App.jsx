@@ -118,6 +118,7 @@ export default function App() {
       onRefresh: data.refresh,
       payrollRuns: data.payrollRuns,
       monthlyPerformanceSummary: data.monthlyPerformanceSummary,
+      navItems,
       performanceSummary: data.performanceSummary,
       setActivePage,
       squareStatus: data.squareStatus,
@@ -127,7 +128,7 @@ export default function App() {
       user: auth.user,
       warnings: data.warnings,
     }),
-    [auth.profile, auth.user, businessOptions, data],
+    [auth.profile, auth.user, businessOptions, data, navItems],
   );
 
   function renderPage() {

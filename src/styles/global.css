@@ -212,8 +212,22 @@ select {
 
 .sidebar__nav {
   display: grid;
-  gap: 0.45rem;
+  gap: 1rem;
   margin-top: 2rem;
+}
+
+.nav-group {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.nav-group__label {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  padding: 0 0.78rem;
+  text-transform: uppercase;
 }
 
 .nav-item {
@@ -1255,6 +1269,83 @@ select {
 .action-card.high .action-card__icon,
 .action-card.medium .action-card__icon {
   color: var(--gold-strong);
+}
+
+.workspace-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.workspace-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
+}
+
+.workspace-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.7rem;
+  min-height: 132px;
+  padding: 0.85rem;
+}
+
+.workspace-card > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.workspace-actions {
+  align-content: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.workspace-checklist {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.workspace-checklist > div {
+  align-items: center;
+  display: grid;
+  gap: 0.18rem 0.5rem;
+  grid-template-columns: auto 1fr;
+}
+
+.workspace-checklist svg {
+  grid-row: span 2;
+}
+
+.workspace-checklist .complete svg {
+  color: var(--green);
+}
+
+.workspace-checklist .open svg {
+  color: var(--gold-strong);
+}
+
+.workspace-checklist strong {
+  font-size: 0.88rem;
+}
+
+.workspace-checklist small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.compact-list {
+  color: var(--muted);
+  display: grid;
+  gap: 0.4rem;
+  line-height: 1.4;
+  margin: 0;
+  padding-left: 1rem;
 }
 
 .action-center-snapshot__footer {
@@ -2713,6 +2804,7 @@ select {
 
   .snapshot-grid,
   .operations-grid,
+  .workspace-grid,
   .dashboard-action-list,
   .manual-record-grid,
   .staff-insight-grid,

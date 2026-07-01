@@ -8,6 +8,7 @@ import {
   MODULE_IDS,
   MODULE_LABELS,
 } from '../lib/permissions.js';
+import { buildRoleWorkspace } from '../utils/workspaces';
 
 function permissionTone(level) {
   if (level === 'admin') return 'gold';
@@ -16,8 +17,9 @@ function permissionTone(level) {
   return 'danger';
 }
 
-export default function MyRolePage({ accessProfile, businessUnits }) {
+export default function MyRolePage({ accessProfile, businessUnit, businessUnits, navItems, setActivePage }) {
   const payload = getEffectivePermissionsPayload(accessProfile);
+  const workspace = buildRoleWorkspace(accessProfile, navItems, businessUnit);
   const owner = isOwnerProfile(accessProfile);
   const allBusinesses = owner || hasAllBusinessAccess(accessProfile);
   const businessNames = allBusinesses
@@ -75,6 +77,48 @@ export default function MyRolePage({ accessProfile, businessUnits }) {
               {accessProfile?.active || owner ? 'Active' : 'Inactive'}
             </StatusBadge>
           </div>
+        </div>
+      </section>
+
+      <section className="panel two-thirds">
+        <div className="section-header">
+          <div>
+            <span>Workspace</span>
+            <h2>Start here</h2>
+          </div>
+          <ClipboardCheck size={20} />
+        </div>
+        <p className="subtle-text">{workspace.description}</p>
+        <div className="workspace-actions">
+          {workspace.focusPages.map((page) => (
+            <button
+              className="secondary-button small"
+              key={page.id}
+              type="button"
+              onClick={() => setActivePage(page.id)}
+            >
+              {page.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="section-header">
+          <div>
+            <span>Setup</span>
+            <h2>Onboarding checklist</h2>
+          </div>
+          <CheckCircle2 size={20} />
+        </div>
+        <div className="workspace-checklist">
+          {workspace.onboarding.map((item) => (
+            <div className={item.complete ? 'complete' : 'open'} key={item.label}>
+              <CheckCircle2 size={16} />
+              <strong>{item.label}</strong>
+              <small>{item.detail}</small>
+            </div>
+          ))}
         </div>
       </section>
 

@@ -42,6 +42,7 @@ import {
   getBusinessSelectionOptions,
   suggestInstagramHandle,
 } from '../src/utils/businessProfiles.js';
+import { NAV_ITEMS } from '../src/utils/constants.js';
 import {
   ALL_BUSINESSES_ACCESS,
   createModulePermissions,
@@ -67,6 +68,7 @@ import {
   enrichStaffWithBusinessMetadata,
   staffBelongsToBusiness,
 } from '../src/utils/staffBusiness.js';
+import { buildRoleWorkspace } from '../src/utils/workspaces.js';
 
 function profileWithPermissions(modules, extra = {}) {
   return {
@@ -132,6 +134,27 @@ test('role templates carry expectations and module permissions', () => {
   assert.equal(canAccessPage(appointmentCoordinator, 'insights'), true);
   assert.equal(canUsePayroll(appointmentCoordinator), false);
   assert.match(getProfileExpectations(appointmentCoordinator), /appointment data/i);
+});
+
+test('role workspace surfaces allowed role-specific actions', () => {
+  const appointmentCoordinator = {
+    active: true,
+    business_unit_id: 'beauty',
+    permissions: buildPermissionsFromTemplate('appointment_coordinator', {
+      business_unit_ids: ['beauty'],
+    }),
+  };
+  const allowedNav = NAV_ITEMS.filter((item) => canAccessPage(appointmentCoordinator, item.id));
+  const workspace = buildRoleWorkspace(
+    appointmentCoordinator,
+    allowedNav,
+    { id: 'beauty', name: 'RTB Beauty Lounge' },
+  );
+
+  assert.equal(workspace.title, 'Appointment Coordination Workspace');
+  assert.equal(workspace.focusPages.some((page) => page.id === 'insights'), true);
+  assert.equal(workspace.focusPages.some((page) => page.id === 'payroll'), false);
+  assert.equal(workspace.onboarding.every((item) => item.complete), true);
 });
 
 test('business access can be one business, many businesses, or all businesses', () => {

@@ -15,19 +15,19 @@
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'action-center', label: 'Action Center', icon: BellRing },
-  { id: 'payroll', label: 'Payroll', icon: CircleDollarSign },
-  { id: 'staff', label: 'Roster', icon: Users },
-  { id: 'performance', label: 'Performance', icon: BarChart3 },
-  { id: 'insights', label: 'Appointment Insights', icon: CalendarDays },
-  { id: 'customer-intelligence', label: 'Customer IQ', icon: MessageSquareText },
-  { id: 'ai-consultant', label: 'AI Consultant', icon: Brain },
-  { id: 'booth-rent', label: 'Booth Rent', icon: ReceiptText },
-  { id: 'operations', label: 'Operations', icon: ClipboardCheck },
-  { id: 'system', label: 'System Tools', icon: SlidersHorizontal },
-  { id: 'access', label: 'Access', icon: ShieldCheck },
-  { id: 'my-role', label: 'My Role', icon: UserCog },
+  { group: 'Workspace', id: 'dashboard', label: 'My Workspace', icon: LayoutDashboard },
+  { group: 'Workspace', id: 'action-center', label: 'Action Center', icon: BellRing },
+  { group: 'Workspace', id: 'my-role', label: 'My Role', icon: UserCog },
+  { group: 'Operations', id: 'payroll', label: 'Payroll', icon: CircleDollarSign },
+  { group: 'Operations', id: 'staff', label: 'Roster', icon: Users },
+  { group: 'Operations', id: 'insights', label: 'Appointments', icon: CalendarDays },
+  { group: 'Operations', id: 'booth-rent', label: 'Booth Rent', icon: ReceiptText },
+  { group: 'Operations', id: 'operations', label: 'Operations', icon: ClipboardCheck },
+  { group: 'Intelligence', id: 'performance', label: 'Performance', icon: BarChart3 },
+  { group: 'Intelligence', id: 'customer-intelligence', label: 'Customer IQ', icon: MessageSquareText },
+  { group: 'Intelligence', id: 'ai-consultant', label: 'AI Consultant', icon: Brain },
+  { group: 'Admin', id: 'system', label: 'System Tools', icon: SlidersHorizontal },
+  { group: 'Admin', id: 'access', label: 'Access', icon: ShieldCheck },
 ];
 
 export const LOW_SALES_THRESHOLD = 500;

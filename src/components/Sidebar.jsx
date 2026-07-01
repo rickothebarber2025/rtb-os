@@ -1,6 +1,14 @@
 import { Scissors, X } from 'lucide-react';
 
 export default function Sidebar({ activePage, isOpen, navItems, onClose, setActivePage }) {
+  const groups = navItems.reduce((result, item) => {
+    const group = item.group || 'Workspace';
+    return {
+      ...result,
+      [group]: [...(result[group] || []), item],
+    };
+  }, {});
+
   return (
     <aside className={`sidebar ${isOpen ? 'is-open' : ''}`}>
       <div className="sidebar__brand">
@@ -17,25 +25,30 @@ export default function Sidebar({ activePage, isOpen, navItems, onClose, setActi
       </div>
 
       <nav className="sidebar__nav" aria-label="Main navigation">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = activePage === item.id;
+        {Object.entries(groups).map(([group, items]) => (
+          <div className="nav-group" key={group}>
+            <span className="nav-group__label">{group}</span>
+            {items.map((item) => {
+              const Icon = item.icon;
+              const active = activePage === item.id;
 
-          return (
-            <button
-              className={`nav-item ${active ? 'active' : ''}`}
-              key={item.id}
-              type="button"
-              onClick={() => {
-                setActivePage(item.id);
-                onClose();
-              }}
-            >
-              <Icon size={18} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
+              return (
+                <button
+                  className={`nav-item ${active ? 'active' : ''}`}
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setActivePage(item.id);
+                    onClose();
+                  }}
+                >
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="sidebar__footer">
