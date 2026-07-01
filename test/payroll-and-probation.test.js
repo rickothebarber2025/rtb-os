@@ -45,9 +45,12 @@ import {
 import {
   ALL_BUSINESSES_ACCESS,
   createModulePermissions,
+  getEffectivePermissionsPayload,
+  getProfileExpectations,
   getProfileBusinessUnitIds,
   profileCanAccessBusiness,
 } from '../src/lib/permissions.js';
+import { buildPermissionsFromTemplate } from '../src/lib/roleTemplates.js';
 import {
   canAccessPage,
   canDeleteBoothRent,
@@ -95,6 +98,40 @@ test('explicit permissions are required for app and page access', () => {
   assert.equal(canUsePayroll(payrollViewer), true);
   assert.equal(canDeleteBoothRent(boothEditor), false);
   assert.equal(canDeleteBoothRent(boothAdmin), true);
+});
+
+test('legacy null permissions get temporary role fallback only until saved', () => {
+  const legacyManager = {
+    active: true,
+    business_unit_id: 'beauty',
+    permissions: null,
+    role: 'manager',
+  };
+  const savedManager = {
+    active: true,
+    business_unit_id: 'beauty',
+    permissions: buildPermissionsFromTemplate('custom'),
+    role: 'manager',
+  };
+
+  assert.equal(canUseApp({ active: true, role: 'manager' }), false);
+  assert.equal(canAccessPage(legacyManager, 'staff'), true);
+  assert.equal(canAccessPage(legacyManager, 'access'), false);
+  assert.equal(canUseApp(savedManager), false);
+  assert.equal(getEffectivePermissionsPayload(legacyManager).role_template, 'legacy_manager');
+});
+
+test('role templates carry expectations and module permissions', () => {
+  const appointmentCoordinator = {
+    active: true,
+    permissions: buildPermissionsFromTemplate('appointment_coordinator', {
+      business_unit_ids: ['beauty'],
+    }),
+  };
+
+  assert.equal(canAccessPage(appointmentCoordinator, 'insights'), true);
+  assert.equal(canUsePayroll(appointmentCoordinator), false);
+  assert.match(getProfileExpectations(appointmentCoordinator), /appointment data/i);
 });
 
 test('business access can be one business, many businesses, or all businesses', () => {

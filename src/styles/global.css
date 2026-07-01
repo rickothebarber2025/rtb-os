@@ -2467,12 +2467,17 @@ select {
 }
 
 .template-preview span,
+.template-preview small,
 .role-summary-list span {
   color: var(--muted);
   display: block;
   font-size: 0.78rem;
   line-height: 1.45;
   margin-top: 0.2rem;
+}
+
+.template-preview small {
+  color: var(--text-soft);
 }
 
 .permission-matrix,
@@ -2516,6 +2521,10 @@ select {
 
 .role-detail-grid textarea {
   min-height: 118px;
+}
+
+.role-detail-grid .full-width {
+  grid-column: 1 / -1;
 }
 
 .permission-overview-card {

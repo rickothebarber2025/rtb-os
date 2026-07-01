@@ -1,5 +1,347 @@
 begin;
 
+-- Bootstrap the production tables that existed before this hardening
+-- migration was committed. These definitions are intentionally additive so a
+-- fresh shadow database can replay the full migration chain, while production
+-- data remains untouched when the migration has already been applied.
+create extension if not exists pgcrypto;
+
+create schema if not exists private;
+
+create table if not exists public.business_units (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  type text not null,
+  address text,
+  phone text,
+  email text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.user_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null,
+  full_name text,
+  role text not null default 'pending',
+  business_unit_id uuid references public.business_units(id) on delete set null,
+  active boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  permissions jsonb,
+  role_title text,
+  role_description text,
+  responsibilities jsonb not null default '[]'::jsonb,
+  restrictions jsonb not null default '[]'::jsonb,
+  expectations text
+);
+
+create table if not exists public.staff (
+  id uuid primary key default gen_random_uuid(),
+  business_unit_id uuid references public.business_units(id) on delete set null,
+  full_name text not null,
+  email text,
+  phone text,
+  role text not null default 'Staff',
+  tier text not null default 'standard',
+  commission_rate numeric not null default 60,
+  fixed_rate boolean not null default false,
+  active boolean not null default true,
+  start_date date,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  probation_start_date date
+);
+
+create table if not exists public.payroll_runs (
+  id uuid primary key default gen_random_uuid(),
+  business_unit_id uuid references public.business_units(id) on delete set null,
+  week_label text not null,
+  week_start date,
+  week_end date,
+  status text not null default 'draft',
+  owner_net_sales numeric not null default 0,
+  owner_tips numeric not null default 0,
+  total_net_sales numeric not null default 0,
+  total_staff_payout numeric not null default 0,
+  total_deductions numeric not null default 0,
+  rtb_net numeric not null default 0,
+  notes text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  locked_at timestamptz,
+  performance_saved_at timestamptz,
+  corrected_from_run_id uuid references public.payroll_runs(id) on delete set null,
+  void_reason text,
+  voided_at timestamptz,
+  voided_by uuid references auth.users(id) on delete set null
+);
+
+create table if not exists public.payroll_entries (
+  id uuid primary key default gen_random_uuid(),
+  payroll_run_id uuid not null references public.payroll_runs(id) on delete cascade,
+  staff_id uuid references public.staff(id) on delete set null,
+  staff_name_snapshot text not null,
+  role_snapshot text,
+  tier_snapshot text,
+  base_commission_rate numeric not null default 60,
+  applied_commission_rate numeric not null default 60,
+  fixed_rate_snapshot boolean not null default false,
+  adjusted boolean not null default false,
+  net_sales numeric not null default 0,
+  tips numeric not null default 0,
+  deduction numeric not null default 5,
+  take_home numeric not null default 0,
+  paystub_status text not null default 'pending',
+  paystub_sent_at timestamptz,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.booth_rent (
+  id uuid primary key default gen_random_uuid(),
+  staff_id uuid references public.staff(id) on delete set null,
+  business_unit_id uuid references public.business_units(id) on delete set null,
+  renter_name text not null,
+  week_label text,
+  rent_amount numeric not null default 200,
+  paid boolean not null default false,
+  paid_at timestamptz,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.performance_history (
+  id uuid primary key default gen_random_uuid(),
+  staff_id uuid references public.staff(id) on delete set null,
+  business_unit_id uuid references public.business_units(id) on delete set null,
+  week_label text not null,
+  week_start date,
+  net_sales numeric not null default 0,
+  tips numeric not null default 0,
+  take_home numeric not null default 0,
+  applied_commission_rate numeric not null default 60,
+  tier text,
+  under_minimum boolean not null default false,
+  adjusted boolean not null default false,
+  created_at timestamptz not null default now(),
+  payroll_run_id uuid references public.payroll_runs(id) on delete cascade
+);
+
+create table if not exists public.app_settings (
+  id uuid primary key default gen_random_uuid(),
+  key text not null unique,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.business_units enable row level security;
+alter table public.user_profiles enable row level security;
+alter table public.staff enable row level security;
+alter table public.payroll_runs enable row level security;
+alter table public.payroll_entries enable row level security;
+alter table public.booth_rent enable row level security;
+alter table public.performance_history enable row level security;
+alter table public.app_settings enable row level security;
+
+create or replace function private.permission_rank(p_level text)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $function$
+  select case lower(coalesce(p_level, 'none'))
+    when 'admin' then 3
+    when 'edit' then 2
+    when 'view' then 1
+    else 0
+  end;
+$function$;
+
+create or replace function private.role_fallback_permission(p_role text, p_module text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $function$
+  select case lower(coalesce(p_role, 'pending'))
+    when 'owner' then 'admin'
+    when 'admin' then 'admin'
+    when 'manager' then
+      case
+        when p_module = 'access' then 'none'
+        when p_module in ('dashboard', 'payroll', 'settings') then 'view'
+        when p_module in (
+          'roster',
+          'performance',
+          'appointments',
+          'booth_rent',
+          'operations'
+        ) then 'edit'
+        else 'none'
+      end
+    when 'staff' then
+      case
+        when p_module in ('dashboard', 'operations') then 'view'
+        else 'none'
+      end
+    else 'none'
+  end;
+$function$;
+
+create or replace function private.module_permission(p_module text)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $function$
+declare
+  current_profile public.user_profiles%rowtype;
+  module_payload jsonb;
+  permission text;
+begin
+  select *
+  into current_profile
+  from public.user_profiles
+  where id = (select auth.uid());
+
+  if lower(coalesce(current_profile.email, '')) = 'rickothebarber@gmail.com' then
+    return 'admin';
+  end if;
+
+  if current_profile.id is null or current_profile.active is false then
+    return 'none';
+  end if;
+
+  if current_profile.permissions is null then
+    return private.role_fallback_permission(current_profile.role, p_module);
+  end if;
+
+  module_payload := case
+    when jsonb_typeof(current_profile.permissions -> 'modules') = 'object'
+      then current_profile.permissions -> 'modules'
+    else current_profile.permissions
+  end;
+  permission := lower(coalesce(module_payload ->> p_module, 'none'));
+
+  if permission in ('none', 'view', 'edit', 'admin') then
+    return permission;
+  end if;
+
+  return 'none';
+end;
+$function$;
+
+create or replace function private.can_module_view(p_module text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select private.permission_rank(private.module_permission(p_module)) >= 1;
+$function$;
+
+create or replace function private.can_module_edit(p_module text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select private.permission_rank(private.module_permission(p_module)) >= 2;
+$function$;
+
+create or replace function private.can_module_admin(p_module text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select private.permission_rank(private.module_permission(p_module)) >= 3;
+$function$;
+
+create or replace function private.is_app_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select private.can_module_admin('access')
+    or private.can_module_admin('payroll')
+    or exists (
+      select 1
+      from public.user_profiles up
+      where up.id = (select auth.uid())
+        and lower(up.email) = 'rickothebarber@gmail.com'
+    );
+$function$;
+
+create or replace function private.can_access_business_unit(p_business_unit_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $function$
+declare
+  current_profile public.user_profiles%rowtype;
+  allowed_ids jsonb;
+begin
+  select *
+  into current_profile
+  from public.user_profiles
+  where id = (select auth.uid());
+
+  if lower(coalesce(current_profile.email, '')) = 'rickothebarber@gmail.com' then
+    return true;
+  end if;
+
+  if current_profile.id is null or current_profile.active is false then
+    return false;
+  end if;
+
+  if p_business_unit_id is null then
+    return private.is_app_admin();
+  end if;
+
+  if current_profile.permissions is null then
+    return current_profile.business_unit_id = p_business_unit_id;
+  end if;
+
+  if current_profile.permissions ->> 'business_scope' = 'all' then
+    return true;
+  end if;
+
+  allowed_ids := case
+    when jsonb_typeof(current_profile.permissions -> 'business_unit_ids') = 'array'
+      then current_profile.permissions -> 'business_unit_ids'
+    else '[]'::jsonb
+  end;
+
+  return current_profile.business_unit_id = p_business_unit_id
+    or exists (
+      select 1
+      from jsonb_array_elements_text(allowed_ids) as allowed(id)
+      where allowed.id in (p_business_unit_id::text, 'all-businesses')
+    );
+end;
+$function$;
+
+grant usage on schema private to authenticated;
+grant execute on function private.permission_rank(text) to authenticated;
+grant execute on function private.role_fallback_permission(text, text) to authenticated;
+grant execute on function private.module_permission(text) to authenticated;
+grant execute on function private.can_module_view(text) to authenticated;
+grant execute on function private.can_module_edit(text) to authenticated;
+grant execute on function private.can_module_admin(text) to authenticated;
+grant execute on function private.is_app_admin() to authenticated;
+grant execute on function private.can_access_business_unit(uuid) to authenticated;
+
 -- Managers can manage roster records only inside business units they can access.
 drop policy if exists staff_admin_all on public.staff;
 drop policy if exists staff_insert_by_manager_or_admin on public.staff;

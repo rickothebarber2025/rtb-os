@@ -51,7 +51,7 @@ function getDraft(profile, drafts) {
     ...draft,
     active: Boolean(draft.active),
     business_unit_id: draft.business_unit_id || '',
-    permissions: normalizePermissionsPayload(draft.permissions),
+    permissions: draft.permissions === null ? null : normalizePermissionsPayload(draft.permissions),
     role: draft.role || 'staff',
   };
 }
@@ -241,6 +241,22 @@ function ResponsibilitiesEditor({ disabled, permissions, onChange }) {
   return (
     <div className="role-detail-grid">
       <label className="field">
+        <span>Role title</span>
+        <input
+          disabled={disabled}
+          onChange={(event) => onChange('role_title', event.target.value)}
+          value={payload.role_title}
+        />
+      </label>
+      <label className="field">
+        <span>Role description</span>
+        <input
+          disabled={disabled}
+          onChange={(event) => onChange('role_description', event.target.value)}
+          value={payload.role_description}
+        />
+      </label>
+      <label className="field">
         <span>Responsibilities checklist</span>
         <textarea
           disabled={disabled}
@@ -256,6 +272,14 @@ function ResponsibilitiesEditor({ disabled, permissions, onChange }) {
           value={listToText(payload.restrictions)}
         />
       </label>
+      <label className="field full-width">
+        <span>Notes / expectations</span>
+        <textarea
+          disabled={disabled}
+          onChange={(event) => onChange('expectations', event.target.value)}
+          value={payload.expectations}
+        />
+      </label>
     </div>
   );
 }
@@ -269,6 +293,7 @@ function RoleTemplatePreview({ permissions }) {
       <div>
         <strong>{payload.role_title}</strong>
         <span>{payload.role_description}</span>
+        {payload.expectations ? <small>{payload.expectations}</small> : null}
       </div>
       <div className="business-chip-list">
         {visibleModules.length ? (
@@ -403,7 +428,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
   function updateDraftModule(profile, moduleId, permission) {
     setDrafts((current) => {
       const draft = getDraft(profile, current);
-      const payload = normalizePermissionsPayload(draft.permissions);
+      const payload = getEffectivePermissionsPayload(draft);
       return {
         ...current,
         [profile.id]: {
@@ -423,12 +448,13 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
   function updateDraftList(profile, field, value) {
     setDrafts((current) => {
       const draft = getDraft(profile, current);
+      const payload = getEffectivePermissionsPayload(draft);
       return {
         ...current,
         [profile.id]: {
           ...draft,
           permissions: {
-            ...normalizePermissionsPayload(draft.permissions),
+            ...payload,
             [field]: value,
           },
         },
@@ -505,7 +531,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
     try {
       await updateUserProfile(draft);
       setMessage(
-        `${draft.full_name || draft.email} is now ${normalizePermissionsPayload(draft.permissions).role_title}.`,
+        `${draft.full_name || draft.email} is now ${getEffectivePermissionsPayload(draft).role_title}.`,
       );
       await loadProfiles();
       return true;

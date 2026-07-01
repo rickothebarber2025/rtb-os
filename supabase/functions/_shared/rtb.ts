@@ -138,14 +138,29 @@ function getBusinessAccess(value: unknown) {
   };
 }
 
-function hasAnyPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown } | null, minimum: string) {
+function legacyPermission(profile: { role?: string | null } | null, moduleId: string) {
+  const role = String(profile?.role || "").trim().toLowerCase();
+  if (role === "admin" || role === "owner") return "admin";
+  if (role === "manager") {
+    if (moduleId === "access") return "none";
+    if (["dashboard", "payroll", "settings"].includes(moduleId)) return "view";
+    return "edit";
+  }
+  if (role === "staff" && ["dashboard", "operations"].includes(moduleId)) return "view";
+  return "none";
+}
+
+function hasAnyPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown; role?: string | null } | null, minimum: string) {
   if (String(profile?.email || "").trim().toLowerCase() === OWNER_EMAIL) return true;
   if (!profile?.active) return false;
 
   const levels = ["none", "view", "edit", "admin"];
   const requiredLevel = levels.indexOf(minimum);
+  const permissions = profile.permissions === null
+    ? Object.fromEntries(MODULE_IDS.map((moduleId) => [moduleId, legacyPermission(profile, moduleId)]))
+    : normalizePermissionsPayload(profile.permissions);
 
-  return Object.values(normalizePermissionsPayload(profile.permissions)).some((permission) => {
+  return Object.values(permissions).some((permission) => {
     const currentLevel = levels.indexOf(normalizePermission(permission));
     return currentLevel >= requiredLevel;
   });
@@ -166,7 +181,7 @@ export async function authorizeManager(
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("active,business_unit_id,email,permissions")
+    .select("active,business_unit_id,email,permissions,role")
     .eq("id", authData.user.id)
     .maybeSingle();
 

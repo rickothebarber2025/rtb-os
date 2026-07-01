@@ -1,5 +1,9 @@
 import { supabase } from '../lib/supabaseClient';
-import { normalizePermissionsPayload } from '../lib/permissions.js';
+import {
+  getEffectivePermissionsPayload,
+  mergeProfilePermissionFields,
+  normalizePermissionsPayload,
+} from '../lib/permissions.js';
 import { buildPermissionsFromTemplate } from '../lib/roleTemplates.js';
 import { calculateEntryValues } from '../utils/payroll';
 import { PROBATION_RATE, toDateKey } from '../utils/probation';
@@ -20,6 +24,43 @@ function cleanObject(payload) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined),
   );
+}
+
+const USER_PROFILE_SELECT = [
+  'id',
+  'email',
+  'full_name',
+  'role',
+  'active',
+  'business_unit_id',
+  'permissions',
+  'role_title',
+  'role_description',
+  'responsibilities',
+  'restrictions',
+  'expectations',
+].join(',');
+
+const USER_PROFILE_LIST_SELECT = `${USER_PROFILE_SELECT},created_at,updated_at`;
+
+function hydrateUserProfile(profile) {
+  if (!profile) return null;
+  if (profile.permissions === null || profile.permissions === undefined) return profile;
+  return mergeProfilePermissionFields(profile);
+}
+
+function profileRolePayload(profile) {
+  const permissions = profile.permissions === null
+    ? getEffectivePermissionsPayload(profile)
+    : normalizePermissionsPayload(profile.permissions);
+  return {
+    expectations: permissions.expectations || null,
+    permissions,
+    responsibilities: permissions.responsibilities,
+    restrictions: permissions.restrictions,
+    role_description: permissions.role_description,
+    role_title: permissions.role_title,
+  };
 }
 
 async function getFunctionErrorMessage(error) {
@@ -85,12 +126,12 @@ export async function getCurrentUserProfile(userId) {
   const client = requireClient();
   const { data, error } = await client
     .from('user_profiles')
-    .select('id,email,full_name,role,active,business_unit_id,permissions')
+    .select(USER_PROFILE_SELECT)
     .eq('id', userId)
     .maybeSingle();
 
   if (error) throw error;
-  return data || null;
+  return hydrateUserProfile(data);
 }
 
 export async function createPendingUserProfile(user) {
@@ -101,7 +142,7 @@ export async function createPendingUserProfile(user) {
     user?.email ||
     'Pending user';
 
-  return requireData(
+  const profile = requireData(
     await client
       .from('user_profiles')
       .insert({
@@ -109,37 +150,40 @@ export async function createPendingUserProfile(user) {
         email: user.email,
         full_name: fullName,
         id: user.id,
-        permissions: buildPermissionsFromTemplate('custom'),
+        ...profileRolePayload({ permissions: buildPermissionsFromTemplate('custom') }),
         role: 'pending',
       })
       .select()
       .single(),
   );
+  return hydrateUserProfile(profile);
 }
 
 export async function getUserProfiles() {
   const client = requireClient();
-  return requireData(
+  const profiles = requireData(
     await client
       .from('user_profiles')
-      .select('id,email,full_name,role,active,business_unit_id,permissions,created_at,updated_at')
+      .select(USER_PROFILE_LIST_SELECT)
       .order('role', { ascending: true })
       .order('full_name', { ascending: true }),
   );
+  return profiles.map(hydrateUserProfile);
 }
 
 export async function updateUserProfile(profile) {
   const client = requireClient();
+  const rolePayload = profileRolePayload(profile);
   const payload = cleanObject({
     active: Boolean(profile.active),
     business_unit_id: profile.business_unit_id || null,
     full_name: profile.full_name || profile.email,
-    permissions: normalizePermissionsPayload(profile.permissions),
+    ...rolePayload,
     role: profile.role || 'pending',
     updated_at: new Date().toISOString(),
   });
 
-  return requireData(
+  const updated = requireData(
     await client
       .from('user_profiles')
       .update(payload)
@@ -147,15 +191,17 @@ export async function updateUserProfile(profile) {
       .select()
       .single(),
   );
+  return hydrateUserProfile(updated);
 }
 
 export async function inviteUserProfile(invite) {
+  const rolePayload = profileRolePayload(invite);
   return invokeFunction('invite-user', {
     business_unit_id: invite.business_unit_id || null,
     email: invite.email,
     full_name: invite.full_name,
     active: Boolean(invite.active),
-    permissions: normalizePermissionsPayload(invite.permissions),
+    ...rolePayload,
     redirectTo: window.location.origin,
     role: invite.role || 'staff',
   });

@@ -83,6 +83,7 @@ function normalizePermissionsPayload(value: unknown) {
   return {
     business_scope: hasAllBusinesses ? "all" : "selected",
     business_unit_ids: hasAllBusinesses ? [ALL_BUSINESSES_ACCESS] : businessUnitIds,
+    expectations: String(raw.expectations || ""),
     modules,
     responsibilities: Array.isArray(raw.responsibilities) ? raw.responsibilities : [],
     restrictions: Array.isArray(raw.restrictions) ? raw.restrictions : [],
@@ -92,11 +93,18 @@ function normalizePermissionsPayload(value: unknown) {
   };
 }
 
-function hasPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown } | null, minimum: string) {
+function legacyAccessPermission(profile: { role?: string | null } | null) {
+  const role = String(profile?.role || "").trim().toLowerCase();
+  return role === "admin" || role === "owner" ? "admin" : "none";
+}
+
+function hasPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown; role?: string | null } | null, minimum: string) {
   if (normalizeEmail(profile?.email) === OWNER_EMAIL) return true;
   if (!profile?.active) return false;
 
-  const permission = normalizePermission(normalizePermissionsPayload(profile.permissions).modules.access);
+  const permission = profile.permissions === null
+    ? legacyAccessPermission(profile)
+    : normalizePermission(normalizePermissionsPayload(profile.permissions).modules.access);
   const levels = ["none", "view", "edit", "admin"];
   const currentLevel = levels.indexOf(permission);
   const requiredLevel = levels.indexOf(minimum);
@@ -153,7 +161,7 @@ async function requireAdmin(admin: ReturnType<typeof createClient>, req: Request
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("id,email,active,permissions")
+    .select("id,email,active,permissions,role")
     .eq("id", authData.user.id)
     .maybeSingle();
 
@@ -242,6 +250,11 @@ Deno.serve(async (req) => {
           full_name: fullName || email,
           id: targetUser.id,
           permissions,
+          expectations: permissions.expectations || null,
+          responsibilities: permissions.responsibilities,
+          restrictions: permissions.restrictions,
+          role_description: permissions.role_description,
+          role_title: permissions.role_title,
           role,
           updated_at: new Date().toISOString(),
         },

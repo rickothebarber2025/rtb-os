@@ -1,4 +1,4 @@
-import { CheckCircle2, LockKeyhole, ShieldCheck, UserCog } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, LockKeyhole, ShieldCheck, UserCog } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import {
   getProfileBusinessUnitIds,
@@ -32,6 +32,7 @@ export default function MyRolePage({ accessProfile, businessUnits }) {
   const restrictions = payload.restrictions.length
     ? payload.restrictions
     : ['No restrictions are listed for this role.'];
+  const expectations = payload.expectations || 'No extra expectations are listed for this role.';
 
   return (
     <div className="page-grid my-role-page">
@@ -110,6 +111,17 @@ export default function MyRolePage({ accessProfile, businessUnits }) {
             <li key={item}>{item}</li>
           ))}
         </ul>
+      </section>
+
+      <section className="panel">
+        <div className="section-header">
+          <div>
+            <span>Expectations</span>
+            <h2>Role notes</h2>
+          </div>
+          <ClipboardCheck size={20} />
+        </div>
+        <p className="subtle-text">{expectations}</p>
       </section>
 
       <section className="panel two-thirds">

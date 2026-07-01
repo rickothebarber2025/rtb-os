@@ -15,6 +15,7 @@ const allAdmin = createModulePermissions('admin');
 export const ROLE_TEMPLATES = [
   {
     description: 'No preset access. Start from none and customize intentionally.',
+    expectations: 'Choose a template or customize permissions before this user starts working in RTB OS.',
     id: 'custom',
     permissions: createModulePermissions(),
     responsibilities: [],
@@ -24,6 +25,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     description: 'Owner-level access across every business and module.',
+    expectations: 'Own final decisions and keep access, payroll, and operating standards accurate.',
     id: 'owner',
     permissions: allAdmin,
     responsibilities: [
@@ -37,6 +39,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     description: 'Full operating access for trusted administrators.',
+    expectations: 'Keep the platform clean, correct data mistakes, and escalate major changes to Ricko.',
     id: 'full_admin',
     permissions: allAdmin,
     responsibilities: [
@@ -50,6 +53,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     description: 'Runs RTB Beauty Lounge daily operations without user-access control.',
+    expectations: 'Keep RTB Beauty Lounge appointment, roster, and performance records current each week.',
     id: 'beauty_manager',
     permissions: permissions({
       appointments: 'admin',
@@ -73,6 +77,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     description: 'Runs RTB Lounge barbershop operations with Booksy and Square data.',
+    expectations: 'Keep RTB Lounge Booksy imports, staff records, and booth rent follow-up current.',
     id: 'barbershop_manager',
     permissions: permissions({
       appointments: 'edit',
@@ -96,6 +101,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     description: 'Helps prepare payroll without access to user management.',
+    expectations: 'Prepare payroll carefully and flag anything that needs owner approval before finalization.',
     id: 'payroll_assistant',
     permissions: permissions({
       dashboard: 'view',
@@ -115,6 +121,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     description: 'Maintains SOPs, tasks, action items, and operating records.',
+    expectations: 'Keep tasks, SOPs, and operating notes organized so management can act quickly.',
     id: 'operations_assistant',
     permissions: permissions({
       dashboard: 'view',
@@ -135,6 +142,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     description: 'Handles appointment imports, no-shows, and schedule issues.',
+    expectations: 'Check appointment data regularly and report import, no-show, or schedule issues quickly.',
     id: 'appointment_coordinator',
     permissions: permissions({
       appointments: 'edit',
@@ -154,6 +162,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     description: 'Can see operational context for content planning without financial controls.',
+    expectations: 'Use approved business context for content planning without changing operational records.',
     id: 'content_marketing',
     permissions: permissions({
       appointments: 'view',
@@ -173,6 +182,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     description: 'Read-only access for reviewing reports without changing data.',
+    expectations: 'Review assigned information and tell management when something looks wrong.',
     id: 'view_only',
     permissions: permissions({
       appointments: 'view',
@@ -204,6 +214,7 @@ export function buildPermissionsFromTemplate(templateId, overrides = {}) {
 
   return buildPermissionsPayload({
     modules: template.permissions,
+    expectations: template.expectations,
     responsibilities: template.responsibilities,
     restrictions: template.restrictions,
     role_description: template.description,

@@ -115,11 +115,25 @@ function getBusinessAccess(value: unknown) {
   };
 }
 
-function hasPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown } | null, moduleId: string, minimum: string) {
+function legacyPermission(profile: { role?: string | null } | null, moduleId: string) {
+  const role = String(profile?.role || "").trim().toLowerCase();
+  if (role === "admin" || role === "owner") return "admin";
+  if (role === "manager") {
+    if (moduleId === "access") return "none";
+    if (["dashboard", "payroll", "settings"].includes(moduleId)) return "view";
+    return "edit";
+  }
+  if (role === "staff" && ["dashboard", "operations"].includes(moduleId)) return "view";
+  return "none";
+}
+
+function hasPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown; role?: string | null } | null, moduleId: string, minimum: string) {
   if (String(profile?.email || "").trim().toLowerCase() === OWNER_EMAIL) return true;
   if (!profile?.active) return false;
 
-  const permission = normalizePermission(normalizePermissionsPayload(profile.permissions)[moduleId]);
+  const permission = profile.permissions === null
+    ? normalizePermission(legacyPermission(profile, moduleId))
+    : normalizePermission(normalizePermissionsPayload(profile.permissions)[moduleId]);
   const levels = ["none", "view", "edit", "admin"];
   const currentLevel = levels.indexOf(permission);
   const requiredLevel = levels.indexOf(minimum);
@@ -265,7 +279,7 @@ async function authorizeRequest(
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("active,business_unit_id,email,permissions")
+    .select("active,business_unit_id,email,permissions,role")
     .eq("id", authData.user.id)
     .maybeSingle();
 
