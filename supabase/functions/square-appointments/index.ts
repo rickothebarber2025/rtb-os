@@ -21,6 +21,7 @@ const SCOPES = [
   "ORDERS_READ",
 ];
 const OWNER_EMAIL = "rickothebarber@gmail.com";
+const ALL_BUSINESSES_ACCESS = "all-businesses";
 const MODULE_IDS = [
   "dashboard",
   "roster",
@@ -96,6 +97,22 @@ function normalizePermissionsPayload(value: unknown) {
       return [moduleId, ["none", "view", "edit", "admin"].includes(level) ? level : "none"];
     }),
   );
+}
+
+function getBusinessAccess(value: unknown) {
+  const raw = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const businessUnitIds = Array.isArray(raw.business_unit_ids)
+    ? [...new Set(raw.business_unit_ids.map((id) => String(id || "").trim()).filter(Boolean))]
+    : [];
+
+  return {
+    all:
+      raw.business_scope === "all" ||
+      businessUnitIds.includes(ALL_BUSINESSES_ACCESS),
+    ids: businessUnitIds.filter((id) => id !== ALL_BUSINESSES_ACCESS),
+  };
 }
 
 function hasPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown } | null, moduleId: string, minimum: string) {
@@ -254,9 +271,13 @@ async function authorizeRequest(
 
   if (profileError) throw profileError;
 
-  const canManage =
-    hasPermission(profile, "appointments", "edit") &&
-    (!profile?.business_unit_id || profile.business_unit_id === businessUnitId);
+  const businessAccess = getBusinessAccess(profile?.permissions);
+  const canAccessBusiness =
+    String(profile?.email || "").trim().toLowerCase() === OWNER_EMAIL ||
+    businessAccess.all ||
+    businessAccess.ids.includes(String(businessUnitId)) ||
+    profile?.business_unit_id === businessUnitId;
+  const canManage = hasPermission(profile, "appointments", "edit") && canAccessBusiness;
 
   if (!canManage) {
     throw new RequestError("Admin or assigned manager access is required.", 403);

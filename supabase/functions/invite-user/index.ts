@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const ROLE_VALUES = new Set(["admin", "manager", "staff", "pending"]);
 const OWNER_EMAIL = "rickothebarber@gmail.com";
+const ALL_BUSINESSES_ACCESS = "all-businesses";
 const MODULE_IDS = [
   "dashboard",
   "roster",
@@ -73,8 +74,15 @@ function normalizePermissionsPayload(value: unknown) {
       return [moduleId, ["none", "view", "edit", "admin"].includes(level) ? level : "none"];
     }),
   );
+  const businessUnitIds = Array.isArray(raw.business_unit_ids)
+    ? [...new Set(raw.business_unit_ids.map((id) => String(id || "").trim()).filter(Boolean))]
+    : [];
+  const hasAllBusinesses =
+    raw.business_scope === "all" || businessUnitIds.includes(ALL_BUSINESSES_ACCESS);
 
   return {
+    business_scope: hasAllBusinesses ? "all" : "selected",
+    business_unit_ids: hasAllBusinesses ? [ALL_BUSINESSES_ACCESS] : businessUnitIds,
     modules,
     responsibilities: Array.isArray(raw.responsibilities) ? raw.responsibilities : [],
     restrictions: Array.isArray(raw.restrictions) ? raw.restrictions : [],
@@ -94,6 +102,15 @@ function hasPermission(profile: { active?: boolean | null; email?: string | null
   const requiredLevel = levels.indexOf(minimum);
 
   return currentLevel >= requiredLevel;
+}
+
+function hasAssignedBusiness(permissions: ReturnType<typeof normalizePermissionsPayload>, businessUnitId: string | null) {
+  return (
+    permissions.business_scope === "all" ||
+    permissions.business_unit_ids.includes(ALL_BUSINESSES_ACCESS) ||
+    Boolean(businessUnitId) ||
+    permissions.business_unit_ids.some((id) => id !== ALL_BUSINESSES_ACCESS)
+  );
 }
 
 function cleanRedirectTo(value: unknown, origin: string | null) {
@@ -193,8 +210,8 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Choose a valid role." }, 400);
     }
 
-    if (!businessUnitId && email !== OWNER_EMAIL) {
-      return jsonResponse({ error: "Choose a business unit for this user." }, 400);
+    if (email !== OWNER_EMAIL && !hasAssignedBusiness(permissions, businessUnitId)) {
+      return jsonResponse({ error: "Choose at least one business for this user." }, 400);
     }
 
     let invited = false;

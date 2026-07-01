@@ -15,6 +15,7 @@ import {
   ALL_BUSINESSES_UNIT,
   BUSINESS_PROFILES_KEY,
   canUseAllBusinesses,
+  getAccessibleBusinessUnits,
   getAppointmentSettingKey,
   hydrateBusinessUnits,
   isAllBusinessesId,
@@ -80,7 +81,10 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
 
   const selectedBusinessUnit = useMemo(
     () => {
-      if (isAllBusinessesId(selectedBusinessUnitId) && canUseAllBusinesses(accessProfile)) {
+      if (
+        isAllBusinessesId(selectedBusinessUnitId) &&
+        canUseAllBusinesses(accessProfile, data.businessUnits)
+      ) {
         return ALL_BUSINESSES_UNIT;
       }
 
@@ -107,9 +111,10 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         getBusinessUnits(),
         getAppSettingRecord(BUSINESS_PROFILES_KEY).catch(() => null),
       ]);
-      const businessUnits = hydrateBusinessUnits(rawBusinessUnits, businessProfilesRecord?.value);
+      const allBusinessUnits = hydrateBusinessUnits(rawBusinessUnits, businessProfilesRecord?.value);
+      const businessUnits = getAccessibleBusinessUnits(allBusinessUnits, accessProfile);
       const isAllBusinesses =
-        canUseAllBusinesses(accessProfile) && isAllBusinessesId(selectedBusinessUnitId);
+        canUseAllBusinesses(accessProfile, businessUnits) && isAllBusinessesId(selectedBusinessUnitId);
       const activeUnit =
         isAllBusinesses
           ? ALL_BUSINESSES_UNIT
@@ -120,7 +125,13 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
             );
 
       if (!activeUnit) {
-        setData({ ...EMPTY_STATE, businessUnits });
+        setData({
+          ...EMPTY_STATE,
+          businessUnits,
+          warnings: [
+            'No business unit is assigned to this login. Ask an access admin to update business access.',
+          ],
+        });
         return;
       }
 

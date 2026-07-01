@@ -37,11 +37,17 @@ import {
 import {
   ALL_BUSINESSES_ID,
   canUseAllBusinesses,
+  getAccessibleBusinessUnits,
   getBusinessProfile,
   getBusinessSelectionOptions,
   suggestInstagramHandle,
 } from '../src/utils/businessProfiles.js';
-import { createModulePermissions } from '../src/lib/permissions.js';
+import {
+  ALL_BUSINESSES_ACCESS,
+  createModulePermissions,
+  getProfileBusinessUnitIds,
+  profileCanAccessBusiness,
+} from '../src/lib/permissions.js';
 import {
   canAccessPage,
   canDeleteBoothRent,
@@ -89,6 +95,58 @@ test('explicit permissions are required for app and page access', () => {
   assert.equal(canUsePayroll(payrollViewer), true);
   assert.equal(canDeleteBoothRent(boothEditor), false);
   assert.equal(canDeleteBoothRent(boothAdmin), true);
+});
+
+test('business access can be one business, many businesses, or all businesses', () => {
+  const businessUnits = [
+    { id: 'lounge', name: 'RTB Lounge' },
+    { id: 'beauty', name: 'RTB Beauty Lounge' },
+    { id: 'training', name: 'Training Studio' },
+  ];
+  const legacySingle = profileWithPermissions(
+    { dashboard: 'view' },
+    { business_unit_id: 'lounge' },
+  );
+  const multiBusiness = profileWithPermissions(
+    { dashboard: 'view' },
+    {
+      permissions: {
+        business_unit_ids: ['lounge', 'beauty'],
+        modules: {
+          ...createModulePermissions(),
+          dashboard: 'view',
+        },
+      },
+    },
+  );
+  const allBusinessAdmin = profileWithPermissions(
+    { access: 'admin', dashboard: 'view' },
+    {
+      permissions: {
+        business_scope: 'all',
+        business_unit_ids: [ALL_BUSINESSES_ACCESS],
+        modules: {
+          ...createModulePermissions(),
+          access: 'admin',
+          dashboard: 'view',
+        },
+      },
+    },
+  );
+
+  assert.deepEqual(getProfileBusinessUnitIds(legacySingle), ['lounge']);
+  assert.equal(profileCanAccessBusiness(multiBusiness, 'beauty'), true);
+  assert.equal(profileCanAccessBusiness(multiBusiness, 'training'), false);
+  assert.deepEqual(
+    getAccessibleBusinessUnits(businessUnits, multiBusiness).map((unit) => unit.id),
+    ['lounge', 'beauty'],
+  );
+  assert.deepEqual(
+    getBusinessSelectionOptions(businessUnits, legacySingle).map((unit) => unit.id),
+    ['lounge'],
+  );
+  assert.equal(canUseAllBusinesses(allBusinessAdmin, businessUnits), true);
+  assert.equal(getBusinessSelectionOptions(businessUnits, allBusinessAdmin)[0].id, ALL_BUSINESSES_ID);
 });
 
 test('commission drops to 55% below $500 for non-fixed staff', () => {
@@ -453,9 +511,20 @@ test('booksy import remembers aliases and applies them to dashboard rows', () =>
 test('business profiles define separate platform and branding rules', () => {
   const lounge = getBusinessProfile({ name: 'RTB Lounge' });
   const beauty = getBusinessProfile({ name: 'RTB Beauty Lounge' });
-  const options = getBusinessSelectionOptions([{ id: 'rtb', name: 'RTB Lounge' }], {
-    ...profileWithPermissions({ access: 'admin' }),
-  });
+  const allBusinessAdmin = profileWithPermissions(
+    { access: 'admin' },
+    {
+      permissions: {
+        business_scope: 'all',
+        business_unit_ids: [ALL_BUSINESSES_ACCESS],
+        modules: {
+          ...createModulePermissions(),
+          access: 'admin',
+        },
+      },
+    },
+  );
+  const options = getBusinessSelectionOptions([{ id: 'rtb', name: 'RTB Lounge' }], allBusinessAdmin);
 
   assert.equal(lounge.booking_platform, 'Booksy');
   assert.equal(lounge.pos_platform, 'Square');

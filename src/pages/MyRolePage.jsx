@@ -1,6 +1,8 @@
 import { CheckCircle2, LockKeyhole, ShieldCheck, UserCog } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import {
+  getProfileBusinessUnitIds,
+  hasAllBusinessAccess,
   getEffectivePermissionsPayload,
   isOwnerProfile,
   MODULE_IDS,
@@ -16,8 +18,14 @@ function permissionTone(level) {
 
 export default function MyRolePage({ accessProfile, businessUnits }) {
   const payload = getEffectivePermissionsPayload(accessProfile);
-  const businessUnit = businessUnits.find((unit) => unit.id === accessProfile?.business_unit_id);
   const owner = isOwnerProfile(accessProfile);
+  const allBusinesses = owner || hasAllBusinessAccess(accessProfile);
+  const businessNames = allBusinesses
+    ? ['All Businesses']
+    : getProfileBusinessUnitIds(accessProfile)
+        .map((id) => businessUnits.find((unit) => unit.id === id)?.name)
+        .filter(Boolean);
+  const businessLabel = businessNames.length ? businessNames.join(', ') : 'Not assigned';
   const responsibilities = payload.responsibilities.length
     ? payload.responsibilities
     : ['No responsibilities are assigned yet.'];
@@ -34,8 +42,8 @@ export default function MyRolePage({ accessProfile, businessUnits }) {
           <p>{payload.role_description}</p>
         </div>
         <div className="hero-meta">
-          <strong>{owner ? 'Owner' : businessUnit?.name || 'Assigned business required'}</strong>
-          <span>{owner ? 'All businesses' : 'Business unit'}</span>
+          <strong>{owner ? 'Owner' : businessLabel}</strong>
+          <span>{allBusinesses ? 'All businesses' : 'Business access'}</span>
         </div>
       </section>
 
@@ -53,8 +61,8 @@ export default function MyRolePage({ accessProfile, businessUnits }) {
             <strong>{accessProfile?.email || 'Not set'}</strong>
           </div>
           <div>
-            <span>Business unit</span>
-            <strong>{owner ? 'All Businesses' : businessUnit?.name || 'Not assigned'}</strong>
+            <span>Business access</span>
+            <strong>{businessLabel}</strong>
           </div>
           <div>
             <span>Template</span>

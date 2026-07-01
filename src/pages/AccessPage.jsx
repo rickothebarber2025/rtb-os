@@ -14,9 +14,12 @@ import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { getUserProfiles, inviteUserProfile, updateUserProfile } from '../services/rtbService';
 import {
+  ALL_BUSINESSES_ACCESS,
   getEffectivePermissionsPayload,
   getModulePermission,
+  getProfileBusinessUnitIds,
   hasAnyModulePermission,
+  hasAllBusinessAccess,
   isOwnerEmail,
   isOwnerProfile,
   MODULE_IDS,
@@ -75,9 +78,137 @@ function textToList(value) {
     .filter(Boolean);
 }
 
-function businessLabel(businessUnits, businessUnitId, owner) {
+function uniqueIds(ids) {
+  return [...new Set((ids || []).filter(Boolean).map(String))];
+}
+
+function actualBusinessIds(businessUnits) {
+  return businessUnits.map((unit) => unit.id);
+}
+
+function getBusinessAccess(record, businessUnits) {
+  if (isOwnerProfile(record) || isOwnerEmail(record?.email) || hasAllBusinessAccess(record)) {
+    return {
+      all: true,
+      ids: actualBusinessIds(businessUnits),
+    };
+  }
+
+  const ids = uniqueIds(getProfileBusinessUnitIds(record)).filter(
+    (id) => id !== ALL_BUSINESSES_ACCESS,
+  );
+
+  return {
+    all: false,
+    ids,
+  };
+}
+
+function businessAccessLabel(businessUnits, record, owner) {
   if (owner) return 'All Businesses';
-  return businessUnits.find((unit) => unit.id === businessUnitId)?.name || 'Business required';
+  const access = getBusinessAccess(record, businessUnits);
+  if (access.all) return 'All Businesses';
+  if (!access.ids.length) return 'Business required';
+
+  return access.ids
+    .map((id) => businessUnits.find((unit) => unit.id === id)?.name)
+    .filter(Boolean)
+    .join(', ') || 'Business required';
+}
+
+function setBusinessAccess(record, selectedIds, businessUnits, all = false) {
+  const payload = normalizePermissionsPayload(record.permissions);
+  const ids = all
+    ? [ALL_BUSINESSES_ACCESS]
+    : uniqueIds(selectedIds).filter((id) => actualBusinessIds(businessUnits).includes(id));
+  const primaryId = all
+    ? businessUnits[0]?.id || record.business_unit_id || ''
+    : ids[0] || '';
+
+  return {
+    ...record,
+    business_unit_id: primaryId,
+    permissions: {
+      ...payload,
+      business_scope: all ? 'all' : 'selected',
+      business_unit_ids: ids,
+    },
+  };
+}
+
+function preserveBusinessAccess(record, permissions, businessUnits) {
+  const access = getBusinessAccess(record, businessUnits);
+  return {
+    ...normalizePermissionsPayload(permissions),
+    business_scope: access.all ? 'all' : 'selected',
+    business_unit_ids: access.all ? [ALL_BUSINESSES_ACCESS] : access.ids,
+  };
+}
+
+function hasBusinessAccess(record, businessUnits) {
+  const access = getBusinessAccess(record, businessUnits);
+  return access.all || access.ids.length > 0;
+}
+
+function BusinessAccessPicker({ businessUnits, disabled, owner, record, onChange }) {
+  const access = getBusinessAccess(record, businessUnits);
+
+  function updateOne(businessUnitId, checked) {
+    const nextIds = checked
+      ? uniqueIds([...access.ids, businessUnitId])
+      : access.ids.filter((id) => id !== businessUnitId);
+    onChange(setBusinessAccess(record, nextIds, businessUnits, false));
+  }
+
+  return (
+    <fieldset className="business-access-picker" disabled={disabled || owner}>
+      <legend>Business access</legend>
+      <p>
+        Choose every business this user can see. Data stays separated unless All Businesses is
+        intentionally selected.
+      </p>
+      <div className="business-access-toolbar">
+        <button
+          className={access.all ? 'secondary-button small active' : 'ghost-button small'}
+          disabled={disabled || owner || !businessUnits.length}
+          onClick={() => onChange(setBusinessAccess(record, [], businessUnits, true))}
+          type="button"
+        >
+          All businesses
+        </button>
+        <button
+          className="ghost-button small"
+          disabled={disabled || owner}
+          onClick={() => onChange(setBusinessAccess(record, [], businessUnits, false))}
+          type="button"
+        >
+          Clear
+        </button>
+      </div>
+      <div className="business-access-options">
+        {businessUnits.map((unit) => (
+          <label className="check-row" key={unit.id}>
+            <input
+              checked={access.all || access.ids.includes(unit.id)}
+              disabled={disabled || owner || access.all}
+              onChange={(event) => updateOne(unit.id, event.target.checked)}
+              type="checkbox"
+            />
+            <span>{unit.name}</span>
+          </label>
+        ))}
+      </div>
+      {owner ? (
+        <StatusBadge tone="gold">Owner always has all businesses</StatusBadge>
+      ) : (
+        <StatusBadge tone={access.all || access.ids.length ? 'success' : 'danger'}>
+          {access.all
+            ? 'All businesses selected'
+            : `${access.ids.length} business${access.ids.length === 1 ? '' : 'es'} selected`}
+        </StatusBadge>
+      )}
+    </fieldset>
+  );
 }
 
 function PermissionMatrix({ disabled, permissions, onChange }) {
@@ -206,7 +337,11 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
 
   function applyInviteTemplate(templateId) {
     setInvite({
-      permissions: buildPermissionsFromTemplate(templateId),
+      permissions: preserveBusinessAccess(
+        inviteForm,
+        buildPermissionsFromTemplate(templateId),
+        businessUnits,
+      ),
       role: getTemplateRoleValue(templateId),
     });
   }
@@ -240,12 +375,26 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
     }));
   }
 
+  function updateDraftBusinessAccess(profile, nextRecord) {
+    setDrafts((current) => ({
+      ...current,
+      [profile.id]: {
+        ...getDraft(profile, current),
+        ...nextRecord,
+      },
+    }));
+  }
+
   function applyDraftTemplate(profile, templateId) {
     setDrafts((current) => ({
       ...current,
       [profile.id]: {
         ...getDraft(profile, current),
-        permissions: buildPermissionsFromTemplate(templateId),
+        permissions: preserveBusinessAccess(
+          getDraft(profile, current),
+          buildPermissionsFromTemplate(templateId),
+          businessUnits,
+        ),
         role: getTemplateRoleValue(templateId),
       },
     }));
@@ -291,8 +440,8 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
     event.preventDefault();
     if (!accessAdmin) return;
 
-    if (!inviteForm.business_unit_id && !isOwnerEmail(inviteForm.email)) {
-      setError('Choose a business unit before inviting this user.');
+    if (!hasBusinessAccess(inviteForm, businessUnits) && !isOwnerEmail(inviteForm.email)) {
+      setError('Choose at least one business before inviting this user.');
       return;
     }
 
@@ -339,8 +488,8 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
       return false;
     }
 
-    if (!draft.business_unit_id && !isOwnerEmail(profile.email)) {
-      setError('Choose a business unit before saving this user.');
+    if (!hasBusinessAccess(draft, businessUnits) && !isOwnerEmail(profile.email)) {
+      setError('Choose at least one business before saving this user.');
       return false;
     }
 
@@ -431,22 +580,6 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
               />
             </label>
             <label className="field">
-              <span>Business unit</span>
-              <select
-                disabled={!accessAdmin}
-                onChange={(event) => updateInvite('business_unit_id', event.target.value)}
-                required={!isOwnerEmail(inviteForm.email)}
-                value={inviteForm.business_unit_id}
-              >
-                <option value="">Choose business unit</option>
-                {businessUnits.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
               <span>Choose role template</span>
               <select
                 disabled={!accessAdmin}
@@ -484,6 +617,14 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
               <span>Active login</span>
             </label>
           </div>
+
+          <BusinessAccessPicker
+            businessUnits={businessUnits}
+            disabled={!accessAdmin}
+            onChange={(nextRecord) => setInvite(nextRecord)}
+            owner={isOwnerEmail(inviteForm.email)}
+            record={inviteForm}
+          />
 
           <RoleTemplatePreview permissions={inviteForm.permissions} />
           <PermissionMatrix
@@ -557,7 +698,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       </StatusBadge>
                       <StatusBadge tone={owner ? 'gold' : 'muted'}>{payload.role_title}</StatusBadge>
                       <StatusBadge tone="muted">
-                        {businessLabel(businessUnits, draft.business_unit_id, owner)}
+                        {businessAccessLabel(businessUnits, draft, owner)}
                       </StatusBadge>
                     </div>
                   </div>
@@ -591,24 +732,6 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                         ))}
                       </select>
                     </label>
-                    <label className="field">
-                      <span>Business unit</span>
-                      <select
-                        disabled={disabled}
-                        onChange={(event) =>
-                          updateDraft(profile, 'business_unit_id', event.target.value)
-                        }
-                        required={!owner}
-                        value={draft.business_unit_id || ''}
-                      >
-                        <option value="">{owner ? 'All Businesses' : 'Choose business unit'}</option>
-                        {businessUnits.map((unit) => (
-                          <option key={unit.id} value={unit.id}>
-                            {unit.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
                     <label className="check-row">
                       <input
                         checked={Boolean(draft.active || owner)}
@@ -619,6 +742,14 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       <span>Active login</span>
                     </label>
                   </div>
+
+                  <BusinessAccessPicker
+                    businessUnits={businessUnits}
+                    disabled={disabled}
+                    onChange={(nextRecord) => updateDraftBusinessAccess(profile, nextRecord)}
+                    owner={owner}
+                    record={draft}
+                  />
 
                   <div className="template-preview">
                     <div>

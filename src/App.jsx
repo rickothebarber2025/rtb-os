@@ -62,7 +62,7 @@ export default function App() {
   useEffect(() => {
     const selectedExists = businessOptions.some((unit) => unit.id === selectedBusinessUnitId);
     if (data.businessUnits.length && (!selectedBusinessUnitId || !selectedExists)) {
-      setSelectedBusinessUnitId(data.businessUnits[0].id);
+      setSelectedBusinessUnitId(businessOptions[0]?.id || data.businessUnits[0].id);
     }
   }, [businessOptions, data.businessUnits, selectedBusinessUnitId]);
 

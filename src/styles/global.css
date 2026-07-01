@@ -620,6 +620,48 @@ select {
   gap: 0.35rem;
 }
 
+.business-access-picker {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.9rem;
+}
+
+.business-access-picker legend {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0 0.35rem;
+}
+
+.business-access-picker p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.business-access-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.business-access-toolbar .active {
+  background: var(--gold-soft);
+  border-color: rgba(214, 168, 79, 0.36);
+  color: var(--gold-strong);
+}
+
+.business-access-options {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .checkbox-grid {
   display: grid;
   gap: 0.45rem;
@@ -2755,6 +2797,10 @@ select {
   }
 
   .checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .business-access-options {
     grid-template-columns: 1fr;
   }
 

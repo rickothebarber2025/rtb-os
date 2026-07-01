@@ -90,6 +90,7 @@ export function getBearerToken(req: Request) {
 }
 
 const OWNER_EMAIL = "rickothebarber@gmail.com";
+const ALL_BUSINESSES_ACCESS = "all-businesses";
 const MODULE_IDS = [
   "dashboard",
   "roster",
@@ -119,6 +120,22 @@ function normalizePermissionsPayload(value: unknown) {
       return [moduleId, ["none", "view", "edit", "admin"].includes(level) ? level : "none"];
     }),
   );
+}
+
+function getBusinessAccess(value: unknown) {
+  const raw = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const businessUnitIds = Array.isArray(raw.business_unit_ids)
+    ? [...new Set(raw.business_unit_ids.map((id) => String(id || "").trim()).filter(Boolean))]
+    : [];
+
+  return {
+    all:
+      raw.business_scope === "all" ||
+      businessUnitIds.includes(ALL_BUSINESSES_ACCESS),
+    ids: businessUnitIds.filter((id) => id !== ALL_BUSINESSES_ACCESS),
+  };
 }
 
 function hasAnyPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown } | null, minimum: string) {
@@ -155,9 +172,14 @@ export async function authorizeManager(
 
   if (profileError) throw profileError;
 
-  const canManage =
-    hasAnyPermission(profile, "edit") &&
-    (!businessId || !profile?.business_unit_id || profile.business_unit_id === businessId);
+  const businessAccess = getBusinessAccess(profile?.permissions);
+  const canAccessBusiness =
+    !businessId ||
+    String(profile?.email || "").trim().toLowerCase() === OWNER_EMAIL ||
+    businessAccess.all ||
+    businessAccess.ids.includes(String(businessId)) ||
+    profile?.business_unit_id === businessId;
+  const canManage = hasAnyPermission(profile, "edit") && canAccessBusiness;
 
   if (!canManage) {
     throw new RequestError("Admin or assigned manager access is required.", 403);

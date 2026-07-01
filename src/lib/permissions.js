@@ -1,4 +1,5 @@
 export const OWNER_EMAIL = 'rickothebarber@gmail.com';
+export const ALL_BUSINESSES_ACCESS = 'all-businesses';
 
 export const PERMISSION_LEVELS = ['none', 'view', 'edit', 'admin'];
 
@@ -43,6 +44,8 @@ export const PAGE_MODULE_MAP = {
 };
 
 const DEFAULT_PAYLOAD_META = {
+  business_scope: 'selected',
+  business_unit_ids: [],
   responsibilities: [],
   restrictions: ['No module access has been assigned yet.'],
   role_description: 'Custom access profile.',
@@ -62,6 +65,10 @@ function safeArray(value) {
   return Array.isArray(value)
     ? value.map((item) => String(item || '').trim()).filter(Boolean)
     : [];
+}
+
+function uniqueArray(values) {
+  return [...new Set(safeArray(values))];
 }
 
 function safeObject(value) {
@@ -107,8 +114,13 @@ export function normalizeModulePermissions(value) {
 export function normalizePermissionsPayload(value) {
   const raw = safeObject(value);
   const modules = normalizeModulePermissions(raw.modules || raw);
+  const businessUnitIds = uniqueArray(raw.business_unit_ids || raw.businessUnitIds);
+  const hasAllBusinesses =
+    raw.business_scope === 'all' || businessUnitIds.includes(ALL_BUSINESSES_ACCESS);
 
   return {
+    business_scope: hasAllBusinesses ? 'all' : DEFAULT_PAYLOAD_META.business_scope,
+    business_unit_ids: hasAllBusinesses ? [ALL_BUSINESSES_ACCESS] : businessUnitIds,
     modules,
     responsibilities: safeArray(raw.responsibilities),
     restrictions: safeArray(raw.restrictions),
@@ -120,8 +132,14 @@ export function normalizePermissionsPayload(value) {
 
 export function buildPermissionsPayload(value = {}) {
   const base = normalizePermissionsPayload(value);
+  const businessUnitIds = uniqueArray(value.business_unit_ids || base.business_unit_ids);
+  const hasAllBusinesses =
+    value.business_scope === 'all' || base.business_scope === 'all' || businessUnitIds.includes(ALL_BUSINESSES_ACCESS);
+
   return {
     ...base,
+    business_scope: hasAllBusinesses ? 'all' : 'selected',
+    business_unit_ids: hasAllBusinesses ? [ALL_BUSINESSES_ACCESS] : businessUnitIds,
     modules: normalizeModulePermissions({
       ...base.modules,
       ...(value.modules || {}),
@@ -148,9 +166,38 @@ export function isOwnerProfile(profile) {
   );
 }
 
+export function hasAllBusinessAccess(profile) {
+  if (isOwnerProfile(profile)) return true;
+  const payload = normalizePermissionsPayload(profile?.permissions);
+  return (
+    payload.business_scope === 'all' ||
+    payload.business_unit_ids.includes(ALL_BUSINESSES_ACCESS)
+  );
+}
+
+export function getProfileBusinessUnitIds(profile) {
+  if (isOwnerProfile(profile)) return [ALL_BUSINESSES_ACCESS];
+
+  const payload = normalizePermissionsPayload(profile?.permissions);
+  if (payload.business_scope === 'all') return [ALL_BUSINESSES_ACCESS];
+
+  const explicitIds = payload.business_unit_ids.filter((id) => id !== ALL_BUSINESSES_ACCESS);
+  if (explicitIds.length) return uniqueArray(explicitIds);
+
+  return profile?.business_unit_id ? [String(profile.business_unit_id)] : [];
+}
+
+export function profileCanAccessBusiness(profile, businessUnitId) {
+  if (!businessUnitId) return false;
+  if (hasAllBusinessAccess(profile)) return true;
+  return getProfileBusinessUnitIds(profile).includes(String(businessUnitId));
+}
+
 export function getEffectivePermissionsPayload(profile) {
   if (isOwnerProfile(profile)) {
     return buildPermissionsPayload({
+      business_scope: 'all',
+      business_unit_ids: [ALL_BUSINESSES_ACCESS],
       modules: createModulePermissions('admin'),
       responsibilities: [
         'Own final business decisions',

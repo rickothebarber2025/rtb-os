@@ -1,4 +1,9 @@
 import { isAdmin } from './access.js';
+import {
+  getProfileBusinessUnitIds,
+  hasAllBusinessAccess,
+  isOwnerProfile,
+} from '../lib/permissions.js';
 
 export const ALL_BUSINESSES_ID = 'all-businesses';
 export const BUSINESS_PROFILES_KEY = 'business_profiles';
@@ -107,13 +112,25 @@ export function hydrateBusinessUnits(businessUnits, profileOverrides = null) {
   }));
 }
 
-export function canUseAllBusinesses(profile) {
-  return isAdmin(profile);
+export function getAccessibleBusinessUnits(businessUnits, profile) {
+  if (isOwnerProfile(profile) || hasAllBusinessAccess(profile)) return businessUnits;
+
+  const allowedIds = new Set(getProfileBusinessUnitIds(profile));
+  return businessUnits.filter((unit) => allowedIds.has(unit.id));
+}
+
+export function canUseAllBusinesses(profile, businessUnits = []) {
+  if (!isAdmin(profile)) return false;
+  if (isOwnerProfile(profile) || hasAllBusinessAccess(profile)) return true;
+
+  const accessibleCount = getAccessibleBusinessUnits(businessUnits, profile).length;
+  return accessibleCount > 1;
 }
 
 export function getBusinessSelectionOptions(businessUnits, profile) {
-  if (!canUseAllBusinesses(profile)) return businessUnits;
-  return [ALL_BUSINESSES_UNIT, ...businessUnits];
+  const accessibleUnits = getAccessibleBusinessUnits(businessUnits, profile);
+  if (!canUseAllBusinesses(profile, businessUnits)) return accessibleUnits;
+  return [ALL_BUSINESSES_UNIT, ...accessibleUnits];
 }
 
 export function isAllBusinessesId(value) {
