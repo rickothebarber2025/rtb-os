@@ -1078,6 +1078,7 @@ export default function BooksyInsightsPage({
   const squareConnected = Boolean(squareStatus?.connected);
   const squareSetupMode = squareStatus?.setup?.mode || squareStatus?.connection?.status || 'missing';
   const usesDirectSquareToken = squareSetupMode === 'direct_token';
+  const squareOAuthConfigured = Boolean(squareStatus?.setup?.oauthConfigured);
   const squareStatusLabel = squareConnected
     ? usesDirectSquareToken
       ? 'Token ready'
@@ -1085,15 +1086,49 @@ export default function BooksyInsightsPage({
     : 'Setup needed';
   const squareStatusTone = squareConnected ? 'success' : 'warning';
   const squareStatusDetail = squareConnected
-    ? usesDirectSquareToken
-      ? 'Production token sync ready'
-      : 'Square OAuth connected'
+    ? (usesDirectSquareToken ? 'Production token sync ready' : 'Square OAuth connected')
     : squareStatus?.setup?.message ||
       'Add SQUARE_ACCESS_TOKEN in Supabase Edge Function secrets, then click Sync Square.';
   const squareSyncLimited = squareStatus?.sync?.allowed === false;
+  const appointmentsEditTitle = canManage ? undefined : 'Appointments edit access is required.';
+  const squareSyncDisabled =
+    Boolean(actionLoading) ||
+    !canManage ||
+    allBusinessesView ||
+    !squareConnected ||
+    squareSyncLimited;
+  const squareSyncTitle = !canManage
+    ? appointmentsEditTitle
+    : !squareConnected
+      ? 'Square token or OAuth connection is required before syncing.'
+      : squareSyncLimited
+        ? 'Daily Square sync limit reached.'
+        : undefined;
+  const squareCanUseOAuth =
+    canManage &&
+    !allBusinessesView &&
+    !usesDirectSquareToken &&
+    squareOAuthConfigured;
+  const squareConnectDisabled = Boolean(actionLoading) || !squareCanUseOAuth;
+  const squareConnectTitle = !canManage
+    ? appointmentsEditTitle
+    : usesDirectSquareToken
+      ? 'Production token sync is active. Use Sync Square instead of OAuth Connect.'
+      : !squareOAuthConfigured
+        ? 'Square OAuth secrets are not configured. Use Sync Square with the production token.'
+        : undefined;
+  const squareConnectLabel = actionLoading === 'connect'
+    ? 'Opening Square...'
+    : usesDirectSquareToken
+      ? 'Token sync active'
+      : squareConnected
+        ? 'Reconnect Square'
+        : squareOAuthConfigured
+          ? 'OAuth Connect'
+          : 'OAuth unavailable';
 
   async function handleSquareConnect() {
-    if (allBusinessesView) return;
+    if (allBusinessesView || !canManage || usesDirectSquareToken || !squareOAuthConfigured) return;
     setActionError('');
     setActionMessage('');
     setActionLoading('connect');
@@ -1108,12 +1143,16 @@ export default function BooksyInsightsPage({
   }
 
   async function handleSquareSync() {
-    if (allBusinessesView) return;
+    if (allBusinessesView || !canManage) return;
     setActionError('');
     setActionMessage('');
     setActionLoading('sync');
 
     try {
+      if (!squareConnected) {
+        throw new Error('Square token or OAuth connection is required before syncing.');
+      }
+
       if (squareRange.startDate && squareRange.endDate && squareRange.startDate > squareRange.endDate) {
         throw new Error('Choose a Square sync end date after the start date.');
       }
@@ -1133,7 +1172,7 @@ export default function BooksyInsightsPage({
 
   async function handleBooksyImport(event) {
     const file = event.target.files?.[0];
-    if (!file || allBusinessesView) return;
+    if (!file || allBusinessesView || !canManage) return;
 
     setActionError('');
     setActionMessage('');
@@ -1207,7 +1246,7 @@ export default function BooksyInsightsPage({
   }
 
   async function handleConfirmBooksyImport() {
-    if (!importWizard || !businessUnit?.id) return;
+    if (!importWizard || !businessUnit?.id || !canManage) return;
 
     setActionError('');
     setActionMessage('');
@@ -1268,6 +1307,8 @@ export default function BooksyInsightsPage({
   }
 
   async function handleClearImport() {
+    if (!canManage) return;
+
     const settingKey =
       source.name === 'Booksy'
         ? 'rtb_master_dashboard'
@@ -1298,12 +1339,14 @@ export default function BooksyInsightsPage({
           className="sr-only"
           type="file"
           accept=".pdf,.csv,.tsv,.txt,application/pdf,text/csv,text/tab-separated-values"
+          disabled={Boolean(actionLoading) || !canManage}
           onChange={handleBooksyImport}
         />
         <div className="action-row">
           <button
             className="primary-button"
-            disabled={Boolean(actionLoading)}
+            disabled={Boolean(actionLoading) || !canManage}
+            title={appointmentsEditTitle}
             type="button"
             onClick={() => booksyInputRef.current?.click()}
           >
@@ -1344,7 +1387,8 @@ export default function BooksyInsightsPage({
           <label className="field compact-field">
             <span>Sync start</span>
             <input
-              disabled={Boolean(actionLoading)}
+              disabled={Boolean(actionLoading) || !canManage || !squareConnected}
+              title={squareSyncTitle}
               type="date"
               value={squareRange.startDate}
               onChange={(event) =>
@@ -1355,7 +1399,8 @@ export default function BooksyInsightsPage({
           <label className="field compact-field">
             <span>Sync end</span>
             <input
-              disabled={Boolean(actionLoading)}
+              disabled={Boolean(actionLoading) || !canManage || !squareConnected}
+              title={squareSyncTitle}
               type="date"
               value={squareRange.endDate}
               onChange={(event) =>
@@ -1367,7 +1412,8 @@ export default function BooksyInsightsPage({
         <div className="action-row">
           <button
             className="primary-button"
-            disabled={Boolean(actionLoading) || squareSyncLimited}
+            disabled={squareSyncDisabled}
+            title={squareSyncTitle}
             type="button"
             onClick={handleSquareSync}
           >
@@ -1375,15 +1421,12 @@ export default function BooksyInsightsPage({
           </button>
           <button
             className="secondary-button"
-            disabled={Boolean(actionLoading)}
+            disabled={squareConnectDisabled}
+            title={squareConnectTitle}
             type="button"
             onClick={handleSquareConnect}
           >
-            {actionLoading === 'connect'
-              ? 'Opening Square...'
-              : squareConnected && !usesDirectSquareToken
-                ? 'Reconnect Square'
-                : 'OAuth Connect'}
+            {squareConnectLabel}
           </button>
           <a
             className="secondary-button"
