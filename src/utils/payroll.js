@@ -97,6 +97,31 @@ export function getMissingPayrollStaff(staffMembers, entries) {
   );
 }
 
+export function splitPayrollRunsByVoidStatus(runs) {
+  const activeRuns = [];
+  const voidedRuns = [];
+
+  (runs || []).forEach((run) => {
+    if (run?.status === 'voided') {
+      voidedRuns.push(run);
+    } else {
+      activeRuns.push(run);
+    }
+  });
+
+  return { activeRuns, voidedRuns };
+}
+
+export function getPayrollReplacementMap(runs) {
+  const replacements = new Map();
+
+  (runs || []).forEach((run) => {
+    if (run?.corrected_from_run_id) replacements.set(run.corrected_from_run_id, run);
+  });
+
+  return replacements;
+}
+
 export function recalculateEntry(entry) {
   const calculated = calculateEntryValues({
     baseCommissionRate: entry.base_commission_rate,

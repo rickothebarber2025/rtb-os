@@ -30,8 +30,10 @@ import {
   createCorrectionDraft,
   createDraftEntry,
   entryBelongsToStaff,
+  getPayrollReplacementMap,
   getMissingPayrollStaff,
   recalculateEntry,
+  splitPayrollRunsByVoidStatus,
   toMoneyNumber,
 } from '../utils/payroll';
 
@@ -45,6 +47,12 @@ function createInitialRun(businessUnitId) {
     status: 'draft',
     ...week,
   };
+}
+
+function runStatusTone(status) {
+  if (status === 'voided') return 'danger';
+  if (status === 'draft') return 'warning';
+  return 'success';
 }
 
 export default function PayrollPage({
@@ -67,6 +75,7 @@ export default function PayrollPage({
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState('');
+  const [showVoidedRuns, setShowVoidedRuns] = useState(false);
   const previousBusinessUnitId = useRef(null);
 
   useEffect(() => {
@@ -102,6 +111,13 @@ export default function PayrollPage({
     () => getMissingPayrollStaff(activeStaff, entries),
     [activeStaff, entries],
   );
+  const { activeRuns: activePayrollRuns, voidedRuns: voidedPayrollRuns } = useMemo(
+    () => splitPayrollRunsByVoidStatus(payrollRuns),
+    [payrollRuns],
+  );
+  const replacementByVoidedRunId = useMemo(() => {
+    return getPayrollReplacementMap(payrollRuns);
+  }, [payrollRuns]);
   const documentRun = useMemo(
     () => ({
       ...currentRun,
@@ -295,7 +311,23 @@ export default function PayrollPage({
             </span>
           </div>
 
-          {payrollRuns.length ? (
+          {voidedPayrollRuns.length ? (
+            <div className="history-filter-row">
+              <span>
+                {voidedPayrollRuns.length} voided payroll run
+                {voidedPayrollRuns.length === 1 ? '' : 's'} hidden
+              </span>
+              <button
+                className="ghost-button small"
+                type="button"
+                onClick={() => setShowVoidedRuns((current) => !current)}
+              >
+                {showVoidedRuns ? 'Hide voided' : 'Show voided'}
+              </button>
+            </div>
+          ) : null}
+
+          {activePayrollRuns.length || (showVoidedRuns && voidedPayrollRuns.length) ? (
             <DataTable>
               <table>
                 <thead>
@@ -310,12 +342,12 @@ export default function PayrollPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {payrollRuns.map((run) => (
+                  {[...activePayrollRuns, ...(showVoidedRuns ? voidedPayrollRuns : [])].map((run) => (
                     <tr key={run.id}>
                       <td>{run.business_name || 'RTB'}</td>
                       <td>{run.week_label}</td>
                       <td>
-                        <StatusBadge tone={run.status === 'draft' ? 'warning' : 'success'}>
+                        <StatusBadge tone={runStatusTone(run.status)}>
                           {run.status}
                         </StatusBadge>
                       </td>
@@ -332,7 +364,11 @@ export default function PayrollPage({
             <EmptyState
               icon={CheckCircle2}
               title="No payroll history"
-              message="Saved runs from each business will appear here after they are created."
+              message={
+                voidedPayrollRuns.length
+                  ? 'Only voided correction records exist. Use Show voided to review them.'
+                  : 'Saved runs from each business will appear here after they are created.'
+              }
             />
           )}
         </section>
@@ -770,27 +806,31 @@ export default function PayrollPage({
             <span>History</span>
             <h2>Saved runs</h2>
           </div>
+          {voidedPayrollRuns.length ? (
+            <button
+              className="ghost-button small"
+              type="button"
+              onClick={() => setShowVoidedRuns((current) => !current)}
+            >
+              {showVoidedRuns ? 'Hide voided' : 'Show voided'}
+            </button>
+          ) : null}
         </div>
 
         <div className="run-list">
-          {payrollRuns.map((run) => (
+          {activePayrollRuns.map((run) => (
             <button className="run-card" key={run.id} type="button" onClick={() => loadRun(run)}>
               <div>
                 <strong>{run.week_label}</strong>
                 <span>{formatDate(run.created_at)}</span>
               </div>
-              <StatusBadge
-                tone={
-                  run.status === 'voided'
-                    ? 'danger'
-                    : run.status === 'draft'
-                      ? 'warning'
-                      : 'success'
-                }
-              >
+              <StatusBadge tone={runStatusTone(run.status)}>
                 {run.status}
               </StatusBadge>
               <b>{formatCurrency(run.total_net_sales)}</b>
+              {run.corrected_from_run_id ? (
+                <small className="success-text">Correction replacement</small>
+              ) : null}
               {run.status === 'locked' ? (
                 <small className={run.performance_saved_at ? 'success-text' : 'danger-text'}>
                   {run.performance_saved_at ? 'Performance saved' : 'Performance missing'}
@@ -798,14 +838,63 @@ export default function PayrollPage({
               ) : null}
             </button>
           ))}
-          {!payrollRuns.length ? (
+          {!activePayrollRuns.length ? (
             <EmptyState
               icon={CheckCircle2}
               title="No saved runs"
-              message="Drafts and locked runs will appear here."
+              message={
+                voidedPayrollRuns.length
+                  ? 'Only voided correction records exist. Use Show voided to review them.'
+                  : 'Drafts and locked runs will appear here.'
+              }
             />
           ) : null}
         </div>
+
+        {voidedPayrollRuns.length ? (
+          <div className="voided-history">
+            <button
+              className="voided-history__toggle"
+              type="button"
+              onClick={() => setShowVoidedRuns((current) => !current)}
+            >
+              <span>Voided / Corrections</span>
+              <strong>
+                {voidedPayrollRuns.length} {showVoidedRuns ? 'shown' : 'hidden'}
+              </strong>
+            </button>
+            {showVoidedRuns ? (
+              <div className="run-list">
+                {voidedPayrollRuns.map((run) => {
+                  const replacement = replacementByVoidedRunId.get(run.id);
+
+                  return (
+                    <button
+                      className="run-card voided"
+                      key={run.id}
+                      type="button"
+                      onClick={() => loadRun(run)}
+                    >
+                      <div>
+                        <strong>{run.week_label}</strong>
+                        <span>
+                          Voided {run.voided_at ? formatDate(run.voided_at) : formatDate(run.created_at)}
+                        </span>
+                      </div>
+                      <StatusBadge tone="danger">voided</StatusBadge>
+                      <b>{formatCurrency(run.total_net_sales)}</b>
+                      <small className="subtle-text">
+                        {replacement
+                          ? `Replaced by ${replacement.week_label}`
+                          : 'Kept for correction audit trail'}
+                      </small>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </aside>
 
       {confirmAction === 'delete-draft' ? (

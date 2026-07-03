@@ -6,6 +6,8 @@ import {
   createCorrectionDraft,
   createDraftEntry,
   getMissingPayrollStaff,
+  getPayrollReplacementMap,
+  splitPayrollRunsByVoidStatus,
 } from '../src/utils/payroll.js';
 import { buildOperationalChecks, daysSince } from '../src/utils/operations.js';
 import {
@@ -375,6 +377,25 @@ test('saved payroll drafts can detect and add missing active staff', () => {
   assert.equal(getMissingPayrollStaff(staff, repairedEntries).length, 0);
   assert.equal(repairedEntries[1].staff_id, 'staff-sara');
   assert.equal(repairedEntries[1].fixed_rate_snapshot, true);
+});
+
+test('payroll history separates voided correction records from active runs', () => {
+  const runs = [
+    { id: 'draft-1', status: 'draft', week_label: 'Draft week' },
+    { id: 'void-1', status: 'voided', week_label: 'Voided week' },
+    {
+      corrected_from_run_id: 'void-1',
+      id: 'replacement-1',
+      status: 'draft',
+      week_label: 'Replacement week',
+    },
+  ];
+  const { activeRuns, voidedRuns } = splitPayrollRunsByVoidStatus(runs);
+  const replacements = getPayrollReplacementMap(runs);
+
+  assert.deepEqual(activeRuns.map((run) => run.id), ['draft-1', 'replacement-1']);
+  assert.deepEqual(voidedRuns.map((run) => run.id), ['void-1']);
+  assert.equal(replacements.get('void-1').id, 'replacement-1');
 });
 
 test('operations extension normalizes saved checklist data', () => {

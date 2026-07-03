@@ -1059,6 +1059,25 @@ select {
   justify-content: flex-end;
 }
 
+.history-filter-row {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: space-between;
+  margin: 1rem 0;
+  padding: 0.75rem;
+}
+
+.history-filter-row span {
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
 .square-sync-range {
   margin-top: 0.25rem;
 }
@@ -1096,6 +1115,45 @@ select {
 .run-card b {
   color: var(--gold-strong);
   grid-column: 1 / -1;
+}
+
+.run-card.voided {
+  background: rgba(255, 113, 109, 0.045);
+  border-color: rgba(255, 113, 109, 0.16);
+}
+
+.voided-history {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.voided-history__toggle {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: flex;
+  gap: 0.7rem;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+}
+
+.voided-history__toggle span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.voided-history__toggle strong {
+  color: var(--red);
+  font-size: 0.8rem;
 }
 
 .stat-list {
