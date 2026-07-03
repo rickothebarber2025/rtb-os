@@ -665,6 +665,13 @@ export async function runBusinessConsultantAnalysis(businessId) {
   });
 }
 
+export async function runStaffPerformanceCoaching(businessId) {
+  return invokeFunction('feedback-worker', {
+    action: 'staff-coaching',
+    businessId,
+  });
+}
+
 function scopedByBusiness(query, field, businessUnitId) {
   return businessUnitId ? query.eq(field, businessUnitId) : query;
 }

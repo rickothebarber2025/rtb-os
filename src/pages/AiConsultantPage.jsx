@@ -17,6 +17,7 @@ import {
   deleteBusinessIntelligenceSource,
   getBusinessConsultantData,
   runBusinessConsultantAnalysis,
+  runStaffPerformanceCoaching,
   saveBusinessIntelligenceSource,
   updateImprovementProject,
   updateImprovementTask,
@@ -123,6 +124,8 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
   const openProjects = (data?.projects || []).filter(
     (project) => !['done', 'ignored'].includes(project.status),
   );
+  const [staffCoaching, setStaffCoaching] = useState([]);
+  const [coachingLoading, setCoachingLoading] = useState(false);
   const performanceFeedback = useMemo(
     () => buildStaffPerformanceFeedback(performanceSummary || [], staff || []),
     [performanceSummary, staff],
@@ -141,12 +144,37 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
     }
   }
 
+  async function loadStaffCoaching() {
+    if (!scopedBusinessId) {
+      setStaffCoaching([]);
+      return;
+    }
+
+    setCoachingLoading(true);
+    setError('');
+
+    try {
+      const result = await runStaffPerformanceCoaching(scopedBusinessId);
+      setStaffCoaching(result.coaching || []);
+    } catch (err) {
+      if (err?.message?.includes('OPENAI_API_KEY')) {
+        setError('AI coaching is unavailable until the OpenAI API key is configured.');
+      } else {
+        setError(err.message || 'Unable to load staff coaching.');
+      }
+      setStaffCoaching([]);
+    } finally {
+      setCoachingLoading(false);
+    }
+  }
+
   useEffect(() => {
     setSourceForm(blankSource(businessUnit));
   }, [businessUnit]);
 
   useEffect(() => {
     loadData();
+    loadStaffCoaching();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedBusinessId]);
 
@@ -263,6 +291,15 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
             <Sparkles size={16} />
             {working === 'report' ? 'Analyzing...' : 'Generate report'}
           </button>
+          <button
+            className="secondary-button"
+            disabled={!scopedBusinessId || coachingLoading}
+            type="button"
+            onClick={loadStaffCoaching}
+          >
+            <RefreshCw size={16} />
+            {coachingLoading ? 'Refreshing coaching...' : 'Refresh coaching'}
+          </button>
         </div>
       </section>
 
@@ -316,14 +353,52 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
             <h2>Personalized performance feedback</h2>
           </div>
         </div>
-        {performanceFeedback.length ? (
+        {coachingLoading ? (
+          <LoadingState label="Loading staff coaching" />
+        ) : staffCoaching.length ? (
+          <div className="feedback-cards">
+            {staffCoaching.map((feedback) => (
+              <article key={feedback.staff_id} className="feedback-card">
+                <div className="feedback-card__header">
+                  <div>
+                    <strong>{feedback.full_name}</strong>
+                    <span>Priority: {feedback.priority}</span>
+                  </div>
+                  <StatusBadge
+                    tone={
+                      feedback.priority === 'high'
+                        ? 'danger'
+                        : feedback.priority === 'medium'
+                        ? 'warning'
+                        : 'success'
+                    }
+                  >
+                    {feedback.priority}
+                  </StatusBadge>
+                </div>
+                <p>{feedback.summary}</p>
+                <ul>
+                  <li>
+                    <strong>Growth:</strong> {feedback.growth_tip}
+                  </li>
+                  <li>
+                    <strong>Customer service:</strong> {feedback.service_tip}
+                  </li>
+                  <li>
+                    <strong>Next action:</strong> {feedback.next_action}
+                  </li>
+                </ul>
+              </article>
+            ))}
+          </div>
+        ) : performanceFeedback.length ? (
           <div className="feedback-cards">
             {performanceFeedback.map((feedback) => (
               <article key={feedback.staff_id} className="feedback-card">
                 <div className="feedback-card__header">
                   <div>
                     <strong>{feedback.full_name}</strong>
-                    <span>{formatNumber(feedback.weeksRecorded)} weeks recorded</span>
+                    <span>Priority: {feedback.priority}</span>
                   </div>
                   <StatusBadge
                     tone={

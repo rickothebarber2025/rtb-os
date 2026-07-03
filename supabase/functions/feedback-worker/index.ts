@@ -16,6 +16,7 @@ import {
 type AdminClient = ReturnType<typeof createClient>;
 
 const DEFAULT_MODEL = "gpt-4.1-mini";
+const DEFAULT_STAFF_COACH_MODEL = "gpt-4o-mini";
 const FEEDBACK_WORKER_REQUIREMENTS = [
   { module: "performance", minimum: "edit" },
   { module: "operations", minimum: "edit" },
@@ -163,6 +164,33 @@ const consultantSchema = {
   type: "object",
 };
 
+const staffCoachingSchema = {
+  additionalProperties: false,
+  items: {
+    additionalProperties: false,
+    properties: {
+      staff_id: { type: "string" },
+      full_name: { type: "string" },
+      summary: { type: "string" },
+      growth_tip: { type: "string" },
+      service_tip: { type: "string" },
+      next_action: { type: "string" },
+      priority: { enum: ["low", "medium", "high"], type: "string" },
+    },
+    required: [
+      "staff_id",
+      "full_name",
+      "summary",
+      "growth_tip",
+      "service_tip",
+      "next_action",
+      "priority",
+    ],
+    type: "object",
+  },
+  type: "array",
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -277,11 +305,11 @@ function normalizeAnalysis(analysis: Record<string, any>, rawResult: Record<stri
   };
 }
 
-async function structuredOpenAI(prompt: string, payload: Record<string, unknown>, schema: Record<string, unknown>, name: string) {
+async function structuredOpenAI(prompt: string, payload: Record<string, unknown>, schema: Record<string, unknown>, name: string, modelOverride?: string) {
   const apiKey = Deno.env.get("OPENAI_API_KEY");
   if (!apiKey) return null;
 
-  const model = Deno.env.get("OPENAI_MODEL") || DEFAULT_MODEL;
+  const model = modelOverride || Deno.env.get("OPENAI_MODEL") || DEFAULT_MODEL;
   const response = await fetch("https://api.openai.com/v1/responses", {
     body: JSON.stringify({
       input: [
@@ -311,6 +339,27 @@ async function structuredOpenAI(prompt: string, payload: Record<string, unknown>
   }
 
   return { body, model, parsed: JSON.parse(extractResponseText(body)) };
+}
+
+async function analyzeStaffCoaching(payload: Record<string, unknown>) {
+  const prompt =
+    "You are RTB OS, an AI coach for salon and barbershop operations. Analyze the provided staff performance metrics and provide practical coaching for improvement, customer service, and next actions. Return only valid JSON. Use short, direct sentences and avoid repetition. If performance data is limited, summarize the highest-priority coaching opportunity for each staff member.";
+
+  try {
+    const model = Deno.env.get("OPENAI_STAFF_COACH_MODEL") || DEFAULT_STAFF_COACH_MODEL;
+    const ai = await structuredOpenAI(
+      prompt,
+      payload,
+      staffCoachingSchema,
+      "rtb_staff_coaching",
+      model,
+    );
+
+    if (!ai) return [];
+    return Array.isArray(ai.parsed) ? ai.parsed : [];
+  } catch (_err) {
+    return [];
+  }
 }
 
 async function getFeedbackContext(admin: AdminClient, responseId: string) {
@@ -721,6 +770,31 @@ Deno.serve(async (req) => {
 
       const report = await createBusinessConsultantReport(admin, businessId, auth.user.id);
       return jsonResponse({ report });
+    }
+
+    if (action === "staff-coaching") {
+      if (!businessId) throw new RequestError("Choose one business before requesting staff coaching.");
+
+      const [{ data: business, error: businessError }, { data: performance, error: performanceError }, { data: staffRows, error: staffError }] = await Promise.all([
+        admin.from("business_units").select("id,name,type").eq("id", businessId).maybeSingle(),
+        admin.from("staff_performance_summary").select("*").eq("business_id", businessId),
+        admin.from("staff").select("id,full_name,role,fixed_rate").eq("business_unit_id", businessId),
+      ]);
+
+      if (businessError || !business) throw businessError || new RequestError("Unable to load business data.", 500);
+      if (performanceError) throw performanceError;
+      if (staffError) throw staffError;
+
+      const coaching = await analyzeStaffCoaching({
+        business,
+        performance: performance || [],
+        staff: staffRows || [],
+      });
+
+      return jsonResponse({
+        coaching: coaching || [],
+        ai_available: Boolean(coaching?.length),
+      });
     }
 
     throw new RequestError("Unknown feedback worker action.", 400);
