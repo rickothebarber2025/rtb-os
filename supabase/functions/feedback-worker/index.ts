@@ -748,7 +748,7 @@ Deno.serve(async (req) => {
 
     const admin = getAdminClient();
     const body = await readJson(req);
-    const action = String(body.action || "process");
+    const action = String(body.action || "process").trim().replace(/_/g, '-').toLowerCase();
     const businessId = body.businessId || body.business_id || null;
     const auth = await authorizeManager(req, admin, businessId, FEEDBACK_WORKER_REQUIREMENTS);
 
