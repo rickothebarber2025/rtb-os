@@ -112,6 +112,20 @@ export function splitPayrollRunsByVoidStatus(runs) {
   return { activeRuns, voidedRuns };
 }
 
+function payrollRunSortTime(run) {
+  const timestamp = Date.parse(run?.week_start || run?.week_end || run?.created_at || '');
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+export function sortPayrollRunsByWeekAsc(runs) {
+  return [...(runs || [])].sort((a, b) => {
+    const weekDiff = payrollRunSortTime(a) - payrollRunSortTime(b);
+    if (weekDiff !== 0) return weekDiff;
+
+    return String(a?.week_label || '').localeCompare(String(b?.week_label || ''));
+  });
+}
+
 export function getPayrollReplacementMap(runs) {
   const replacements = new Map();
 

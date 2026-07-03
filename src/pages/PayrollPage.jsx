@@ -33,6 +33,7 @@ import {
   getPayrollReplacementMap,
   getMissingPayrollStaff,
   recalculateEntry,
+  sortPayrollRunsByWeekAsc,
   splitPayrollRunsByVoidStatus,
   toMoneyNumber,
 } from '../utils/payroll';
@@ -111,13 +112,17 @@ export default function PayrollPage({
     () => getMissingPayrollStaff(activeStaff, entries),
     [activeStaff, entries],
   );
-  const { activeRuns: activePayrollRuns, voidedRuns: voidedPayrollRuns } = useMemo(
-    () => splitPayrollRunsByVoidStatus(payrollRuns),
+  const sortedPayrollRuns = useMemo(
+    () => sortPayrollRunsByWeekAsc(payrollRuns),
     [payrollRuns],
   );
+  const { activeRuns: activePayrollRuns, voidedRuns: voidedPayrollRuns } = useMemo(
+    () => splitPayrollRunsByVoidStatus(sortedPayrollRuns),
+    [sortedPayrollRuns],
+  );
   const replacementByVoidedRunId = useMemo(() => {
-    return getPayrollReplacementMap(payrollRuns);
-  }, [payrollRuns]);
+    return getPayrollReplacementMap(sortedPayrollRuns);
+  }, [sortedPayrollRuns]);
   const documentRun = useMemo(
     () => ({
       ...currentRun,

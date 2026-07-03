@@ -7,6 +7,7 @@ import {
   createDraftEntry,
   getMissingPayrollStaff,
   getPayrollReplacementMap,
+  sortPayrollRunsByWeekAsc,
   splitPayrollRunsByVoidStatus,
 } from '../src/utils/payroll.js';
 import { buildOperationalChecks, daysSince } from '../src/utils/operations.js';
@@ -396,6 +397,40 @@ test('payroll history separates voided correction records from active runs', () 
   assert.deepEqual(activeRuns.map((run) => run.id), ['draft-1', 'replacement-1']);
   assert.deepEqual(voidedRuns.map((run) => run.id), ['void-1']);
   assert.equal(replacements.get('void-1').id, 'replacement-1');
+});
+
+test('payroll history sorts by payroll week instead of save date', () => {
+  const runs = [
+    {
+      created_at: '2026-07-03T12:00:00Z',
+      id: 'jun-29',
+      week_label: 'Jun 29 - Jul 5',
+      week_start: '2026-06-29',
+    },
+    {
+      created_at: '2026-07-01T12:00:00Z',
+      id: 'jun-8',
+      week_label: 'Jun 8 - Jun 14',
+      week_start: '2026-06-08',
+    },
+    {
+      created_at: '2026-07-03T10:00:00Z',
+      id: 'jun-1',
+      week_label: 'Jun 1 - Jun 7',
+      week_start: '2026-06-01',
+    },
+    {
+      created_at: '2026-07-02T12:00:00Z',
+      id: 'jun-15',
+      week_label: 'Jun 15 - Jun 21',
+      week_start: '2026-06-15',
+    },
+  ];
+
+  assert.deepEqual(
+    sortPayrollRunsByWeekAsc(runs).map((run) => run.id),
+    ['jun-1', 'jun-8', 'jun-15', 'jun-29'],
+  );
 });
 
 test('operations extension normalizes saved checklist data', () => {
