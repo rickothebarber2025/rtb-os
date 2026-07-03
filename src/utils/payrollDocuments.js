@@ -207,7 +207,13 @@ export async function downloadPaystubPdf(run, entry, businessUnit) {
     doc.setTextColor('#9a3412');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.text('Commission adjusted to 55% because net sales were below $500.', 50, y + 38);
+    doc.text(
+      entry.fixed_rate_snapshot
+        ? 'Fixed commission lowered by 5 points because net sales were below $500.'
+        : `Commission adjusted to ${formatPercent(entry.applied_commission_rate)} because net sales were below $500.`,
+      50,
+      y + 38,
+    );
   }
 
   if (entry.notes) {

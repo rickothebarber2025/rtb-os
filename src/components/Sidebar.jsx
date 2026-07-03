@@ -10,7 +10,7 @@ export default function Sidebar({ activePage, isOpen, navItems, onClose, setActi
   }, {});
 
   return (
-    <aside className={`sidebar ${isOpen ? 'is-open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'is-open' : ''}`} aria-label="Main navigation drawer">
       <div className="sidebar__brand">
         <div className="brand-mark">
           <Scissors size={22} />

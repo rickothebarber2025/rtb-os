@@ -32,4 +32,5 @@ export const NAV_ITEMS = [
 
 export const LOW_SALES_THRESHOLD = 500;
 export const ADJUSTED_COMMISSION_RATE = 55;
+export const FIXED_RATE_LOW_SALES_ADJUSTMENT = 5;
 export const ENTRY_DEDUCTION = 5;

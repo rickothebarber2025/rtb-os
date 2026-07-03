@@ -9,6 +9,7 @@ import {
   Save,
   Sparkles,
   Trash2,
+  UserPlus,
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DataTable from '../components/DataTable';
@@ -28,6 +29,8 @@ import {
   calculateRunTotals,
   createCorrectionDraft,
   createDraftEntry,
+  entryBelongsToStaff,
+  getMissingPayrollStaff,
   recalculateEntry,
   toMoneyNumber,
 } from '../utils/payroll';
@@ -95,6 +98,10 @@ export default function PayrollPage({
     () => calculateRunTotals({ entries, ownerNetSales: currentRun.owner_net_sales }),
     [currentRun.owner_net_sales, entries],
   );
+  const missingStaff = useMemo(
+    () => getMissingPayrollStaff(activeStaff, entries),
+    [activeStaff, entries],
+  );
   const documentRun = useMemo(
     () => ({
       ...currentRun,
@@ -132,6 +139,35 @@ export default function PayrollPage({
           : entry,
       ),
     );
+  }
+
+  function addStaffToDraft(member) {
+    if (readOnly) return;
+    setEntries((rows) => {
+      if (rows.some((entry) => entryBelongsToStaff(entry, member))) return rows;
+      return [...rows, createDraftEntry(member)];
+    });
+    setError('');
+    setNotice(`${member.full_name} added to this draft. Save the draft to keep the change.`);
+  }
+
+  function addAllMissingStaff() {
+    if (readOnly) return;
+    setEntries((rows) => [
+      ...rows,
+      ...activeStaff
+        .filter((member) => !rows.some((entry) => entryBelongsToStaff(entry, member)))
+        .map(createDraftEntry),
+    ]);
+    setError('');
+    setNotice('All missing active staff were added. Save the draft to keep the change.');
+  }
+
+  function removeEntry(index) {
+    if (readOnly) return;
+    setEntries((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
+    setError('');
+    setNotice('Payroll row removed. Save the draft to keep the change.');
   }
 
   function loadRun(run) {
@@ -478,6 +514,47 @@ export default function PayrollPage({
           </div>
         </div>
 
+        {!readOnly ? (
+          <section className="payroll-fix-panel" aria-label="Payroll draft fix-ups">
+            <div>
+              <span>Draft fix-ups</span>
+              <strong>
+                {missingStaff.length
+                  ? `${missingStaff.length} active staff missing`
+                  : 'All active staff included'}
+              </strong>
+              <p>
+                Load any saved draft, add missing staff, remove wrong rows, then save the draft.
+              </p>
+            </div>
+            {missingStaff.length ? (
+              <div className="payroll-fix-panel__actions">
+                <button
+                  className="secondary-button small"
+                  disabled={saving}
+                  type="button"
+                  onClick={addAllMissingStaff}
+                >
+                  <UserPlus size={15} />
+                  Add all missing
+                </button>
+                {missingStaff.map((member) => (
+                  <button
+                    className="ghost-button small"
+                    disabled={saving}
+                    key={member.id}
+                    type="button"
+                    onClick={() => addStaffToDraft(member)}
+                  >
+                    <UserPlus size={14} />
+                    {member.full_name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         {entries.length ? (
           <DataTable className="payroll-table">
             <table>
@@ -491,6 +568,7 @@ export default function PayrollPage({
                   <th>Take home</th>
                   <th>Notes</th>
                   <th>Paystub</th>
+                  {!readOnly ? <th>Fix</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -503,11 +581,14 @@ export default function PayrollPage({
                           {entry.role_snapshot} / {entry.tier_snapshot}
                         </span>
                       </div>
-                      {entry.fixed_rate_snapshot ? (
-                        <StatusBadge tone="gold">Fixed rate</StatusBadge>
-                      ) : entry.adjusted ? (
-                        <StatusBadge tone="warning">Adjusted</StatusBadge>
-                      ) : null}
+                      <div className="business-chip-list">
+                        {entry.fixed_rate_snapshot ? (
+                          <StatusBadge tone="gold">Fixed rate</StatusBadge>
+                        ) : null}
+                        {entry.adjusted ? (
+                          <StatusBadge tone="warning">Adjusted</StatusBadge>
+                        ) : null}
+                      </div>
                     </td>
                     <td>
                       <input
@@ -560,6 +641,20 @@ export default function PayrollPage({
                         <ReceiptText size={15} />
                       </button>
                     </td>
+                    {!readOnly ? (
+                      <td>
+                        <button
+                          aria-label={`Remove ${entry.staff_name_snapshot} from this draft`}
+                          className="ghost-button small danger-action"
+                          disabled={saving}
+                          onClick={() => removeEntry(index)}
+                          type="button"
+                        >
+                          <Trash2 size={14} />
+                          Remove
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -568,8 +663,19 @@ export default function PayrollPage({
         ) : (
           <EmptyState
             icon={Sparkles}
-            title="No active staff"
-            message="Add active staff before drafting payroll."
+            title={activeStaff.length ? 'No staff rows in this draft' : 'No active staff'}
+            message={
+              activeStaff.length
+                ? 'Add the active roster back into this draft, then save it.'
+                : 'Add active staff before drafting payroll.'
+            }
+            action={
+              activeStaff.length && !readOnly ? (
+                <button className="ghost-button" type="button" onClick={addAllMissingStaff}>
+                  Add active roster
+                </button>
+              ) : null
+            }
           />
         )}
 

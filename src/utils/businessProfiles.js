@@ -8,6 +8,11 @@ import {
 export const ALL_BUSINESSES_ID = 'all-businesses';
 export const BUSINESS_PROFILES_KEY = 'business_profiles';
 
+export const BUSINESS_STAFF_ROLES = {
+  'RTB Lounge': ['Barber', 'Hairstylist'],
+  'RTB Beauty Lounge': ['Nail Tech', 'Lash Tech'],
+};
+
 export const DEFAULT_BUSINESS_PROFILES = {
   'RTB Lounge': {
     business_name: 'RTB Lounge',
@@ -16,6 +21,7 @@ export const DEFAULT_BUSINESS_PROFILES = {
     default_commission_rules: {
       auto_adjust_floor: 55,
       deduction_per_payroll_entry: 5,
+      fixed_low_sales_adjustment: 5,
       standard_rate: 60,
       under_minimum_net_sales: 500,
     },
@@ -28,7 +34,7 @@ export const DEFAULT_BUSINESS_PROFILES = {
       source_note: 'Use Booksy appointment imports with Square POS revenue tracking.',
     },
     pos_platform: 'Square',
-    staff_roles: ['Barber', 'Master Barber', 'Apprentice Barber', 'Booth Renter', 'Manager'],
+    staff_roles: BUSINESS_STAFF_ROLES['RTB Lounge'],
   },
   'RTB Beauty Lounge': {
     business_name: 'RTB Beauty Lounge',
@@ -37,6 +43,7 @@ export const DEFAULT_BUSINESS_PROFILES = {
     default_commission_rules: {
       auto_adjust_floor: 55,
       deduction_per_payroll_entry: 5,
+      fixed_low_sales_adjustment: 5,
       standard_rate: 60,
       under_minimum_net_sales: 500,
     },
@@ -49,7 +56,7 @@ export const DEFAULT_BUSINESS_PROFILES = {
       source_note: 'Use Square Appointments and Square POS data for beauty services payroll.',
     },
     pos_platform: 'Square',
-    staff_roles: ['Nail Tech', 'Lash Tech', 'Brow Tech', 'Esthetician', 'Booth Renter', 'Manager'],
+    staff_roles: BUSINESS_STAFF_ROLES['RTB Beauty Lounge'],
   },
 };
 
@@ -69,16 +76,31 @@ function getProfileOverride(overrides, businessName) {
   return overrides[businessName] || overrides[businessName?.toLowerCase?.()] || {};
 }
 
+export function getStaffRolesForBusinessName(businessName) {
+  return BUSINESS_STAFF_ROLES[businessName] || ['Staff'];
+}
+
+export function getCombinedStaffRoles() {
+  return [...new Set(Object.values(BUSINESS_STAFF_ROLES).flat())];
+}
+
 export function normalizeBusinessProfiles(value) {
   return Object.fromEntries(
-    Object.entries(DEFAULT_BUSINESS_PROFILES).map(([businessName, defaults]) => [
-      businessName,
-      {
+    Object.entries(DEFAULT_BUSINESS_PROFILES).map(([businessName, defaults]) => {
+      const profile = {
         ...defaults,
         ...getProfileOverride(value, businessName),
         business_name: businessName,
-      },
-    ]),
+      };
+
+      return [
+        businessName,
+        {
+          ...profile,
+          staff_roles: getStaffRolesForBusinessName(businessName),
+        },
+      ];
+    }),
   );
 }
 

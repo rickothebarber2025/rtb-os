@@ -16,6 +16,11 @@ import {
 type AdminClient = ReturnType<typeof createClient>;
 
 const DEFAULT_MODEL = "gpt-4.1-mini";
+const FEEDBACK_WORKER_REQUIREMENTS = [
+  { module: "performance", minimum: "edit" },
+  { module: "operations", minimum: "edit" },
+  { module: "settings", minimum: "admin" },
+];
 
 const CATEGORY_KEYWORDS: Array<[string, string[]]> = [
   ["Reception Experience", ["front", "desk", "reception", "greet", "welcome", "check in"]],
@@ -696,7 +701,7 @@ Deno.serve(async (req) => {
     const body = await readJson(req);
     const action = String(body.action || "process");
     const businessId = body.businessId || body.business_id || null;
-    const auth = await authorizeManager(req, admin, businessId);
+    const auth = await authorizeManager(req, admin, businessId, FEEDBACK_WORKER_REQUIREMENTS);
 
     if (action === "process") {
       const result = await processQueuedFeedbackAnalysis(admin, {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import MobileTabBar from './MobileTabBar';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 
@@ -48,6 +49,12 @@ export default function AppShell({
           user={user}
         />
         <main className="content">{children}</main>
+        <MobileTabBar
+          activePage={activePage}
+          navItems={navItems}
+          onMoreClick={() => setSidebarOpen(true)}
+          setActivePage={setActivePage}
+        />
       </div>
     </div>
   );

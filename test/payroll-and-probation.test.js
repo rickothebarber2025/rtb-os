@@ -4,6 +4,8 @@ import {
   calculateEntryValues,
   calculateRunTotals,
   createCorrectionDraft,
+  createDraftEntry,
+  getMissingPayrollStaff,
 } from '../src/utils/payroll.js';
 import { buildOperationalChecks, daysSince } from '../src/utils/operations.js';
 import {
@@ -40,6 +42,7 @@ import {
   getAccessibleBusinessUnits,
   getBusinessProfile,
   getBusinessSelectionOptions,
+  normalizeBusinessProfiles,
   suggestInstagramHandle,
 } from '../src/utils/businessProfiles.js';
 import { NAV_ITEMS } from '../src/utils/constants.js';
@@ -223,7 +226,7 @@ test('commission drops to 55% below $500 for non-fixed staff', () => {
   assert.equal(result.takeHome, 235);
 });
 
-test('fixed-rate staff never auto-adjust', () => {
+test('fixed-rate staff below $500 lose five commission points', () => {
   const result = calculateEntryValues({
     baseCommissionRate: 65,
     fixedRate: true,
@@ -231,9 +234,22 @@ test('fixed-rate staff never auto-adjust', () => {
     tips: 0,
   });
 
+  assert.equal(result.adjusted, true);
+  assert.equal(result.appliedCommissionRate, 60);
+  assert.equal(result.takeHome, 145);
+});
+
+test('fixed-rate staff at or above $500 keep their fixed commission', () => {
+  const result = calculateEntryValues({
+    baseCommissionRate: 65,
+    fixedRate: true,
+    netSales: 500,
+    tips: 0,
+  });
+
   assert.equal(result.adjusted, false);
   assert.equal(result.appliedCommissionRate, 65);
-  assert.equal(result.takeHome, 157.5);
+  assert.equal(result.takeHome, 320);
 });
 
 test('empty payroll entries never create negative payout or phantom deductions', () => {
@@ -328,6 +344,37 @@ test('payroll correction keeps values but removes saved record identifiers', () 
   assert.equal(correction.entries[0].payroll_run_id, undefined);
   assert.equal(correction.entries[0].net_sales, 750);
   assert.equal(correction.entries[0].paystub_status, 'pending');
+});
+
+test('saved payroll drafts can detect and add missing active staff', () => {
+  const staff = [
+    {
+      active: true,
+      commission_rate: 60,
+      fixed_rate: false,
+      full_name: 'Ricko Joseph',
+      id: 'staff-ricko',
+      role: 'Barber',
+      tier: 'standard',
+    },
+    {
+      active: true,
+      commission_rate: 65,
+      fixed_rate: true,
+      full_name: 'Sara Hairstylist',
+      id: 'staff-sara',
+      role: 'Hairstylist',
+      tier: 'standard',
+    },
+  ];
+  const draftEntries = [createDraftEntry(staff[0])];
+  const missing = getMissingPayrollStaff(staff, draftEntries);
+  const repairedEntries = [...draftEntries, ...missing.map(createDraftEntry)];
+
+  assert.deepEqual(missing.map((member) => member.full_name), ['Sara Hairstylist']);
+  assert.equal(getMissingPayrollStaff(staff, repairedEntries).length, 0);
+  assert.equal(repairedEntries[1].staff_id, 'staff-sara');
+  assert.equal(repairedEntries[1].fixed_rate_snapshot, true);
 });
 
 test('operations extension normalizes saved checklist data', () => {
@@ -588,12 +635,28 @@ test('business profiles define separate platform and branding rules', () => {
 
   assert.equal(lounge.booking_platform, 'Booksy');
   assert.equal(lounge.pos_platform, 'Square');
+  assert.deepEqual(lounge.staff_roles, ['Barber', 'Hairstylist']);
   assert.equal(beauty.booking_platform, 'Square Appointments');
   assert.equal(beauty.pos_platform, 'Square');
+  assert.deepEqual(beauty.staff_roles, ['Nail Tech', 'Lash Tech']);
   assert.equal(suggestInstagramHandle('Josh Smith', lounge.instagram_format), 'josh.rtb_lounge');
   assert.equal(suggestInstagramHandle('Josh Smith', 'firstnamelastname'), 'joshsmith');
   assert.equal(canUseAllBusinesses(profileWithPermissions({ access: 'edit' })), false);
   assert.equal(options[0].id, ALL_BUSINESSES_ID);
+});
+
+test('business profile overrides cannot reintroduce retired staff roles', () => {
+  const profiles = normalizeBusinessProfiles({
+    'RTB Lounge': {
+      staff_roles: ['Master Barber', 'Booth Renter', 'Barber'],
+    },
+    'RTB Beauty Lounge': {
+      staff_roles: ['Nail Tech', 'Brow Tech', 'Esthetician'],
+    },
+  });
+
+  assert.deepEqual(profiles['RTB Lounge'].staff_roles, ['Barber', 'Hairstylist']);
+  assert.deepEqual(profiles['RTB Beauty Lounge'].staff_roles, ['Nail Tech', 'Lash Tech']);
 });
 
 test('staff metadata supports both-business assignment without duplicating staff', () => {

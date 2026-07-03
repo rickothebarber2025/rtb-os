@@ -8,10 +8,16 @@ import {
   getSurveyUrl,
   jsonResponse,
   maxBatchSize,
+  profileCanAccessBusiness,
   readJson,
 } from "../_shared/rtb.ts";
 
 const OWNER_EMAIL = "rickothebarber@gmail.com";
+const FEEDBACK_EDIT_REQUIREMENTS = [
+  { module: "performance", minimum: "edit" },
+  { module: "operations", minimum: "edit" },
+  { module: "settings", minimum: "admin" },
+];
 
 function parseDelayHours(value: unknown) {
   const number = Number(value ?? Deno.env.get("FEEDBACK_DEFAULT_DELAY_HOURS") ?? 2);
@@ -188,11 +194,11 @@ Deno.serve(async (req) => {
     const body = await readJson(req);
     const action = String(body.action || "create-request");
     const targetBusinessId = body.businessId || body.business_id || body.request?.business_id || body.request?.businessId;
-    const auth = await authorizeManager(req, admin, targetBusinessId || null);
+    const auth = await authorizeManager(req, admin, targetBusinessId || null, FEEDBACK_EDIT_REQUIREMENTS);
 
     if (action === "create-request") {
       const payload = normalizeRequest(body.request || {});
-      await authorizeManager(req, admin, payload.business_id);
+      await authorizeManager(req, admin, payload.business_id, FEEDBACK_EDIT_REQUIREMENTS);
 
       const { data, error } = await admin
         .from("feedback_requests")
@@ -230,7 +236,7 @@ Deno.serve(async (req) => {
         if (!auth.profile?.active && String(auth.profile?.email || "").toLowerCase() !== OWNER_EMAIL) {
           continue;
         }
-        if (auth.profile.business_unit_id && auth.profile.business_unit_id !== request.business_id) {
+        if (!profileCanAccessBusiness(auth.profile, request.business_id)) {
           continue;
         }
         results.push(await dispatchOne(admin, request));

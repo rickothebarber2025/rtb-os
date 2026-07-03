@@ -1,6 +1,7 @@
 import {
   ADJUSTED_COMMISSION_RATE,
   ENTRY_DEDUCTION,
+  FIXED_RATE_LOW_SALES_ADJUSTMENT,
   LOW_SALES_THRESHOLD,
 } from './constants.js';
 
@@ -22,9 +23,16 @@ export function calculateEntryValues({
   const net = toMoneyNumber(netSales);
   const tipAmount = toMoneyNumber(tips);
   const baseRate = toMoneyNumber(baseCommissionRate || 60);
-  const adjusted =
-    !fixedRate && net < LOW_SALES_THRESHOLD && baseRate > ADJUSTED_COMMISSION_RATE;
-  const appliedRate = adjusted ? ADJUSTED_COMMISSION_RATE : baseRate;
+  const lowSales = net < LOW_SALES_THRESHOLD;
+  let appliedRate = baseRate;
+
+  if (lowSales && fixedRate) {
+    appliedRate = Math.max(0, baseRate - FIXED_RATE_LOW_SALES_ADJUSTMENT);
+  } else if (lowSales && baseRate > ADJUSTED_COMMISSION_RATE) {
+    appliedRate = ADJUSTED_COMMISSION_RATE;
+  }
+
+  const adjusted = appliedRate !== baseRate;
   const commissionAmount = roundMoney(net * (appliedRate / 100));
   const grossPay = roundMoney(commissionAmount + tipAmount);
   const deduction = roundMoney(Math.min(ENTRY_DEDUCTION, Math.max(0, grossPay)));
@@ -63,6 +71,30 @@ export function createDraftEntry(staffMember) {
     tier_snapshot: staffMember.tier || 'standard',
     tips: 0,
   };
+}
+
+export function normalizePayrollStaffName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+export function entryBelongsToStaff(entry, staffMember) {
+  const entryId = entry?.staff_id;
+  const staffId = staffMember?.id;
+  if (entryId && staffId && entryId === staffId) return true;
+
+  return (
+    normalizePayrollStaffName(entry?.staff_name_snapshot) ===
+    normalizePayrollStaffName(staffMember?.full_name)
+  );
+}
+
+export function getMissingPayrollStaff(staffMembers, entries) {
+  return (staffMembers || []).filter(
+    (member) => member?.active && !(entries || []).some((entry) => entryBelongsToStaff(entry, member)),
+  );
 }
 
 export function recalculateEntry(entry) {

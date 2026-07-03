@@ -292,6 +292,10 @@ select {
   gap: 0.6rem;
 }
 
+.mobile-tabbar {
+  display: none;
+}
+
 .content {
   padding: 1.4rem;
 }
@@ -990,6 +994,47 @@ select {
 
 .payroll-table input {
   min-width: 110px;
+}
+
+.payroll-fix-panel {
+  align-items: center;
+  background: rgba(214, 168, 79, 0.07);
+  border: 1px solid rgba(214, 168, 79, 0.2);
+  border-radius: var(--radius);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin: 0 0 1rem;
+  padding: 0.9rem;
+}
+
+.payroll-fix-panel span {
+  color: var(--gold-strong);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.payroll-fix-panel strong {
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.payroll-fix-panel p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  margin: 0.35rem 0 0;
+}
+
+.payroll-fix-panel__actions {
+  align-items: center;
+  display: flex;
+  flex: 0 1 58%;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
 }
 
 .person-cell {
@@ -2848,15 +2893,18 @@ select {
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1024px) {
   .sidebar {
     bottom: 0;
     left: 0;
+    max-width: 20rem;
+    overflow-y: auto;
+    padding-bottom: calc(1.2rem + env(safe-area-inset-bottom));
     position: fixed;
     top: 0;
     transform: translateX(-100%);
     transition: transform 180ms ease;
-    width: min(86vw, var(--sidebar-width));
+    width: min(84vw, var(--sidebar-width));
     z-index: 80;
   }
 
@@ -2883,18 +2931,82 @@ select {
   }
 
   .topbar {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: stretch;
+    gap: 0.72rem;
+    min-height: auto;
+    padding: calc(0.7rem + env(safe-area-inset-top)) 0.9rem 0.72rem;
   }
 
   .topbar__actions {
-    flex-wrap: wrap;
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
     width: 100%;
   }
 
-  .business-selector {
-    flex: 1 1 220px;
+  .topbar__actions .role-pill {
+    display: none;
+  }
+
+  .topbar__title {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .topbar__title > div {
     min-width: 0;
+  }
+
+  .topbar__title h1 {
+    font-size: 1.08rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .business-selector {
+    min-width: 0;
+  }
+
+  .business-selector select {
+    font-size: 0.86rem;
+  }
+
+  .mobile-tabbar {
+    align-items: center;
+    background: rgba(10, 12, 17, 0.96);
+    backdrop-filter: blur(18px);
+    border-top: 1px solid var(--line);
+    bottom: 0;
+    display: grid;
+    gap: 0.25rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    left: 0;
+    padding: 0.42rem 0.48rem calc(0.42rem + env(safe-area-inset-bottom));
+    position: fixed;
+    right: 0;
+    z-index: 60;
+  }
+
+  .mobile-tabbar__item {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    color: var(--muted);
+    display: grid;
+    font-size: 0.68rem;
+    font-weight: 850;
+    gap: 0.2rem;
+    justify-items: center;
+    min-height: 52px;
+    padding: 0.34rem 0.18rem;
+  }
+
+  .mobile-tabbar__item.active {
+    background: var(--gold-soft);
+    border-color: rgba(214, 168, 79, 0.26);
+    color: var(--gold-strong);
   }
 
   .checkbox-grid {
@@ -2906,7 +3018,7 @@ select {
   }
 
   .content {
-    padding: 1rem;
+    padding: 1rem 1rem calc(5.8rem + env(safe-area-inset-bottom));
   }
 
   .auth-panel {
@@ -2955,6 +3067,16 @@ select {
 
   .payroll-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .payroll-fix-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .payroll-fix-panel__actions {
+    flex: 1 1 auto;
+    justify-content: flex-start;
   }
 
   .award-layout {

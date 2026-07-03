@@ -16,6 +16,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
 import { getAppSetting, saveAppSetting } from '../services/rtbService';
+import { getCombinedStaffRoles, getStaffRolesForBusinessName } from '../utils/businessProfiles';
 import {
   COMMISSION_TIERS,
   FINANCE_CLOSE_STEPS,
@@ -41,7 +42,6 @@ const TAB_ITEMS = [
   { icon: RefreshCw, id: 'updates', label: 'Updates' },
 ];
 
-const ROLE_OPTIONS = ['Barber / Stylist', 'Nail Tech', 'Lash / Brow', 'Braider', 'Esthetics', 'Front Desk', 'Manager'];
 const SHOP_OPTIONS = ['RTB Lounge', 'RTB Beauty Lounge', 'Both businesses'];
 
 function dateKey(value = new Date()) {
@@ -57,11 +57,18 @@ function createId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function getOperationsRoleOptions(shop, fallbackBusinessName) {
+  if (shop === 'Both businesses') return getCombinedStaffRoles();
+  return getStaffRolesForBusinessName(shop || fallbackBusinessName);
+}
+
 function blankHire(businessUnitName) {
+  const roleOptions = getOperationsRoleOptions(businessUnitName, businessUnitName);
+
   return {
     date: dateKey(),
     name: '',
-    role: ROLE_OPTIONS[0],
+    role: roleOptions[0],
     shop: businessUnitName || 'RTB Lounge',
   };
 }
@@ -216,6 +223,18 @@ export default function OperationsPage({ businessUnit, staff }) {
     () => staff.filter((member) => member.active).map((member) => member.full_name),
     [staff],
   );
+  const hireRoleOptions = useMemo(
+    () => getOperationsRoleOptions(hireForm.shop, businessUnit?.name),
+    [businessUnit?.name, hireForm.shop],
+  );
+  const editingHireRoleOptions = useMemo(() => {
+    if (!editingHire) return [];
+    return [
+      ...new Set(
+        [editingHire.role, ...getOperationsRoleOptions(editingHire.shop, businessUnit?.name)].filter(Boolean),
+      ),
+    ];
+  }, [businessUnit?.name, editingHire]);
 
   useEffect(() => {
     let cancelled = false;
@@ -242,10 +261,16 @@ export default function OperationsPage({ businessUnit, staff }) {
   }, []);
 
   useEffect(() => {
-    setHireForm((current) => ({
-      ...current,
-      shop: current.shop || businessUnit?.name || 'RTB Lounge',
-    }));
+    setHireForm((current) => {
+      const shop = current.shop || businessUnit?.name || 'RTB Lounge';
+      const roleOptions = getOperationsRoleOptions(shop, businessUnit?.name);
+
+      return {
+        ...current,
+        role: roleOptions.includes(current.role) ? current.role : roleOptions[0],
+        shop,
+      };
+    });
   }, [businessUnit?.name]);
 
   async function persist(nextState, successMessage) {
@@ -496,7 +521,7 @@ export default function OperationsPage({ businessUnit, staff }) {
                   value={hireForm.role}
                   onChange={(event) => setHireForm({ ...hireForm, role: event.target.value })}
                 >
-                  {ROLE_OPTIONS.map((role) => (
+                  {hireRoleOptions.map((role) => (
                     <option key={role}>{role}</option>
                   ))}
                 </select>
@@ -505,7 +530,15 @@ export default function OperationsPage({ businessUnit, staff }) {
                 <span>Shop</span>
                 <select
                   value={hireForm.shop}
-                  onChange={(event) => setHireForm({ ...hireForm, shop: event.target.value })}
+                  onChange={(event) => {
+                    const shop = event.target.value;
+                    const roleOptions = getOperationsRoleOptions(shop, businessUnit?.name);
+                    setHireForm({
+                      ...hireForm,
+                      role: roleOptions.includes(hireForm.role) ? hireForm.role : roleOptions[0],
+                      shop,
+                    });
+                  }}
                 >
                   {SHOP_OPTIONS.map((shop) => (
                     <option key={shop}>{shop}</option>
@@ -922,7 +955,7 @@ export default function OperationsPage({ businessUnit, staff }) {
                   value={editingHire.role}
                   onChange={(event) => setEditingHire({ ...editingHire, role: event.target.value })}
                 >
-                  {ROLE_OPTIONS.map((role) => (
+                  {editingHireRoleOptions.map((role) => (
                     <option key={role}>{role}</option>
                   ))}
                 </select>
@@ -931,7 +964,17 @@ export default function OperationsPage({ businessUnit, staff }) {
                 <span>Shop</span>
                 <select
                   value={editingHire.shop}
-                  onChange={(event) => setEditingHire({ ...editingHire, shop: event.target.value })}
+                  onChange={(event) => {
+                    const shop = event.target.value;
+                    const roleOptions = getOperationsRoleOptions(shop, businessUnit?.name);
+                    setEditingHire({
+                      ...editingHire,
+                      role: roleOptions.includes(editingHire.role)
+                        ? editingHire.role
+                        : roleOptions[0],
+                      shop,
+                    });
+                  }}
                 >
                   {SHOP_OPTIONS.map((shop) => (
                     <option key={shop}>{shop}</option>

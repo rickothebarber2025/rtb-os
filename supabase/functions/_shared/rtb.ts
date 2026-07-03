@@ -150,26 +150,51 @@ function legacyPermission(profile: { role?: string | null } | null, moduleId: st
   return "none";
 }
 
-function hasAnyPermission(profile: { active?: boolean | null; email?: string | null; permissions?: unknown; role?: string | null } | null, minimum: string) {
+function hasModulePermission(
+  profile: { active?: boolean | null; email?: string | null; permissions?: unknown; role?: string | null } | null,
+  moduleId: string,
+  minimum: string,
+) {
   if (String(profile?.email || "").trim().toLowerCase() === OWNER_EMAIL) return true;
   if (!profile?.active) return false;
 
   const levels = ["none", "view", "edit", "admin"];
   const requiredLevel = levels.indexOf(minimum);
   const permissions = profile.permissions === null
-    ? Object.fromEntries(MODULE_IDS.map((moduleId) => [moduleId, legacyPermission(profile, moduleId)]))
+    ? Object.fromEntries(MODULE_IDS.map((id) => [id, legacyPermission(profile, id)]))
     : normalizePermissionsPayload(profile.permissions);
+  const currentLevel = levels.indexOf(normalizePermission(permissions[moduleId]));
 
-  return Object.values(permissions).some((permission) => {
-    const currentLevel = levels.indexOf(normalizePermission(permission));
-    return currentLevel >= requiredLevel;
-  });
+  return currentLevel >= requiredLevel;
+}
+
+export type ModuleRequirement = {
+  minimum?: string;
+  module: string;
+};
+
+function normalizeRequirements(requirements: ModuleRequirement[] | ModuleRequirement | null | undefined) {
+  if (!requirements) return [];
+  return Array.isArray(requirements) ? requirements : [requirements];
+}
+
+function hasAnyModuleRequirement(
+  profile: { active?: boolean | null; email?: string | null; permissions?: unknown; role?: string | null } | null,
+  requirements: ModuleRequirement[] | ModuleRequirement | null | undefined,
+) {
+  const normalized = normalizeRequirements(requirements);
+  if (!normalized.length) return false;
+
+  return normalized.some((requirement) =>
+    hasModulePermission(profile, requirement.module, requirement.minimum || "edit")
+  );
 }
 
 export async function authorizeManager(
   req: Request,
   admin: ReturnType<typeof createClient>,
   businessId?: string | null,
+  requirements?: ModuleRequirement[] | ModuleRequirement,
 ) {
   const token = getBearerToken(req);
   if (!token) throw new RequestError("Sign in to manage customer intelligence.", 401);
@@ -189,18 +214,34 @@ export async function authorizeManager(
 
   const businessAccess = getBusinessAccess(profile?.permissions);
   const canAccessBusiness =
-    !businessId ||
     String(profile?.email || "").trim().toLowerCase() === OWNER_EMAIL ||
-    businessAccess.all ||
-    businessAccess.ids.includes(String(businessId)) ||
-    profile?.business_unit_id === businessId;
-  const canManage = hasAnyPermission(profile, "edit") && canAccessBusiness;
+    (businessId
+      ? businessAccess.all ||
+        businessAccess.ids.includes(String(businessId)) ||
+        profile?.business_unit_id === businessId
+      : businessAccess.all);
+  const canManage = hasAnyModuleRequirement(profile, requirements) && canAccessBusiness;
 
   if (!canManage) {
     throw new RequestError("Admin or assigned manager access is required.", 403);
   }
 
   return { profile, user: authData.user };
+}
+
+export function profileCanAccessBusiness(
+  profile: { active?: boolean | null; business_unit_id?: string | null; email?: string | null; permissions?: unknown } | null,
+  businessId?: string | null,
+) {
+  if (!businessId) return false;
+  if (String(profile?.email || "").trim().toLowerCase() === OWNER_EMAIL) return true;
+
+  const businessAccess = getBusinessAccess(profile?.permissions);
+  return (
+    businessAccess.all ||
+    businessAccess.ids.includes(String(businessId)) ||
+    profile?.business_unit_id === businessId
+  );
 }
 
 export function maxBatchSize(value: unknown, fallback = 5, max = 25) {

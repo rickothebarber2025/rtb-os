@@ -259,10 +259,10 @@ export const TRAINING_SECTIONS = [
   {
     title: 'Role paths',
     rows: [
-      ['Barber / Stylist', 'Consultation, RTB cut standards, speed, chair turnover, fade and finish checks'],
+      ['Barber', 'Consultation, RTB cut standards, speed, chair turnover, fade and finish checks'],
+      ['Hairstylist', 'Consultation, styling standards, service timing, finish checks, content, rebooking'],
       ['Nail Tech', 'Full set standards, sanitation, table reset, product handling, before and after content'],
-      ['Lash / Brow', 'Application standards, retention, client comfort, consultation, aftercare'],
-      ['Braider / Esthetics', 'Service quality bar, realistic timing, sanitation, content, rebooking'],
+      ['Lash Tech', 'Application standards, retention, client comfort, consultation, aftercare'],
     ],
   },
   {
