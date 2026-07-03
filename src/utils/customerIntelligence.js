@@ -260,3 +260,58 @@ export function buildConsultantRecommendations({ feedback = [], projects = [], s
         : 'Add feedback, reviews, audits, notes, or reports to generate a stronger business readout.',
   };
 }
+
+export function buildStaffPerformanceFeedback(performanceRows = [], staffMembers = []) {
+  const staffById = new Map((staffMembers || []).map((member) => [member.id, member]));
+
+  return (performanceRows || []).map((row) => {
+    const staff = staffById.get(row.staff_id) || {};
+    const name = row.full_name || staff.full_name || 'This team member';
+    const role = String(row.role || staff.role || 'Staff');
+    const underMinimum = Number(row.under_minimum_weeks || 0);
+    const adjustedWeeks = Number(row.adjusted_weeks || 0);
+    const avgWeekNet = Number(row.avg_weekly_net || 0);
+    const bestWeekNet = Number(row.best_week_net || 0);
+    const weeksRecorded = Number(row.weeks_recorded || 0);
+    const fixedRate = Boolean(row.fixed_rate || staff.fixed_rate);
+    const strongPerformance = avgWeekNet >= 900 && underMinimum === 0;
+    const highPotential = bestWeekNet > avgWeekNet * 1.25 && weeksRecorded >= 3;
+    const inconsistentPerformance = underMinimum > 0 || avgWeekNet < 700;
+
+    const summary = strongPerformance
+      ? `${name} is showing strong performance with consistent sales and customer service.`
+      : inconsistentPerformance
+      ? `${name} needs to improve weekly consistency and customer experience.`
+      : `${name} is performing steadily and can grow further with clear coaching.`;
+
+    const growthTip = strongPerformance
+      ? `Encourage ${role.toLowerCase()} ${name} to mentor newer team members and share strong service habits.`
+      : highPotential
+      ? `Coach ${role.toLowerCase()} ${name} to turn strong weeks into a reliable monthly average.`
+      : `Review goals and support ${role.toLowerCase()} ${name} with targeted coaching on service quality and sales consistency.`;
+
+    const customerServiceTip = fixedRate
+      ? `Reinforce consults, appointment timing, and add-on service suggestions to protect margins.`
+      : `Focus on clear client communication, friendly check-ins, and consistent service pacing.`;
+
+    const action = strongPerformance
+      ? 'Keep recognizing good work and look for peer learning opportunities.'
+      : inconsistentPerformance
+      ? 'Set a short-term coaching goal and review progress after the next payroll run.'
+      : 'Keep building momentum with measurable weekly improvement steps.';
+
+    return {
+      staff_id: row.staff_id,
+      full_name: name,
+      summary,
+      growthTip,
+      customerServiceTip,
+      action,
+      priority: strongPerformance ? 'low' : inconsistentPerformance ? 'high' : 'medium',
+      underMinimum,
+      avgWeekNet,
+      bestWeekNet,
+      weeksRecorded,
+    };
+  });
+}

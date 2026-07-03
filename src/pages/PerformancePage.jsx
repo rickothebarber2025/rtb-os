@@ -13,6 +13,7 @@ import {
 } from '../utils/formatters';
 import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import { isProbationStaff } from '../utils/probation';
+import { buildStaffPerformanceFeedback } from '../utils/customerIntelligence';
 
 function monthLabel(value) {
   if (!value) return 'No month selected';
@@ -37,6 +38,10 @@ export default function PerformancePage({
   );
   const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || '');
   const staffById = useMemo(() => new Map(staff.map((member) => [member.id, member])), [staff]);
+  const performanceFeedback = useMemo(
+    () => buildStaffPerformanceFeedback(performanceSummary, staff),
+    [performanceSummary, staff],
+  );
   const monthlyRows = useMemo(
     () => monthlyPerformanceSummary.filter((row) => row.month_start === selectedMonth),
     [monthlyPerformanceSummary, selectedMonth],
@@ -187,62 +192,108 @@ export default function PerformancePage({
         </div>
 
         {performanceSummary.length ? (
-          <DataTable>
-            <table>
-              <thead>
-                <tr>
-                  <th>Staff</th>
-                  <th>Role</th>
-                  <th>Commission</th>
-                  <th>Total sales</th>
-                  <th>Avg week</th>
-                  <th>Best week</th>
-                  <th>Take-home</th>
-                  <th>Weeks</th>
-                  <th>Flags</th>
-                </tr>
-              </thead>
-              <tbody>
-                {performanceSummary.map((row) => {
-                  const rosterMember = staffById.get(row.staff_id);
-                  const probation = isProbationStaff(rosterMember);
+          <>
+            <DataTable>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Staff</th>
+                    <th>Role</th>
+                    <th>Commission</th>
+                    <th>Total sales</th>
+                    <th>Avg week</th>
+                    <th>Best week</th>
+                    <th>Take-home</th>
+                    <th>Weeks</th>
+                    <th>Flags</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {performanceSummary.map((row) => {
+                    const rosterMember = staffById.get(row.staff_id);
+                    const probation = isProbationStaff(rosterMember);
 
-                  return (
-                    <tr key={row.staff_id || row.full_name}>
-                      <td className="performance-profile-cell">
-                        {probation ? (
-                          <ProbationProgressCard member={rosterMember} />
-                        ) : null}
-                        <div className="person-cell">
-                          <strong>{row.full_name}</strong>
-                          <span>{row.business_unit}</span>
-                        </div>
-                      </td>
-                      <td>{row.role || 'Staff'}</td>
-                      <td>
-                        <strong>{formatPercent(row.commission_rate)}</strong>
-                        {row.fixed_rate ? <StatusBadge tone="gold">Fixed rate</StatusBadge> : null}
-                      </td>
-                      <td>{formatCurrency(row.total_net_sales)}</td>
-                      <td>{formatCurrency(row.avg_weekly_net)}</td>
-                      <td>{formatCurrency(row.best_week_net)}</td>
-                      <td>{formatCurrency(row.total_take_home)}</td>
-                      <td>{formatNumber(row.weeks_recorded)}</td>
-                      <td>
-                        {Number(row.under_minimum_weeks || 0) > 0 ? (
-                          <StatusBadge tone="warning">
-                            {row.under_minimum_weeks} under $500
-                          </StatusBadge>
-                        ) : (
-                          <StatusBadge tone="success">On track</StatusBadge>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </DataTable>
+                    return (
+                      <tr key={row.staff_id || row.full_name}>
+                        <td className="performance-profile-cell">
+                          {probation ? (
+                            <ProbationProgressCard member={rosterMember} />
+                          ) : null}
+                          <div className="person-cell">
+                            <strong>{row.full_name}</strong>
+                            <span>{row.business_unit}</span>
+                          </div>
+                        </td>
+                        <td>{row.role || 'Staff'}</td>
+                        <td>
+                          <strong>{formatPercent(row.commission_rate)}</strong>
+                          {row.fixed_rate ? <StatusBadge tone="gold">Fixed rate</StatusBadge> : null}
+                        </td>
+                        <td>{formatCurrency(row.total_net_sales)}</td>
+                        <td>{formatCurrency(row.avg_weekly_net)}</td>
+                        <td>{formatCurrency(row.best_week_net)}</td>
+                        <td>{formatCurrency(row.total_take_home)}</td>
+                        <td>{formatNumber(row.weeks_recorded)}</td>
+                        <td>
+                          {Number(row.under_minimum_weeks || 0) > 0 ? (
+                            <StatusBadge tone="warning">
+                              {row.under_minimum_weeks} under $500
+                            </StatusBadge>
+                          ) : (
+                            <StatusBadge tone="success">On track</StatusBadge>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </DataTable>
+
+            <section className="panel full-span performance-feedback-panel">
+              <div className="section-header">
+                <div>
+                  <span>Feedback</span>
+                  <h2>Performance coaching for staff</h2>
+                </div>
+              </div>
+              <div className="feedback-cards">
+                {performanceFeedback.map((feedback) => (
+                  <article key={feedback.staff_id} className="feedback-card">
+                    <div className="feedback-card__header">
+                      <div>
+                        <strong>{feedback.full_name}</strong>
+                        <span>{formatCurrency(feedback.avgWeekNet)} avg weekly sales</span>
+                      </div>
+                      <StatusBadge
+                        tone={
+                          feedback.priority === 'high'
+                            ? 'danger'
+                            : feedback.priority === 'medium'
+                            ? 'warning'
+                            : 'success'
+                        }
+                      >
+                        {feedback.priority}
+                      </StatusBadge>
+                    </div>
+                    <p>{feedback.summary}</p>
+                    <ul>
+                      <li>
+                        <strong>Growth:</strong> {feedback.growthTip}
+                      </li>
+                      <li>
+                        <strong>Customer service:</strong> {feedback.customerServiceTip}
+                      </li>
+                      <li>
+                        <strong>Next action:</strong> {feedback.action}
+                      </li>
+                    </ul>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
         ) : (
           <EmptyState
             icon={BarChart3}

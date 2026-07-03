@@ -25,6 +25,7 @@ import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import {
   SOURCE_TYPES,
   buildConsultantRecommendations,
+  buildStaffPerformanceFeedback,
   getProjectProgress,
   getSourceTypeLabel,
 } from '../utils/customerIntelligence';
@@ -99,7 +100,7 @@ function ProjectCard({ onStatus, onTask, project }) {
   );
 }
 
-export default function AiConsultantPage({ businessUnit }) {
+export default function AiConsultantPage({ businessUnit, staff, performanceSummary }) {
   const [data, setData] = useState(null);
   const [sourceForm, setSourceForm] = useState(() => blankSource(businessUnit));
   const [loading, setLoading] = useState(true);
@@ -121,6 +122,10 @@ export default function AiConsultantPage({ businessUnit }) {
   const report = normalizeReport(data?.latestReport, fallbackReport);
   const openProjects = (data?.projects || []).filter(
     (project) => !['done', 'ignored'].includes(project.status),
+  );
+  const performanceFeedback = useMemo(
+    () => buildStaffPerformanceFeedback(performanceSummary || [], staff || []),
+    [performanceSummary, staff],
   );
 
   async function loadData() {
@@ -302,6 +307,58 @@ export default function AiConsultantPage({ businessUnit }) {
             <strong>{report.lowestCost}</strong>
           </div>
         </div>
+      </section>
+
+      <section className="panel full-span performance-feedback-panel">
+        <div className="section-header">
+          <div>
+            <span>Staff coaching</span>
+            <h2>Personalized performance feedback</h2>
+          </div>
+        </div>
+        {performanceFeedback.length ? (
+          <div className="feedback-cards">
+            {performanceFeedback.map((feedback) => (
+              <article key={feedback.staff_id} className="feedback-card">
+                <div className="feedback-card__header">
+                  <div>
+                    <strong>{feedback.full_name}</strong>
+                    <span>{formatNumber(feedback.weeksRecorded)} weeks recorded</span>
+                  </div>
+                  <StatusBadge
+                    tone={
+                      feedback.priority === 'high'
+                        ? 'danger'
+                        : feedback.priority === 'medium'
+                        ? 'warning'
+                        : 'success'
+                    }
+                  >
+                    {feedback.priority}
+                  </StatusBadge>
+                </div>
+                <p>{feedback.summary}</p>
+                <ul>
+                  <li>
+                    <strong>Growth:</strong> {feedback.growthTip}
+                  </li>
+                  <li>
+                    <strong>Customer service:</strong> {feedback.customerServiceTip}
+                  </li>
+                  <li>
+                    <strong>Next action:</strong> {feedback.action}
+                  </li>
+                </ul>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Brain}
+            title="No performance coaching yet"
+            message="Once payroll and performance data are available, RTB OS can generate coaching insights for each staff member."
+          />
+        )}
       </section>
 
       <section className="panel two-thirds">

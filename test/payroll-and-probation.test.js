@@ -67,6 +67,7 @@ import {
 } from '../src/utils/access.js';
 import {
   buildConsultantRecommendations,
+  buildStaffPerformanceFeedback,
   calculateFeedbackMetrics,
   groupRecurringIssues,
 } from '../src/utils/customerIntelligence.js';
@@ -814,4 +815,42 @@ test('AI consultant fallback prioritizes recurring projects and delegation', () 
   assert.equal(recommendation.highestRoi, 'Improve Reception Experience');
   assert.equal(recommendation.lowestCost, 'Improve Reception Experience');
   assert.equal(recommendation.delegateRecommendations.length, 1);
+});
+
+test('staff performance feedback generates coaching recommendations from performance data', () => {
+  const rows = [
+    {
+      staff_id: 'staff-1',
+      full_name: 'Ari Barber',
+      role: 'Barber',
+      under_minimum_weeks: 1,
+      avg_weekly_net: 620,
+      best_week_net: 950,
+      weeks_recorded: 4,
+      fixed_rate: false,
+    },
+    {
+      staff_id: 'staff-2',
+      full_name: 'Mia Stylist',
+      role: 'Hairstylist',
+      under_minimum_weeks: 0,
+      avg_weekly_net: 980,
+      best_week_net: 1100,
+      weeks_recorded: 5,
+      fixed_rate: true,
+    },
+  ];
+
+  const feedback = buildStaffPerformanceFeedback(rows, []);
+
+  assert.equal(feedback.length, 2);
+  assert.equal(feedback[0].staff_id, 'staff-1');
+  assert.equal(feedback[0].priority, 'high');
+  assert.match(feedback[0].summary, /needs to improve weekly consistency/i);
+  assert.match(feedback[0].growthTip, /coach barber ari barber to turn strong weeks into a reliable monthly average/i);
+
+  assert.equal(feedback[1].staff_id, 'staff-2');
+  assert.equal(feedback[1].priority, 'low');
+  assert.match(feedback[1].summary, /strong performance/i);
+  assert.match(feedback[1].customerServiceTip, /consults, appointment timing, and add-on service suggestions/i);
 });
