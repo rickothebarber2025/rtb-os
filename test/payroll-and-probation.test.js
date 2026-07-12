@@ -823,6 +823,8 @@ test('staff performance feedback generates coaching recommendations from perform
       staff_id: 'staff-1',
       full_name: 'Ari Barber',
       role: 'Barber',
+      total_net_sales: 2480,
+      total_tips: 120,
       under_minimum_weeks: 1,
       avg_weekly_net: 620,
       best_week_net: 950,
@@ -833,6 +835,8 @@ test('staff performance feedback generates coaching recommendations from perform
       staff_id: 'staff-2',
       full_name: 'Mia Stylist',
       role: 'Hairstylist',
+      total_net_sales: 4900,
+      total_tips: 760,
       under_minimum_weeks: 0,
       avg_weekly_net: 980,
       best_week_net: 1100,
@@ -846,11 +850,13 @@ test('staff performance feedback generates coaching recommendations from perform
   assert.equal(feedback.length, 2);
   assert.equal(feedback[0].staff_id, 'staff-1');
   assert.equal(feedback[0].priority, 'high');
-  assert.match(feedback[0].summary, /needs to improve weekly consistency/i);
-  assert.match(feedback[0].growthTip, /coach barber ari barber to turn strong weeks into a reliable monthly average/i);
+  assert.match(feedback[0].summary, /under the \$500 floor/i);
+  assert.match(feedback[0].growthTip, /pre-book the next cut/i);
+  assert.match(feedback[0].tipTip, /tips are only/i);
 
   assert.equal(feedback[1].staff_id, 'staff-2');
   assert.equal(feedback[1].priority, 'low');
-  assert.match(feedback[1].summary, /strong performance/i);
-  assert.match(feedback[1].customerServiceTip, /consults, appointment timing, and add-on service suggestions/i);
+  assert.match(feedback[1].summary, /strong and steady/i);
+  assert.match(feedback[1].growthTip, /maintenance schedule/i);
+  assert.match(feedback[1].tipTip, /Tips are strong/i);
 });

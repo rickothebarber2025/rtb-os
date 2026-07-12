@@ -384,6 +384,11 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
                   <li>
                     <strong>Customer service:</strong> {feedback.service_tip}
                   </li>
+                  {feedback.tip_tip ? (
+                    <li>
+                      <strong>Tips:</strong> {feedback.tip_tip}
+                    </li>
+                  ) : null}
                   <li>
                     <strong>Next action:</strong> {feedback.next_action}
                   </li>
@@ -419,6 +424,9 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
                   </li>
                   <li>
                     <strong>Customer service:</strong> {feedback.customerServiceTip}
+                  </li>
+                  <li>
+                    <strong>Tips:</strong> {feedback.tipTip}
                   </li>
                   <li>
                     <strong>Next action:</strong> {feedback.action}

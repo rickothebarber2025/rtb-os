@@ -174,6 +174,7 @@ const staffCoachingSchema = {
       summary: { type: "string" },
       growth_tip: { type: "string" },
       service_tip: { type: "string" },
+      tip_tip: { type: "string" },
       next_action: { type: "string" },
       priority: { enum: ["low", "medium", "high"], type: "string" },
     },
@@ -183,6 +184,7 @@ const staffCoachingSchema = {
       "summary",
       "growth_tip",
       "service_tip",
+      "tip_tip",
       "next_action",
       "priority",
     ],
@@ -343,7 +345,7 @@ async function structuredOpenAI(prompt: string, payload: Record<string, unknown>
 
 async function analyzeStaffCoaching(payload: Record<string, unknown>) {
   const prompt =
-    "You are RTB OS, an AI coach for salon and barbershop operations. Analyze the provided staff performance metrics and provide practical coaching for improvement, customer service, and next actions. Return only valid JSON. Use short, direct sentences and avoid repetition. If performance data is limited, summarize the highest-priority coaching opportunity for each staff member.";
+    "You are RTB OS, an AI coach for salon and barbershop operations. Analyze each staff member separately using their role, total net sales, total tips, tip rate, average week, best week, under-minimum weeks, adjusted weeks, fixed-rate status, tier, and weeks recorded. Return only valid JSON. Give different, specific coaching for each staff member. Focus on revenue growth, better tip earning behavior, customer experience, and a clear next conversation Ricko can bring up. Avoid generic repeated wording. For barbers, hairstylists, nail techs, and lash techs, tailor the advice to the actual service role. If data is limited, state the missing signal and give one baseline action.";
 
   try {
     const model = Deno.env.get("OPENAI_STAFF_COACH_MODEL") || DEFAULT_STAFF_COACH_MODEL;

@@ -286,6 +286,9 @@ export default function PerformancePage({
                         <strong>Customer service:</strong> {feedback.customerServiceTip}
                       </li>
                       <li>
+                        <strong>Tips:</strong> {feedback.tipTip}
+                      </li>
+                      <li>
                         <strong>Next action:</strong> {feedback.action}
                       </li>
                     </ul>

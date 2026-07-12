@@ -261,6 +261,52 @@ export function buildConsultantRecommendations({ feedback = [], projects = [], s
   };
 }
 
+function getRoleCoaching(role) {
+  const normalized = String(role || '').toLowerCase();
+
+  if (normalized.includes('barber')) {
+    return {
+      revenueMove: 'pre-book the next cut before the client leaves and offer beard, lineup, or enhancement upgrades when they fit the service',
+      serviceMoment: 'use a mirror check before the cape comes off and ask what they want tightened before they leave',
+      tipMove: 'explain one visible detail you cleaned up so the client understands the extra care behind the finish',
+    };
+  }
+
+  if (normalized.includes('hair')) {
+    return {
+      revenueMove: 'recommend a maintenance schedule, treatment, or style add-on tied to the client\'s hair goal',
+      serviceMoment: 'explain the plan before starting and recap home care before checkout',
+      tipMove: 'give one personalized product or heat-care tip that makes the client feel coached, not rushed',
+    };
+  }
+
+  if (normalized.includes('nail')) {
+    return {
+      revenueMove: 'offer design upgrades like French, chrome, art, repair, or longer-wear options before the color is locked in',
+      serviceMoment: 'confirm shape, length, and color in stages so fixes happen early instead of at checkout',
+      tipMove: 'create a photo-ready reveal moment and recommend aftercare such as cuticle oil or refill timing',
+    };
+  }
+
+  if (normalized.includes('lash')) {
+    return {
+      revenueMove: 'pre-book fills, recommend lash bath or aftercare, and explain when a fuller set protects retention',
+      serviceMoment: 'do a comfort check during the appointment and explain aftercare before the client sits up',
+      tipMove: 'connect the final reveal to retention tips so the client sees the value beyond the appointment',
+    };
+  }
+
+  return {
+    revenueMove: 'identify one repeatable add-on, pre-booking, or upgrade conversation that fits their service',
+    serviceMoment: 'use a clear greeting, mid-service check-in, and checkout recap every time',
+    tipMove: 'name one extra detail completed for the client so the service feels intentional',
+  };
+}
+
+function moneyLabel(value) {
+  return `$${Math.round(safeNumber(value)).toLocaleString('en-US')}`;
+}
+
 export function buildStaffPerformanceFeedback(performanceRows = [], staffMembers = []) {
   const staffById = new Map((staffMembers || []).map((member) => [member.id, member]));
 
@@ -268,49 +314,105 @@ export function buildStaffPerformanceFeedback(performanceRows = [], staffMembers
     const staff = staffById.get(row.staff_id) || {};
     const name = row.full_name || staff.full_name || 'This team member';
     const role = String(row.role || staff.role || 'Staff');
-    const underMinimum = Number(row.under_minimum_weeks || 0);
-    const adjustedWeeks = Number(row.adjusted_weeks || 0);
-    const avgWeekNet = Number(row.avg_weekly_net || 0);
-    const bestWeekNet = Number(row.best_week_net || 0);
-    const weeksRecorded = Number(row.weeks_recorded || 0);
+    const roleLabel = role.toLowerCase();
+    const roleCoaching = getRoleCoaching(role);
+    const underMinimum = safeNumber(row.under_minimum_weeks);
+    const adjustedWeeks = safeNumber(row.adjusted_weeks);
+    const avgWeekNet = safeNumber(row.avg_weekly_net);
+    const bestWeekNet = safeNumber(row.best_week_net);
+    const totalNetSales = safeNumber(row.total_net_sales);
+    const totalTips = safeNumber(row.total_tips);
+    const weeksRecorded = safeNumber(row.weeks_recorded);
     const fixedRate = Boolean(row.fixed_rate || staff.fixed_rate);
-    const strongPerformance = avgWeekNet >= 900 && underMinimum === 0;
-    const highPotential = bestWeekNet > avgWeekNet * 1.25 && weeksRecorded >= 3;
-    const inconsistentPerformance = underMinimum > 0 || avgWeekNet < 700;
+    const tipRate = totalNetSales > 0 ? round((totalTips / totalNetSales) * 100, 1) : 0;
+    const bestLift = avgWeekNet > 0 ? round(((bestWeekNet - avgWeekNet) / avgWeekNet) * 100, 0) : 0;
+    const underMinimumRate = weeksRecorded > 0 ? underMinimum / weeksRecorded : 0;
+    const strongSales = avgWeekNet >= 900 && underMinimum === 0;
+    const lowTips = totalNetSales > 0 && tipRate < 8;
+    const highTips = tipRate >= 13;
+    const highPotential = bestLift >= 25 && weeksRecorded >= 3;
+    const unstableFloor = underMinimum > 0 || avgWeekNet < 650;
 
-    const summary = strongPerformance
-      ? `${name} is showing strong performance with consistent sales and customer service.`
-      : inconsistentPerformance
-      ? `${name} needs to improve weekly consistency and customer experience.`
-      : `${name} is performing steadily and can grow further with clear coaching.`;
+    let summary;
+    let growthTip;
+    let tipTip;
+    let customerServiceTip;
+    let action;
+    let priority = 'medium';
 
-    const growthTip = strongPerformance
-      ? `Encourage ${role.toLowerCase()} ${name} to mentor newer team members and share strong service habits.`
-      : highPotential
-      ? `Coach ${role.toLowerCase()} ${name} to turn strong weeks into a reliable monthly average.`
-      : `Review goals and support ${role.toLowerCase()} ${name} with targeted coaching on service quality and sales consistency.`;
+    if (!weeksRecorded) {
+      summary = `${name} does not have enough saved performance history yet to coach from trends.`;
+      growthTip = `Have ${name} track weekly sales, tips, rebooking, and add-on conversations before judging performance.`;
+      tipTip = `Start with one tip habit: thank the client by name and explain the best care step before checkout.`;
+      customerServiceTip = `Standardize the basics: greeting, timing, consultation, service check-in, and checkout recap.`;
+      action = `Create a first baseline week for ${name}, then review the numbers before giving hard goals.`;
+    } else if (unstableFloor) {
+      priority = 'high';
+      summary = `${name} has ${underMinimum} of ${weeksRecorded} week${weeksRecorded === 1 ? '' : 's'} under the $500 floor and averages ${moneyLabel(avgWeekNet)} per week.`;
+      growthTip = `Coach ${roleLabel} ${name} to rebuild the sales floor first: ${roleCoaching.revenueMove}.`;
+      tipTip = lowTips
+        ? `Tips are only ${tipRate}% of sales. Bring up how they can make the client feel guided, not processed: ${roleCoaching.tipMove}.`
+        : `Tips are healthier than sales. Use that client trust to ask for rebooking and one appropriate upgrade each appointment.`;
+      customerServiceTip = `${roleCoaching.serviceMoment}. Then ask which part of the appointment made the client most likely to come back.`;
+      action = `Set a next-payroll goal: no under-$500 week and at least ${moneyLabel(Math.max(500, avgWeekNet + 100))} in weekly sales.`;
+    } else if (lowTips) {
+      priority = 'medium';
+      summary = `${name} is producing revenue, but tips are lagging at ${tipRate}% of sales.`;
+      growthTip = `Keep the revenue routine steady while improving the parts clients reward emotionally: listening, confidence, and checkout care.`;
+      tipTip = `Ask ${name} to practice this tip driver for one week: ${roleCoaching.tipMove}.`;
+      customerServiceTip = `${roleCoaching.serviceMoment}. This should feel natural, not like begging for tips.`;
+      action = `Review tip percentage after the next payroll run and compare it against the current ${tipRate}% baseline.`;
+    } else if (highPotential) {
+      priority = 'medium';
+      summary = `${name}'s best week was ${moneyLabel(bestWeekNet)}, about ${bestLift}% above their ${moneyLabel(avgWeekNet)} average.`;
+      growthTip = `Break down what happened in that best week: schedule quality, add-ons, repeat clients, and pre-booking. Turn the top two behaviors into a weekly checklist.`;
+      tipTip = highTips
+        ? `Tips are already strong at ${tipRate}%. Protect that by keeping the personal touches consistent while raising average ticket.`
+        : `Use the best-week client behaviors to lift tips too: ${roleCoaching.tipMove}.`;
+      customerServiceTip = `${roleCoaching.serviceMoment}. The goal is to repeat the best week, not chase random busy weeks.`;
+      action = `Bring one question to the staff meeting: what exactly made ${moneyLabel(bestWeekNet)} happen, and what will be repeated this week?`;
+    } else if (strongSales) {
+      priority = 'low';
+      summary = `${name} is strong and steady with ${moneyLabel(avgWeekNet)} average weekly sales and no under-minimum weeks.`;
+      growthTip = `Use ${name} as a model for the team, but still push one revenue layer: ${roleCoaching.revenueMove}.`;
+      tipTip = highTips
+        ? `Tips are strong at ${tipRate}%. Ask them to share the client-service habit behind that with newer staff.`
+        : `The next growth opportunity is tips. Add a more intentional finish: ${roleCoaching.tipMove}.`;
+      customerServiceTip = fixedRate
+        ? `Because they are fixed-rate, protect margin with timing, rebooking, and upgrade discipline.`
+        : `${roleCoaching.serviceMoment}. Keep the experience consistent as volume grows.`;
+      action = `Give recognition, then set a stretch goal of ${moneyLabel(avgWeekNet + 150)} average weekly sales without lowering service quality.`;
+    } else {
+      summary = `${name} is stable at ${moneyLabel(avgWeekNet)} average weekly sales, with room to grow revenue and tips.`;
+      growthTip = `Pick one measurable growth lever for ${roleLabel} ${name}: ${roleCoaching.revenueMove}.`;
+      tipTip = lowTips
+        ? `Tip rate is ${tipRate}%, so coach the emotional finish: ${roleCoaching.tipMove}.`
+        : `Keep tip habits steady and use trust to increase rebooking and add-on acceptance.`;
+      customerServiceTip = `${roleCoaching.serviceMoment}. Track whether this improves client return behavior.`;
+      action = `Set a two-week target: raise average weekly sales by ${moneyLabel(100)} or add one more upgrade/pre-booking conversation per day.`;
+    }
 
-    const customerServiceTip = fixedRate
-      ? `Reinforce consults, appointment timing, and add-on service suggestions to protect margins.`
-      : `Focus on clear client communication, friendly check-ins, and consistent service pacing.`;
-
-    const action = strongPerformance
-      ? 'Keep recognizing good work and look for peer learning opportunities.'
-      : inconsistentPerformance
-      ? 'Set a short-term coaching goal and review progress after the next payroll run.'
-      : 'Keep building momentum with measurable weekly improvement steps.';
+    if (fixedRate && unstableFloor) {
+      action += ' Fixed-rate staff still lose five commission points below $500, so make the floor non-negotiable.';
+    }
 
     return {
-      staff_id: row.staff_id,
-      full_name: name,
-      summary,
-      growthTip,
-      customerServiceTip,
       action,
-      priority: strongPerformance ? 'low' : inconsistentPerformance ? 'high' : 'medium',
-      underMinimum,
+      adjustedWeeks,
       avgWeekNet,
       bestWeekNet,
+      customerServiceTip,
+      fixedRate,
+      full_name: name,
+      growthTip,
+      priority,
+      staff_id: row.staff_id,
+      summary,
+      tipRate,
+      tipTip,
+      totalNetSales,
+      totalTips,
+      underMinimum,
       weeksRecorded,
     };
   });
