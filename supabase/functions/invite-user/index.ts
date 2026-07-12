@@ -136,7 +136,6 @@ function cleanRedirectTo(value: unknown, origin: string | null) {
       "http://localhost:5173",
       "https://rtbheadquaters.com",
       "https://www.rtbheadquaters.com",
-      "https://rtb-os.netlify.app",
     ]);
     allowedOrigins.add(new URL(fallback).origin);
 
