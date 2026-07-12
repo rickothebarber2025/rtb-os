@@ -1,0 +1,1 @@
+import{y as e}from"./constants-B_XAv2Pj.js";var t=e();function n({action:e,icon:n,message:r,title:i}){return(0,t.jsxs)(`div`,{className:`empty-state`,children:[n?(0,t.jsx)(n,{size:30}):null,(0,t.jsx)(`h3`,{children:i}),(0,t.jsx)(`p`,{children:r}),e]})}export{n as t};

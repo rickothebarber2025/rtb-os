@@ -1,0 +1,1 @@
+import{y as e}from"./constants-B_XAv2Pj.js";var t=e();function n({children:e,className:n=``}){return(0,t.jsx)(`div`,{className:`table-wrap ${n}`,children:e})}export{n as t};

@@ -1,0 +1,1 @@
+import{y as e}from"./constants-B_XAv2Pj.js";var t=e(),n={danger:`badge danger`,default:`badge`,gold:`badge gold`,muted:`badge muted`,success:`badge success`,warning:`badge warning`};function r({children:e,tone:r=`default`}){return(0,t.jsx)(`span`,{className:n[r]||n.default,children:e})}export{r as t};
