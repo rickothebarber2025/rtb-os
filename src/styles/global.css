@@ -4824,6 +4824,273 @@ tbody tr:hover {
   border-top-color: rgba(255, 255, 255, 0.12);
 }
 
+/* Motion polish */
+@keyframes rtbPageIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rtbSideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes rtbTopIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rtbButtonSheen {
+  from {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+
+  to {
+    transform: translateX(180%) skewX(-18deg);
+  }
+}
+
+@keyframes rtbBarFlow {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 36px 0;
+  }
+}
+
+@keyframes rtbStatusGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(241, 199, 104, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 18px rgba(241, 199, 104, 0.16);
+  }
+}
+
+.sidebar {
+  animation: rtbSideIn 360ms ease both;
+}
+
+.topbar,
+.mobile-tabbar {
+  animation: rtbTopIn 340ms ease both;
+}
+
+.auth-brand > *,
+.auth-card,
+.content > *,
+.survey-shell,
+.staff-hub-page {
+  animation: rtbPageIn 420ms ease both;
+}
+
+.auth-card {
+  animation-delay: 90ms;
+}
+
+.metric-card:nth-child(2),
+.workspace-card:nth-child(2),
+.action-card:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.metric-card:nth-child(3),
+.workspace-card:nth-child(3),
+.action-card:nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.metric-card:nth-child(4),
+.workspace-card:nth-child(4),
+.action-card:nth-child(4) {
+  animation-delay: 135ms;
+}
+
+.nav-item,
+.mobile-tabbar__item,
+.business-selector,
+.user-chip,
+.role-pill,
+.badge,
+.run-card,
+.workspace-card,
+.action-card,
+.staff-insight-card,
+.ops-checklist-card,
+.ops-form-card,
+.ops-hire-card,
+.ops-tier-card,
+.probation-card,
+.certificate-preview,
+.monthly-ranking div,
+.staff-hub-alert-row {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease;
+}
+
+.panel,
+.hero-panel,
+.metric-card,
+.auth-card,
+.access-gate {
+  transition:
+    transform 200ms ease,
+    border-color 200ms ease,
+    background 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.nav-item:hover {
+  transform: translateX(3px);
+}
+
+.nav-item.active {
+  box-shadow: inset 3px 0 0 currentColor;
+}
+
+.mobile-tabbar__item:hover,
+.mobile-tabbar__item.active {
+  transform: translateY(-2px);
+}
+
+.panel:hover,
+.metric-card:hover,
+.workspace-card:hover,
+.action-card:hover,
+.run-card:hover,
+.staff-insight-card:hover,
+.ops-checklist-card:hover,
+.ops-form-card:hover,
+.ops-hire-card:hover,
+.ops-tier-card:hover,
+.probation-card:hover,
+.certificate-preview:hover,
+.staff-hub-alert-row:hover {
+  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.32);
+  transform: translateY(-2px);
+}
+
+.primary-button,
+.danger-button,
+.secondary-button,
+.ghost-button,
+.icon-button {
+  overflow: hidden;
+  position: relative;
+}
+
+.primary-button::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+  content: "";
+  inset: -30% auto -30% 0;
+  position: absolute;
+  width: 42%;
+  transform: translateX(-120%) skewX(-18deg);
+}
+
+.primary-button:hover::after {
+  animation: rtbButtonSheen 760ms ease;
+}
+
+.secondary-button:active,
+.ghost-button:active,
+.danger-button:active,
+.icon-button:active,
+.primary-button:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.probation-progress div,
+.ops-progress span,
+.project-progress span {
+  background-size: 36px 36px;
+  position: relative;
+}
+
+.probation-progress div::after,
+.ops-progress span::after,
+.project-progress span::after {
+  animation: rtbBarFlow 1.2s linear infinite;
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.18) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.18) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 36px 36px;
+  border-radius: inherit;
+  content: "";
+  inset: 0;
+  opacity: 0.38;
+  position: absolute;
+}
+
+.badge.success,
+.badge.warning,
+.badge.danger,
+.role-pill.admin,
+.user-chip,
+.alert.success,
+.alert.warning,
+.alert.danger {
+  animation: rtbStatusGlow 4.4s ease-in-out infinite;
+}
+
+.table-wrap tbody tr,
+.monthly-ranking div {
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.table-wrap tbody tr:hover,
+.monthly-ranking div:hover {
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}
+
 @media (max-width: 700px) {
   .auth-page {
     align-items: flex-start;
