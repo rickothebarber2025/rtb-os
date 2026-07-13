@@ -94,22 +94,23 @@ export default function DashboardPage({
     staff,
   });
   const actionSummary = getActionCenterSummary(actionItems);
-  const topActions = actionItems.slice(0, 4);
+  const topActions = actionItems.slice(0, 3);
   const workspace = buildRoleWorkspace(accessProfile, navItems, businessUnit);
 
   return (
-    <div className="page-grid">
-      <section className="hero-panel">
+    <div className="page-grid dashboard-page">
+      <section className="hero-panel dashboard-hero">
         <div className="hero-brand-lockup">
           <div className="hero-brand-logo">
             <img src={businessProfile.logo_url} alt="" />
           </div>
           <div>
-            <h2>{businessUnit?.name || 'RTB'} operations snapshot</h2>
+            <span className="eyebrow">{allBusinessesView ? 'Combined view' : businessProfile.business_type}</span>
+            <h2>{businessUnit?.name || 'RTB OS'}</h2>
             <p>
               {allBusinessesView
-                ? 'Combined owner view across RTB Lounge and RTB Beauty Lounge.'
-                : `Live roster, payroll, performance, booth rent, and ${businessProfile.booking_platform} activity for this business.`}
+                ? 'Reports and rankings from both businesses.'
+                : `${businessProfile.booking_platform || 'Appointments'} and ${businessProfile.pos_platform || 'POS'} operations.`}
             </p>
           </div>
         </div>
@@ -124,7 +125,7 @@ export default function DashboardPage({
         <div className="section-header">
           <div>
             <span>{workspace.roleTitle}</span>
-            <h2>{workspace.title}</h2>
+            <h2>Quick actions</h2>
           </div>
           <StatusBadge tone={workspace.editableModules.length ? 'gold' : 'muted'}>
             {workspace.editableModules.length
@@ -132,10 +133,9 @@ export default function DashboardPage({
               : 'View only'}
           </StatusBadge>
         </div>
-        <p className="subtle-text">{workspace.description}</p>
         <div className="workspace-grid">
           <div className="workspace-card">
-            <span>Start here</span>
+            <span>Open</span>
             <div className="workspace-actions">
               {workspace.focusPages.map((page) => (
                 <button
@@ -150,27 +150,26 @@ export default function DashboardPage({
             </div>
           </div>
           <div className="workspace-card">
-            <span>Onboarding</span>
-            <div className="workspace-checklist">
+            <span>Status</span>
+            <div className="workspace-status-pills">
               {workspace.onboarding.map((item) => (
-                <div className={item.complete ? 'complete' : 'open'} key={item.label}>
+                <div className={item.complete ? 'complete' : 'open'} key={item.label} title={item.detail}>
                   <CheckCircle2 size={16} />
                   <strong>{item.label}</strong>
-                  <small>{item.detail}</small>
                 </div>
               ))}
             </div>
           </div>
           <div className="workspace-card">
-            <span>Responsibilities</span>
+            <span>Role</span>
             {workspace.responsibilities.length ? (
-              <ul className="compact-list">
-                {workspace.responsibilities.slice(0, 4).map((item) => (
+              <ul className="compact-list workspace-mini-list">
+                {workspace.responsibilities.slice(0, 3).map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
             ) : (
-              <p className="subtle-text">No responsibilities assigned yet.</p>
+              <p className="subtle-text">No role notes yet.</p>
             )}
           </div>
         </div>
@@ -216,8 +215,8 @@ export default function DashboardPage({
       <section className="panel full-span">
         <div className="section-header">
           <div>
-            <span>{businessProfile.business_type}</span>
-            <h2>Business setup</h2>
+            <span>Setup</span>
+            <h2>Business profile</h2>
           </div>
         </div>
         <div className="snapshot-grid">
@@ -237,14 +236,13 @@ export default function DashboardPage({
             <strong>{businessProfile.instagram_format || 'Manual'}</strong>
           </div>
         </div>
-        <p className="subtle-text">{businessProfile.import_source}</p>
       </section>
 
       <section className="panel full-span">
         <div className="section-header">
           <div>
             <span>Operations</span>
-            <h2>Readiness checks</h2>
+            <h2>Checks</h2>
           </div>
         </div>
         <div className="operations-grid">
@@ -272,7 +270,7 @@ export default function DashboardPage({
         <div className="section-header">
           <div>
             <span>Action Center</span>
-            <h2>Needs attention</h2>
+            <h2>Attention</h2>
           </div>
           <button className="ghost-button" type="button" onClick={() => setActivePage('action-center')}>
             <BellRing size={16} />

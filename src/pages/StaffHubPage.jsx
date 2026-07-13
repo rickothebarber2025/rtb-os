@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   BadgeCheck,
   Bell,
@@ -13,6 +13,7 @@ import {
   Clock3,
   FileText,
   Megaphone,
+  Palette,
   ShieldCheck,
   TrendingUp,
   UserRound,
@@ -29,6 +30,7 @@ import {
   decideTimeOffRequest,
   markStaffAnnouncementRead,
   saveContentSubmission,
+  saveStaff,
   saveStaffAnnouncement,
   saveStaffAvailability,
   saveStaffNewsletter,
@@ -62,6 +64,48 @@ const EMPTY_STAFF_HUB = {
 const ANNOUNCEMENT_CATEGORIES = ['policy', 'schedule', 'promotion', 'training', 'event', 'reminder'];
 const TASK_CATEGORIES = ['cleaning', 'opening', 'closing', 'content', 'restocking', 'client_followup', 'general'];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const PROFILE_THEME_OPTIONS = [
+  { id: 'business', label: 'Business', description: 'Use the selected business style.' },
+  { id: 'rose', label: 'Rose', description: 'Soft salon pink.' },
+  { id: 'gold', label: 'Gold', description: 'Classic RTB gold.' },
+  { id: 'sage', label: 'Sage', description: 'Calm clean green.' },
+  { id: 'sky', label: 'Sky', description: 'Fresh blue.' },
+];
+
+function profileThemeKey(user, staffProfile) {
+  return `rtb_staff_hub_theme_${staffProfile?.id || user?.email || 'guest'}`;
+}
+
+function readSavedTheme(user, staffProfile) {
+  if (typeof window === 'undefined') return 'business';
+  try {
+    return window.localStorage.getItem(profileThemeKey(user, staffProfile)) || 'business';
+  } catch {
+    return 'business';
+  }
+}
+
+function saveThemePreference(user, staffProfile, theme) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(profileThemeKey(user, staffProfile), theme);
+  } catch {
+    // Local personalization should never block the staff portal.
+  }
+}
+
+function createProfileForm(staffProfile, user) {
+  return {
+    bio: staffProfile?.bio || '',
+    full_name: staffProfile?.full_name || user?.user_metadata?.full_name || '',
+    phone: staffProfile?.phone || '',
+    photo_url: staffProfile?.photo_url || user?.user_metadata?.avatar_url || '',
+    services_text: Array.isArray(staffProfile?.services_offered)
+      ? staffProfile.services_offered.join(', ')
+      : '',
+    social_handle: staffProfile?.social_handle || staffProfile?.instagram_handle || '',
+  };
+}
 
 function normalize(value) {
   return String(value || '').trim().toLowerCase();
@@ -276,6 +320,8 @@ export default function StaffHubPage({
     media_type: 'idea',
     media_url: '',
   });
+  const [profileForm, setProfileForm] = useState(() => createProfileForm(null, user));
+  const [profileTheme, setProfileTheme] = useState('business');
   const staffProfile = useMemo(
     () => findStaffProfile({ accessProfile, staff, user }),
     [accessProfile, staff, user],
@@ -284,6 +330,10 @@ export default function StaffHubPage({
   const canManageHub = ownerView || canManageOperations(accessProfile);
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const businessProfile = getBusinessProfile(businessUnit);
+  useEffect(() => {
+    setProfileForm(createProfileForm(staffProfile, user));
+    setProfileTheme(readSavedTheme(user, staffProfile));
+  }, [staffProfile, user]);
   const activeStaffCount = staff.filter((member) => member.active).length;
   const allowedPageIds = useMemo(() => new Set(navItems.map((item) => item.id)), [navItems]);
   const businessCards = useMemo(() => {
@@ -349,6 +399,8 @@ export default function StaffHubPage({
   const portalMode = staffProfile ? 'My staff portal' : ownerView ? 'Staff portal preview' : 'Staff access setup needed';
   const profilePhoto = getProfilePhoto(staffProfile, user);
   const firstName = String(profileName).split(/\s+/)[0] || 'there';
+  const businessThemeClass = businessProfile.portal_theme || 'theme-combined';
+  const profileThemeClass = `tone-${profileTheme}`;
   const quickTools = [
     {
       description: 'Role, tier, expectations, and probation status',
@@ -457,6 +509,15 @@ export default function StaffHubPage({
     setContentForm((current) => ({ ...current, [field]: value }));
   }
 
+  function updateProfileForm(field, value) {
+    setProfileForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function chooseProfileTheme(theme) {
+    setProfileTheme(theme);
+    saveThemePreference(user, staffProfile, theme);
+  }
+
   async function submitAnnouncement(event) {
     event.preventDefault();
     await runHubAction(
@@ -562,6 +623,29 @@ export default function StaffHubPage({
     setContentForm({ caption: '', content_type: 'work', media_type: 'idea', media_url: '' });
   }
 
+  async function submitProfile(event) {
+    event.preventDefault();
+    if (!staffProfile) return;
+    const services = profileForm.services_text
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    await runHubAction(
+      'profile',
+      () =>
+        saveStaff({
+          ...staffProfile,
+          bio: profileForm.bio,
+          full_name: profileForm.full_name || staffProfile.full_name,
+          phone: profileForm.phone,
+          photo_url: profileForm.photo_url,
+          services_offered: services,
+          social_handle: profileForm.social_handle,
+        }),
+      'Profile updated.',
+    );
+  }
+
   async function decideTimeOff(recordId, status) {
     await runHubAction(
       `time-off-${recordId}`,
@@ -579,7 +663,7 @@ export default function StaffHubPage({
   }
 
   return (
-    <div className="page-grid staff-hub-page">
+    <div className={`page-grid staff-hub-page ${businessThemeClass} ${profileThemeClass}`}>
       <section className="hero-panel full-span staff-hub-hero">
         <div className="staff-hub-brand-lockup">
           <div className="staff-hub-logo-stack">
@@ -1512,57 +1596,127 @@ export default function StaffHubPage({
             <div className="section-header">
               <div>
                 <span>Profile</span>
-                <h2>My staff record</h2>
+                <h2>Profile & style</h2>
               </div>
-              <CalendarDays size={20} />
+              <Palette size={20} />
             </div>
-            <div className="staff-hub-profile-grid compact">
-              <div>
-                <span>Name</span>
-                <strong>{staffProfile?.full_name || accessProfile?.full_name || 'Not set'}</strong>
+            <div className="staff-hub-profile-editor">
+              <article className="staff-hub-profile-card">
+                <div className="staff-hub-profile-photo">
+                  {profileForm.photo_url ? <img src={profileForm.photo_url} alt="" /> : <span>{initials(profileForm.full_name)}</span>}
+                </div>
+                <div>
+                  <strong>{profileForm.full_name || staffProfile?.full_name || 'Staff profile'}</strong>
+                  <span>{staffProfile?.role || accessProfile?.role || 'Staff'}</span>
+                  <small>{businessUnit?.name || staffProfile?.primary_business_name || 'Assigned business'}</small>
+                </div>
+                <p>{profileForm.bio || 'Add a short bio so the profile feels personal.'}</p>
+                <div className="staff-hub-chip-row">
+                  {(profileForm.services_text || '')
+                    .split(',')
+                    .map((service) => service.trim())
+                    .filter(Boolean)
+                    .slice(0, 4)
+                    .map((service) => (
+                      <StatusBadge key={service} tone="muted">{service}</StatusBadge>
+                    ))}
+                </div>
+              </article>
+
+              <div className="staff-hub-style-panel">
+                <div className="section-header compact">
+                  <div>
+                    <span>Portal vibe</span>
+                    <h3>Choose your color</h3>
+                  </div>
+                </div>
+                <div className="staff-hub-theme-options">
+                  {PROFILE_THEME_OPTIONS.map((option) => (
+                    <button
+                      className={profileTheme === option.id ? 'active' : ''}
+                      key={option.id}
+                      onClick={() => chooseProfileTheme(option.id)}
+                      type="button"
+                    >
+                      <span className={`theme-dot theme-dot--${option.id}`} />
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <span>Role</span>
-                <strong>{staffProfile?.role || accessProfile?.role || 'Staff'}</strong>
-              </div>
-              <div>
-                <span>Start date</span>
-                <strong>{formatDate(staffProfile?.start_date)}</strong>
-              </div>
-              <div>
-                <span>Phone</span>
-                <strong>{staffProfile?.phone || 'Not set'}</strong>
-              </div>
-              <div>
-                <span>Instagram</span>
-                <strong>{staffProfile?.instagram_handle || staffProfile?.social_handle || 'Not set'}</strong>
-              </div>
-              <div>
-                <span>Probation</span>
-                <strong>
-                  {staffProfile?.tier === 'probation'
-                    ? staffProfile?.probation_end_date
-                      ? `Ends ${formatDate(staffProfile.probation_end_date)}`
-                      : 'Probation tier'
-                    : 'Not on probation'}
-                </strong>
-              </div>
-              <div>
-                <span>Services</span>
-                <strong>
-                  {Array.isArray(staffProfile?.services_offered) && staffProfile.services_offered.length
-                    ? staffProfile.services_offered.join(', ')
-                    : 'Not set'}
-                </strong>
-              </div>
-              <div>
-                <span>Booking profile</span>
-                <strong>{staffProfile?.booking_platform_profile || 'Not set'}</strong>
-              </div>
-              <div>
-                <span>Bio</span>
-                <strong>{staffProfile?.bio || 'Not set'}</strong>
-              </div>
+
+              <form className="staff-hub-form staff-hub-profile-form" onSubmit={submitProfile}>
+                <div className="form-grid compact">
+                  <label className="field">
+                    <span>Display name</span>
+                    <input
+                      disabled={!staffProfile}
+                      value={profileForm.full_name}
+                      onChange={(event) => updateProfileForm('full_name', event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Phone</span>
+                    <input
+                      disabled={!staffProfile}
+                      value={profileForm.phone}
+                      onChange={(event) => updateProfileForm('phone', event.target.value)}
+                      placeholder="Staff phone"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Instagram / social</span>
+                    <input
+                      disabled={!staffProfile}
+                      value={profileForm.social_handle}
+                      onChange={(event) => updateProfileForm('social_handle', event.target.value)}
+                      placeholder="@handle"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Photo URL</span>
+                    <input
+                      disabled={!staffProfile}
+                      value={profileForm.photo_url}
+                      onChange={(event) => updateProfileForm('photo_url', event.target.value)}
+                      placeholder="https://..."
+                    />
+                  </label>
+                </div>
+                <label className="field">
+                  <span>Services</span>
+                  <input
+                    disabled={!staffProfile}
+                    value={profileForm.services_text}
+                    onChange={(event) => updateProfileForm('services_text', event.target.value)}
+                    placeholder="Haircut, beard trim, lashes, nails"
+                  />
+                </label>
+                <label className="field">
+                  <span>Bio</span>
+                  <textarea
+                    disabled={!staffProfile}
+                    rows={3}
+                    value={profileForm.bio}
+                    onChange={(event) => updateProfileForm('bio', event.target.value)}
+                    placeholder="A short friendly intro for your staff profile."
+                  />
+                </label>
+                <div className="staff-hub-profile-meta">
+                  <span>Start: {formatDate(staffProfile?.start_date)}</span>
+                  <span>
+                    {staffProfile?.tier === 'probation'
+                      ? staffProfile?.probation_end_date
+                        ? `Probation ends ${formatDate(staffProfile.probation_end_date)}`
+                        : 'Probation tier'
+                      : 'Standard profile'}
+                  </span>
+                </div>
+                <button className="primary-button" disabled={!staffProfile || savingHubAction === 'profile'} type="submit">
+                  Save profile
+                </button>
+              </form>
             </div>
           </section>
         </>

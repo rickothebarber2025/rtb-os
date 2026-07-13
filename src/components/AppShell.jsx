@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import MobileTabBar from './MobileTabBar';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import { getBusinessProfile } from '../utils/businessProfiles';
 
 export default function AppShell({
   activePage,
@@ -22,9 +23,11 @@ export default function AppShell({
     () => navItems.find((item) => item.id === activePage)?.label || 'Dashboard',
     [activePage, navItems],
   );
+  const selectedBusiness = businessOptions?.find((unit) => unit.id === selectedBusinessUnitId);
+  const shellTheme = getBusinessProfile(selectedBusiness).portal_theme || 'theme-combined';
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${shellTheme}`}>
       <Sidebar
         activePage={activePage}
         businessOptions={businessOptions}

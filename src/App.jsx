@@ -290,11 +290,8 @@ export default function App() {
     >
       {isAllBusinessesId(selectedBusinessUnitId) ? (
         <div className="alert warning global-alert">
-          <strong>All Businesses view is on.</strong>
-          <span>
-            Reports and rankings are intentionally combined. Select one business before adding
-            staff, booth rent, imports, or payroll.
-          </span>
+          <strong>All Businesses view</strong>
+          <span>Combined reporting. Choose one business before editing records.</span>
         </div>
       ) : null}
       {probationBanner ? <div className="alert success global-alert">{probationBanner}</div> : null}

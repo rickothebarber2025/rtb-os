@@ -15,6 +15,8 @@ export const BUSINESS_STAFF_ROLES = {
 
 export const DEFAULT_BUSINESS_PROFILES = {
   'RTB Lounge': {
+    accent_color: '#d6a84f',
+    accent_soft: 'rgba(214, 168, 79, 0.14)',
     business_name: 'RTB Lounge',
     business_type: 'Barbershop',
     booking_platform: 'Booksy',
@@ -29,6 +31,8 @@ export const DEFAULT_BUSINESS_PROFILES = {
     instagram_format: 'firstname.rtb_lounge',
     instagram_formats: ['firstname.rtb_lounge', 'firstnamelastname'],
     logo_url: '/assets/rtb-lounge-logo.png',
+    portal_theme: 'theme-lounge',
+    portal_tone: 'clean',
     payroll_rules: {
       appointment_source: 'Booksy',
       pos_source: 'Square POS',
@@ -38,6 +42,8 @@ export const DEFAULT_BUSINESS_PROFILES = {
     staff_roles: BUSINESS_STAFF_ROLES['RTB Lounge'],
   },
   'RTB Beauty Lounge': {
+    accent_color: '#f0a8c8',
+    accent_soft: 'rgba(240, 168, 200, 0.16)',
     business_name: 'RTB Beauty Lounge',
     business_type: 'Beauty Services',
     booking_platform: 'Square Appointments',
@@ -52,6 +58,8 @@ export const DEFAULT_BUSINESS_PROFILES = {
     instagram_format: 'firstname.rtb_lounge',
     instagram_formats: ['firstname.rtb_lounge', 'firstnamelastname'],
     logo_url: '/assets/rtb-beauty-logo.png',
+    portal_theme: 'theme-beauty',
+    portal_tone: 'soft',
     payroll_rules: {
       appointment_source: 'Square Appointments',
       pos_source: 'Square POS',
@@ -63,6 +71,8 @@ export const DEFAULT_BUSINESS_PROFILES = {
 };
 
 export const ALL_BUSINESSES_UNIT = {
+  accent_color: '#d6a84f',
+  accent_soft: 'rgba(214, 168, 79, 0.14)',
   booking_platform: 'Booksy + Square Appointments',
   business_type: 'Combined operations',
   id: ALL_BUSINESSES_ID,
@@ -71,6 +81,8 @@ export const ALL_BUSINESSES_UNIT = {
   isAllBusinesses: true,
   logo_url: '/assets/rtb-combined-logo.png',
   name: 'All Businesses',
+  portal_theme: 'theme-combined',
+  portal_tone: 'balanced',
   pos_platform: 'Square',
 };
 
@@ -114,12 +126,16 @@ export function getBusinessProfile(businessUnit, overrides = null) {
     profiles[businessUnit?.name] || {
       business_name: businessUnit?.name || 'RTB',
       business_type: 'Operations',
+      accent_color: '#d6a84f',
+      accent_soft: 'rgba(214, 168, 79, 0.14)',
       booking_platform: 'Manual',
       default_commission_rules: DEFAULT_BUSINESS_PROFILES['RTB Lounge'].default_commission_rules,
       import_source: 'Manual import',
       instagram_format: 'firstname.rtb_lounge',
       instagram_formats: ['firstname.rtb_lounge', 'firstnamelastname'],
       logo_url: '/assets/rtb-combined-logo.png',
+      portal_theme: 'theme-combined',
+      portal_tone: 'balanced',
       payroll_rules: {
         appointment_source: 'Manual',
         pos_source: 'Square POS',
