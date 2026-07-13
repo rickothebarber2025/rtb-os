@@ -1747,6 +1747,148 @@ select {
   margin-top: 0.1rem;
 }
 
+.staff-hub-section-stack {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.staff-hub-preview-list__header span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.staff-hub-form {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.82rem;
+}
+
+.staff-hub-form .primary-button {
+  justify-self: start;
+}
+
+.checkbox-line {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 0.45rem;
+}
+
+.checkbox-line input {
+  accent-color: var(--gold);
+  height: 16px;
+  width: 16px;
+}
+
+.staff-hub-feed,
+.staff-hub-list {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.staff-hub-feed-card,
+.staff-hub-list-row {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.78rem;
+}
+
+.staff-hub-feed-card.read {
+  opacity: 0.74;
+}
+
+.staff-hub-feed-card > div,
+.staff-hub-list-row {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.staff-hub-feed-card > div,
+.staff-hub-list-row,
+.staff-hub-inline-actions,
+.staff-hub-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.staff-hub-feed-card h3,
+.staff-hub-newsletter h3 {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.staff-hub-feed-card p,
+.staff-hub-newsletter p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.45;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.staff-hub-feed-card small,
+.staff-hub-list-row small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.staff-hub-split-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 1rem 0;
+}
+
+.section-header.compact {
+  margin-bottom: 0;
+}
+
+.section-header.compact h3 {
+  font-size: 1rem;
+}
+
+.staff-hub-list-row {
+  justify-content: space-between;
+}
+
+.staff-hub-list-row > div:first-child {
+  display: grid;
+  gap: 0.12rem;
+  min-width: min(100%, 240px);
+}
+
+.staff-hub-list-row.overdue {
+  border-color: rgba(239, 90, 90, 0.42);
+}
+
+.staff-hub-inline-actions {
+  align-items: center;
+}
+
+.staff-hub-chip-row {
+  margin-top: 0.75rem;
+}
+
+.staff-hub-newsletter {
+  display: grid;
+  gap: 0.5rem;
+}
+
 .staff-hub-overview-panel,
 .staff-hub-assignment-panel {
   align-content: start;
@@ -3423,7 +3565,8 @@ select {
   .staff-hub-business-grid,
   .staff-hub-more-grid,
   .staff-hub-performance-grid,
-  .staff-hub-profile-grid {
+  .staff-hub-profile-grid,
+  .staff-hub-split-grid {
     grid-template-columns: 1fr;
   }
 

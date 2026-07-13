@@ -6,6 +6,7 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   Camera,
+  Check,
   ChevronRight,
   CircleDollarSign,
   ClipboardCheck,
@@ -16,12 +17,26 @@ import {
   TrendingUp,
   UserRound,
   WalletCards,
+  X,
 } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import { isOwnerProfile } from '../lib/permissions';
+import {
+  decideContentSubmission,
+  decideTimeOffRequest,
+  markStaffAnnouncementRead,
+  saveContentSubmission,
+  saveStaffAnnouncement,
+  saveStaffAvailability,
+  saveStaffNewsletter,
+  saveStaffTask,
+  saveTimeOffRequest,
+  updateStaffTaskStatus,
+} from '../services/rtbService';
+import { canManageOperations } from '../utils/access';
 import { normalizeActionCenterState } from '../utils/actionCenter';
 import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from '../utils/formatters';
@@ -33,6 +48,20 @@ const TABS = [
   { id: 'schedule', label: 'Schedule' },
   { id: 'more', label: 'More' },
 ];
+
+const EMPTY_STAFF_HUB = {
+  announcementReads: [],
+  announcements: [],
+  availability: [],
+  contentSubmissions: [],
+  newsletters: [],
+  tasks: [],
+  timeOffRequests: [],
+};
+
+const ANNOUNCEMENT_CATEGORIES = ['policy', 'schedule', 'promotion', 'training', 'event', 'reminder'];
+const TASK_CATEGORIES = ['cleaning', 'opening', 'closing', 'content', 'restocking', 'client_followup', 'general'];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function normalize(value) {
   return String(value || '').trim().toLowerCase();
@@ -165,6 +194,26 @@ function getStaffActionItems(actionCenter, staffProfile, ownerView) {
   return [...documents, ...warnings].slice(0, 4);
 }
 
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function weekStartKey() {
+  const date = new Date();
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  date.setDate(diff);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatCategory(value) {
+  return String(value || 'general').replace(/_/g, ' ');
+}
+
+function isOverdueTask(task) {
+  return task.status !== 'completed' && task.due_date && task.due_date < todayKey();
+}
+
 export default function StaffHubPage({
   actionCenter,
   accessProfile,
@@ -173,18 +222,66 @@ export default function StaffHubPage({
   masterDashboard,
   masterDashboardUpdatedAt,
   navItems,
+  onRefresh,
   payrollRuns,
   performanceSummary,
   setActivePage,
   staff,
+  staffHub = EMPTY_STAFF_HUB,
   user,
 }) {
   const [activeTab, setActiveTab] = useState('home');
+  const [hubMessage, setHubMessage] = useState('');
+  const [hubError, setHubError] = useState('');
+  const [savingHubAction, setSavingHubAction] = useState('');
+  const [announcementForm, setAnnouncementForm] = useState({
+    body: '',
+    category: 'reminder',
+    pinned: false,
+    title: '',
+  });
+  const [availabilityForm, setAvailabilityForm] = useState({
+    day_of_week: 1,
+    end_time: '17:00',
+    note: '',
+    start_time: '09:00',
+    unavailable: false,
+  });
+  const [timeOffForm, setTimeOffForm] = useState({
+    end_date: '',
+    reason: '',
+    start_date: '',
+  });
+  const [taskForm, setTaskForm] = useState({
+    category: 'general',
+    details: '',
+    due_date: '',
+    staff_id: '',
+    title: '',
+  });
+  const [newsletterForm, setNewsletterForm] = useState({
+    client_feedback: '',
+    improvements_needed: '',
+    new_services_promos: '',
+    published: true,
+    reminders: '',
+    top_performer_id: '',
+    top_performer_note: '',
+    week_start: weekStartKey(),
+    weekly_goals: '',
+  });
+  const [contentForm, setContentForm] = useState({
+    caption: '',
+    content_type: 'work',
+    media_type: 'idea',
+    media_url: '',
+  });
   const staffProfile = useMemo(
     () => findStaffProfile({ accessProfile, staff, user }),
     [accessProfile, staff, user],
   );
   const ownerView = isOwnerProfile(accessProfile);
+  const canManageHub = ownerView || canManageOperations(accessProfile);
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const businessProfile = getBusinessProfile(businessUnit);
   const activeStaffCount = staff.filter((member) => member.active).length;
@@ -225,6 +322,22 @@ export default function StaffHubPage({
   const actionItems = useMemo(
     () => getStaffActionItems(actionCenter, staffProfile, ownerView),
     [actionCenter, ownerView, staffProfile],
+  );
+  const hubRecords = {
+    ...EMPTY_STAFF_HUB,
+    ...(staffHub || {}),
+  };
+  const readAnnouncementIds = useMemo(
+    () => new Set(hubRecords.announcementReads.map((read) => read.announcement_id)),
+    [hubRecords.announcementReads],
+  );
+  const visibleAnnouncements = hubRecords.announcements.slice(0, 8);
+  const latestNewsletter = hubRecords.newsletters[0] || null;
+  const pendingTasks = hubRecords.tasks.filter((task) => task.status !== 'completed').slice(0, 8);
+  const completedTasks = hubRecords.tasks.filter((task) => task.status === 'completed').slice(0, 5);
+  const contentSubmissions = hubRecords.contentSubmissions.slice(0, 12);
+  const pendingContentSubmissions = hubRecords.contentSubmissions.filter(
+    (item) => item.status === 'pending',
   );
   const totalTakeHome = sum(ownEntries, 'take_home');
   const totalTips = sum(ownEntries, 'tips');
@@ -301,8 +414,168 @@ export default function StaffHubPage({
     },
   ];
 
+  async function runHubAction(actionKey, action, successMessage) {
+    setHubError('');
+    setHubMessage('');
+    setSavingHubAction(actionKey);
+    try {
+      await action();
+      setHubMessage(successMessage);
+      await onRefresh?.();
+    } catch (err) {
+      setHubError(err.message || 'Unable to save Staff Hub update.');
+    } finally {
+      setSavingHubAction('');
+    }
+  }
+
   function openPage(pageId) {
     if (canOpen(pageId)) setActivePage(pageId);
+  }
+
+  function updateAnnouncementForm(field, value) {
+    setAnnouncementForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateAvailabilityForm(field, value) {
+    setAvailabilityForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateTimeOffForm(field, value) {
+    setTimeOffForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateTaskForm(field, value) {
+    setTaskForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateNewsletterForm(field, value) {
+    setNewsletterForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateContentForm(field, value) {
+    setContentForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function submitAnnouncement(event) {
+    event.preventDefault();
+    await runHubAction(
+      'announcement',
+      () =>
+        saveStaffAnnouncement({
+          ...announcementForm,
+          business_unit_id: allBusinessesView ? null : businessUnit?.id,
+        }),
+      'Announcement posted.',
+    );
+    setAnnouncementForm({ body: '', category: 'reminder', pinned: false, title: '' });
+  }
+
+  async function markAnnouncementRead(announcementId) {
+    if (!staffProfile) return;
+    await runHubAction(
+      `read-${announcementId}`,
+      () => markStaffAnnouncementRead(announcementId, staffProfile.id),
+      'Update marked as read.',
+    );
+  }
+
+  async function submitAvailability(event) {
+    event.preventDefault();
+    if (!staffProfile) return;
+    await runHubAction(
+      'availability',
+      () =>
+        saveStaffAvailability({
+          ...availabilityForm,
+          business_unit_id: staffProfile.business_unit_id || businessUnit?.id,
+          staff_id: staffProfile.id,
+        }),
+      'Availability saved.',
+    );
+  }
+
+  async function submitTimeOff(event) {
+    event.preventDefault();
+    if (!staffProfile) return;
+    await runHubAction(
+      'time-off',
+      () =>
+        saveTimeOffRequest({
+          ...timeOffForm,
+          business_unit_id: staffProfile.business_unit_id || businessUnit?.id,
+          staff_id: staffProfile.id,
+        }),
+      'Time-off request sent.',
+    );
+    setTimeOffForm({ end_date: '', reason: '', start_date: '' });
+  }
+
+  async function submitTask(event) {
+    event.preventDefault();
+    await runHubAction(
+      'task',
+      () =>
+        saveStaffTask({
+          ...taskForm,
+          business_unit_id: staff.find((member) => member.id === taskForm.staff_id)?.business_unit_id || businessUnit?.id,
+        }),
+      'Task assigned.',
+    );
+    setTaskForm({ category: 'general', details: '', due_date: '', staff_id: '', title: '' });
+  }
+
+  async function completeTask(task) {
+    await runHubAction(
+      `task-${task.id}`,
+      () => updateStaffTaskStatus(task.id, task.status === 'completed' ? 'pending' : 'completed'),
+      task.status === 'completed' ? 'Task reopened.' : 'Task completed.',
+    );
+  }
+
+  async function submitNewsletter(event) {
+    event.preventDefault();
+    await runHubAction(
+      'newsletter',
+      () =>
+        saveStaffNewsletter({
+          ...newsletterForm,
+          business_unit_id: allBusinessesView ? null : businessUnit?.id,
+        }),
+      'Newsletter saved.',
+    );
+  }
+
+  async function submitContent(event) {
+    event.preventDefault();
+    if (!staffProfile) return;
+    await runHubAction(
+      'content',
+      () =>
+        saveContentSubmission({
+          ...contentForm,
+          business_unit_id: staffProfile.business_unit_id || businessUnit?.id,
+          staff_id: staffProfile.id,
+        }),
+      'Content submitted.',
+    );
+    setContentForm({ caption: '', content_type: 'work', media_type: 'idea', media_url: '' });
+  }
+
+  async function decideTimeOff(recordId, status) {
+    await runHubAction(
+      `time-off-${recordId}`,
+      () => decideTimeOffRequest(recordId, status),
+      `Time-off request ${status}.`,
+    );
+  }
+
+  async function decideContent(recordId, status) {
+    await runHubAction(
+      `content-${recordId}`,
+      () => decideContentSubmission(recordId, status),
+      `Content ${status}.`,
+    );
   }
 
   return (
@@ -358,6 +631,14 @@ export default function StaffHubPage({
               Staff will see their own earnings and performance after their login email is matched
               to a roster profile in Access and Roster.
             </span>
+          </div>
+        </section>
+      ) : null}
+
+      {hubError || hubMessage ? (
+        <section className="panel full-span staff-hub-alert-panel">
+          <div className={`alert ${hubError ? 'danger' : 'success'}`}>
+            {hubError || hubMessage}
           </div>
         </section>
       ) : null}
@@ -453,6 +734,96 @@ export default function StaffHubPage({
                 ))}
               </div>
             ) : null}
+            <div className="staff-hub-section-stack">
+              <div className="staff-hub-preview-list__header">
+                <strong>Home feed</strong>
+                <span>{formatNumber(visibleAnnouncements.length)} updates</span>
+              </div>
+              {canManageHub ? (
+                <form className="staff-hub-form" onSubmit={submitAnnouncement}>
+                  <div className="form-grid compact">
+                    <label className="field">
+                      <span>Title</span>
+                      <input
+                        required
+                        value={announcementForm.title}
+                        onChange={(event) => updateAnnouncementForm('title', event.target.value)}
+                        placeholder="Staff reminder"
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Category</span>
+                      <select
+                        value={announcementForm.category}
+                        onChange={(event) => updateAnnouncementForm('category', event.target.value)}
+                      >
+                        {ANNOUNCEMENT_CATEGORIES.map((category) => (
+                          <option key={category} value={category}>
+                            {formatCategory(category)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <label className="field">
+                    <span>Message</span>
+                    <textarea
+                      required
+                      rows={3}
+                      value={announcementForm.body}
+                      onChange={(event) => updateAnnouncementForm('body', event.target.value)}
+                      placeholder="Write the update staff should see."
+                    />
+                  </label>
+                  <label className="checkbox-line">
+                    <input
+                      checked={announcementForm.pinned}
+                      onChange={(event) => updateAnnouncementForm('pinned', event.target.checked)}
+                      type="checkbox"
+                    />
+                    Pin this update
+                  </label>
+                  <button className="primary-button" disabled={savingHubAction === 'announcement'} type="submit">
+                    Post update
+                  </button>
+                </form>
+              ) : null}
+              {visibleAnnouncements.length ? (
+                <div className="staff-hub-feed">
+                  {visibleAnnouncements.map((announcement) => {
+                    const isRead = readAnnouncementIds.has(announcement.id);
+                    return (
+                      <article className={isRead ? 'staff-hub-feed-card read' : 'staff-hub-feed-card'} key={announcement.id}>
+                        <div>
+                          <StatusBadge tone={announcement.pinned ? 'gold' : 'muted'}>
+                            {formatCategory(announcement.category)}
+                          </StatusBadge>
+                          <small>{formatDate(announcement.created_at)}</small>
+                        </div>
+                        <h3>{announcement.title}</h3>
+                        <p>{announcement.body}</p>
+                        {staffProfile ? (
+                          <button
+                            className="ghost-button small"
+                            disabled={isRead || savingHubAction === `read-${announcement.id}`}
+                            onClick={() => markAnnouncementRead(announcement.id)}
+                            type="button"
+                          >
+                            {isRead ? 'Read' : 'Mark read'}
+                          </button>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={Megaphone}
+                  title="No staff updates yet"
+                  message="Admin announcements, policy updates, training reminders, and events will show here."
+                />
+              )}
+            </div>
             {businessCards.length ? (
               <div className="staff-hub-business-grid">
                 {businessCards.map((card) => (
@@ -635,6 +1006,151 @@ export default function StaffHubPage({
               Last appointment import: {formatDateTime(masterDashboardUpdatedAt)}
             </p>
           ) : null}
+          <div className="staff-hub-split-grid">
+            <form className="staff-hub-form" onSubmit={submitAvailability}>
+              <div className="section-header compact">
+                <div>
+                  <span>Availability</span>
+                  <h3>Submit weekly availability</h3>
+                </div>
+              </div>
+              <div className="form-grid compact">
+                <label className="field">
+                  <span>Day</span>
+                  <select
+                    disabled={!staffProfile}
+                    value={availabilityForm.day_of_week}
+                    onChange={(event) => updateAvailabilityForm('day_of_week', event.target.value)}
+                  >
+                    {WEEKDAYS.map((day, index) => (
+                      <option key={day} value={index}>
+                        {day}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Start</span>
+                  <input
+                    disabled={!staffProfile || availabilityForm.unavailable}
+                    type="time"
+                    value={availabilityForm.start_time}
+                    onChange={(event) => updateAvailabilityForm('start_time', event.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>End</span>
+                  <input
+                    disabled={!staffProfile || availabilityForm.unavailable}
+                    type="time"
+                    value={availabilityForm.end_time}
+                    onChange={(event) => updateAvailabilityForm('end_time', event.target.value)}
+                  />
+                </label>
+              </div>
+              <label className="checkbox-line">
+                <input
+                  checked={availabilityForm.unavailable}
+                  disabled={!staffProfile}
+                  onChange={(event) => updateAvailabilityForm('unavailable', event.target.checked)}
+                  type="checkbox"
+                />
+                Not available this day
+              </label>
+              <label className="field">
+                <span>Note</span>
+                <input
+                  disabled={!staffProfile}
+                  value={availabilityForm.note}
+                  onChange={(event) => updateAvailabilityForm('note', event.target.value)}
+                  placeholder="Optional note"
+                />
+              </label>
+              <button className="primary-button" disabled={!staffProfile || savingHubAction === 'availability'} type="submit">
+                Save availability
+              </button>
+            </form>
+
+            <form className="staff-hub-form" onSubmit={submitTimeOff}>
+              <div className="section-header compact">
+                <div>
+                  <span>Time off</span>
+                  <h3>Request time off</h3>
+                </div>
+              </div>
+              <div className="form-grid compact">
+                <label className="field">
+                  <span>Start date</span>
+                  <input
+                    disabled={!staffProfile}
+                    required
+                    type="date"
+                    value={timeOffForm.start_date}
+                    onChange={(event) => updateTimeOffForm('start_date', event.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>End date</span>
+                  <input
+                    disabled={!staffProfile}
+                    required
+                    type="date"
+                    value={timeOffForm.end_date}
+                    onChange={(event) => updateTimeOffForm('end_date', event.target.value)}
+                  />
+                </label>
+              </div>
+              <label className="field">
+                <span>Reason</span>
+                <input
+                  disabled={!staffProfile}
+                  value={timeOffForm.reason}
+                  onChange={(event) => updateTimeOffForm('reason', event.target.value)}
+                  placeholder="Optional"
+                />
+              </label>
+              <button className="primary-button" disabled={!staffProfile || savingHubAction === 'time-off'} type="submit">
+                Send request
+              </button>
+            </form>
+          </div>
+
+          <div className="staff-hub-section-stack">
+            <div className="staff-hub-preview-list__header">
+              <strong>Time-off requests</strong>
+              <span>{formatNumber(hubRecords.timeOffRequests.length)} total</span>
+            </div>
+            {hubRecords.timeOffRequests.length ? (
+              <div className="staff-hub-list">
+                {hubRecords.timeOffRequests.slice(0, 8).map((request) => (
+                  <article className="staff-hub-list-row" key={request.id}>
+                    <div>
+                      <strong>
+                        {formatDate(request.start_date)} - {formatDate(request.end_date)}
+                      </strong>
+                      <small>{request.reason || 'No reason added'}</small>
+                    </div>
+                    <StatusBadge tone={request.status === 'approved' ? 'success' : request.status === 'denied' ? 'danger' : 'warning'}>
+                      {request.status}
+                    </StatusBadge>
+                    {canManageHub && request.status === 'pending' ? (
+                      <div className="staff-hub-inline-actions">
+                        <button className="ghost-button small" type="button" onClick={() => decideTimeOff(request.id, 'approved')}>
+                          <Check size={14} /> Approve
+                        </button>
+                        <button className="ghost-button small danger" type="button" onClick={() => decideTimeOff(request.id, 'denied')}>
+                          <X size={14} /> Deny
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="subtle-text">No time-off requests yet.</p>
+            )}
+          </div>
+
           {scheduleRows.length ? (
             <DataTable>
               <table>
@@ -709,6 +1225,283 @@ export default function StaffHubPage({
           <section className="panel">
             <div className="section-header">
               <div>
+                <span>Newsletter</span>
+                <h2>Weekly update</h2>
+              </div>
+              <BookOpen size={20} />
+            </div>
+            {latestNewsletter ? (
+              <div className="staff-hub-newsletter">
+                <StatusBadge tone={latestNewsletter.published ? 'success' : 'warning'}>
+                  {latestNewsletter.published ? 'Published' : 'Draft'}
+                </StatusBadge>
+                <h3>Week of {formatDate(latestNewsletter.week_start)}</h3>
+                {latestNewsletter.weekly_goals ? <p><strong>Goals:</strong> {latestNewsletter.weekly_goals}</p> : null}
+                {latestNewsletter.reminders ? <p><strong>Reminders:</strong> {latestNewsletter.reminders}</p> : null}
+                {latestNewsletter.client_feedback ? <p><strong>Client feedback:</strong> {latestNewsletter.client_feedback}</p> : null}
+                {latestNewsletter.new_services_promos ? <p><strong>New services/promos:</strong> {latestNewsletter.new_services_promos}</p> : null}
+                {latestNewsletter.improvements_needed ? <p><strong>Improve:</strong> {latestNewsletter.improvements_needed}</p> : null}
+              </div>
+            ) : (
+              <p className="subtle-text">No newsletter has been published yet.</p>
+            )}
+          </section>
+
+          {canManageHub ? (
+            <section className="panel full-span">
+              <div className="section-header">
+                <div>
+                  <span>Admin</span>
+                  <h2>Create weekly newsletter</h2>
+                </div>
+              </div>
+              <form className="staff-hub-form" onSubmit={submitNewsletter}>
+                <div className="form-grid compact">
+                  <label className="field">
+                    <span>Week start</span>
+                    <input
+                      required
+                      type="date"
+                      value={newsletterForm.week_start}
+                      onChange={(event) => updateNewsletterForm('week_start', event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Top performer</span>
+                    <select
+                      value={newsletterForm.top_performer_id}
+                      onChange={(event) => updateNewsletterForm('top_performer_id', event.target.value)}
+                    >
+                      <option value="">No top performer</option>
+                      {staff.filter((member) => member.active).map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="form-grid compact">
+                  {[
+                    ['weekly_goals', 'Weekly business goals'],
+                    ['reminders', 'Staff reminders'],
+                    ['client_feedback', 'Client feedback'],
+                    ['new_services_promos', 'New services/promotions'],
+                    ['improvements_needed', 'Improvements needed'],
+                    ['top_performer_note', 'Top performer note'],
+                  ].map(([field, label]) => (
+                    <label className="field" key={field}>
+                      <span>{label}</span>
+                      <textarea
+                        rows={2}
+                        value={newsletterForm[field]}
+                        onChange={(event) => updateNewsletterForm(field, event.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <label className="checkbox-line">
+                  <input
+                    checked={newsletterForm.published}
+                    onChange={(event) => updateNewsletterForm('published', event.target.checked)}
+                    type="checkbox"
+                  />
+                  Publish to staff
+                </label>
+                <button className="primary-button" disabled={savingHubAction === 'newsletter'} type="submit">
+                  Save newsletter
+                </button>
+              </form>
+            </section>
+          ) : null}
+
+          <section className="panel">
+            <div className="section-header">
+              <div>
+                <span>Tasks</span>
+                <h2>Assigned work</h2>
+              </div>
+              <StatusBadge tone={pendingTasks.length ? 'warning' : 'success'}>
+                {pendingTasks.length ? `${pendingTasks.length} open` : 'Clear'}
+              </StatusBadge>
+            </div>
+            {canManageHub ? (
+              <form className="staff-hub-form" onSubmit={submitTask}>
+                <div className="form-grid compact">
+                  <label className="field">
+                    <span>Assign to</span>
+                    <select
+                      required
+                      value={taskForm.staff_id}
+                      onChange={(event) => updateTaskForm('staff_id', event.target.value)}
+                    >
+                      <option value="">Select staff</option>
+                      {staff.filter((member) => member.active).map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Category</span>
+                    <select
+                      value={taskForm.category}
+                      onChange={(event) => updateTaskForm('category', event.target.value)}
+                    >
+                      {TASK_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {formatCategory(category)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Due date</span>
+                    <input
+                      type="date"
+                      value={taskForm.due_date}
+                      onChange={(event) => updateTaskForm('due_date', event.target.value)}
+                    />
+                  </label>
+                </div>
+                <label className="field">
+                  <span>Task</span>
+                  <input
+                    required
+                    value={taskForm.title}
+                    onChange={(event) => updateTaskForm('title', event.target.value)}
+                    placeholder="Restock towels, post content, follow up with client..."
+                  />
+                </label>
+                <label className="field">
+                  <span>Details</span>
+                  <textarea
+                    rows={2}
+                    value={taskForm.details}
+                    onChange={(event) => updateTaskForm('details', event.target.value)}
+                  />
+                </label>
+                <button className="primary-button" disabled={savingHubAction === 'task'} type="submit">
+                  Assign task
+                </button>
+              </form>
+            ) : null}
+            <div className="staff-hub-list">
+              {[...pendingTasks, ...completedTasks].map((task) => (
+                <article className={isOverdueTask(task) ? 'staff-hub-list-row overdue' : 'staff-hub-list-row'} key={task.id}>
+                  <div>
+                    <strong>{task.title}</strong>
+                    <small>
+                      {formatCategory(task.category)}
+                      {task.due_date ? ` · due ${formatDate(task.due_date)}` : ''}
+                    </small>
+                  </div>
+                  <StatusBadge tone={task.status === 'completed' ? 'success' : isOverdueTask(task) ? 'danger' : 'warning'}>
+                    {task.status === 'completed' ? 'completed' : isOverdueTask(task) ? 'overdue' : 'pending'}
+                  </StatusBadge>
+                  <button className="ghost-button small" type="button" onClick={() => completeTask(task)}>
+                    {task.status === 'completed' ? 'Reopen' : 'Complete'}
+                  </button>
+                </article>
+              ))}
+            </div>
+            {!pendingTasks.length && !completedTasks.length ? <p className="subtle-text">No assigned tasks yet.</p> : null}
+          </section>
+
+          <section className="panel">
+            <div className="section-header">
+              <div>
+                <span>Content Center</span>
+                <h2>Submit work</h2>
+              </div>
+              <Camera size={20} />
+            </div>
+            <form className="staff-hub-form" onSubmit={submitContent}>
+              <div className="form-grid compact">
+                <label className="field">
+                  <span>Type</span>
+                  <select
+                    disabled={!staffProfile}
+                    value={contentForm.content_type}
+                    onChange={(event) => updateContentForm('content_type', event.target.value)}
+                  >
+                    <option value="work">My work</option>
+                    <option value="before_after">Before/after</option>
+                    <option value="idea">Content idea</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Media type</span>
+                  <select
+                    disabled={!staffProfile}
+                    value={contentForm.media_type}
+                    onChange={(event) => updateContentForm('media_type', event.target.value)}
+                  >
+                    <option value="idea">Idea only</option>
+                    <option value="photo">Photo URL</option>
+                    <option value="video">Video URL</option>
+                  </select>
+                </label>
+              </div>
+              <label className="field">
+                <span>Media URL</span>
+                <input
+                  disabled={!staffProfile || contentForm.media_type === 'idea'}
+                  value={contentForm.media_url}
+                  onChange={(event) => updateContentForm('media_url', event.target.value)}
+                  placeholder="Paste photo/video link"
+                />
+              </label>
+              <label className="field">
+                <span>Caption / idea</span>
+                <textarea
+                  disabled={!staffProfile}
+                  required
+                  rows={3}
+                  value={contentForm.caption}
+                  onChange={(event) => updateContentForm('caption', event.target.value)}
+                />
+              </label>
+              <button className="primary-button" disabled={!staffProfile || savingHubAction === 'content'} type="submit">
+                Submit content
+              </button>
+            </form>
+            {canManageHub && pendingContentSubmissions.length ? (
+              <div className="staff-hub-section-stack">
+                <strong>Pending approval</strong>
+                <div className="staff-hub-list">
+                  {pendingContentSubmissions.slice(0, 6).map((item) => (
+                    <article className="staff-hub-list-row" key={item.id}>
+                      <div>
+                        <strong>{formatCategory(item.content_type)}</strong>
+                        <small>{item.caption || item.media_url || 'No caption'}</small>
+                      </div>
+                      <div className="staff-hub-inline-actions">
+                        <button className="ghost-button small" type="button" onClick={() => decideContent(item.id, 'approved')}>
+                          <Check size={14} /> Approve
+                        </button>
+                        <button className="ghost-button small danger" type="button" onClick={() => decideContent(item.id, 'rejected')}>
+                          <X size={14} /> Reject
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="staff-hub-chip-row">
+              {contentSubmissions.slice(0, 6).map((item) => (
+                <StatusBadge key={item.id} tone={item.status === 'approved' ? 'success' : item.status === 'rejected' ? 'danger' : 'warning'}>
+                  {formatCategory(item.content_type)} · {item.status}
+                </StatusBadge>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="section-header">
+              <div>
                 <span>Profile</span>
                 <h2>My staff record</h2>
               </div>
@@ -736,8 +1529,30 @@ export default function StaffHubPage({
                 <strong>{staffProfile?.instagram_handle || staffProfile?.social_handle || 'Not set'}</strong>
               </div>
               <div>
+                <span>Probation</span>
+                <strong>
+                  {staffProfile?.tier === 'probation'
+                    ? staffProfile?.probation_end_date
+                      ? `Ends ${formatDate(staffProfile.probation_end_date)}`
+                      : 'Probation tier'
+                    : 'Not on probation'}
+                </strong>
+              </div>
+              <div>
+                <span>Services</span>
+                <strong>
+                  {Array.isArray(staffProfile?.services_offered) && staffProfile.services_offered.length
+                    ? staffProfile.services_offered.join(', ')
+                    : 'Not set'}
+                </strong>
+              </div>
+              <div>
                 <span>Booking profile</span>
                 <strong>{staffProfile?.booking_platform_profile || 'Not set'}</strong>
+              </div>
+              <div>
+                <span>Bio</span>
+                <strong>{staffProfile?.bio || 'Not set'}</strong>
               </div>
             </div>
           </section>

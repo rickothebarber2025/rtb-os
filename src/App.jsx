@@ -124,6 +124,7 @@ export default function App() {
       setActivePage,
       squareStatus: data.squareStatus,
       staff: data.staff,
+      staffHub: data.staffHub,
       staffBusinessMetadata: data.staffBusinessMetadata,
       accessProfile: auth.profile,
       user: auth.user,

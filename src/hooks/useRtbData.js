@@ -8,6 +8,7 @@ import {
   getPerformanceSummary,
   getSquareStatus,
   getStaff,
+  getStaffHubRecords,
 } from '../services/rtbService';
 import { ACTION_CENTER_SETTING_KEY, normalizeActionCenterState } from '../utils/actionCenter';
 import { canUsePayroll } from '../utils/access';
@@ -39,6 +40,15 @@ const EMPTY_STATE = {
   performanceSummary: [],
   squareStatus: null,
   staff: [],
+  staffHub: {
+    announcementReads: [],
+    announcements: [],
+    availability: [],
+    contentSubmissions: [],
+    newsletters: [],
+    tasks: [],
+    timeOffRequests: [],
+  },
   staffBusinessMetadata: {},
   warnings: [],
 };
@@ -53,6 +63,7 @@ const LOAD_LABELS = {
   staffBusinessMetadataRecord: 'Staff business profile settings',
   squareStatus: 'Square connection status',
   staff: 'Staff roster',
+  staffHub: 'Staff Hub records',
 };
 
 function uniqueById(rows) {
@@ -66,6 +77,20 @@ function uniqueById(rows) {
 function sortByCreatedAtDesc(rows) {
   return [...rows].sort(
     (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+  );
+}
+
+function normalize(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function findLinkedStaffProfile(staff, accessProfile) {
+  const email = normalize(accessProfile?.email);
+  const fullName = normalize(accessProfile?.full_name);
+  return (
+    staff.find((member) => normalize(member.email) === email) ||
+    staff.find((member) => normalize(member.full_name) === fullName) ||
+    null
   );
 }
 
@@ -202,6 +227,17 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
       const scopedStaff = isAllBusinesses
         ? allStaff
         : allStaff.filter((member) => staffBelongsToBusiness(member, activeUnit.id));
+      const linkedStaffProfile = findLinkedStaffProfile(scopedStaff, accessProfile);
+      let staffHub = EMPTY_STATE.staffHub;
+
+      try {
+        staffHub = await getStaffHubRecords({
+          businessUnitId: isAllBusinesses ? null : activeUnit.id,
+          staffId: linkedStaffProfile?.id || null,
+        });
+      } catch (err) {
+        warnings.push(`${LOAD_LABELS.staffHub} could not load: ${err.message || 'Unknown error'}`);
+      }
 
       setData({
         actionCenter: normalizeActionCenterState(loaded.actionCenterRecord?.value),
@@ -214,6 +250,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         performanceSummary: loaded.performanceSummary,
         squareStatus: loaded.squareStatus,
         staff: scopedStaff,
+        staffHub,
         staffBusinessMetadata,
         warnings,
       });

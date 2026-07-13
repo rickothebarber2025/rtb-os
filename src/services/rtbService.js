@@ -227,6 +227,7 @@ export async function saveStaff(staff) {
   const isProbation = staff.tier === 'probation';
   const payload = cleanObject({
     active: staff.active ?? true,
+    bio: staff.bio || null,
     business_unit_id: staff.business_unit_id,
     commission_rate: isProbation ? PROBATION_RATE : Number(staff.commission_rate || 0),
     email: staff.email || null,
@@ -234,10 +235,14 @@ export async function saveStaff(staff) {
     full_name: staff.full_name,
     notes: staff.notes || null,
     phone: staff.phone || null,
+    photo_url: staff.photo_url || null,
+    probation_end_date: staff.probation_end_date || null,
     probation_start_date: isProbation
       ? staff.probation_start_date || staff.start_date || toDateKey()
       : staff.probation_start_date || null,
     role: staff.role || 'Staff',
+    services_offered: Array.isArray(staff.services_offered) ? staff.services_offered : undefined,
+    social_handle: staff.social_handle || staff.instagram_handle || null,
     start_date: staff.start_date || null,
     tier: staff.tier || 'standard',
     updated_at: new Date().toISOString(),
@@ -541,6 +546,338 @@ export async function saveAppSetting(key, value) {
 
 export async function clearAppSetting(key) {
   return saveAppSetting(key, null);
+}
+
+function applyNullableBusinessScope(query, businessUnitId) {
+  if (!businessUnitId) return query;
+  return query.or(`business_unit_id.is.null,business_unit_id.eq.${businessUnitId}`);
+}
+
+function applyBusinessScope(query, businessUnitId) {
+  if (!businessUnitId) return query;
+  return query.eq('business_unit_id', businessUnitId);
+}
+
+export async function getStaffHubRecords({ businessUnitId = null, staffId = null } = {}) {
+  const client = requireClient();
+  const [
+    announcements,
+    announcementReads,
+    availability,
+    timeOffRequests,
+    tasks,
+    newsletters,
+    contentSubmissions,
+  ] = await Promise.all([
+    requireData(
+      await applyNullableBusinessScope(
+        client
+          .from('staff_announcements')
+          .select('*')
+          .order('pinned', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(80),
+        businessUnitId,
+      ),
+    ),
+    staffId
+      ? requireData(
+          await client
+            .from('staff_announcement_reads')
+            .select('*')
+            .eq('staff_id', staffId),
+        )
+      : [],
+    requireData(
+      await applyBusinessScope(
+        client
+          .from('staff_availability')
+          .select('*')
+          .order('day_of_week', { ascending: true }),
+        businessUnitId,
+      ),
+    ),
+    requireData(
+      await applyBusinessScope(
+        client
+          .from('staff_time_off_requests')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100),
+        businessUnitId,
+      ),
+    ),
+    requireData(
+      await applyBusinessScope(
+        client
+          .from('staff_tasks')
+          .select('*')
+          .order('status', { ascending: false })
+          .order('due_date', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(120),
+        businessUnitId,
+      ),
+    ),
+    requireData(
+      await applyNullableBusinessScope(
+        client
+          .from('staff_newsletters')
+          .select('*')
+          .order('week_start', { ascending: false })
+          .limit(24),
+        businessUnitId,
+      ),
+    ),
+    requireData(
+      await applyBusinessScope(
+        client
+          .from('staff_content_submissions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(120),
+        businessUnitId,
+      ),
+    ),
+  ]);
+
+  return {
+    announcementReads,
+    announcements,
+    availability,
+    contentSubmissions,
+    newsletters,
+    tasks,
+    timeOffRequests,
+  };
+}
+
+export async function saveStaffAnnouncement(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    body: record.body,
+    business_unit_id: record.business_unit_id || null,
+    category: record.category || 'reminder',
+    pinned: Boolean(record.pinned),
+    title: record.title,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (record.id) {
+    return requireData(
+      await client
+        .from('staff_announcements')
+        .update(payload)
+        .eq('id', record.id)
+        .select()
+        .single(),
+    );
+  }
+
+  return requireData(await client.from('staff_announcements').insert(payload).select().single());
+}
+
+export async function markStaffAnnouncementRead(announcementId, staffId) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('staff_announcement_reads')
+      .upsert(
+        {
+          announcement_id: announcementId,
+          read_at: new Date().toISOString(),
+          staff_id: staffId,
+        },
+        { onConflict: 'announcement_id,staff_id' },
+      )
+      .select()
+      .single(),
+  );
+}
+
+export async function saveStaffAvailability(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    business_unit_id: record.business_unit_id || null,
+    day_of_week: Number(record.day_of_week),
+    end_time: record.unavailable ? null : record.end_time || null,
+    note: record.note || null,
+    staff_id: record.staff_id,
+    start_time: record.unavailable ? null : record.start_time || null,
+    unavailable: Boolean(record.unavailable),
+    updated_at: new Date().toISOString(),
+  });
+
+  return requireData(
+    await client
+      .from('staff_availability')
+      .upsert(payload, { onConflict: 'staff_id,day_of_week' })
+      .select()
+      .single(),
+  );
+}
+
+export async function saveTimeOffRequest(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    business_unit_id: record.business_unit_id || null,
+    end_date: record.end_date,
+    reason: record.reason || null,
+    staff_id: record.staff_id,
+    start_date: record.start_date,
+    status: record.status || 'pending',
+    updated_at: new Date().toISOString(),
+  });
+
+  if (record.id) {
+    return requireData(
+      await client
+        .from('staff_time_off_requests')
+        .update(payload)
+        .eq('id', record.id)
+        .select()
+        .single(),
+    );
+  }
+
+  return requireData(await client.from('staff_time_off_requests').insert(payload).select().single());
+}
+
+export async function decideTimeOffRequest(recordId, status, adminNote = '') {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('staff_time_off_requests')
+      .update({
+        admin_note: adminNote || null,
+        decided_at: new Date().toISOString(),
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', recordId)
+      .select()
+      .single(),
+  );
+}
+
+export async function saveStaffTask(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    business_unit_id: record.business_unit_id || null,
+    category: record.category || 'general',
+    details: record.details || null,
+    due_date: record.due_date || null,
+    staff_id: record.staff_id,
+    status: record.status || 'pending',
+    title: record.title,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (record.id) {
+    return requireData(
+      await client.from('staff_tasks').update(payload).eq('id', record.id).select().single(),
+    );
+  }
+
+  return requireData(await client.from('staff_tasks').insert(payload).select().single());
+}
+
+export async function updateStaffTaskStatus(taskId, status) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('staff_tasks')
+      .update({
+        completed_at: status === 'completed' ? new Date().toISOString() : null,
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', taskId)
+      .select()
+      .single(),
+  );
+}
+
+export async function saveStaffNewsletter(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    business_unit_id: record.business_unit_id || null,
+    client_feedback: record.client_feedback || null,
+    improvements_needed: record.improvements_needed || null,
+    new_services_promos: record.new_services_promos || null,
+    published: Boolean(record.published),
+    reminders: record.reminders || null,
+    top_performer_id: record.top_performer_id || null,
+    top_performer_note: record.top_performer_note || null,
+    updated_at: new Date().toISOString(),
+    week_start: record.week_start,
+    weekly_goals: record.weekly_goals || null,
+  });
+
+  if (record.id) {
+    return requireData(
+      await client
+        .from('staff_newsletters')
+        .update(payload)
+        .eq('id', record.id)
+        .select()
+        .single(),
+    );
+  }
+
+  return requireData(
+    await client
+      .from('staff_newsletters')
+      .upsert(payload, { onConflict: 'business_unit_id,week_start' })
+      .select()
+      .single(),
+  );
+}
+
+export async function saveContentSubmission(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    business_unit_id: record.business_unit_id || null,
+    caption: record.caption || null,
+    content_type: record.content_type || 'work',
+    media_type: record.media_type || 'idea',
+    media_url: record.media_url || null,
+    staff_id: record.staff_id,
+    status: record.status || 'pending',
+    updated_at: new Date().toISOString(),
+  });
+
+  if (record.id) {
+    return requireData(
+      await client
+        .from('staff_content_submissions')
+        .update(payload)
+        .eq('id', record.id)
+        .select()
+        .single(),
+    );
+  }
+
+  return requireData(
+    await client.from('staff_content_submissions').insert(payload).select().single(),
+  );
+}
+
+export async function decideContentSubmission(recordId, status, adminNote = '') {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('staff_content_submissions')
+      .update({
+        admin_note: adminNote || null,
+        reviewed_at: new Date().toISOString(),
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', recordId)
+      .select()
+      .single(),
+  );
 }
 
 export async function startSquareConnection(businessUnitId) {
