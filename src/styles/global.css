@@ -4442,3 +4442,412 @@ select {
     padding: 0.72rem;
   }
 }
+
+/* RTB OS visual refresh: richer accents without changing app behavior */
+:root {
+  --bg: #07080c;
+  --bg-soft: #0d1018;
+  --panel: #141823;
+  --panel-strong: #1b2130;
+  --panel-soft: #202737;
+  --text-soft: #d9e0ec;
+  --teal: #3ed7c2;
+  --teal-soft: rgba(62, 215, 194, 0.13);
+  --indigo: #9aa7ff;
+  --indigo-soft: rgba(154, 167, 255, 0.13);
+  --rose: #ff8ca3;
+  --rose-soft: rgba(255, 140, 163, 0.13);
+  --orange: #ffb25f;
+  --orange-soft: rgba(255, 178, 95, 0.13);
+  --cyan: #6eddf7;
+  --cyan-soft: rgba(110, 221, 247, 0.12);
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(122, 183, 255, 0.055), transparent 24rem),
+    linear-gradient(135deg, rgba(214, 168, 79, 0.075), transparent 30rem),
+    linear-gradient(215deg, rgba(62, 215, 194, 0.055), transparent 28rem),
+    #07080c;
+}
+
+.sidebar {
+  background:
+    linear-gradient(180deg, rgba(16, 20, 31, 0.98), rgba(8, 10, 15, 0.96)),
+    #090b10;
+  box-shadow: 18px 0 44px rgba(0, 0, 0, 0.22);
+}
+
+.sidebar::before {
+  background: linear-gradient(180deg, var(--gold), var(--teal), var(--indigo), var(--rose));
+  content: "";
+  inset: 0 auto 0 0;
+  opacity: 0.86;
+  position: absolute;
+  width: 3px;
+}
+
+.sidebar__brand {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius);
+  padding: 0.55rem;
+}
+
+.nav-group:nth-child(1) .nav-item.active,
+.nav-group:nth-child(1) .nav-item:hover {
+  background: var(--gold-soft);
+  border-color: rgba(241, 199, 104, 0.32);
+  color: var(--gold-strong);
+}
+
+.nav-group:nth-child(2) .nav-item.active,
+.nav-group:nth-child(2) .nav-item:hover {
+  background: var(--teal-soft);
+  border-color: rgba(62, 215, 194, 0.28);
+  color: var(--teal);
+}
+
+.nav-group:nth-child(3) .nav-item.active,
+.nav-group:nth-child(3) .nav-item:hover {
+  background: var(--indigo-soft);
+  border-color: rgba(154, 167, 255, 0.28);
+  color: var(--indigo);
+}
+
+.nav-group:nth-child(4) .nav-item.active,
+.nav-group:nth-child(4) .nav-item:hover {
+  background: var(--rose-soft);
+  border-color: rgba(255, 140, 163, 0.28);
+  color: var(--rose);
+}
+
+.topbar {
+  background:
+    linear-gradient(90deg, rgba(13, 16, 24, 0.96), rgba(19, 24, 36, 0.9)),
+    rgba(8, 9, 13, 0.9);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+}
+
+.topbar__title h1 {
+  color: #ffffff;
+  letter-spacing: 0;
+}
+
+.topbar__title span {
+  color: var(--gold-strong);
+  font-weight: 850;
+}
+
+.content {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 260px),
+    transparent;
+}
+
+.panel,
+.hero-panel,
+.metric-card,
+.access-gate,
+.auth-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)),
+    linear-gradient(135deg, rgba(214, 168, 79, 0.045), transparent 48%),
+    var(--panel);
+  border-color: rgba(255, 255, 255, 0.11);
+}
+
+.panel:hover,
+.metric-card:hover,
+.workspace-card:hover,
+.action-card:hover,
+.run-card:hover,
+.staff-insight-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.hero-panel {
+  background:
+    linear-gradient(90deg, rgba(13, 16, 24, 0.96), rgba(21, 26, 38, 0.8)),
+    linear-gradient(135deg, rgba(214, 168, 79, 0.18), transparent 44%),
+    linear-gradient(35deg, transparent 54%, rgba(62, 215, 194, 0.11) 54% 72%, rgba(154, 167, 255, 0.12) 72% 100%);
+}
+
+.hero-panel::after {
+  background:
+    linear-gradient(90deg, rgba(62, 215, 194, 0.14), rgba(214, 168, 79, 0.1), transparent),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.055) 0, rgba(255, 255, 255, 0.055) 1px, transparent 1px, transparent 14px);
+  opacity: 0.72;
+}
+
+.metric-card,
+.payroll-summary div,
+.stat-list div,
+.snapshot-grid div,
+.workspace-card,
+.admin-control-card,
+.permission-cell,
+.system-summary div,
+.split-stats div,
+.mini-stats span,
+.import-summary-grid > div,
+.staff-hub-performance-grid > div,
+.staff-hub-profile-grid > div {
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card::before,
+.payroll-summary div::before,
+.stat-list div::before,
+.snapshot-grid div::before,
+.workspace-card::before,
+.admin-control-card::before,
+.permission-cell::before,
+.system-summary div::before,
+.split-stats div::before,
+.mini-stats span::before,
+.import-summary-grid > div::before,
+.staff-hub-performance-grid > div::before,
+.staff-hub-profile-grid > div::before {
+  background: var(--gold);
+  content: "";
+  inset: 0 auto 0 0;
+  position: absolute;
+  width: 3px;
+}
+
+.metric-card:nth-child(4n + 1)::before,
+.payroll-summary div:nth-child(4n + 1)::before,
+.stat-list div:nth-child(4n + 1)::before,
+.snapshot-grid div:nth-child(4n + 1)::before,
+.workspace-card:nth-child(4n + 1)::before,
+.admin-control-card:nth-child(4n + 1)::before,
+.permission-cell:nth-child(4n + 1)::before,
+.system-summary div:nth-child(4n + 1)::before,
+.split-stats div:nth-child(4n + 1)::before,
+.mini-stats span:nth-child(4n + 1)::before,
+.import-summary-grid > div:nth-child(4n + 1)::before,
+.staff-hub-performance-grid > div:nth-child(4n + 1)::before,
+.staff-hub-profile-grid > div:nth-child(4n + 1)::before {
+  background: var(--gold);
+}
+
+.metric-card:nth-child(4n + 2)::before,
+.payroll-summary div:nth-child(4n + 2)::before,
+.stat-list div:nth-child(4n + 2)::before,
+.snapshot-grid div:nth-child(4n + 2)::before,
+.workspace-card:nth-child(4n + 2)::before,
+.admin-control-card:nth-child(4n + 2)::before,
+.permission-cell:nth-child(4n + 2)::before,
+.system-summary div:nth-child(4n + 2)::before,
+.split-stats div:nth-child(4n + 2)::before,
+.mini-stats span:nth-child(4n + 2)::before,
+.import-summary-grid > div:nth-child(4n + 2)::before,
+.staff-hub-performance-grid > div:nth-child(4n + 2)::before,
+.staff-hub-profile-grid > div:nth-child(4n + 2)::before {
+  background: var(--teal);
+}
+
+.metric-card:nth-child(4n + 3)::before,
+.payroll-summary div:nth-child(4n + 3)::before,
+.stat-list div:nth-child(4n + 3)::before,
+.snapshot-grid div:nth-child(4n + 3)::before,
+.workspace-card:nth-child(4n + 3)::before,
+.admin-control-card:nth-child(4n + 3)::before,
+.permission-cell:nth-child(4n + 3)::before,
+.system-summary div:nth-child(4n + 3)::before,
+.split-stats div:nth-child(4n + 3)::before,
+.mini-stats span:nth-child(4n + 3)::before,
+.import-summary-grid > div:nth-child(4n + 3)::before,
+.staff-hub-performance-grid > div:nth-child(4n + 3)::before,
+.staff-hub-profile-grid > div:nth-child(4n + 3)::before {
+  background: var(--blue);
+}
+
+.metric-card:nth-child(4n)::before,
+.payroll-summary div:nth-child(4n)::before,
+.stat-list div:nth-child(4n)::before,
+.snapshot-grid div:nth-child(4n)::before,
+.workspace-card:nth-child(4n)::before,
+.admin-control-card:nth-child(4n)::before,
+.permission-cell:nth-child(4n)::before,
+.system-summary div:nth-child(4n)::before,
+.split-stats div:nth-child(4n)::before,
+.mini-stats span:nth-child(4n)::before,
+.import-summary-grid > div:nth-child(4n)::before,
+.staff-hub-performance-grid > div:nth-child(4n)::before,
+.staff-hub-profile-grid > div:nth-child(4n)::before {
+  background: var(--rose);
+}
+
+.metric-card__icon,
+.certificate-seal,
+.action-card__icon {
+  background: rgba(214, 168, 79, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.045);
+}
+
+.metric-card:nth-child(4n + 2) .metric-card__icon,
+.action-card:nth-child(4n + 2) .action-card__icon {
+  background: var(--teal-soft);
+  border-color: rgba(62, 215, 194, 0.24);
+  color: var(--teal);
+}
+
+.metric-card:nth-child(4n + 3) .metric-card__icon,
+.action-card:nth-child(4n + 3) .action-card__icon {
+  background: rgba(122, 183, 255, 0.13);
+  border-color: rgba(122, 183, 255, 0.24);
+  color: var(--blue);
+}
+
+.metric-card:nth-child(4n) .metric-card__icon,
+.action-card:nth-child(4n) .action-card__icon {
+  background: var(--rose-soft);
+  border-color: rgba(255, 140, 163, 0.24);
+  color: var(--rose);
+}
+
+.primary-button {
+  box-shadow: 0 8px 20px rgba(214, 168, 79, 0.18);
+}
+
+.secondary-button:hover,
+.ghost-button:hover,
+.icon-button:hover,
+.staff-hub-tabs button.active,
+.segmented-control button.active,
+.toolbar button.active,
+.insight-tabs button.active,
+.wizard-steps button.active {
+  box-shadow: inset 0 -2px 0 rgba(241, 199, 104, 0.58);
+}
+
+.badge.success,
+.alert.success,
+.operation-check.success,
+.ops-step.done,
+.system-check-card.success,
+.probation-card.success {
+  background: linear-gradient(180deg, rgba(85, 214, 146, 0.13), rgba(255, 255, 255, 0.025));
+}
+
+.badge.danger,
+.alert.danger,
+.insight-alert,
+.system-check-card.danger,
+.probation-card.danger,
+.run-card.voided {
+  background: linear-gradient(180deg, rgba(255, 113, 109, 0.13), rgba(255, 255, 255, 0.025));
+}
+
+.badge.warning,
+.alert.warning,
+.operation-check.warning,
+.ops-tier-card.warning,
+.dashboard-action-item.high,
+.action-card.high {
+  background: linear-gradient(180deg, rgba(255, 178, 95, 0.13), rgba(255, 255, 255, 0.025));
+}
+
+.certificate-panel,
+.ops-tier-card.blue {
+  background: linear-gradient(180deg, rgba(122, 183, 255, 0.1), rgba(255, 255, 255, 0.025));
+}
+
+.table-wrap,
+.monthly-ranking,
+.access-details,
+.business-access-picker,
+.integration-status,
+.wizard-steps,
+.import-review-summary,
+.probation-edit,
+.staff-hub-form,
+.ops-template-preview section {
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+th {
+  color: #bcc6d8;
+}
+
+tbody tr:hover {
+  background: rgba(62, 215, 194, 0.045);
+}
+
+.run-card b,
+.leaderboard-row b,
+.eyebrow,
+.section-kpi,
+.hero-meta strong,
+.insight-bar-row strong,
+.ops-tier-card strong,
+.ops-template-preview h3 {
+  color: var(--gold-strong);
+}
+
+.leaderboard-row:nth-child(2n) > span {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.leaderboard-row:nth-child(3n) > span {
+  background: rgba(122, 183, 255, 0.13);
+  color: var(--blue);
+}
+
+.month-chart__bar {
+  background: linear-gradient(180deg, var(--teal), var(--blue));
+}
+
+.month-chart__item:nth-child(2n) .month-chart__bar {
+  background: linear-gradient(180deg, var(--gold-strong), var(--orange));
+}
+
+.month-chart__item:nth-child(3n) .month-chart__bar {
+  background: linear-gradient(180deg, var(--indigo), var(--blue));
+}
+
+.business-selector,
+.user-chip,
+.role-pill.admin {
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+}
+
+.mobile-tabbar {
+  background:
+    linear-gradient(180deg, rgba(19, 24, 36, 0.96), rgba(8, 9, 13, 0.98)),
+    var(--bg);
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 700px) {
+  .auth-page {
+    align-items: flex-start;
+    padding: 1rem 0.75rem;
+  }
+
+  .auth-panel {
+    gap: 1rem;
+  }
+
+  .auth-brand {
+    gap: 0.65rem;
+  }
+
+  .auth-brand h1 {
+    font-size: clamp(2.2rem, 13vw, 3.45rem);
+    line-height: 1.03;
+    margin-top: 0.25rem;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .auth-brand h1 {
+    font-size: clamp(2rem, 12vw, 2.75rem);
+  }
+}
