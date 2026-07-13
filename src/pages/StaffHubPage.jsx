@@ -1,10 +1,18 @@
 import { useMemo, useState } from 'react';
 import {
   BadgeCheck,
+  Bell,
+  BookOpen,
   BriefcaseBusiness,
   CalendarDays,
+  Camera,
+  ChevronRight,
   CircleDollarSign,
   ClipboardCheck,
+  Clock3,
+  FileText,
+  Megaphone,
+  ShieldCheck,
   TrendingUp,
   UserRound,
   WalletCards,
@@ -14,14 +22,16 @@ import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import { isOwnerProfile } from '../lib/permissions';
+import { normalizeActionCenterState } from '../utils/actionCenter';
 import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
-import { formatCurrency, formatDate, formatNumber } from '../utils/formatters';
+import { formatCurrency, formatDate, formatDateTime, formatNumber } from '../utils/formatters';
 
 const TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'earnings', label: 'Earnings' },
-  { id: 'performance', label: 'Performance' },
-  { id: 'profile', label: 'Profile' },
+  { id: 'home', label: 'Home' },
+  { id: 'money', label: 'Money' },
+  { id: 'stats', label: 'Stats' },
+  { id: 'schedule', label: 'Schedule' },
+  { id: 'more', label: 'More' },
 ];
 
 function normalize(value) {
@@ -84,10 +94,84 @@ function getRank(performanceSummary, staffProfile) {
   return index >= 0 ? index + 1 : null;
 }
 
+function getRows(rows) {
+  return Array.isArray(rows) ? rows : [];
+}
+
+function initials(name = '') {
+  const parts = String(name)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return `${parts[0]?.[0] || 'R'}${parts.length > 1 ? parts[parts.length - 1][0] : ''}`.toUpperCase();
+}
+
+function getProfilePhoto(staffProfile, user) {
+  return (
+    staffProfile?.photo_url ||
+    staffProfile?.avatar_url ||
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.picture ||
+    ''
+  );
+}
+
+function getDashboardScheduleRows(masterDashboard) {
+  return [
+    ...getRows(masterDashboard?.upcomingAppointments).map((row) => ({ ...row, schedule_type: 'Upcoming' })),
+    ...getRows(masterDashboard?.recentTransactions).map((row) => ({ ...row, schedule_type: 'Recent' })),
+  ];
+}
+
+function scheduleBelongsToStaff(row, staffProfile) {
+  if (!staffProfile) return false;
+  const staffName = normalize(row.staffer || row.staff || row.staff_name || row.team_member);
+  const profileName = normalize(staffProfile.full_name);
+  if (!staffName || !profileName) return false;
+  return staffName === profileName || staffName.includes(profileName) || profileName.includes(staffName);
+}
+
+function manualRecordBelongsToStaff(record, staffProfile) {
+  if (!staffProfile) return false;
+  return (
+    (record.staff_id && record.staff_id === staffProfile.id) ||
+    normalize(record.staff_name) === normalize(staffProfile.full_name)
+  );
+}
+
+function getStaffActionItems(actionCenter, staffProfile, ownerView) {
+  const state = normalizeActionCenterState(actionCenter);
+  const warnings = state.warnings
+    .filter((warning) => !warning.resolved_at)
+    .filter((warning) => ownerView || manualRecordBelongsToStaff(warning, staffProfile))
+    .map((warning) => ({
+      date: warning.date || warning.created_at,
+      detail: warning.notes || warning.warning_type || 'Staff warning needs review.',
+      id: `warning-${warning.id}`,
+      label: 'Warning',
+      tone: 'warning',
+    }));
+  const documents = state.documents
+    .filter((document) => !document.resolved_at)
+    .filter((document) => ownerView || manualRecordBelongsToStaff(document, staffProfile))
+    .map((document) => ({
+      date: document.due_date || document.created_at,
+      detail: `${document.document_name || 'Document'}${document.staff_name ? ` for ${document.staff_name}` : ''}`,
+      id: `document-${document.id}`,
+      label: 'Document',
+      tone: 'danger',
+    }));
+
+  return [...documents, ...warnings].slice(0, 4);
+}
+
 export default function StaffHubPage({
+  actionCenter,
   accessProfile,
   businessUnit,
   businessUnits,
+  masterDashboard,
+  masterDashboardUpdatedAt,
   navItems,
   payrollRuns,
   performanceSummary,
@@ -95,7 +179,7 @@ export default function StaffHubPage({
   staff,
   user,
 }) {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('home');
   const staffProfile = useMemo(
     () => findStaffProfile({ accessProfile, staff, user }),
     [accessProfile, staff, user],
@@ -131,6 +215,17 @@ export default function StaffHubPage({
     () => performanceSummary.find((row) => rowBelongsToStaff(row, staffProfile)) || null,
     [performanceSummary, staffProfile],
   );
+  const scheduleRows = useMemo(
+    () =>
+      getDashboardScheduleRows(masterDashboard)
+        .filter((row) => ownerView || scheduleBelongsToStaff(row, staffProfile))
+        .slice(0, 8),
+    [masterDashboard, ownerView, staffProfile],
+  );
+  const actionItems = useMemo(
+    () => getStaffActionItems(actionCenter, staffProfile, ownerView),
+    [actionCenter, ownerView, staffProfile],
+  );
   const totalTakeHome = sum(ownEntries, 'take_home');
   const totalTips = sum(ownEntries, 'tips');
   const latestEntry = ownEntries[0] || null;
@@ -139,6 +234,72 @@ export default function StaffHubPage({
   const canOpen = (pageId) => allowedPageIds.has(pageId);
   const profileName = staffProfile?.full_name || accessProfile?.full_name || user?.email || 'My Staff Account';
   const portalMode = staffProfile ? 'My staff portal' : ownerView ? 'Staff portal preview' : 'Staff access setup needed';
+  const profilePhoto = getProfilePhoto(staffProfile, user);
+  const firstName = String(profileName).split(/\s+/)[0] || 'there';
+  const quickTools = [
+    {
+      description: 'Role, tier, expectations, and probation status',
+      icon: BriefcaseBusiness,
+      id: ownerView && !staffProfile ? 'access' : 'my-role',
+      label: ownerView && !staffProfile ? 'Access setup' : 'My role',
+    },
+    {
+      description: 'Weekly earnings and payroll history',
+      icon: CircleDollarSign,
+      id: 'payroll',
+      label: 'Payroll history',
+    },
+    {
+      description: 'Sales, rank, goals, and client performance',
+      icon: TrendingUp,
+      id: 'performance',
+      label: 'Performance',
+    },
+    {
+      description: 'Imported appointments and schedule data',
+      icon: CalendarDays,
+      id: 'insights',
+      label: 'Schedule',
+    },
+  ];
+  const moreOptions = [
+    {
+      description: 'Opening, closing, policies, forms, and operating standards',
+      icon: BookOpen,
+      id: 'operations',
+      label: 'Policies & training',
+    },
+    {
+      description: 'Warnings, missing documents, and follow-up items',
+      icon: Bell,
+      id: 'action-center',
+      label: 'Alerts',
+    },
+    {
+      description: 'Client signals and content ideas from customer trends',
+      icon: Camera,
+      id: 'customer-intelligence',
+      label: 'Content center',
+    },
+    {
+      description: 'Staff profiles, commission levels, assignments, and status',
+      icon: UserRound,
+      id: 'staff',
+      label: 'Team',
+    },
+    {
+      description: 'Invite staff and control what each person can access',
+      icon: ShieldCheck,
+      id: 'access',
+      label: 'Access',
+    },
+    {
+      description: 'Imported reports, diagnostics, and export tools',
+      icon: FileText,
+      id: 'system',
+      label: 'System tools',
+    },
+  ];
 
   function openPage(pageId) {
     if (canOpen(pageId)) setActivePage(pageId);
@@ -148,15 +309,20 @@ export default function StaffHubPage({
     <div className="page-grid staff-hub-page">
       <section className="hero-panel full-span staff-hub-hero">
         <div className="staff-hub-brand-lockup">
-          <div className="staff-hub-logo">
-            <img src={businessProfile.logo_url} alt="" />
+          <div className="staff-hub-logo-stack">
+            <div className="staff-hub-logo">
+              <img src={businessProfile.logo_url} alt="" />
+            </div>
+            <div className="staff-hub-avatar" aria-label={profileName}>
+              {profilePhoto ? <img src={profilePhoto} alt="" /> : <span>{initials(profileName)}</span>}
+            </div>
           </div>
           <div>
             <span className="eyebrow">{portalMode}</span>
-            <h2>{profileName}</h2>
+            <h2>Hey {firstName}</h2>
             <p>
-              A focused staff workspace for earnings, performance, schedule readiness, and assigned
-              business updates.
+              Earnings, performance, schedule, alerts, and business resources for{' '}
+              {businessUnit?.name || staffProfile?.primary_business_name || 'your assigned business'}.
             </p>
           </div>
         </div>
@@ -239,54 +405,54 @@ export default function StaffHubPage({
         </div>
       </section>
 
-      {activeTab === 'overview' ? (
+      {activeTab === 'home' ? (
         <>
           <section className="panel two-thirds staff-hub-overview-panel">
             <div className="section-header">
               <div>
-                <span>{ownerView && !staffProfile ? 'Setup' : 'Start here'}</span>
-                <h2>{ownerView && !staffProfile ? 'Staff portal controls' : 'Common staff actions'}</h2>
+                <span>{ownerView && !staffProfile ? 'Setup' : 'Today'}</span>
+                <h2>{ownerView && !staffProfile ? 'Staff portal controls' : 'Staff home'}</h2>
               </div>
-              <ClipboardCheck size={20} />
+              <Megaphone size={20} />
             </div>
-            <div className="staff-hub-actions">
-              <button
-                className="secondary-button"
-                disabled={!canOpen(ownerView && !staffProfile ? 'access' : 'my-role')}
-                onClick={() => openPage(ownerView && !staffProfile ? 'access' : 'my-role')}
-                type="button"
-              >
-                <BriefcaseBusiness size={17} />
-                {ownerView && !staffProfile ? 'Access' : 'My role'}
-              </button>
-              <button
-                className="secondary-button"
-                disabled={!canOpen(ownerView && !staffProfile ? 'staff' : 'performance')}
-                onClick={() => openPage(ownerView && !staffProfile ? 'staff' : 'performance')}
-                type="button"
-              >
-                {ownerView && !staffProfile ? <UserRound size={17} /> : <TrendingUp size={17} />}
-                {ownerView && !staffProfile ? 'Roster' : 'Performance'}
-              </button>
-              <button
-                className="secondary-button"
-                disabled={!canOpen('payroll')}
-                onClick={() => openPage('payroll')}
-                type="button"
-              >
-                <CircleDollarSign size={17} />
-                Payroll history
-              </button>
-              <button
-                className="secondary-button"
-                disabled={!canOpen('operations')}
-                onClick={() => openPage('operations')}
-                type="button"
-              >
-                <ClipboardCheck size={17} />
-                Operations
-              </button>
+            <div className="staff-hub-action-grid">
+              {quickTools.map((tool) => {
+                const Icon = tool.icon;
+                return (
+                  <button
+                    className="staff-hub-tool"
+                    disabled={!canOpen(tool.id)}
+                    key={tool.label}
+                    onClick={() => openPage(tool.id)}
+                    type="button"
+                  >
+                    <Icon size={17} />
+                    <span>
+                      <strong>{tool.label}</strong>
+                      <small>{tool.description}</small>
+                    </span>
+                    <ChevronRight size={16} />
+                  </button>
+                );
+              })}
             </div>
+            {actionItems.length ? (
+              <div className="staff-hub-preview-list">
+                <div className="staff-hub-preview-list__header">
+                  <strong>Needs attention</strong>
+                  <button type="button" onClick={() => openPage('action-center')} disabled={!canOpen('action-center')}>
+                    View all
+                  </button>
+                </div>
+                {actionItems.map((item) => (
+                  <article className="staff-hub-alert-row" key={item.id}>
+                    <StatusBadge tone={item.tone}>{item.label}</StatusBadge>
+                    <span>{item.detail}</span>
+                    <small>{formatDate(item.date)}</small>
+                  </article>
+                ))}
+              </div>
+            ) : null}
             {businessCards.length ? (
               <div className="staff-hub-business-grid">
                 {businessCards.map((card) => (
@@ -345,7 +511,7 @@ export default function StaffHubPage({
         </>
       ) : null}
 
-      {activeTab === 'earnings' ? (
+      {activeTab === 'money' ? (
         <section className="panel full-span">
           <div className="section-header">
             <div>
@@ -407,7 +573,7 @@ export default function StaffHubPage({
         </section>
       ) : null}
 
-      {activeTab === 'performance' ? (
+      {activeTab === 'stats' ? (
         <section className="panel full-span">
           <div className="section-header">
             <div>
@@ -453,42 +619,129 @@ export default function StaffHubPage({
         </section>
       ) : null}
 
-      {activeTab === 'profile' ? (
+      {activeTab === 'schedule' ? (
         <section className="panel full-span">
           <div className="section-header">
             <div>
-              <span>Profile</span>
-              <h2>My staff record</h2>
+              <span>Schedule</span>
+              <h2>My appointments</h2>
             </div>
-            <CalendarDays size={20} />
+            <StatusBadge tone={scheduleRows.length ? 'success' : 'muted'}>
+              {scheduleRows.length ? `${scheduleRows.length} rows` : 'No imported rows'}
+            </StatusBadge>
           </div>
-          <div className="staff-hub-profile-grid">
-            <div>
-              <span>Name</span>
-              <strong>{staffProfile?.full_name || accessProfile?.full_name || 'Not set'}</strong>
-            </div>
-            <div>
-              <span>Role</span>
-              <strong>{staffProfile?.role || accessProfile?.role || 'Staff'}</strong>
-            </div>
-            <div>
-              <span>Start date</span>
-              <strong>{formatDate(staffProfile?.start_date)}</strong>
-            </div>
-            <div>
-              <span>Phone</span>
-              <strong>{staffProfile?.phone || 'Not set'}</strong>
-            </div>
-            <div>
-              <span>Instagram</span>
-              <strong>{staffProfile?.instagram_handle || 'Not set'}</strong>
-            </div>
-            <div>
-              <span>Booking profile</span>
-              <strong>{staffProfile?.booking_platform_profile || 'Not set'}</strong>
-            </div>
-          </div>
+          {masterDashboardUpdatedAt ? (
+            <p className="staff-hub-import-note">
+              Last appointment import: {formatDateTime(masterDashboardUpdatedAt)}
+            </p>
+          ) : null}
+          {scheduleRows.length ? (
+            <DataTable>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Client</th>
+                    <th>Service</th>
+                    <th>Staff</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scheduleRows.map((row, index) => (
+                    <tr key={`${row.date || row.created_at || index}-${row.client || row.service || index}`}>
+                      <td>
+                        <strong>{row.date || formatDate(row.created_at)}</strong>
+                        <span className="table-subtext">{row.schedule_type}</span>
+                      </td>
+                      <td>{row.client || row.customer || 'Not listed'}</td>
+                      <td>{row.service || row.item || 'Service'}</td>
+                      <td>{row.staffer || row.staff || row.staff_name || 'Team'}</td>
+                      <td>{row.amount ? formatCurrency(row.amount) : 'Not set'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTable>
+          ) : (
+            <EmptyState
+              icon={Clock3}
+              title="No schedule rows for this profile yet"
+              message="Imported Booksy or Square appointment data connected to this staff profile will show here."
+            />
+          )}
         </section>
+      ) : null}
+
+      {activeTab === 'more' ? (
+        <>
+          <section className="panel two-thirds">
+            <div className="section-header">
+              <div>
+                <span>More</span>
+                <h2>Staff tools and resources</h2>
+              </div>
+              <ClipboardCheck size={20} />
+            </div>
+            <div className="staff-hub-more-grid">
+              {moreOptions.map((option) => {
+                const Icon = option.icon;
+                return (
+                  <button
+                    className="staff-hub-more-card"
+                    disabled={!canOpen(option.id)}
+                    key={option.label}
+                    onClick={() => openPage(option.id)}
+                    type="button"
+                  >
+                    <Icon size={18} />
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                    </span>
+                    <ChevronRight size={16} />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="section-header">
+              <div>
+                <span>Profile</span>
+                <h2>My staff record</h2>
+              </div>
+              <CalendarDays size={20} />
+            </div>
+            <div className="staff-hub-profile-grid compact">
+              <div>
+                <span>Name</span>
+                <strong>{staffProfile?.full_name || accessProfile?.full_name || 'Not set'}</strong>
+              </div>
+              <div>
+                <span>Role</span>
+                <strong>{staffProfile?.role || accessProfile?.role || 'Staff'}</strong>
+              </div>
+              <div>
+                <span>Start date</span>
+                <strong>{formatDate(staffProfile?.start_date)}</strong>
+              </div>
+              <div>
+                <span>Phone</span>
+                <strong>{staffProfile?.phone || 'Not set'}</strong>
+              </div>
+              <div>
+                <span>Instagram</span>
+                <strong>{staffProfile?.instagram_handle || staffProfile?.social_handle || 'Not set'}</strong>
+              </div>
+              <div>
+                <span>Booking profile</span>
+                <strong>{staffProfile?.booking_platform_profile || 'Not set'}</strong>
+              </div>
+            </div>
+          </section>
+        </>
       ) : null}
     </div>
   );

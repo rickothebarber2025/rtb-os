@@ -1534,6 +1534,35 @@ select {
   width: calc(100% - 12px);
 }
 
+.staff-hub-logo-stack {
+  display: grid;
+  position: relative;
+}
+
+.staff-hub-avatar {
+  align-items: center;
+  background: linear-gradient(135deg, var(--gold), var(--gold-strong));
+  border: 2px solid rgba(8, 9, 13, 0.96);
+  border-radius: 999px;
+  bottom: -0.35rem;
+  color: #11100c;
+  display: flex;
+  font-size: 0.9rem;
+  font-weight: 950;
+  height: 42px;
+  justify-content: center;
+  overflow: hidden;
+  position: absolute;
+  right: -0.4rem;
+  width: 42px;
+}
+
+.staff-hub-avatar img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
 .staff-hub-account-card {
   align-content: center;
   background: rgba(8, 9, 13, 0.72);
@@ -1600,6 +1629,122 @@ select {
 .staff-hub-actions .secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.staff-hub-action-grid,
+.staff-hub-more-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.staff-hub-tool,
+.staff-hub-more-card {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 72px;
+  padding: 0.78rem;
+  text-align: left;
+}
+
+.staff-hub-tool svg,
+.staff-hub-more-card svg {
+  color: var(--gold);
+}
+
+.staff-hub-tool span,
+.staff-hub-more-card span {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.staff-hub-tool strong,
+.staff-hub-more-card strong {
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+
+.staff-hub-tool small,
+.staff-hub-more-card small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.staff-hub-tool:disabled,
+.staff-hub-more-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.staff-hub-preview-list {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.staff-hub-preview-list__header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.staff-hub-preview-list__header button {
+  background: transparent;
+  border: 0;
+  color: var(--gold-strong);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.staff-hub-preview-list__header button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.staff-hub-alert-row {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 52px;
+  padding: 0.62rem 0.7rem;
+}
+
+.staff-hub-alert-row > span:not(.badge) {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.staff-hub-alert-row small,
+.staff-hub-import-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.table-subtext {
+  color: var(--muted);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 750;
+  margin-top: 0.1rem;
 }
 
 .staff-hub-overview-panel,
@@ -1674,6 +1819,10 @@ select {
   display: grid;
   gap: 0.85rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.staff-hub-profile-grid.compact {
+  grid-template-columns: 1fr;
 }
 
 .staff-hub-performance-grid > div,
@@ -3270,7 +3419,9 @@ select {
   .permission-matrix,
   .permission-overview-grid,
   .role-detail-grid,
+  .staff-hub-action-grid,
   .staff-hub-business-grid,
+  .staff-hub-more-grid,
   .staff-hub-performance-grid,
   .staff-hub-profile-grid {
     grid-template-columns: 1fr;
