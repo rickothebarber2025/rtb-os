@@ -13,7 +13,11 @@ export default function Topbar({
   setSelectedBusinessUnitId,
   signOut,
   user,
+  userPreferences,
 }) {
+  const displayLabel = userPreferences?.displayName || user?.email || 'Signed in';
+  const displayInitial = displayLabel.trim().charAt(0).toUpperCase() || 'R';
+
   return (
     <header className="topbar">
       <div className="topbar__title">
@@ -41,8 +45,8 @@ export default function Topbar({
         <button className="icon-button" type="button" onClick={onRefresh} aria-label="Refresh data">
           <RefreshCw size={18} />
         </button>
-        <div className="user-chip" title={user?.email || 'Signed in'}>
-          {user?.email?.charAt(0).toUpperCase() || 'R'}
+        <div className="user-chip" title={displayLabel}>
+          {displayInitial}
         </div>
         <button className="icon-button" type="button" onClick={signOut} aria-label="Sign out">
           <LogOut size={18} />

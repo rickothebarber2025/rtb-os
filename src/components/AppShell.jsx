@@ -17,6 +17,7 @@ export default function AppShell({
   setSelectedBusinessUnitId,
   signOut,
   user,
+  userPreferences,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pageTitle = useMemo(
@@ -24,10 +25,19 @@ export default function AppShell({
     [activePage, navItems],
   );
   const selectedBusiness = businessOptions?.find((unit) => unit.id === selectedBusinessUnitId);
-  const shellTheme = getBusinessProfile(selectedBusiness).portal_theme || 'theme-combined';
+  const businessTheme = getBusinessProfile(selectedBusiness).portal_theme || 'theme-combined';
+  const preferredTheme =
+    userPreferences?.themePreference && userPreferences.themePreference !== 'auto'
+      ? `theme-${userPreferences.themePreference}`
+      : businessTheme;
+  const densityClass =
+    userPreferences?.density === 'compact' ? 'density-compact' : 'density-comfortable';
+  const navigationClass =
+    userPreferences?.navigationStyle === 'full' ? 'nav-full' : 'nav-simple';
+  const motionClass = userPreferences?.reduceMotion ? 'motion-reduced' : 'motion-standard';
 
   return (
-    <div className={`app-shell ${shellTheme}`}>
+    <div className={`app-shell ${preferredTheme} ${densityClass} ${navigationClass} ${motionClass}`}>
       <Sidebar
         activePage={activePage}
         businessOptions={businessOptions}
@@ -52,6 +62,7 @@ export default function AppShell({
           setSelectedBusinessUnitId={setSelectedBusinessUnitId}
           signOut={signOut}
           user={user}
+          userPreferences={userPreferences}
         />
         <main className="content">{children}</main>
         <MobileTabBar

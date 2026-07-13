@@ -7,6 +7,7 @@ import AccessPendingPage from './pages/AccessPendingPage';
 import AuthPage from './pages/AuthPage';
 import { useAuth } from './hooks/useAuth';
 import { useRtbData } from './hooks/useRtbData';
+import { useUserPreferences } from './hooks/useUserPreferences';
 import { saveStaff } from './services/rtbService';
 import { canAccessPage, canManageStaff, canUseApp, getAllowedNavItems } from './utils/access';
 import {
@@ -45,6 +46,7 @@ function getSurveyTokenFromLocation() {
 export default function App() {
   const auth = useAuth();
   useSyncAuthProfile(auth.profile, auth.loading);
+  const [userPreferences, setUserPreferences] = useUserPreferences(auth.user?.id);
   const surveyToken = getSurveyTokenFromLocation();
   const [activePage, setActivePage] = useState('dashboard');
   const [selectedBusinessUnitId, setSelectedBusinessUnitId] = useState(() =>
@@ -127,10 +129,12 @@ export default function App() {
       staffHub: data.staffHub,
       staffBusinessMetadata: data.staffBusinessMetadata,
       accessProfile: auth.profile,
+      setUserPreferences,
       user: auth.user,
+      userPreferences,
       warnings: data.warnings,
     }),
-    [auth.profile, auth.user, businessOptions, data, navItems],
+    [auth.profile, auth.user, businessOptions, data, navItems, setUserPreferences, userPreferences],
   );
 
   function renderPage() {
@@ -287,6 +291,7 @@ export default function App() {
       setSelectedBusinessUnitId={setSelectedBusinessUnitId}
       signOut={auth.signOut}
       user={auth.user}
+      userPreferences={userPreferences}
     >
       {isAllBusinessesId(selectedBusinessUnitId) ? (
         <div className="alert warning global-alert">
