@@ -670,7 +670,7 @@ export default function StaffHubPage({
         />
       </section>
 
-      <section className="panel full-span">
+      <section className="panel full-span staff-hub-tabs-panel">
         <div className="staff-hub-tabs" role="tablist" aria-label="Staff Hub sections">
           {TABS.map((tab) => (
             <button
@@ -740,53 +740,62 @@ export default function StaffHubPage({
                 <span>{formatNumber(visibleAnnouncements.length)} updates</span>
               </div>
               {canManageHub ? (
-                <form className="staff-hub-form" onSubmit={submitAnnouncement}>
-                  <div className="form-grid compact">
+                <details className="staff-hub-composer">
+                  <summary>
+                    <span>
+                      <strong>Post staff update</strong>
+                      <small>Share a reminder, policy note, event, or training update.</small>
+                    </span>
+                    <ChevronRight size={16} />
+                  </summary>
+                  <form className="staff-hub-form" onSubmit={submitAnnouncement}>
+                    <div className="form-grid compact">
+                      <label className="field">
+                        <span>Title</span>
+                        <input
+                          required
+                          value={announcementForm.title}
+                          onChange={(event) => updateAnnouncementForm('title', event.target.value)}
+                          placeholder="Staff reminder"
+                        />
+                      </label>
+                      <label className="field">
+                        <span>Category</span>
+                        <select
+                          value={announcementForm.category}
+                          onChange={(event) => updateAnnouncementForm('category', event.target.value)}
+                        >
+                          {ANNOUNCEMENT_CATEGORIES.map((category) => (
+                            <option key={category} value={category}>
+                              {formatCategory(category)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
                     <label className="field">
-                      <span>Title</span>
-                      <input
+                      <span>Message</span>
+                      <textarea
                         required
-                        value={announcementForm.title}
-                        onChange={(event) => updateAnnouncementForm('title', event.target.value)}
-                        placeholder="Staff reminder"
+                        rows={3}
+                        value={announcementForm.body}
+                        onChange={(event) => updateAnnouncementForm('body', event.target.value)}
+                        placeholder="Write the update staff should see."
                       />
                     </label>
-                    <label className="field">
-                      <span>Category</span>
-                      <select
-                        value={announcementForm.category}
-                        onChange={(event) => updateAnnouncementForm('category', event.target.value)}
-                      >
-                        {ANNOUNCEMENT_CATEGORIES.map((category) => (
-                          <option key={category} value={category}>
-                            {formatCategory(category)}
-                          </option>
-                        ))}
-                      </select>
+                    <label className="checkbox-line">
+                      <input
+                        checked={announcementForm.pinned}
+                        onChange={(event) => updateAnnouncementForm('pinned', event.target.checked)}
+                        type="checkbox"
+                      />
+                      Pin this update
                     </label>
-                  </div>
-                  <label className="field">
-                    <span>Message</span>
-                    <textarea
-                      required
-                      rows={3}
-                      value={announcementForm.body}
-                      onChange={(event) => updateAnnouncementForm('body', event.target.value)}
-                      placeholder="Write the update staff should see."
-                    />
-                  </label>
-                  <label className="checkbox-line">
-                    <input
-                      checked={announcementForm.pinned}
-                      onChange={(event) => updateAnnouncementForm('pinned', event.target.checked)}
-                      type="checkbox"
-                    />
-                    Pin this update
-                  </label>
-                  <button className="primary-button" disabled={savingHubAction === 'announcement'} type="submit">
-                    Post update
-                  </button>
-                </form>
+                    <button className="primary-button" disabled={savingHubAction === 'announcement'} type="submit">
+                      Post update
+                    </button>
+                  </form>
+                </details>
               ) : null}
               {visibleAnnouncements.length ? (
                 <div className="staff-hub-feed">

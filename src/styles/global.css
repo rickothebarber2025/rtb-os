@@ -1483,36 +1483,77 @@ select {
 }
 
 .staff-hub-page {
-  gap: 0.85rem;
+  gap: 0.72rem;
+  margin: 0 auto;
+  max-width: 1320px;
+  width: 100%;
+}
+
+.staff-hub-page .panel,
+.staff-hub-page .hero-panel,
+.staff-hub-page .metric-card {
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: none;
+}
+
+.staff-hub-page .panel {
+  padding: 0.9rem;
 }
 
 .staff-hub-page .metric-card {
-  min-height: 104px;
+  gap: 0.7rem;
+  min-height: 86px;
+  padding: 0.82rem;
 }
 
 .staff-hub-page .metric-card strong {
-  font-size: clamp(1.25rem, 1.8vw, 1.75rem);
+  font-size: clamp(1.18rem, 1.45vw, 1.45rem);
+  margin-top: 0.25rem;
+}
+
+.staff-hub-page .metric-card span {
+  margin-top: 0.28rem;
+}
+
+.staff-hub-page .metric-card__icon {
+  border-radius: 10px;
+  height: 34px;
+  width: 34px;
+}
+
+.staff-hub-page .metrics-grid {
+  gap: 0.72rem;
 }
 
 .staff-hub-hero {
   align-items: center;
   background:
-    linear-gradient(90deg, rgba(12, 14, 20, 0.98), rgba(18, 21, 29, 0.86)),
-    linear-gradient(135deg, rgba(214, 168, 79, 0.12), transparent 58%);
-  min-height: 176px;
+    linear-gradient(90deg, rgba(12, 14, 20, 0.98), rgba(16, 19, 27, 0.94)),
+    rgba(255, 255, 255, 0.035);
+  min-height: 132px;
+  padding: 1rem;
 }
 
 .staff-hub-hero::after {
-  opacity: 0.22;
-  width: 36%;
+  display: none;
 }
 
 .staff-hub-brand-lockup {
   align-items: center;
   display: grid;
-  gap: 1.1rem;
+  gap: 0.85rem;
   grid-template-columns: auto minmax(0, 1fr);
   min-width: 0;
+}
+
+.staff-hub-brand-lockup h2 {
+  font-size: clamp(1.7rem, 2.6vw, 2.55rem);
+}
+
+.staff-hub-brand-lockup p {
+  font-size: 0.9rem;
+  margin-top: 0.42rem;
+  max-width: 680px;
 }
 
 .staff-hub-logo {
@@ -1521,10 +1562,10 @@ select {
   border: 1px solid rgba(241, 199, 104, 0.24);
   border-radius: var(--radius);
   display: flex;
-  height: 104px;
+  height: 78px;
   justify-content: center;
   overflow: hidden;
-  width: 104px;
+  width: 78px;
 }
 
 .staff-hub-logo img {
@@ -1544,17 +1585,17 @@ select {
   background: linear-gradient(135deg, var(--gold), var(--gold-strong));
   border: 2px solid rgba(8, 9, 13, 0.96);
   border-radius: 999px;
-  bottom: -0.35rem;
+  bottom: -0.2rem;
   color: #11100c;
   display: flex;
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   font-weight: 950;
-  height: 42px;
+  height: 32px;
   justify-content: center;
   overflow: hidden;
   position: absolute;
-  right: -0.4rem;
-  width: 42px;
+  right: -0.28rem;
+  width: 32px;
 }
 
 .staff-hub-avatar img {
@@ -1565,13 +1606,13 @@ select {
 
 .staff-hub-account-card {
   align-content: center;
-  background: rgba(8, 9, 13, 0.72);
+  background: rgba(8, 9, 13, 0.52);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
   display: grid;
-  gap: 0.48rem;
-  min-width: min(270px, 100%);
-  padding: 0.92rem;
+  gap: 0.35rem;
+  min-width: min(220px, 100%);
+  padding: 0.72rem;
 }
 
 .staff-hub-account-card__top {
@@ -1595,28 +1636,43 @@ select {
 }
 
 .staff-hub-alert-panel {
-  padding: 0.75rem;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.staff-hub-alert-panel .alert {
+  padding: 0.72rem 0.85rem;
+}
+
+.staff-hub-tabs-panel {
+  padding: 0.58rem;
 }
 
 .staff-hub-tabs {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.35rem;
+  padding: 0.35rem;
 }
 
 .staff-hub-tabs button {
-  background: var(--panel-soft);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
   color: var(--muted);
   font-weight: 800;
-  min-height: 38px;
-  padding: 0 0.85rem;
+  min-height: 34px;
+  padding: 0 0.78rem;
 }
 
 .staff-hub-tabs button.active {
-  background: var(--gold-soft);
-  border-color: rgba(214, 168, 79, 0.45);
+  background: rgba(214, 168, 79, 0.14);
+  border-color: rgba(214, 168, 79, 0.28);
   color: var(--gold-strong);
 }
 
@@ -1641,15 +1697,15 @@ select {
 .staff-hub-tool,
 .staff-hub-more-card {
   align-items: center;
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.028);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   color: var(--text);
   display: grid;
   gap: 0.75rem;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 72px;
-  padding: 0.78rem;
+  min-height: 58px;
+  padding: 0.65rem;
   text-align: left;
 }
 
@@ -1691,6 +1747,56 @@ select {
   gap: 0.5rem;
   margin-top: 1rem;
   padding-top: 1rem;
+}
+
+.staff-hub-composer {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.staff-hub-composer summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 54px;
+  padding: 0.72rem 0.82rem;
+}
+
+.staff-hub-composer summary::-webkit-details-marker {
+  display: none;
+}
+
+.staff-hub-composer summary span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.staff-hub-composer summary strong {
+  font-size: 0.9rem;
+}
+
+.staff-hub-composer summary small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.staff-hub-composer summary svg {
+  color: var(--gold-strong);
+  transition: transform 180ms ease;
+}
+
+.staff-hub-composer[open] summary svg {
+  transform: rotate(90deg);
+}
+
+.staff-hub-composer .staff-hub-form {
+  border-width: 1px 0 0;
+  border-radius: 0;
 }
 
 .staff-hub-preview-list__header {
@@ -1766,8 +1872,8 @@ select {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   display: grid;
-  gap: 0.75rem;
-  padding: 0.82rem;
+  gap: 0.65rem;
+  padding: 0.72rem;
 }
 
 .staff-hub-form .primary-button {
@@ -1797,12 +1903,12 @@ select {
 
 .staff-hub-feed-card,
 .staff-hub-list-row {
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.026);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   display: grid;
   gap: 0.55rem;
-  padding: 0.78rem;
+  padding: 0.68rem;
 }
 
 .staff-hub-feed-card.read {
@@ -1909,8 +2015,8 @@ select {
   display: grid;
   gap: 0.35rem 0.75rem;
   grid-template-columns: auto minmax(0, 1fr);
-  min-height: 92px;
-  padding: 0.75rem;
+  min-height: 78px;
+  padding: 0.65rem;
 }
 
 .staff-hub-business-card img {
@@ -1918,10 +2024,10 @@ select {
   border: 1px solid rgba(241, 199, 104, 0.18);
   border-radius: var(--radius);
   grid-row: span 2;
-  height: 58px;
+  height: 48px;
   object-fit: contain;
   padding: 0.18rem;
-  width: 58px;
+  width: 48px;
 }
 
 .staff-hub-business-card strong {
@@ -3705,10 +3811,15 @@ select {
   .staff-hub-action-grid,
   .staff-hub-business-grid,
   .staff-hub-more-grid,
-  .staff-hub-performance-grid,
-  .staff-hub-profile-grid,
   .staff-hub-split-grid {
     grid-template-columns: 1fr;
+  }
+
+  .staff-hub-action-grid,
+  .staff-hub-more-grid,
+  .staff-hub-performance-grid,
+  .staff-hub-profile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .page-grid,
@@ -3893,8 +4004,8 @@ select {
   }
 
   .staff-hub-logo {
-    height: 82px;
-    width: 82px;
+    height: 68px;
+    width: 68px;
   }
 
   .staff-hub-account-card {
@@ -4997,6 +5108,24 @@ tbody tr:hover {
 .staff-hub-alert-row:hover {
   box-shadow: 0 22px 46px rgba(0, 0, 0, 0.32);
   transform: translateY(-2px);
+}
+
+.staff-hub-page .metric-card::before,
+.staff-hub-page .staff-hub-performance-grid > div::before,
+.staff-hub-page .staff-hub-profile-grid > div::before {
+  display: none;
+}
+
+.staff-hub-page .panel:hover,
+.staff-hub-page .metric-card:hover,
+.staff-hub-page .staff-hub-alert-row:hover,
+.staff-hub-page .staff-hub-tool:hover,
+.staff-hub-page .staff-hub-more-card:hover,
+.staff-hub-page .staff-hub-feed-card:hover,
+.staff-hub-page .staff-hub-list-row:hover,
+.staff-hub-page .staff-hub-business-card:hover {
+  box-shadow: none;
+  transform: none;
 }
 
 .primary-button,
