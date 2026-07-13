@@ -1442,6 +1442,122 @@ select {
   line-height: 1.35;
 }
 
+.staff-hub-page .metric-card {
+  min-height: 118px;
+}
+
+.staff-hub-hero {
+  align-items: stretch;
+}
+
+.staff-hub-identity {
+  align-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.35rem;
+  justify-items: start;
+  min-width: min(260px, 100%);
+  padding: 1rem;
+}
+
+.staff-hub-identity svg {
+  color: var(--gold);
+}
+
+.staff-hub-identity strong {
+  font-size: 1rem;
+}
+
+.staff-hub-identity span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.staff-hub-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.staff-hub-tabs button {
+  background: var(--panel-soft);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-weight: 800;
+  min-height: 38px;
+  padding: 0 0.85rem;
+}
+
+.staff-hub-tabs button.active {
+  background: var(--gold-soft);
+  border-color: rgba(214, 168, 79, 0.45);
+  color: var(--gold-strong);
+}
+
+.staff-hub-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.staff-hub-actions .secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.staff-hub-total {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.staff-hub-total span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.staff-hub-performance-grid,
+.staff-hub-profile-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.staff-hub-performance-grid > div,
+.staff-hub-profile-grid > div {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.35rem;
+  min-height: 90px;
+  padding: 0.85rem;
+}
+
+.staff-hub-performance-grid span,
+.staff-hub-profile-grid span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.staff-hub-performance-grid strong,
+.staff-hub-profile-grid strong {
+  font-size: 1rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .compact-list {
   color: var(--muted);
   display: grid;
@@ -2922,7 +3038,9 @@ select {
   .access-card__controls,
   .permission-matrix,
   .permission-overview-grid,
-  .role-detail-grid {
+  .role-detail-grid,
+  .staff-hub-performance-grid,
+  .staff-hub-profile-grid {
     grid-template-columns: 1fr;
   }
 

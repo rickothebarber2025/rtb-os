@@ -39,6 +39,7 @@ export const PAGE_MODULE_MAP = {
   operations: 'operations',
   payroll: 'payroll',
   performance: 'performance',
+  'staff-hub': 'dashboard',
   staff: 'roster',
   system: 'settings',
 };

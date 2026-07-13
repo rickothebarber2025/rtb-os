@@ -1,11 +1,12 @@
 import { Menu } from 'lucide-react';
 
-const QUICK_NAV_IDS = ['dashboard', 'action-center', 'payroll', 'staff'];
+const QUICK_NAV_IDS = ['staff-hub', 'dashboard', 'payroll', 'staff'];
 
 const SHORT_LABELS = {
   'action-center': 'Actions',
   dashboard: 'Home',
   payroll: 'Payroll',
+  'staff-hub': 'Hub',
   staff: 'Roster',
 };
 

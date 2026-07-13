@@ -28,6 +28,7 @@ const MyRolePage = lazy(() => import('./pages/MyRolePage'));
 const PayrollPage = lazy(() => import('./pages/PayrollPage'));
 const PerformancePage = lazy(() => import('./pages/PerformancePage'));
 const StaffPage = lazy(() => import('./pages/StaffPage'));
+const StaffHubPage = lazy(() => import('./pages/StaffHubPage'));
 const SurveyPage = lazy(() => import('./pages/SurveyPage'));
 const SystemPage = lazy(() => import('./pages/SystemPage'));
 
@@ -180,6 +181,12 @@ export default function App() {
         return (
           <ModuleGate module="roster">
             <StaffPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'staff-hub':
+        return (
+          <ModuleGate module="dashboard">
+            <StaffHubPage {...pageProps} />
           </ModuleGate>
         );
       case 'performance':

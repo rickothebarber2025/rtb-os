@@ -1,19 +1,20 @@
 # RTB Staff Hub
 
-This folder is reserved for the RTB Staff Hub app.
+The Staff Hub is now merged into the main RTB OS React app.
 
-Uploaded source file to add here:
+## Current location
 
-- rtb-staff-hub.html
-- Target path: staff-hub/index.html
+- Page: `src/pages/StaffHubPage.jsx`
+- Navigation: `src/utils/constants.js`
+- Permissions: `src/lib/permissions.js`
 
-## Current app scope
+## Scope
 
-The uploaded HTML app includes Supabase login, staff profiles, business switching, announcements, weekly newsletters, pay statements, performance tracking, schedule requests, task management, policies, content approval, team management, and admin alerts.
+The merged Staff Hub gives staff a focused workspace for their assigned business:
 
-## Setup required
+- weekly earnings from payroll entries linked to their staff profile
+- personal performance summary
+- role and profile details
+- common shortcuts into allowed RTB OS modules
 
-1. Add the uploaded HTML file as staff-hub/index.html.
-2. Fill in the Supabase browser config in the HTML file.
-3. Create the required Supabase tables, RLS policies, and storage buckets.
-4. Decide whether this stays standalone or gets migrated into the RTB OS stack.
+It reuses the existing RTB OS Supabase auth, permissions, business scoping, and RLS model.

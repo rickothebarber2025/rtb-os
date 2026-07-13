@@ -5,6 +5,7 @@
   CalendarDays,
   CircleDollarSign,
   ClipboardCheck,
+  IdCard,
   LayoutDashboard,
   MessageSquareText,
   UserCog,
@@ -15,6 +16,7 @@
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
+  { group: 'Workspace', id: 'staff-hub', label: 'Staff Hub', icon: IdCard },
   { group: 'Workspace', id: 'dashboard', label: 'My Workspace', icon: LayoutDashboard },
   { group: 'Workspace', id: 'action-center', label: 'Action Center', icon: BellRing },
   { group: 'Workspace', id: 'my-role', label: 'My Role', icon: UserCog },
