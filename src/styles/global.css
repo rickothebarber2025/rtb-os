@@ -3160,6 +3160,71 @@ select {
   width: auto;
 }
 
+.access-page {
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 auto;
+  max-width: 1120px;
+  width: 100%;
+}
+
+.access-page .panel {
+  padding: 0.85rem;
+}
+
+.access-page .hero-panel {
+  min-height: 118px;
+  padding: 1rem;
+}
+
+.access-page .hero-panel h2 {
+  font-size: clamp(1.45rem, 2.4vw, 2.35rem);
+  max-width: 620px;
+}
+
+.access-page .hero-panel p {
+  font-size: 0.88rem;
+  margin-top: 0.45rem;
+  max-width: 560px;
+}
+
+.access-page .hero-meta {
+  min-width: 112px;
+  padding: 0.7rem;
+}
+
+.access-page .business-access-picker {
+  gap: 0.55rem;
+  padding: 0.65rem;
+}
+
+.access-page .business-access-picker p {
+  font-size: 0.78rem;
+}
+
+.access-page .business-access-toolbar,
+.access-page .business-access-options {
+  gap: 0.4rem;
+}
+
+.access-page .form-grid {
+  gap: 0.65rem;
+}
+
+.access-page .form-grid.compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.access-page .form-grid.compact .field {
+  grid-column: span 2;
+}
+
+.access-page .check-row {
+  gap: 0.45rem;
+  min-height: 36px;
+  padding: 0 0.6rem;
+}
+
 .access-denied-panel {
   align-items: center;
   display: flex;
@@ -3180,9 +3245,18 @@ select {
   align-content: start;
 }
 
+.access-page .admin-control-overview .section-header {
+  margin-bottom: 0.65rem;
+}
+
 .admin-control-grid {
   display: grid;
   gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.access-page .admin-control-grid {
+  gap: 0.55rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -3195,6 +3269,19 @@ select {
   gap: 0.55rem;
   min-height: 156px;
   padding: 0.85rem;
+}
+
+.access-page .admin-control-card {
+  gap: 0.38rem;
+  min-height: 118px;
+  padding: 0.62rem;
+}
+
+.access-page .admin-control-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .admin-control-card > div {
@@ -3231,6 +3318,19 @@ select {
   padding: 1rem;
 }
 
+.access-page .access-template-form,
+.access-page .access-card-list,
+.access-page .access-card,
+.access-page .access-details,
+.access-page .template-preview,
+.access-page .role-summary-list {
+  gap: 0.7rem;
+}
+
+.access-page .access-card {
+  padding: 0.78rem;
+}
+
 .access-card__header,
 .access-card__controls,
 .template-preview {
@@ -3247,11 +3347,24 @@ select {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.access-page .access-card__controls {
+  gap: 0.6rem;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(128px, auto);
+}
+
+.access-page .access-card__controls .check-row {
+  min-width: 0;
+}
+
 .access-details {
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.76rem;
+}
+
+.access-page .access-details {
+  padding: 0.62rem;
 }
 
 .access-details summary {
@@ -3292,6 +3405,11 @@ select {
   padding: 0.85rem;
 }
 
+.access-page .template-preview {
+  gap: 0.6rem;
+  padding: 0.65rem;
+}
+
 .template-preview strong,
 .role-summary-list strong {
   display: block;
@@ -3318,6 +3436,11 @@ select {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.access-page .permission-matrix {
+  gap: 0.45rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .permission-cell,
 .permission-overview-card,
 .role-summary-list > div {
@@ -3332,6 +3455,11 @@ select {
   gap: 0.45rem;
 }
 
+.access-page .permission-cell {
+  gap: 0.32rem;
+  padding: 0.56rem;
+}
+
 .permission-cell span,
 .permission-overview-card span {
   color: var(--muted);
@@ -3344,14 +3472,27 @@ select {
   padding: 0 0.65rem;
 }
 
+.access-page .permission-cell select {
+  min-height: 32px;
+  padding: 0 0.5rem;
+}
+
 .role-detail-grid {
   display: grid;
   gap: 0.85rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.access-page .role-detail-grid {
+  gap: 0.62rem;
+}
+
 .role-detail-grid textarea {
   min-height: 118px;
+}
+
+.access-page .role-detail-grid textarea {
+  min-height: 82px;
 }
 
 .role-detail-grid .full-width {
