@@ -27,9 +27,11 @@ export default function AppShell({
     <div className="app-shell">
       <Sidebar
         activePage={activePage}
+        businessOptions={businessOptions}
         isOpen={sidebarOpen}
         navItems={navItems}
         onClose={() => setSidebarOpen(false)}
+        selectedBusinessUnitId={selectedBusinessUnitId}
         setActivePage={setActivePage}
       />
       {sidebarOpen ? (

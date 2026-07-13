@@ -200,6 +200,19 @@ select {
   width: 42px;
 }
 
+.brand-mark.image-mark {
+  background: #050609;
+  border: 1px solid rgba(241, 199, 104, 0.26);
+  overflow: hidden;
+}
+
+.brand-mark.image-mark img {
+  display: block;
+  height: calc(100% - 6px);
+  object-fit: contain;
+  width: calc(100% - 6px);
+}
+
 .brand-mark.large {
   height: 58px;
   width: 58px;
@@ -383,6 +396,33 @@ select {
   line-height: 1.55;
   margin: 0.8rem 0 0;
   max-width: 640px;
+}
+
+.hero-brand-lockup {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+}
+
+.hero-brand-logo {
+  align-items: center;
+  background: #050609;
+  border: 1px solid rgba(241, 199, 104, 0.24);
+  border-radius: var(--radius);
+  display: flex;
+  height: 92px;
+  justify-content: center;
+  overflow: hidden;
+  width: 92px;
+}
+
+.hero-brand-logo img {
+  display: block;
+  height: calc(100% - 12px);
+  object-fit: contain;
+  width: calc(100% - 12px);
 }
 
 .metrics-grid {
@@ -1442,38 +1482,91 @@ select {
   line-height: 1.35;
 }
 
+.staff-hub-page {
+  gap: 0.85rem;
+}
+
 .staff-hub-page .metric-card {
-  min-height: 118px;
+  min-height: 104px;
+}
+
+.staff-hub-page .metric-card strong {
+  font-size: clamp(1.25rem, 1.8vw, 1.75rem);
 }
 
 .staff-hub-hero {
-  align-items: stretch;
+  align-items: center;
+  background:
+    linear-gradient(90deg, rgba(12, 14, 20, 0.98), rgba(18, 21, 29, 0.86)),
+    linear-gradient(135deg, rgba(214, 168, 79, 0.12), transparent 58%);
+  min-height: 176px;
 }
 
-.staff-hub-identity {
+.staff-hub-hero::after {
+  opacity: 0.22;
+  width: 36%;
+}
+
+.staff-hub-brand-lockup {
+  align-items: center;
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+}
+
+.staff-hub-logo {
+  align-items: center;
+  background: #050609;
+  border: 1px solid rgba(241, 199, 104, 0.24);
+  border-radius: var(--radius);
+  display: flex;
+  height: 104px;
+  justify-content: center;
+  overflow: hidden;
+  width: 104px;
+}
+
+.staff-hub-logo img {
+  display: block;
+  height: calc(100% - 12px);
+  object-fit: contain;
+  width: calc(100% - 12px);
+}
+
+.staff-hub-account-card {
   align-content: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 9, 13, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
   display: grid;
-  gap: 0.35rem;
-  justify-items: start;
-  min-width: min(260px, 100%);
-  padding: 1rem;
+  gap: 0.48rem;
+  min-width: min(270px, 100%);
+  padding: 0.92rem;
 }
 
-.staff-hub-identity svg {
+.staff-hub-account-card__top {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.staff-hub-account-card svg {
   color: var(--gold);
 }
 
-.staff-hub-identity strong {
+.staff-hub-account-card strong {
   font-size: 1rem;
 }
 
-.staff-hub-identity span {
+.staff-hub-account-card span {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.staff-hub-alert-panel {
+  padding: 0.75rem;
 }
 
 .staff-hub-tabs {
@@ -1507,6 +1600,57 @@ select {
 .staff-hub-actions .secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.staff-hub-overview-panel,
+.staff-hub-assignment-panel {
+  align-content: start;
+}
+
+.staff-hub-business-grid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.staff-hub-business-card {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.35rem 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 92px;
+  padding: 0.75rem;
+}
+
+.staff-hub-business-card img {
+  background: #050609;
+  border: 1px solid rgba(241, 199, 104, 0.18);
+  border-radius: var(--radius);
+  grid-row: span 2;
+  height: 58px;
+  object-fit: contain;
+  padding: 0.18rem;
+  width: 58px;
+}
+
+.staff-hub-business-card strong {
+  display: block;
+}
+
+.staff-hub-business-card span,
+.staff-hub-business-card small {
+  color: var(--muted);
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.staff-hub-business-card small {
+  grid-column: 2;
 }
 
 .staff-hub-total {
@@ -3039,6 +3183,7 @@ select {
   .permission-matrix,
   .permission-overview-grid,
   .role-detail-grid,
+  .staff-hub-business-grid,
   .staff-hub-performance-grid,
   .staff-hub-profile-grid {
     grid-template-columns: 1fr;
@@ -3208,6 +3353,30 @@ select {
   .hero-panel {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .staff-hub-brand-lockup {
+    align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .hero-brand-lockup {
+    align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .hero-brand-logo {
+    height: 78px;
+    width: 78px;
+  }
+
+  .staff-hub-logo {
+    height: 82px;
+    width: 82px;
+  }
+
+  .staff-hub-account-card {
+    width: 100%;
   }
 
   .hero-meta {

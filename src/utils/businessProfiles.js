@@ -28,6 +28,7 @@ export const DEFAULT_BUSINESS_PROFILES = {
     import_source: 'Booksy report import + Square POS sales import',
     instagram_format: 'firstname.rtb_lounge',
     instagram_formats: ['firstname.rtb_lounge', 'firstnamelastname'],
+    logo_url: '/assets/rtb-lounge-logo.png',
     payroll_rules: {
       appointment_source: 'Booksy',
       pos_source: 'Square POS',
@@ -50,6 +51,7 @@ export const DEFAULT_BUSINESS_PROFILES = {
     import_source: 'Square Appointments/POS import',
     instagram_format: 'firstname.rtb_lounge',
     instagram_formats: ['firstname.rtb_lounge', 'firstnamelastname'],
+    logo_url: '/assets/rtb-beauty-logo.png',
     payroll_rules: {
       appointment_source: 'Square Appointments',
       pos_source: 'Square POS',
@@ -67,6 +69,7 @@ export const ALL_BUSINESSES_UNIT = {
   import_source: 'Combined reporting only',
   instagram_format: 'Business-specific rules',
   isAllBusinesses: true,
+  logo_url: '/assets/rtb-combined-logo.png',
   name: 'All Businesses',
   pos_platform: 'Square',
 };
@@ -116,6 +119,7 @@ export function getBusinessProfile(businessUnit, overrides = null) {
       import_source: 'Manual import',
       instagram_format: 'firstname.rtb_lounge',
       instagram_formats: ['firstname.rtb_lounge', 'firstnamelastname'],
+      logo_url: '/assets/rtb-combined-logo.png',
       payroll_rules: {
         appointment_source: 'Manual',
         pos_source: 'Square POS',

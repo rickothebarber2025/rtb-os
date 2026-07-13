@@ -13,6 +13,8 @@ import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
+import { isOwnerProfile } from '../lib/permissions';
+import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
 import { formatCurrency, formatDate, formatNumber } from '../utils/formatters';
 
 const TABS = [
@@ -85,6 +87,7 @@ function getRank(performanceSummary, staffProfile) {
 export default function StaffHubPage({
   accessProfile,
   businessUnit,
+  businessUnits,
   navItems,
   payrollRuns,
   performanceSummary,
@@ -97,7 +100,26 @@ export default function StaffHubPage({
     () => findStaffProfile({ accessProfile, staff, user }),
     [accessProfile, staff, user],
   );
+  const ownerView = isOwnerProfile(accessProfile);
+  const allBusinessesView = isAllBusinessesUnit(businessUnit);
+  const businessProfile = getBusinessProfile(businessUnit);
+  const activeStaffCount = staff.filter((member) => member.active).length;
   const allowedPageIds = useMemo(() => new Set(navItems.map((item) => item.id)), [navItems]);
+  const businessCards = useMemo(() => {
+    const units = allBusinessesView ? businessUnits : businessUnits?.filter((unit) => unit.id === businessUnit?.id);
+    return (units || []).map((unit) => {
+      const profile = getBusinessProfile(unit);
+      const assignedStaff = staff.filter((member) => member.business_unit_id === unit.id);
+      return {
+        activeStaff: assignedStaff.filter((member) => member.active).length,
+        id: unit.id,
+        logoUrl: profile.logo_url,
+        name: unit.name,
+        platform: profile.booking_platform,
+        type: profile.business_type,
+      };
+    });
+  }, [allBusinessesView, businessUnit?.id, businessUnits, staff]);
   const ownEntries = useMemo(
     () =>
       getRunEntryRows(payrollRuns)
@@ -113,7 +135,10 @@ export default function StaffHubPage({
   const totalTips = sum(ownEntries, 'tips');
   const latestEntry = ownEntries[0] || null;
   const rank = getRank(performanceSummary, staffProfile);
+  const performanceTotal = sum(performanceSummary, 'total_net_sales');
   const canOpen = (pageId) => allowedPageIds.has(pageId);
+  const profileName = staffProfile?.full_name || accessProfile?.full_name || user?.email || 'My Staff Account';
+  const portalMode = staffProfile ? 'My staff portal' : ownerView ? 'Staff portal preview' : 'Staff access setup needed';
 
   function openPage(pageId) {
     if (canOpen(pageId)) setActivePage(pageId);
@@ -122,23 +147,33 @@ export default function StaffHubPage({
   return (
     <div className="page-grid staff-hub-page">
       <section className="hero-panel full-span staff-hub-hero">
-        <div>
-          <span className="eyebrow">Staff Hub</span>
-          <h2>{accessProfile?.full_name || user?.email || 'My Staff Account'}</h2>
-          <p>
-            Weekly earnings, performance, role details, and business updates for{' '}
-            {businessUnit?.name || 'your assigned RTB business'}.
-          </p>
+        <div className="staff-hub-brand-lockup">
+          <div className="staff-hub-logo">
+            <img src={businessProfile.logo_url} alt="" />
+          </div>
+          <div>
+            <span className="eyebrow">{portalMode}</span>
+            <h2>{profileName}</h2>
+            <p>
+              A focused staff workspace for earnings, performance, schedule readiness, and assigned
+              business updates.
+            </p>
+          </div>
         </div>
-        <div className="staff-hub-identity">
-          <UserRound size={22} />
-          <strong>{staffProfile?.full_name || 'Profile not matched'}</strong>
-          <span>{staffProfile?.role || accessProfile?.role_title || 'Staff'}</span>
+        <div className="staff-hub-account-card">
+          <div className="staff-hub-account-card__top">
+            <UserRound size={18} />
+            <StatusBadge tone={staffProfile?.active || ownerView ? 'success' : 'warning'}>
+              {staffProfile?.active ? 'Active' : ownerView ? 'Owner preview' : 'Needs match'}
+            </StatusBadge>
+          </div>
+          <strong>{staffProfile?.role || accessProfile?.role_title || 'Staff'}</strong>
+          <span>{businessUnit?.name || staffProfile?.primary_business_name || 'Assigned business'}</span>
         </div>
       </section>
 
-      {!staffProfile ? (
-        <section className="panel full-span">
+      {!staffProfile && !ownerView ? (
+        <section className="panel full-span staff-hub-alert-panel">
           <div className="alert warning">
             <strong>No roster profile matched this login.</strong>
             <span>
@@ -149,30 +184,42 @@ export default function StaffHubPage({
         </section>
       ) : null}
 
+      {ownerView && !staffProfile ? (
+        <section className="panel full-span staff-hub-alert-panel">
+          <div className="alert success">
+            <strong>You are viewing the staff portal as the owner.</strong>
+            <span>
+              Staff will see their own earnings and performance after their login email is matched
+              to a roster profile in Access and Roster.
+            </span>
+          </div>
+        </section>
+      ) : null}
+
       <section className="metrics-grid full-span">
         <MetricCard
           icon={WalletCards}
-          label="Latest take-home"
-          trend={latestEntry?.week_label || 'No payroll entry yet'}
-          value={formatCurrency(latestEntry?.take_home)}
+          label={staffProfile ? 'Latest take-home' : 'Active staff'}
+          trend={staffProfile ? latestEntry?.week_label || 'No payroll entry yet' : 'Across selected view'}
+          value={staffProfile ? formatCurrency(latestEntry?.take_home) : formatNumber(activeStaffCount)}
         />
         <MetricCard
           icon={CircleDollarSign}
-          label="Total take-home"
-          trend={`${formatNumber(ownEntries.length)} recorded weeks`}
-          value={formatCurrency(totalTakeHome)}
+          label={staffProfile ? 'Total take-home' : 'Payroll runs'}
+          trend={staffProfile ? `${formatNumber(ownEntries.length)} recorded weeks` : 'Saved payroll history'}
+          value={staffProfile ? formatCurrency(totalTakeHome) : formatNumber(payrollRuns.length)}
         />
         <MetricCard
           icon={TrendingUp}
-          label="Recorded sales"
-          trend={ownPerformance ? `${ownPerformance.weeks_recorded || 0} performance weeks` : 'No saved performance'}
-          value={formatCurrency(ownPerformance?.total_net_sales)}
+          label={staffProfile ? 'Recorded sales' : 'Recorded sales'}
+          trend={ownPerformance ? `${ownPerformance.weeks_recorded || 0} performance weeks` : 'Performance summary'}
+          value={formatCurrency(staffProfile ? ownPerformance?.total_net_sales : performanceTotal)}
         />
         <MetricCard
           icon={BadgeCheck}
-          label="Business rank"
+          label={staffProfile ? 'Business rank' : 'Businesses'}
           trend={businessUnit?.name || 'Assigned business'}
-          value={rank ? `#${rank}` : 'N/A'}
+          value={staffProfile ? (rank ? `#${rank}` : 'N/A') : formatNumber(businessCards.length)}
         />
       </section>
 
@@ -194,32 +241,32 @@ export default function StaffHubPage({
 
       {activeTab === 'overview' ? (
         <>
-          <section className="panel two-thirds">
+          <section className="panel two-thirds staff-hub-overview-panel">
             <div className="section-header">
               <div>
-                <span>Start here</span>
-                <h2>Common staff actions</h2>
+                <span>{ownerView && !staffProfile ? 'Setup' : 'Start here'}</span>
+                <h2>{ownerView && !staffProfile ? 'Staff portal controls' : 'Common staff actions'}</h2>
               </div>
               <ClipboardCheck size={20} />
             </div>
             <div className="staff-hub-actions">
               <button
                 className="secondary-button"
-                disabled={!canOpen('my-role')}
-                onClick={() => openPage('my-role')}
+                disabled={!canOpen(ownerView && !staffProfile ? 'access' : 'my-role')}
+                onClick={() => openPage(ownerView && !staffProfile ? 'access' : 'my-role')}
                 type="button"
               >
                 <BriefcaseBusiness size={17} />
-                My role
+                {ownerView && !staffProfile ? 'Access' : 'My role'}
               </button>
               <button
                 className="secondary-button"
-                disabled={!canOpen('performance')}
-                onClick={() => openPage('performance')}
+                disabled={!canOpen(ownerView && !staffProfile ? 'staff' : 'performance')}
+                onClick={() => openPage(ownerView && !staffProfile ? 'staff' : 'performance')}
                 type="button"
               >
-                <TrendingUp size={17} />
-                Performance
+                {ownerView && !staffProfile ? <UserRound size={17} /> : <TrendingUp size={17} />}
+                {ownerView && !staffProfile ? 'Roster' : 'Performance'}
               </button>
               <button
                 className="secondary-button"
@@ -240,22 +287,44 @@ export default function StaffHubPage({
                 Operations
               </button>
             </div>
+            {businessCards.length ? (
+              <div className="staff-hub-business-grid">
+                {businessCards.map((card) => (
+                  <article className="staff-hub-business-card" key={card.id}>
+                    <img src={card.logoUrl} alt="" />
+                    <div>
+                      <strong>{card.name}</strong>
+                      <span>{card.type}</span>
+                    </div>
+                    <small>
+                      {formatNumber(card.activeStaff)} active staff · {card.platform}
+                    </small>
+                  </article>
+                ))}
+              </div>
+            ) : null}
           </section>
 
-          <section className="panel">
+          <section className="panel staff-hub-assignment-panel">
             <div className="section-header">
               <div>
                 <span>Account</span>
-                <h2>Assigned business</h2>
+                <h2>{ownerView && !staffProfile ? 'Business assignment rules' : 'Assigned business'}</h2>
               </div>
-              <StatusBadge tone={staffProfile?.active ? 'success' : 'muted'}>
-                {staffProfile?.active ? 'Active' : 'Inactive'}
+              <StatusBadge tone={staffProfile?.active || ownerView ? 'success' : 'muted'}>
+                {staffProfile?.active ? 'Active' : ownerView ? 'Ready' : 'Inactive'}
               </StatusBadge>
             </div>
             <div className="role-summary-list compact">
               <div>
                 <span>Business</span>
-                <strong>{businessUnit?.name || staffProfile?.primary_business_name || 'Not set'}</strong>
+                <strong>
+                  {ownerView && !staffProfile
+                    ? allBusinessesView
+                      ? 'Staff see only assigned businesses'
+                      : businessUnit?.name
+                    : businessUnit?.name || staffProfile?.primary_business_name || 'Not set'}
+                </strong>
               </div>
               <div>
                 <span>Email</span>
@@ -263,7 +332,13 @@ export default function StaffHubPage({
               </div>
               <div>
                 <span>Commission</span>
-                <strong>{staffProfile?.fixed_rate ? 'Fixed rate' : `${staffProfile?.commission_rate || 0}%`}</strong>
+                <strong>
+                  {staffProfile
+                    ? staffProfile.fixed_rate
+                      ? 'Fixed rate'
+                      : `${staffProfile.commission_rate || 0}%`
+                    : 'Set per roster profile'}
+                </strong>
               </div>
             </div>
           </section>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LockKeyhole, Mail, Scissors } from 'lucide-react';
+import { LockKeyhole, Mail } from 'lucide-react';
 
 export default function AuthPage({
   authError,
@@ -56,8 +56,8 @@ export default function AuthPage({
     <main className="auth-page">
       <section className="auth-panel">
         <div className="auth-brand">
-          <div className="brand-mark large">
-            <Scissors size={28} />
+          <div className="brand-mark large image-mark">
+            <img src="/assets/rtb-combined-logo.png" alt="" />
           </div>
           <div>
             <span>RTB OS</span>

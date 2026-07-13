@@ -1,6 +1,17 @@
-import { Scissors, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { getBusinessProfile } from '../utils/businessProfiles';
 
-export default function Sidebar({ activePage, isOpen, navItems, onClose, setActivePage }) {
+export default function Sidebar({
+  activePage,
+  businessOptions,
+  isOpen,
+  navItems,
+  onClose,
+  selectedBusinessUnitId,
+  setActivePage,
+}) {
+  const selectedBusiness = businessOptions?.find((unit) => unit.id === selectedBusinessUnitId);
+  const brandProfile = getBusinessProfile(selectedBusiness);
   const groups = navItems.reduce((result, item) => {
     const group = item.group || 'Workspace';
     return {
@@ -12,12 +23,12 @@ export default function Sidebar({ activePage, isOpen, navItems, onClose, setActi
   return (
     <aside className={`sidebar ${isOpen ? 'is-open' : ''}`} aria-label="Main navigation drawer">
       <div className="sidebar__brand">
-        <div className="brand-mark">
-          <Scissors size={22} />
+        <div className="brand-mark image-mark">
+          <img src={brandProfile.logo_url} alt="" />
         </div>
         <div>
           <strong>RTB OS</strong>
-          <span>Operations</span>
+          <span>{selectedBusiness?.name || 'Operations'}</span>
         </div>
         <button className="icon-button sidebar__close" type="button" onClick={onClose}>
           <X size={18} />

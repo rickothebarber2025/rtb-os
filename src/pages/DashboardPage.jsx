@@ -100,13 +100,18 @@ export default function DashboardPage({
   return (
     <div className="page-grid">
       <section className="hero-panel">
-        <div>
-          <h2>{businessUnit?.name || 'RTB'} operations snapshot</h2>
-          <p>
-            {allBusinessesView
-              ? 'Combined owner view across RTB Lounge and RTB Beauty Lounge.'
-              : `Live roster, payroll, performance, booth rent, and ${businessProfile.booking_platform} activity for this business.`}
-          </p>
+        <div className="hero-brand-lockup">
+          <div className="hero-brand-logo">
+            <img src={businessProfile.logo_url} alt="" />
+          </div>
+          <div>
+            <h2>{businessUnit?.name || 'RTB'} operations snapshot</h2>
+            <p>
+              {allBusinessesView
+                ? 'Combined owner view across RTB Lounge and RTB Beauty Lounge.'
+                : `Live roster, payroll, performance, booth rent, and ${businessProfile.booking_platform} activity for this business.`}
+            </p>
+          </div>
         </div>
         {canStartPayroll ? (
           <button className="primary-button" type="button" onClick={() => setActivePage('payroll')}>
