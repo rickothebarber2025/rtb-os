@@ -26,6 +26,7 @@ import {
   updateImprovementProject,
   updateImprovementTask,
 } from '../services/rtbService';
+import { canManagePerformance } from '../utils/access';
 import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import {
   buildCustomerInsightSections,
@@ -72,7 +73,14 @@ function FeedbackList({ items, title }) {
   );
 }
 
-export default function CustomerIntelligencePage({ businessUnit, isAllBusinessesView, setActivePage, staff }) {
+export default function CustomerIntelligencePage({
+  accessProfile,
+  businessUnit,
+  isAllBusinessesView,
+  setActivePage,
+  staff,
+}) {
+  const canEditPerformance = canManagePerformance(accessProfile);
   const [data, setData] = useState(null);
   const [requestForm, setRequestForm] = useState(() => blankRequest(businessUnit, staff));
   const [lastSurveyUrl, setLastSurveyUrl] = useState('');
@@ -82,7 +90,7 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
   const [error, setError] = useState('');
 
   const scopedBusinessId = isAllBusinessesUnit(businessUnit) ? null : businessUnit?.id;
-  const canCreateRequest = Boolean(scopedBusinessId);
+  const canCreateRequest = Boolean(scopedBusinessId) && canEditPerformance;
   const metrics = useMemo(
     () =>
       calculateFeedbackMetrics({
@@ -138,6 +146,11 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
 
   async function createRequest(event) {
     event.preventDefault();
+    if (!canEditPerformance) {
+      setError('Performance edit access is required to create feedback requests.');
+      return;
+    }
+
     setWorking('create');
     setError('');
     setNotice('');
@@ -156,6 +169,11 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
   }
 
   async function runAction(action) {
+    if (!canEditPerformance) {
+      setError('Performance edit access is required to run feedback automation.');
+      return;
+    }
+
     setWorking(action);
     setError('');
     setNotice('');
@@ -185,6 +203,11 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
   }
 
   async function updateProjectStatus(project, status) {
+    if (!canEditPerformance) {
+      setError('Performance edit access is required to update improvement projects.');
+      return;
+    }
+
     setWorking(project.id);
     setError('');
 
@@ -199,6 +222,11 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
   }
 
   async function toggleTask(task) {
+    if (!canEditPerformance) {
+      setError('Performance edit access is required to update improvement tasks.');
+      return;
+    }
+
     setWorking(task.id);
     setError('');
 
@@ -247,6 +275,12 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
           <span>Select one business before creating a customer feedback request.</span>
         </div>
       ) : null}
+      {!canEditPerformance ? (
+        <div className="alert warning full-span">
+          <strong>Customer IQ view-only mode.</strong>
+          <span>Performance edit access is required to send requests or update projects.</span>
+        </div>
+      ) : null}
 
       <section className="metrics-grid">
         <MetricCard icon={Star} label="Average rating" trend="1-5 customer score" value={metrics.averageRating || '0'} />
@@ -270,6 +304,7 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
           <label className="field">
             <span>Customer name</span>
             <input
+              disabled={!canEditPerformance}
               required
               value={requestForm.customer_name}
               onChange={(event) => updateRequestField('customer_name', event.target.value)}
@@ -278,6 +313,7 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
           <label className="field">
             <span>Service</span>
             <input
+              disabled={!canEditPerformance}
               placeholder="Lash fill, haircut, manicure..."
               value={requestForm.service_name}
               onChange={(event) => updateRequestField('service_name', event.target.value)}
@@ -286,6 +322,7 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
           <label className="field">
             <span>Email</span>
             <input
+              disabled={!canEditPerformance}
               type="email"
               value={requestForm.customer_email}
               onChange={(event) => updateRequestField('customer_email', event.target.value)}
@@ -294,6 +331,7 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
           <label className="field">
             <span>Phone</span>
             <input
+              disabled={!canEditPerformance}
               value={requestForm.customer_phone}
               onChange={(event) => updateRequestField('customer_phone', event.target.value)}
             />
@@ -301,6 +339,7 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
           <label className="field">
             <span>Staff</span>
             <select
+              disabled={!canEditPerformance}
               value={requestForm.staff_id}
               onChange={(event) => updateRequestField('staff_id', event.target.value)}
             >
@@ -315,6 +354,7 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
           <label className="field">
             <span>Delay hours</span>
             <input
+              disabled={!canEditPerformance}
               min="0"
               max="168"
               type="number"
@@ -325,6 +365,7 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
           <label className="field">
             <span>Send by</span>
             <select
+              disabled={!canEditPerformance}
               value={requestForm.delivery_channel}
               onChange={(event) => updateRequestField('delivery_channel', event.target.value)}
             >
@@ -340,7 +381,12 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
                 Copy last link
               </button>
             ) : null}
-            <button className="primary-button" disabled={!canCreateRequest || working === 'create'} type="submit">
+            <button
+              className="primary-button"
+              disabled={!canCreateRequest || working === 'create'}
+              title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
+              type="submit"
+            >
               <Mail size={16} />
               {working === 'create' ? 'Creating...' : 'Create request'}
             </button>
@@ -363,15 +409,33 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
           </div>
         </div>
         <div className="stack">
-          <button className="secondary-button" disabled={working === 'dispatch'} type="button" onClick={() => runAction('dispatch')}>
+          <button
+            className="secondary-button"
+            disabled={working === 'dispatch' || !canEditPerformance}
+            title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
+            type="button"
+            onClick={() => runAction('dispatch')}
+          >
             <Send size={16} />
             Send due requests
           </button>
-          <button className="secondary-button" disabled={working === 'process'} type="button" onClick={() => runAction('process')}>
+          <button
+            className="secondary-button"
+            disabled={working === 'process' || !canEditPerformance}
+            title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
+            type="button"
+            onClick={() => runAction('process')}
+          >
             <Sparkles size={16} />
             Process AI queue
           </button>
-          <button className="ghost-button" disabled={working === 'expire'} type="button" onClick={() => runAction('expire')}>
+          <button
+            className="ghost-button"
+            disabled={working === 'expire' || !canEditPerformance}
+            title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
+            type="button"
+            onClick={() => runAction('expire')}
+          >
             Expire old links
           </button>
           <p className="subtle-text">
@@ -426,7 +490,9 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
                   {(project.tasks || []).map((task) => (
                     <button
                       className={task.status === 'done' ? 'done' : ''}
+                      disabled={!canEditPerformance}
                       key={task.id}
+                      title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
                       type="button"
                       onClick={() => toggleTask(task)}
                     >
@@ -436,13 +502,31 @@ export default function CustomerIntelligencePage({ businessUnit, isAllBusinesses
                   ))}
                 </div>
                 <div className="action-row">
-                  <button className="ghost-button small" type="button" onClick={() => updateProjectStatus(project, 'in_progress')}>
+                  <button
+                    className="ghost-button small"
+                    disabled={!canEditPerformance}
+                    title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
+                    type="button"
+                    onClick={() => updateProjectStatus(project, 'in_progress')}
+                  >
                     Start
                   </button>
-                  <button className="ghost-button small success-action" type="button" onClick={() => updateProjectStatus(project, 'done')}>
+                  <button
+                    className="ghost-button small success-action"
+                    disabled={!canEditPerformance}
+                    title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
+                    type="button"
+                    onClick={() => updateProjectStatus(project, 'done')}
+                  >
                     Complete
                   </button>
-                  <button className="ghost-button small danger-action" type="button" onClick={() => updateProjectStatus(project, 'ignored')}>
+                  <button
+                    className="ghost-button small danger-action"
+                    disabled={!canEditPerformance}
+                    title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
+                    type="button"
+                    onClick={() => updateProjectStatus(project, 'ignored')}
+                  >
                     Ignore
                   </button>
                 </div>

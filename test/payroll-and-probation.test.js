@@ -61,6 +61,8 @@ import { buildPermissionsFromTemplate } from '../src/lib/roleTemplates.js';
 import {
   canAccessPage,
   canDeleteBoothRent,
+  canManageOperations,
+  canManagePerformance,
   canManageAccess,
   canUseApp,
   canUsePayroll,
@@ -97,6 +99,10 @@ test('explicit permissions are required for app and page access', () => {
   const payrollViewer = profileWithPermissions({ payroll: 'view' });
   const boothEditor = profileWithPermissions({ booth_rent: 'edit' });
   const boothAdmin = profileWithPermissions({ booth_rent: 'admin' });
+  const operationsViewer = profileWithPermissions({ operations: 'view' });
+  const operationsEditor = profileWithPermissions({ operations: 'edit' });
+  const performanceViewer = profileWithPermissions({ performance: 'view' });
+  const performanceEditor = profileWithPermissions({ performance: 'edit' });
 
   assert.equal(canUseApp({ active: true, role: 'manager' }), false);
   assert.equal(canUseApp(dashboardViewer), true);
@@ -107,6 +113,12 @@ test('explicit permissions are required for app and page access', () => {
   assert.equal(canUsePayroll(payrollViewer), true);
   assert.equal(canDeleteBoothRent(boothEditor), false);
   assert.equal(canDeleteBoothRent(boothAdmin), true);
+  assert.equal(canAccessPage(operationsViewer, 'operations'), true);
+  assert.equal(canManageOperations(operationsViewer), false);
+  assert.equal(canManageOperations(operationsEditor), true);
+  assert.equal(canAccessPage(performanceViewer, 'customer-intelligence'), true);
+  assert.equal(canManagePerformance(performanceViewer), false);
+  assert.equal(canManagePerformance(performanceEditor), true);
 });
 
 test('legacy null permissions get temporary role fallback only until saved', () => {

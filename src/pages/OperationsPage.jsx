@@ -16,6 +16,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
 import { getAppSetting, saveAppSetting } from '../services/rtbService';
+import { canAdminOperations, canManageOperations } from '../utils/access';
 import { getCombinedStaffRoles, getStaffRolesForBusinessName } from '../utils/businessProfiles';
 import {
   COMMISSION_TIERS,
@@ -145,7 +146,7 @@ async function downloadPdf(title, subtitle, sections, filename) {
   doc.save(filename);
 }
 
-function ChecklistCard({ checklist, checklistKey, checks, onDownload, onReset, onToggle }) {
+function ChecklistCard({ canEdit, canReset, checklist, checklistKey, checks, onDownload, onReset, onToggle }) {
   const progress = getChecklistProgress(checklist.items, checks);
 
   return (
@@ -160,7 +161,13 @@ function ChecklistCard({ checklist, checklistKey, checks, onDownload, onReset, o
             <Download size={15} />
             PDF
           </button>
-          <button className="ghost-button small" type="button" onClick={() => onReset(checklistKey)}>
+          <button
+            className="ghost-button small"
+            disabled={!canReset}
+            title={!canReset ? 'Operations admin access is required.' : undefined}
+            type="button"
+            onClick={() => onReset(checklistKey)}
+          >
             Reset
           </button>
         </div>
@@ -176,7 +183,9 @@ function ChecklistCard({ checklist, checklistKey, checks, onDownload, onReset, o
         {checklist.items.map((item, index) => (
           <button
             className={`ops-check-item ${checks[index] ? 'done' : ''}`}
+            disabled={!canEdit}
             key={item}
+            title={!canEdit ? 'Operations edit access is required.' : undefined}
             type="button"
             onClick={() => onToggle(checklistKey, index)}
           >
@@ -206,7 +215,9 @@ function FormPreview({ form }) {
   );
 }
 
-export default function OperationsPage({ businessUnit, staff }) {
+export default function OperationsPage({ accessProfile, businessUnit, staff }) {
+  const canEditOperations = canManageOperations(accessProfile);
+  const canAdminOps = canAdminOperations(accessProfile);
   const [activeTab, setActiveTab] = useState('sops');
   const [state, setState] = useState(() => createDefaultOperationsState());
   const [loading, setLoading] = useState(true);
@@ -274,6 +285,11 @@ export default function OperationsPage({ businessUnit, staff }) {
   }, [businessUnit?.name]);
 
   async function persist(nextState, successMessage) {
+    if (!canEditOperations) {
+      setError('Operations edit access is required to change operating records.');
+      return;
+    }
+
     setState(nextState);
     setSaving(true);
     setError('');
@@ -305,6 +321,11 @@ export default function OperationsPage({ businessUnit, staff }) {
   }
 
   function resetChecklist(checklistKey) {
+    if (!canAdminOps) {
+      setError('Operations admin access is required to reset checklists.');
+      return;
+    }
+
     const checklist = OPERATION_CHECKLISTS[checklistKey];
     persist(
       {
@@ -375,6 +396,11 @@ export default function OperationsPage({ businessUnit, staff }) {
   }
 
   function deleteHire(hireId) {
+    if (!canAdminOps) {
+      setError('Operations admin access is required to remove hiring workflows.');
+      return;
+    }
+
     const hire = state.hires.find((item) => item.id === hireId);
     setConfirmAction({
       description: `Remove ${hire?.name || 'this workflow'} from the operations tracker? This only removes the onboarding workflow and does not delete their roster profile.`,
@@ -408,6 +434,11 @@ export default function OperationsPage({ businessUnit, staff }) {
   }
 
   function deleteChangeLog(index) {
+    if (!canAdminOps) {
+      setError('Operations admin access is required to remove change-log notes.');
+      return;
+    }
+
     setConfirmAction({
       description: 'Remove this change-log note? This is only for cleaning up mistakes in the log.',
       label: 'Remove note',
@@ -476,6 +507,8 @@ export default function OperationsPage({ businessUnit, staff }) {
       <div className="ops-checklist-grid">
         {Object.entries(OPERATION_CHECKLISTS).map(([key, checklist]) => (
           <ChecklistCard
+            canEdit={canEditOperations}
+            canReset={canAdminOps}
             checklist={checklist}
             checklistKey={key}
             checks={state.checklists[key] || []}
@@ -503,6 +536,7 @@ export default function OperationsPage({ businessUnit, staff }) {
             <label className="field">
               <span>Staff member</span>
               <input
+                disabled={!canEditOperations}
                 list="operations-staff-list"
                 placeholder="Type a name or pick from roster"
                 value={hireForm.name}
@@ -518,6 +552,7 @@ export default function OperationsPage({ businessUnit, staff }) {
               <label className="field">
                 <span>Role</span>
                 <select
+                  disabled={!canEditOperations}
                   value={hireForm.role}
                   onChange={(event) => setHireForm({ ...hireForm, role: event.target.value })}
                 >
@@ -529,6 +564,7 @@ export default function OperationsPage({ businessUnit, staff }) {
               <label className="field">
                 <span>Shop</span>
                 <select
+                  disabled={!canEditOperations}
                   value={hireForm.shop}
                   onChange={(event) => {
                     const shop = event.target.value;
@@ -548,13 +584,19 @@ export default function OperationsPage({ businessUnit, staff }) {
               <label className="field wide">
                 <span>Start date</span>
                 <input
+                  disabled={!canEditOperations}
                   type="date"
                   value={hireForm.date}
                   onChange={(event) => setHireForm({ ...hireForm, date: event.target.value })}
                 />
               </label>
             </div>
-            <button className="primary-button" disabled={saving} type="submit">
+            <button
+              className="primary-button"
+              disabled={saving || !canEditOperations}
+              title={!canEditOperations ? 'Operations edit access is required.' : undefined}
+              type="submit"
+            >
               <Plus size={16} />
               Add workflow
             </button>
@@ -601,11 +643,23 @@ export default function OperationsPage({ businessUnit, staff }) {
                           <Download size={15} />
                           PDF
                         </button>
-                        <button className="ghost-button small" type="button" onClick={() => setEditingHire(hire)}>
+                        <button
+                          className="ghost-button small"
+                          disabled={!canEditOperations}
+                          title={!canEditOperations ? 'Operations edit access is required.' : undefined}
+                          type="button"
+                          onClick={() => setEditingHire(hire)}
+                        >
                           <SquarePen size={15} />
                           Edit
                         </button>
-                        <button className="ghost-button small danger-action" type="button" onClick={() => deleteHire(hire.id)}>
+                        <button
+                          className="ghost-button small danger-action"
+                          disabled={!canAdminOps}
+                          title={!canAdminOps ? 'Operations admin access is required.' : undefined}
+                          type="button"
+                          onClick={() => deleteHire(hire.id)}
+                        >
                           <Trash2 size={15} />
                           Remove
                         </button>
@@ -622,7 +676,9 @@ export default function OperationsPage({ businessUnit, staff }) {
                       {HIRE_STEPS.map((step, index) => (
                         <button
                           className={`ops-step ${hire.steps?.[index] ? 'done' : ''}`}
+                          disabled={!canEditOperations}
                           key={step.title}
+                          title={!canEditOperations ? 'Operations edit access is required.' : undefined}
                           type="button"
                           onClick={() => updateHireStep(hire.id, index)}
                         >
@@ -809,12 +865,18 @@ export default function OperationsPage({ businessUnit, staff }) {
             <label className="field">
               <span>What changed?</span>
               <textarea
+                disabled={!canEditOperations}
                 placeholder="Example: Updated weekend opening time or added a new service rule"
                 value={logNote}
                 onChange={(event) => setLogNote(event.target.value)}
               />
             </label>
-            <button className="primary-button" disabled={saving || !logNote.trim()} type="submit">
+            <button
+              className="primary-button"
+              disabled={saving || !logNote.trim() || !canEditOperations}
+              title={!canEditOperations ? 'Operations edit access is required.' : undefined}
+              type="submit"
+            >
               <Plus size={16} />
               Log change
             </button>
@@ -849,8 +911,10 @@ export default function OperationsPage({ businessUnit, staff }) {
                   </div>
                   <button
                     className="icon-button small danger"
+                    disabled={!canAdminOps}
                     type="button"
                     aria-label="Remove change-log note"
+                    title={!canAdminOps ? 'Operations admin access is required.' : undefined}
                     onClick={() => deleteChangeLog(index)}
                   >
                     <Trash2 size={15} />
@@ -919,6 +983,12 @@ export default function OperationsPage({ businessUnit, staff }) {
 
       {notice ? <div className="alert success full-span">{notice}</div> : null}
       {error ? <div className="alert danger full-span">{error}</div> : null}
+      {!canEditOperations ? (
+        <div className="alert warning full-span">
+          <strong>Operations view-only mode.</strong>
+          <span>Ask an access admin for Operations edit access before updating workflows or logs.</span>
+        </div>
+      ) : null}
 
       <div className="full-span">{renderActiveTab()}</div>
 
@@ -944,6 +1014,7 @@ export default function OperationsPage({ businessUnit, staff }) {
             <label className="field">
               <span>Staff member</span>
               <input
+                disabled={!canEditOperations}
                 value={editingHire.name}
                 onChange={(event) => setEditingHire({ ...editingHire, name: event.target.value })}
               />
@@ -952,6 +1023,7 @@ export default function OperationsPage({ businessUnit, staff }) {
               <label className="field">
                 <span>Role</span>
                 <select
+                  disabled={!canEditOperations}
                   value={editingHire.role}
                   onChange={(event) => setEditingHire({ ...editingHire, role: event.target.value })}
                 >
@@ -963,6 +1035,7 @@ export default function OperationsPage({ businessUnit, staff }) {
               <label className="field">
                 <span>Shop</span>
                 <select
+                  disabled={!canEditOperations}
                   value={editingHire.shop}
                   onChange={(event) => {
                     const shop = event.target.value;
@@ -984,6 +1057,7 @@ export default function OperationsPage({ businessUnit, staff }) {
               <label className="field wide">
                 <span>Start date</span>
                 <input
+                  disabled={!canEditOperations}
                   type="date"
                   value={editingHire.date || ''}
                   onChange={(event) => setEditingHire({ ...editingHire, date: event.target.value })}
@@ -994,7 +1068,7 @@ export default function OperationsPage({ businessUnit, staff }) {
               <button className="ghost-button" type="button" onClick={() => setEditingHire(null)}>
                 Cancel
               </button>
-              <button className="primary-button" disabled={saving} type="submit">
+              <button className="primary-button" disabled={saving || !canEditOperations} type="submit">
                 Save changes
               </button>
             </div>

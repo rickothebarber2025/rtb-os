@@ -2878,10 +2878,59 @@ select {
 .access-template-form,
 .access-card-list,
 .access-card,
+.access-details,
 .template-preview,
 .role-summary-list {
   display: grid;
   gap: 1rem;
+}
+
+.admin-control-overview {
+  align-content: start;
+}
+
+.admin-control-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-control-card {
+  align-content: start;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.55rem;
+  min-height: 156px;
+  padding: 0.85rem;
+}
+
+.admin-control-card > div {
+  min-width: 0;
+}
+
+.admin-control-card strong,
+.admin-control-card span,
+.admin-control-card small {
+  display: block;
+}
+
+.admin-control-card span,
+.admin-control-card p,
+.admin-control-card small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.admin-control-card p {
+  margin: 0;
+}
+
+.admin-control-card small {
+  color: var(--gold-strong);
+  font-weight: 800;
 }
 
 .access-card {
@@ -2905,6 +2954,43 @@ select {
 
 .access-card__controls {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.access-details {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.76rem;
+}
+
+.access-details summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  font-weight: 850;
+  gap: 0.7rem;
+  justify-content: space-between;
+  list-style: none;
+}
+
+.access-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.access-details summary::before {
+  color: var(--gold-strong);
+  content: "+";
+  font-weight: 900;
+}
+
+.access-details[open] summary {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1rem;
+  padding-bottom: 0.72rem;
+}
+
+.access-details[open] summary::before {
+  content: "-";
 }
 
 .template-preview {
@@ -3177,6 +3263,7 @@ select {
   .ops-tier-grid,
   .system-check-grid,
   .system-action-grid,
+  .admin-control-grid,
   .intelligence-grid,
   .consultant-answer-grid,
   .access-card__controls,

@@ -97,3 +97,19 @@ export function canDeleteBoothRent(profile) {
 export function canManageAppointments(profile) {
   return hasModulePermission(profile, 'appointments', 'edit');
 }
+
+export function canManageOperations(profile) {
+  return hasModulePermission(profile, 'operations', 'edit');
+}
+
+export function canAdminOperations(profile) {
+  return hasModulePermission(profile, 'operations', 'admin');
+}
+
+export function canManagePerformance(profile) {
+  return hasModulePermission(profile, 'performance', 'edit');
+}
+
+export function canAdminPerformance(profile) {
+  return hasModulePermission(profile, 'performance', 'admin');
+}

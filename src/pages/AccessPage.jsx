@@ -78,6 +78,63 @@ function textToList(value) {
     .filter(Boolean);
 }
 
+const ADMIN_CONTROL_ITEMS = [
+  {
+    detail: 'Owner workspace, staff hub, combined business status, and quick links.',
+    moduleId: 'dashboard',
+    page: 'My Workspace / Staff Hub',
+    write: 'View only',
+  },
+  {
+    detail: 'Create staff, edit staff profiles, manage probation, deactivate, restore, and delete.',
+    moduleId: 'roster',
+    page: 'Roster',
+    write: 'Edit staff; Admin deletes',
+  },
+  {
+    detail: 'Build payroll drafts, save runs, correct old runs, and finalize payroll.',
+    moduleId: 'payroll',
+    page: 'Payroll',
+    write: 'Edit drafts; Admin finalizes',
+  },
+  {
+    detail: 'Booksy imports, Square appointment sync, appointment review, and import cleanup.',
+    moduleId: 'appointments',
+    page: 'Appointments',
+    write: 'Edit imports and syncs',
+  },
+  {
+    detail: 'Create rent records, mark paid, reopen, and remove mistakes.',
+    moduleId: 'booth_rent',
+    page: 'Booth Rent',
+    write: 'Edit records; Admin deletes',
+  },
+  {
+    detail: 'Action Center records, SOP checklists, hiring workflows, forms, and change logs.',
+    moduleId: 'operations',
+    page: 'Action Center / Operations',
+    write: 'Edit records; Admin deletes/resets',
+  },
+  {
+    detail: 'Performance reporting, Customer IQ requests, feedback queue, and improvement projects.',
+    moduleId: 'performance',
+    page: 'Performance / Customer IQ',
+    write: 'Edit Customer IQ projects',
+  },
+  {
+    detail: 'Invite staff, assign businesses, revoke users, and change role templates.',
+    moduleId: 'access',
+    page: 'Access',
+    write: 'Admin only',
+  },
+  {
+    detail: 'Backups, exports, health checks, support bundle, and recovery links.',
+    moduleId: 'settings',
+    page: 'System Tools',
+    write: 'View/export tools',
+  },
+];
+
 function uniqueIds(ids) {
   return [...new Set((ids || []).filter(Boolean).map(String))];
 }
@@ -232,6 +289,45 @@ function PermissionMatrix({ disabled, permissions, onChange }) {
         </label>
       ))}
     </div>
+  );
+}
+
+function permissionTone(level) {
+  if (level === 'admin') return 'gold';
+  if (level === 'edit') return 'success';
+  if (level === 'view') return 'muted';
+  return 'danger';
+}
+
+function AdminControlOverview({ accessProfile }) {
+  const payload = getEffectivePermissionsPayload(accessProfile);
+
+  return (
+    <section className="panel full-span admin-control-overview">
+      <div className="section-header">
+        <div>
+          <span>Admin control map</span>
+          <h2>What each access switch controls</h2>
+        </div>
+        <StatusBadge tone="gold">{payload.role_title}</StatusBadge>
+      </div>
+      <div className="admin-control-grid">
+        {ADMIN_CONTROL_ITEMS.map((item) => {
+          const level = payload.modules[item.moduleId] || 'none';
+          return (
+            <article className="admin-control-card" key={item.moduleId}>
+              <div>
+                <strong>{MODULE_LABELS[item.moduleId]}</strong>
+                <span>{item.page}</span>
+              </div>
+              <StatusBadge tone={permissionTone(level)}>{level}</StatusBadge>
+              <p>{item.detail}</p>
+              <small>{item.write}</small>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -574,6 +670,8 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
         </div>
       </section>
 
+      <AdminControlOverview accessProfile={accessProfile} />
+
       <section className="panel full-span">
         <div className="section-header">
           <div>
@@ -653,16 +751,23 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
           />
 
           <RoleTemplatePreview permissions={inviteForm.permissions} />
-          <PermissionMatrix
-            disabled={!accessAdmin}
-            onChange={updateInviteModule}
-            permissions={inviteForm.permissions}
-          />
-          <ResponsibilitiesEditor
-            disabled={!accessAdmin}
-            onChange={updateInviteList}
-            permissions={inviteForm.permissions}
-          />
+
+          <details className="access-details">
+            <summary>
+              <span>Advanced permissions and role notes</span>
+              <StatusBadge tone="muted">Optional</StatusBadge>
+            </summary>
+            <PermissionMatrix
+              disabled={!accessAdmin}
+              onChange={updateInviteModule}
+              permissions={inviteForm.permissions}
+            />
+            <ResponsibilitiesEditor
+              disabled={!accessAdmin}
+              onChange={updateInviteList}
+              permissions={inviteForm.permissions}
+            />
+          </details>
 
           <div className="action-row">
             <button className="primary-button" disabled={!accessAdmin || inviting} type="submit">
@@ -769,36 +874,48 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                     </label>
                   </div>
 
-                  <BusinessAccessPicker
-                    businessUnits={businessUnits}
-                    disabled={disabled}
-                    onChange={(nextRecord) => updateDraftBusinessAccess(profile, nextRecord)}
-                    owner={owner}
-                    record={draft}
-                  />
+                  <details
+                    className="access-details"
+                    open={isDirty || (!owner && !hasAnyModulePermission(draft))}
+                  >
+                    <summary>
+                      <span>Business, permissions, and role notes</span>
+                      <StatusBadge tone={isDirty ? 'warning' : 'muted'}>
+                        {isDirty ? 'Unsaved' : 'Manage'}
+                      </StatusBadge>
+                    </summary>
 
-                  <div className="template-preview">
-                    <div>
-                      <strong>{payload.role_title}</strong>
-                      <span>{template.description}</span>
+                    <BusinessAccessPicker
+                      businessUnits={businessUnits}
+                      disabled={disabled}
+                      onChange={(nextRecord) => updateDraftBusinessAccess(profile, nextRecord)}
+                      owner={owner}
+                      record={draft}
+                    />
+
+                    <div className="template-preview">
+                      <div>
+                        <strong>{payload.role_title}</strong>
+                        <span>{template.description}</span>
+                      </div>
+                      <StatusBadge tone={owner ? 'gold' : 'muted'}>
+                        {owner ? 'Owner override' : getRoleLabel(draft.role)}
+                      </StatusBadge>
                     </div>
-                    <StatusBadge tone={owner ? 'gold' : 'muted'}>
-                      {owner ? 'Owner override' : getRoleLabel(draft.role)}
-                    </StatusBadge>
-                  </div>
 
-                  <PermissionMatrix
-                    disabled={disabled}
-                    onChange={(moduleId, permission) =>
-                      updateDraftModule(profile, moduleId, permission)
-                    }
-                    permissions={payload}
-                  />
-                  <ResponsibilitiesEditor
-                    disabled={disabled}
-                    onChange={(field, value) => updateDraftList(profile, field, value)}
-                    permissions={payload}
-                  />
+                    <PermissionMatrix
+                      disabled={disabled}
+                      onChange={(moduleId, permission) =>
+                        updateDraftModule(profile, moduleId, permission)
+                      }
+                      permissions={payload}
+                    />
+                    <ResponsibilitiesEditor
+                      disabled={disabled}
+                      onChange={(field, value) => updateDraftList(profile, field, value)}
+                      permissions={payload}
+                    />
+                  </details>
 
                   <div className="row-actions">
                     {isDirty ? (

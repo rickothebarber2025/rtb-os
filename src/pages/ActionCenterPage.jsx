@@ -11,6 +11,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import { saveAppSetting } from '../services/rtbService';
+import { canAdminOperations, canManageOperations } from '../utils/access';
 import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import {
   ACTION_CENTER_SETTING_KEY,
@@ -99,6 +100,8 @@ export default function ActionCenterPage({
   setActivePage,
   staff,
 }) {
+  const canEditOperations = canManageOperations(accessProfile);
+  const canAdminOps = canAdminOperations(accessProfile);
   const normalized = useMemo(() => normalizeActionCenterState(actionCenter), [actionCenter]);
   const [localState, setLocalState] = useState(normalized);
   const [filter, setFilter] = useState('all');
@@ -153,6 +156,11 @@ export default function ActionCenterPage({
   );
 
   async function persist(nextState, message) {
+    if (!canEditOperations) {
+      setError('Operations edit access is required to update Action Center records.');
+      return;
+    }
+
     setLocalState(nextState);
     setSaving(true);
     setError('');
@@ -233,6 +241,12 @@ export default function ActionCenterPage({
 
   function deleteManualItem() {
     if (!deleteTarget) return;
+    if (!canAdminOps) {
+      setError('Operations admin access is required to delete manual Action Center records.');
+      setDeleteTarget(null);
+      return;
+    }
+
     const key = deleteTarget.type === 'warning' ? 'warnings' : 'documents';
 
     persist(
@@ -262,6 +276,12 @@ export default function ActionCenterPage({
 
       {notice ? <div className="alert success full-span">{notice}</div> : null}
       {error ? <div className="alert danger full-span">{error}</div> : null}
+      {!canEditOperations ? (
+        <div className="alert warning full-span">
+          <strong>Action Center view-only mode.</strong>
+          <span>Operations edit access is required to add, resolve, or complete manual records.</span>
+        </div>
+      ) : null}
 
       <section className="metrics-grid">
         <MetricCard icon={BellRing} label="Open actions" trend="Need attention" value={summary.total} />
@@ -322,7 +342,8 @@ export default function ActionCenterPage({
                       {item.resolveType ? (
                         <button
                           className="secondary-button small"
-                          disabled={saving}
+                          disabled={saving || !canEditOperations}
+                          title={!canEditOperations ? 'Operations edit access is required.' : undefined}
                           type="button"
                           onClick={() => resolveManualItem(item.resolveType, item.id.replace('document-', ''))}
                         >
@@ -355,6 +376,7 @@ export default function ActionCenterPage({
             <label className="field">
               <span>Staff</span>
               <select
+                disabled={!canEditOperations}
                 required
                 value={warningForm.staff_id}
                 onChange={(event) => setWarningForm({ ...warningForm, staff_id: event.target.value })}
@@ -370,6 +392,7 @@ export default function ActionCenterPage({
             <label className="field">
               <span>Date</span>
               <input
+                disabled={!canEditOperations}
                 required
                 type="date"
                 value={warningForm.date}
@@ -379,13 +402,19 @@ export default function ActionCenterPage({
             <label className="field wide">
               <span>Note</span>
               <textarea
+                disabled={!canEditOperations}
                 placeholder="What happened and what follow-up is needed?"
                 value={warningForm.note}
                 onChange={(event) => setWarningForm({ ...warningForm, note: event.target.value })}
               />
             </label>
           </div>
-          <button className="primary-button" disabled={saving || !warningForm.staff_id} type="submit">
+          <button
+            className="primary-button"
+            disabled={saving || !warningForm.staff_id || !canEditOperations}
+            title={!canEditOperations ? 'Operations edit access is required.' : undefined}
+            type="submit"
+          >
             <Plus size={16} />
             Add warning
           </button>
@@ -403,6 +432,7 @@ export default function ActionCenterPage({
           <label className="field">
             <span>Staff</span>
             <select
+              disabled={!canEditOperations}
               required
               value={documentForm.staff_id}
               onChange={(event) => setDocumentForm({ ...documentForm, staff_id: event.target.value })}
@@ -418,6 +448,7 @@ export default function ActionCenterPage({
           <label className="field">
             <span>Document</span>
             <select
+              disabled={!canEditOperations}
               value={documentForm.document_name}
               onChange={(event) => setDocumentForm({ ...documentForm, document_name: event.target.value })}
             >
@@ -429,12 +460,18 @@ export default function ActionCenterPage({
           <label className="field">
             <span>Due date</span>
             <input
+              disabled={!canEditOperations}
               type="date"
               value={documentForm.due_date}
               onChange={(event) => setDocumentForm({ ...documentForm, due_date: event.target.value })}
             />
           </label>
-          <button className="primary-button" disabled={saving || !documentForm.staff_id} type="submit">
+          <button
+            className="primary-button"
+            disabled={saving || !documentForm.staff_id || !canEditOperations}
+            title={!canEditOperations ? 'Operations edit access is required.' : undefined}
+            type="submit"
+          >
             <Plus size={16} />
             Add document gap
           </button>
@@ -462,7 +499,8 @@ export default function ActionCenterPage({
                   <div className="row-actions">
                     <button
                       className="secondary-button small"
-                      disabled={saving}
+                      disabled={saving || !canEditOperations}
+                      title={!canEditOperations ? 'Operations edit access is required.' : undefined}
                       type="button"
                       onClick={() => resolveManualItem('warning', warning.id)}
                     >
@@ -470,8 +508,10 @@ export default function ActionCenterPage({
                     </button>
                     <button
                       className="icon-button small danger"
+                      disabled={!canAdminOps}
                       type="button"
                       aria-label="Delete warning"
+                      title={!canAdminOps ? 'Operations admin access is required.' : undefined}
                       onClick={() => setDeleteTarget({ id: warning.id, type: 'warning' })}
                     >
                       <Trash2 size={15} />
@@ -497,7 +537,8 @@ export default function ActionCenterPage({
                   <div className="row-actions">
                     <button
                       className="secondary-button small"
-                      disabled={saving}
+                      disabled={saving || !canEditOperations}
+                      title={!canEditOperations ? 'Operations edit access is required.' : undefined}
                       type="button"
                       onClick={() => resolveManualItem('document', document.id)}
                     >
@@ -505,8 +546,10 @@ export default function ActionCenterPage({
                     </button>
                     <button
                       className="icon-button small danger"
+                      disabled={!canAdminOps}
                       type="button"
                       aria-label="Delete missing document"
+                      title={!canAdminOps ? 'Operations admin access is required.' : undefined}
                       onClick={() => setDeleteTarget({ id: document.id, type: 'document' })}
                     >
                       <Trash2 size={15} />
