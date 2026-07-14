@@ -37,11 +37,13 @@ export default function AppShell({
   const motionClass = userPreferences?.reduceMotion ? 'motion-reduced' : 'motion-standard';
 
   const sidebarClass = sidebarOpen ? 'sidebar-open' : 'sidebar-closed';
+  const pageClass = `page-${activePage}`;
 
   return (
     <div
       className={`app-shell ${preferredTheme} ${densityClass} ${navigationClass} ${motionClass} ${sidebarClass}`}
     >
+      <div className="app-ambient" aria-hidden="true" />
       <Sidebar
         activePage={activePage}
         businessOptions={businessOptions}
@@ -68,7 +70,7 @@ export default function AppShell({
           user={user}
           userPreferences={userPreferences}
         />
-        <main className="content">{children}</main>
+        <main className={`content ${pageClass}`}>{children}</main>
         <MobileTabBar
           activePage={activePage}
           navItems={navItems}

@@ -63,6 +63,10 @@ export default function Sidebar({
       </nav>
 
       <div className="sidebar__footer">
+        <div className="sidebar__status">
+          <span className="status-dot" aria-hidden="true" />
+          <strong>Live workspace</strong>
+        </div>
         <span>RTB Lounge</span>
         <span>RTB Beauty Lounge</span>
       </div>
