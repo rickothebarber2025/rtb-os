@@ -1,4 +1,10 @@
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const REPORT_COLORS = {
+  brass: '#e8b855',
+  info: '#7fa8d9',
+  positive: '#6fbf95',
+  urgent: '#d4614c',
+};
 
 function normalizeKey(value) {
   return String(value || '')
@@ -146,10 +152,15 @@ function parseBooksyStatsReport(text, fileName) {
   return {
     businessUnit: 'RTB Lounge',
     clientSegments: [
-      { appointments: newClients, color: '#5B9BE0', count: newClients, label: 'New' },
-      { appointments: returningClients, color: '#4CAF7D', count: returningClients, label: 'Returning' },
-      { appointments: canceled, color: '#E05252', count: canceled, label: 'Canceled' },
-      { appointments: noShows, color: '#E09040', count: noShows, label: 'No-show' },
+      { appointments: newClients, color: REPORT_COLORS.info, count: newClients, label: 'New' },
+      {
+        appointments: returningClients,
+        color: REPORT_COLORS.positive,
+        count: returningClients,
+        label: 'Returning',
+      },
+      { appointments: canceled, color: REPORT_COLORS.urgent, count: canceled, label: 'Canceled' },
+      { appointments: noShows, color: REPORT_COLORS.brass, count: noShows, label: 'No-show' },
     ],
     importedFrom: fileName,
     location: 'Booksy Stats & Reports import',
@@ -380,7 +391,7 @@ export function parseBooksyReport(text, fileName = 'Booksy report') {
 
   const staffRows = toArray(staff, (name, row) => ({
     appointments: row.appointments,
-    color: '#C9A84C',
+    color: REPORT_COLORS.brass,
     mayAppointments: row.mayAppointments,
     name,
     occupancy: 0,
@@ -414,10 +425,20 @@ export function parseBooksyReport(text, fileName = 'Booksy report') {
   return {
     businessUnit: 'RTB Lounge',
     clientSegments: [
-      { appointments: firstVisitClients, color: '#5B9BE0', count: firstVisitClients, label: 'First Visit' },
-      { appointments: returningClients, color: '#4CAF7D', count: returningClients, label: 'Returning' },
-      { appointments: canceled, color: '#E05252', count: canceled, label: 'Canceled' },
-      { appointments: noShows, color: '#E09040', count: noShows, label: 'No-show' },
+      {
+        appointments: firstVisitClients,
+        color: REPORT_COLORS.info,
+        count: firstVisitClients,
+        label: 'First Visit',
+      },
+      {
+        appointments: returningClients,
+        color: REPORT_COLORS.positive,
+        count: returningClients,
+        label: 'Returning',
+      },
+      { appointments: canceled, color: REPORT_COLORS.urgent, count: canceled, label: 'Canceled' },
+      { appointments: noShows, color: REPORT_COLORS.brass, count: noShows, label: 'No-show' },
     ],
     importedFrom: fileName,
     location: 'Booksy report import',

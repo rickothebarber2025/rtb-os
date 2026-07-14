@@ -1,5 +1,18 @@
 import { formatCurrency, formatDate, formatPercent } from './formatters';
 
+const PDF_COLORS = {
+  brass: '#e8b855',
+  brassWash: '#f6ecd7',
+  cream: '#efe6d6',
+  faint: '#7a6b58',
+  ink: '#16110d',
+  line: '#2c2219',
+  muted: '#9c8b75',
+  panel: '#1e1810',
+  panel2: '#241c15',
+  urgent: '#d4614c',
+};
+
 function slug(value) {
   return String(value || 'rtb-payroll')
     .toLowerCase()
@@ -29,13 +42,13 @@ function downloadBlob(content, type, fileName) {
 }
 
 function drawDocumentHeader(doc, title, businessName, weekLabel) {
-  doc.setFillColor('#08090d');
+  doc.setFillColor(PDF_COLORS.ink);
   doc.rect(0, 0, 612, 88, 'F');
-  doc.setTextColor('#f1c768');
+  doc.setTextColor(PDF_COLORS.brass);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
   doc.text(title, 38, 42);
-  doc.setTextColor('#f8fafc');
+  doc.setTextColor(PDF_COLORS.cream);
   doc.setFontSize(10);
   doc.text(`${businessName} | ${weekLabel}`, 38, 62);
 }
@@ -50,11 +63,11 @@ function drawSummary(doc, run, startY = 112) {
 
   values.forEach(([label, value], index) => {
     const x = 38 + index * 138;
-    doc.setTextColor('#6b7280');
+    doc.setTextColor(PDF_COLORS.muted);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.text(label.toUpperCase(), x, startY);
-    doc.setTextColor('#111827');
+    doc.setTextColor(PDF_COLORS.ink);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.text(value, x, startY + 20);
@@ -115,9 +128,9 @@ export async function downloadPayrollRunPdf(run, businessUnit) {
   drawSummary(doc, run);
 
   let y = 174;
-  doc.setFillColor('#f3f4f6');
+  doc.setFillColor(PDF_COLORS.brassWash);
   doc.rect(34, y - 17, 544, 24, 'F');
-  doc.setTextColor('#374151');
+  doc.setTextColor(PDF_COLORS.ink);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.text('STAFF', 42, y);
@@ -134,16 +147,16 @@ export async function downloadPayrollRunPdf(run, businessUnit) {
       y = 112;
     }
 
-    doc.setTextColor('#111827');
+    doc.setTextColor(PDF_COLORS.ink);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.text(entry.staff_name_snapshot || 'Staff', 42, y);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor('#6b7280');
+    doc.setTextColor(PDF_COLORS.muted);
     doc.setFontSize(7);
     doc.text(`${entry.role_snapshot || 'Staff'} | ${entry.tier_snapshot || 'standard'}`, 42, y + 11);
 
-    doc.setTextColor('#111827');
+    doc.setTextColor(PDF_COLORS.ink);
     doc.setFontSize(9);
     doc.text(formatCurrency(entry.net_sales), 250, y);
     doc.text(formatPercent(entry.applied_commission_rate), 330, y);
@@ -151,7 +164,7 @@ export async function downloadPayrollRunPdf(run, businessUnit) {
     doc.setFont('helvetica', 'bold');
     doc.text(formatCurrency(entry.take_home), 478, y);
 
-    doc.setDrawColor('#e5e7eb');
+    doc.setDrawColor(PDF_COLORS.line);
     doc.line(38, y + 19, 574, y + 19);
     y += 36;
   }
@@ -167,13 +180,13 @@ export async function downloadPaystubPdf(run, entry, businessUnit) {
 
   drawDocumentHeader(doc, title, businessName, run.week_label || 'Payroll run');
 
-  doc.setTextColor('#111827');
+  doc.setTextColor(PDF_COLORS.ink);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.text(entry.staff_name_snapshot || 'Staff member', 38, 134);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.setTextColor('#6b7280');
+  doc.setTextColor(PDF_COLORS.muted);
   doc.text(`${entry.role_snapshot || 'Staff'} | ${entry.tier_snapshot || 'standard'}`, 38, 152);
 
   const rows = [
@@ -189,22 +202,22 @@ export async function downloadPaystubPdf(run, entry, businessUnit) {
 
   let y = 198;
   rows.forEach(([label, value], index) => {
-    doc.setFillColor(index % 2 === 0 ? '#f9fafb' : '#ffffff');
+    doc.setFillColor(index % 2 === 0 ? PDF_COLORS.cream : PDF_COLORS.brassWash);
     doc.rect(38, y - 18, 536, 34, 'F');
-    doc.setTextColor('#6b7280');
+    doc.setTextColor(PDF_COLORS.muted);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.text(label, 50, y + 2);
-    doc.setTextColor('#111827');
+    doc.setTextColor(PDF_COLORS.ink);
     doc.setFont('helvetica', 'bold');
     doc.text(value, 562, y + 2, { align: 'right' });
     y += 34;
   });
 
   if (entry.adjusted) {
-    doc.setFillColor('#fff7ed');
+    doc.setFillColor(PDF_COLORS.brassWash);
     doc.rect(38, y + 10, 536, 48, 'F');
-    doc.setTextColor('#9a3412');
+    doc.setTextColor(PDF_COLORS.ink);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.text(
@@ -217,13 +230,13 @@ export async function downloadPaystubPdf(run, entry, businessUnit) {
   }
 
   if (entry.notes) {
-    doc.setTextColor('#6b7280');
+    doc.setTextColor(PDF_COLORS.muted);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.text(`Notes: ${entry.notes}`, 38, y + 88, { maxWidth: 536 });
   }
 
-  doc.setTextColor('#9ca3af');
+  doc.setTextColor(PDF_COLORS.faint);
   doc.setFontSize(8);
   doc.text('Generated by RTB OS', 38, 750);
   doc.save(`${payrollFileName(run, slug(entry.staff_name_snapshot || 'staff'))}.pdf`);

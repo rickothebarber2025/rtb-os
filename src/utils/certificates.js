@@ -1,6 +1,18 @@
 import { formatCurrency } from './formatters';
 
 const RTB_LOGO_URL = '/assets/rtb-logo.jpg';
+const CERT_COLORS = {
+  brass: '#e8b855',
+  brassDeep: '#5c4520',
+  cream: '#efe6d6',
+  faint: '#7a6b58',
+  ink: '#16110d',
+  line: '#2c2219',
+  muted: '#9c8b75',
+  paperPattern: '#e3dacb',
+  panel: '#1e1810',
+  panel2: '#241c15',
+};
 
 async function imageToDataUrl(url) {
   const response = await fetch(url);
@@ -33,9 +45,9 @@ function drawDiagonalBand(doc, x, y, width, height, color) {
 }
 
 function drawSeal(doc, x, y, businessUnitName, logoDataUrl) {
-  doc.setFillColor('#08090d');
+  doc.setFillColor(CERT_COLORS.ink);
   doc.circle(x, y, 58, 'F');
-  doc.setDrawColor('#d6a84f');
+  doc.setDrawColor(CERT_COLORS.brass);
   doc.setLineWidth(2);
   doc.circle(x, y, 54, 'S');
   doc.circle(x, y, 46, 'S');
@@ -45,18 +57,18 @@ function drawSeal(doc, x, y, businessUnitName, logoDataUrl) {
     return;
   }
 
-  doc.setTextColor('#d6a84f');
+  doc.setTextColor(CERT_COLORS.brass);
   doc.setFont('times', 'bold');
   doc.setFontSize(36);
   doc.text('RTB', x, y - 8, { align: 'center' });
-  doc.setTextColor('#f8fafc');
+  doc.setTextColor(CERT_COLORS.cream);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.text(businessUnitName === 'RTB Beauty Lounge' ? 'BEAUTY LOUNGE' : 'LOUNGE', x, y + 22, {
     align: 'center',
   });
 
-  doc.setTextColor('#d6a84f');
+  doc.setTextColor(CERT_COLORS.brass);
   doc.setFontSize(8);
   doc.text('NAILS | LASHES | BROWS', x, y + 38, { align: 'center' });
 }
@@ -81,19 +93,19 @@ export async function downloadStaffOfMonthCertificate({
   }).format(generatedAt);
   const logoDataUrl = await imageToDataUrl(RTB_LOGO_URL);
 
-  doc.setFillColor('#f8fafc');
+  doc.setFillColor(CERT_COLORS.cream);
   doc.rect(0, 0, width, height, 'F');
 
-  doc.setFillColor('#f1f5f9');
+  doc.setFillColor(CERT_COLORS.paperPattern);
   for (let x = -100; x < width; x += 170) {
     doc.rect(x, height - 150, 160, 200, 'F');
   }
 
-  drawDiagonalBand(doc, width - 220, 0, 220, 220, '#14a8d8');
-  drawDiagonalBand(doc, width - 150, 0, 220, 220, '#1d4f91');
-  drawDiagonalBand(doc, width - 80, 0, 220, 220, '#2c286a');
+  drawDiagonalBand(doc, width - 220, 0, 220, 220, CERT_COLORS.brass);
+  drawDiagonalBand(doc, width - 150, 0, 220, 220, CERT_COLORS.brassDeep);
+  drawDiagonalBand(doc, width - 80, 0, 220, 220, CERT_COLORS.ink);
 
-  doc.setDrawColor('#d6a84f');
+  doc.setDrawColor(CERT_COLORS.brass);
   doc.setLineWidth(4);
   doc.rect(34, 34, width - 68, height - 68, 'S');
   doc.setLineWidth(1);
@@ -101,50 +113,50 @@ export async function downloadStaffOfMonthCertificate({
 
   drawSeal(doc, width - 150, 150, businessName, logoDataUrl);
 
-  doc.setTextColor('#1f2937');
+  doc.setTextColor(CERT_COLORS.ink);
   doc.setFont('times', 'normal');
   doc.setFontSize(60);
   doc.text('CERTIFICATE', 70, 145);
 
-  doc.setTextColor('#1e6aa8');
+  doc.setTextColor(CERT_COLORS.brassDeep);
   doc.setFont('times', 'bold');
   doc.setFontSize(30);
   doc.text('STAFF OF THE MONTH', 74, 188);
 
-  doc.setTextColor('#1f2937');
+  doc.setTextColor(CERT_COLORS.ink);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.text('THIS AWARD IS PROUDLY PRESENTED TO', 78, 262);
 
-  doc.setTextColor('#1e6aa8');
+  doc.setTextColor(CERT_COLORS.brassDeep);
   doc.setFont('times', 'italic');
   doc.setFontSize(54);
   doc.text(performer.full_name || 'Top Performer', 78, 340);
 
-  doc.setTextColor('#1f2937');
+  doc.setTextColor(CERT_COLORS.ink);
   doc.setFont('times', 'normal');
   doc.setFontSize(18);
   doc.text(experienceLine(businessName), 78, 395, { maxWidth: 610 });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.setTextColor('#1e6aa8');
+  doc.setTextColor(CERT_COLORS.brassDeep);
   doc.text(`${month} Staff of the Month`, 78, 452);
 
-  doc.setTextColor('#1f2937');
+  doc.setTextColor(CERT_COLORS.ink);
   doc.setFont('helvetica', 'normal');
   doc.text(`Business: ${businessName}`, 78, 476);
   doc.text(`Top performance sales: ${formatCurrency(performer.total_net_sales)}`, 78, 496);
   doc.text(`Take-home earned: ${formatCurrency(performer.total_take_home)}`, 78, 516);
 
-  doc.setDrawColor('#1f2937');
+  doc.setDrawColor(CERT_COLORS.ink);
   doc.line(width - 360, height - 105, width - 120, height - 105);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.text('RTB LOUNGE', width - 240, height - 82, { align: 'center' });
 
-  doc.setTextColor('#1e6aa8');
+  doc.setTextColor(CERT_COLORS.brassDeep);
   doc.text('OWNER SIGNATURE', width - 240, height - 65, { align: 'center' });
 
   doc.save(`${slug(businessName)}-${slug(performer.full_name)}-${slug(month)}-staff-of-the-month.pdf`);
