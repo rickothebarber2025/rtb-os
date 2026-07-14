@@ -1,9 +1,9 @@
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const REPORT_COLORS = {
-  brass: '#e8b855',
-  info: '#7fa8d9',
-  positive: '#6fbf95',
-  urgent: '#d4614c',
+  brass: '#ffffff',
+  info: '#7fb3dd',
+  positive: '#5fc79b',
+  urgent: '#e8705f',
 };
 
 function normalizeKey(value) {

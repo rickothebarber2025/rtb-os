@@ -2,16 +2,16 @@ import { formatCurrency } from './formatters';
 
 const RTB_LOGO_URL = '/assets/rtb-logo.jpg';
 const CERT_COLORS = {
-  brass: '#e8b855',
-  brassDeep: '#5c4520',
-  cream: '#efe6d6',
-  faint: '#7a6b58',
-  ink: '#16110d',
-  line: '#2c2219',
-  muted: '#9c8b75',
-  paperPattern: '#e3dacb',
-  panel: '#1e1810',
-  panel2: '#241c15',
+  brass: '#ffffff',
+  brassDeep: '#4a5f72',
+  cream: '#ffffff',
+  faint: '#7b8e9e',
+  ink: '#172836',
+  line: '#2a3f52',
+  muted: '#a3b4c2',
+  paperPattern: '#eef1f4',
+  panel: '#1e3243',
+  panel2: '#24394b',
 };
 
 async function imageToDataUrl(url) {

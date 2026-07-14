@@ -36,13 +36,13 @@ const THEME_OPTIONS = [
     value: 'auto',
   },
   {
-    description: 'Warm espresso with brass details',
+    description: 'Navy and white beauty workspace',
     label: 'Beauty',
     swatchClass: 'beauty',
     value: 'beauty',
   },
   {
-    description: 'Deep green with brass details',
+    description: 'Navy and white lounge workspace',
     label: 'RTB Lounge',
     swatchClass: 'lounge',
     value: 'lounge',

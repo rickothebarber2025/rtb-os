@@ -1,16 +1,16 @@
 import { formatCurrency, formatDate, formatPercent } from './formatters';
 
 const PDF_COLORS = {
-  brass: '#e8b855',
-  brassWash: '#f6ecd7',
-  cream: '#efe6d6',
-  faint: '#7a6b58',
-  ink: '#16110d',
-  line: '#2c2219',
-  muted: '#9c8b75',
-  panel: '#1e1810',
-  panel2: '#241c15',
-  urgent: '#d4614c',
+  brass: '#ffffff',
+  brassWash: '#edf1f4',
+  cream: '#ffffff',
+  faint: '#7b8e9e',
+  ink: '#172836',
+  line: '#2a3f52',
+  muted: '#a3b4c2',
+  panel: '#1e3243',
+  panel2: '#24394b',
+  urgent: '#e8705f',
 };
 
 function slug(value) {
