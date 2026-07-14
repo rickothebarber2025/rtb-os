@@ -9605,3 +9605,176 @@ tbody tr:hover,
     border-top-color: var(--rtb-line);
   }
 }
+
+/* RTB logo-only auth lock: remove inherited brown, green, and yellow sign-in styles */
+.auth-page {
+  align-items: center;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.05), transparent 24rem),
+    linear-gradient(135deg, #06111c 0%, #0b1825 48%, #172836 100%) !important;
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: clamp(1rem, 4vw, 2rem);
+}
+
+.auth-panel {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  display: grid;
+  gap: clamp(1rem, 3vw, 1.5rem);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+  margin: 0 auto;
+  max-width: 1060px;
+  overflow: visible;
+  width: 100%;
+}
+
+.auth-brand {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 62%),
+    rgba(11, 24, 37, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  min-height: 430px;
+  padding: clamp(1.2rem, 4vw, 2rem);
+}
+
+.auth-brand .brand-mark,
+.auth-brand .brand-mark.image-mark {
+  background: #06111c !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 16px;
+  box-shadow: none !important;
+}
+
+.auth-brand span {
+  color: #ffffff !important;
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.auth-brand h1 {
+  color: #ffffff !important;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.96;
+  max-width: 9ch;
+  text-shadow: none;
+}
+
+.auth-card {
+  background: rgba(11, 24, 37, 0.94) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22) !important;
+  padding: clamp(1rem, 2.4vw, 1.25rem);
+}
+
+.auth-card h2,
+.auth-card__header h2 {
+  color: #ffffff !important;
+  font-family: "Fraunces", Georgia, serif;
+  letter-spacing: 0;
+}
+
+.auth-card__header p,
+.auth-card p,
+.auth-divider,
+.auth-divider span,
+.auth-card label,
+.auth-card label span {
+  color: #a3b4c2 !important;
+}
+
+.auth-card .segmented-control {
+  background: #06111c !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 999px;
+  padding: 0.25rem;
+}
+
+.auth-card .segmented-control button {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 999px;
+  box-shadow: none !important;
+  color: #a3b4c2 !important;
+}
+
+.auth-card .segmented-control button.active {
+  background: #ffffff !important;
+  color: #06111c !important;
+}
+
+.auth-card .google-button {
+  background: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 10px;
+  color: #06111c !important;
+  box-shadow: none !important;
+}
+
+.auth-card .google-mark {
+  background: #edf1f4 !important;
+  border-color: #a3b4c2 !important;
+  color: #172836 !important;
+}
+
+.auth-card .input-shell {
+  background: #102131 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 10px;
+  color: #a3b4c2 !important;
+}
+
+.auth-card .input-shell input {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+}
+
+.auth-card .input-shell input::placeholder {
+  color: #7b8e9e !important;
+}
+
+.auth-card .primary-button {
+  background: #ffffff !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 10px;
+  box-shadow: none !important;
+  color: #06111c !important;
+}
+
+.auth-card .primary-button:hover,
+.auth-card .google-button:hover {
+  background: #edf1f4 !important;
+  border-color: #edf1f4 !important;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+@media (max-width: 820px) {
+  .auth-panel {
+    grid-template-columns: 1fr;
+    max-width: 520px;
+  }
+
+  .auth-brand {
+    min-height: auto;
+  }
+
+  .auth-brand h1 {
+    font-size: clamp(2.45rem, 13vw, 4.2rem);
+    max-width: 10ch;
+  }
+}
