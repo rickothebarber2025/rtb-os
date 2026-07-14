@@ -66,10 +66,10 @@ const TASK_CATEGORIES = ['cleaning', 'opening', 'closing', 'content', 'restockin
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const PROFILE_THEME_OPTIONS = [
   { id: 'business', label: 'Business', description: 'Use the selected business style.' },
-  { id: 'rose', label: 'Rose', description: 'Soft salon pink.' },
-  { id: 'gold', label: 'Gold', description: 'Classic RTB gold.' },
-  { id: 'sage', label: 'Sage', description: 'Calm clean green.' },
-  { id: 'sky', label: 'Sky', description: 'Fresh blue.' },
+  { id: 'rose', label: 'Espresso', description: 'Warm, rich, and brass-led.' },
+  { id: 'gold', label: 'Brass', description: 'Classic RTB gold focus.' },
+  { id: 'sage', label: 'Deep green', description: 'Old-world barbershop feel.' },
+  { id: 'sky', label: 'Bone', description: 'Light editorial contrast.' },
 ];
 
 function profileThemeKey(user, staffProfile) {

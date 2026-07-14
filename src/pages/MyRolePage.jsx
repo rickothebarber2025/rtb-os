@@ -30,25 +30,25 @@ function permissionTone(level) {
 
 const THEME_OPTIONS = [
   {
-    description: 'Changes with the business selector',
+    description: 'Follows the selected business direction',
     label: 'Auto',
     swatchClass: 'auto',
     value: 'auto',
   },
   {
-    description: 'Soft pink and polished for the salon',
+    description: 'Warm espresso with brass details',
     label: 'Beauty',
     swatchClass: 'beauty',
     value: 'beauty',
   },
   {
-    description: 'Clean black and gold for RTB Lounge',
+    description: 'Deep green with brass details',
     label: 'RTB Lounge',
     swatchClass: 'lounge',
     value: 'lounge',
   },
   {
-    description: 'Balanced owner view for both businesses',
+    description: 'Owner view blending both RTB styles',
     label: 'Combined',
     swatchClass: 'combined',
     value: 'combined',

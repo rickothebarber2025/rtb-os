@@ -15,8 +15,8 @@ export const BUSINESS_STAFF_ROLES = {
 
 export const DEFAULT_BUSINESS_PROFILES = {
   'RTB Lounge': {
-    accent_color: '#d6a84f',
-    accent_soft: 'rgba(214, 168, 79, 0.14)',
+    accent_color: '#d9ba72',
+    accent_soft: 'rgba(217, 186, 114, 0.15)',
     business_name: 'RTB Lounge',
     business_type: 'Barbershop',
     booking_platform: 'Booksy',
@@ -42,8 +42,8 @@ export const DEFAULT_BUSINESS_PROFILES = {
     staff_roles: BUSINESS_STAFF_ROLES['RTB Lounge'],
   },
   'RTB Beauty Lounge': {
-    accent_color: '#f0a8c8',
-    accent_soft: 'rgba(240, 168, 200, 0.16)',
+    accent_color: '#e8b855',
+    accent_soft: 'rgba(232, 184, 85, 0.15)',
     business_name: 'RTB Beauty Lounge',
     business_type: 'Beauty Services',
     booking_platform: 'Square Appointments',
@@ -71,8 +71,8 @@ export const DEFAULT_BUSINESS_PROFILES = {
 };
 
 export const ALL_BUSINESSES_UNIT = {
-  accent_color: '#d6a84f',
-  accent_soft: 'rgba(214, 168, 79, 0.14)',
+  accent_color: '#c9a961',
+  accent_soft: 'rgba(201, 169, 97, 0.15)',
   booking_platform: 'Booksy + Square Appointments',
   business_type: 'Combined operations',
   id: ALL_BUSINESSES_ID,
