@@ -425,6 +425,10 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
       ).length,
     [profiles],
   );
+  const activeCount = useMemo(
+    () => profiles.filter((profile) => profile.active && !isOwnerProfile(profile)).length,
+    [profiles],
+  );
 
   async function loadProfiles() {
     setLoading(true);
@@ -670,6 +674,33 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
         </div>
       </section>
 
+      <section className="panel full-span access-overview">
+        <div className="section-header">
+          <div>
+            <span>Access overview</span>
+            <h2>Less hunting, more clarity</h2>
+          </div>
+          <StatusBadge tone="muted">Built for faster decisions</StatusBadge>
+        </div>
+        <div className="access-overview-grid">
+          <article className="access-overview-card">
+            <span className="eyebrow">At a glance</span>
+            <strong>{activeCount} active team logins</strong>
+            <p>Everyone who can work in RTB OS is surfaced in one place.</p>
+          </article>
+          <article className="access-overview-card">
+            <span className="eyebrow">Needs attention</span>
+            <strong>{pendingCount} users need setup</strong>
+            <p>Invite or update profiles before they start using the app.</p>
+          </article>
+          <article className="access-overview-card">
+            <span className="eyebrow">Templates ready</span>
+            <strong>{ROLE_TEMPLATES.length} role presets</strong>
+            <p>Use a starting point and tailor it without rebuilding permissions.</p>
+          </article>
+        </div>
+      </section>
+
       <AdminControlOverview accessProfile={accessProfile} />
 
       <section className="panel full-span">
@@ -682,104 +713,125 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
         </div>
 
         <form className="access-template-form" onSubmit={sendInvite}>
-          <div className="form-grid compact">
-            <label className="field">
-              <span>Name</span>
-              <input
+          <div className="invite-layout">
+            <div className="invite-form-stack">
+              <div className="form-grid compact">
+                <label className="field">
+                  <span>Name</span>
+                  <input
+                    disabled={!accessAdmin}
+                    onChange={(event) => updateInvite('full_name', event.target.value)}
+                    placeholder="Full name"
+                    value={inviteForm.full_name}
+                  />
+                </label>
+                <label className="field">
+                  <span>Email</span>
+                  <input
+                    disabled={!accessAdmin}
+                    onChange={(event) => updateInvite('email', event.target.value)}
+                    placeholder="name@example.com"
+                    required
+                    type="email"
+                    value={inviteForm.email}
+                  />
+                </label>
+                <label className="field">
+                  <span>Choose role template</span>
+                  <select
+                    disabled={!accessAdmin}
+                    onChange={(event) => applyInviteTemplate(event.target.value)}
+                    value={normalizePermissionsPayload(inviteForm.permissions).role_template}
+                  >
+                    {ROLE_TEMPLATES.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Role label</span>
+                  <select
+                    disabled={!accessAdmin}
+                    onChange={(event) => updateInvite('role', event.target.value)}
+                    value={inviteForm.role}
+                  >
+                    {ROLE_OPTIONS.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="check-row">
+                  <input
+                    checked={Boolean(inviteForm.active)}
+                    disabled={!accessAdmin}
+                    onChange={(event) => updateInvite('active', event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>Active login</span>
+                </label>
+              </div>
+
+              <BusinessAccessPicker
+                businessUnits={businessUnits}
                 disabled={!accessAdmin}
-                onChange={(event) => updateInvite('full_name', event.target.value)}
-                placeholder="Full name"
-                value={inviteForm.full_name}
+                onChange={(nextRecord) => setInvite(nextRecord)}
+                owner={isOwnerEmail(inviteForm.email)}
+                record={inviteForm}
               />
-            </label>
-            <label className="field">
-              <span>Email</span>
-              <input
-                disabled={!accessAdmin}
-                onChange={(event) => updateInvite('email', event.target.value)}
-                placeholder="name@example.com"
-                required
-                type="email"
-                value={inviteForm.email}
-              />
-            </label>
-            <label className="field">
-              <span>Choose role template</span>
-              <select
-                disabled={!accessAdmin}
-                onChange={(event) => applyInviteTemplate(event.target.value)}
-                value={normalizePermissionsPayload(inviteForm.permissions).role_template}
-              >
-                {ROLE_TEMPLATES.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Role label</span>
-              <select
-                disabled={!accessAdmin}
-                onChange={(event) => updateInvite('role', event.target.value)}
-                value={inviteForm.role}
-              >
-                {ROLE_OPTIONS.map((role) => (
-                  <option key={role.value} value={role.value}>
-                    {role.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="check-row">
-              <input
-                checked={Boolean(inviteForm.active)}
-                disabled={!accessAdmin}
-                onChange={(event) => updateInvite('active', event.target.checked)}
-                type="checkbox"
-              />
-              <span>Active login</span>
-            </label>
-          </div>
 
-          <BusinessAccessPicker
-            businessUnits={businessUnits}
-            disabled={!accessAdmin}
-            onChange={(nextRecord) => setInvite(nextRecord)}
-            owner={isOwnerEmail(inviteForm.email)}
-            record={inviteForm}
-          />
+              <details className="access-details">
+                <summary>
+                  <span>Advanced permissions and role notes</span>
+                  <StatusBadge tone="muted">Optional</StatusBadge>
+                </summary>
+                <PermissionMatrix
+                  disabled={!accessAdmin}
+                  onChange={updateInviteModule}
+                  permissions={inviteForm.permissions}
+                />
+                <ResponsibilitiesEditor
+                  disabled={!accessAdmin}
+                  onChange={updateInviteList}
+                  permissions={inviteForm.permissions}
+                />
+              </details>
 
-          <RoleTemplatePreview permissions={inviteForm.permissions} />
+              <div className="action-row">
+                <button className="primary-button" disabled={!accessAdmin || inviting} type="submit">
+                  {inviting ? (
+                    'Sending...'
+                  ) : (
+                    <>
+                      <MailPlus size={17} />
+                      Send invite
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
 
-          <details className="access-details">
-            <summary>
-              <span>Advanced permissions and role notes</span>
-              <StatusBadge tone="muted">Optional</StatusBadge>
-            </summary>
-            <PermissionMatrix
-              disabled={!accessAdmin}
-              onChange={updateInviteModule}
-              permissions={inviteForm.permissions}
-            />
-            <ResponsibilitiesEditor
-              disabled={!accessAdmin}
-              onChange={updateInviteList}
-              permissions={inviteForm.permissions}
-            />
-          </details>
-
-          <div className="action-row">
-            <button className="primary-button" disabled={!accessAdmin || inviting} type="submit">
-              {inviting ? (
-                'Sending...'
-              ) : (
-                <>
-                  <MailPlus size={17} />
-                  Send invite
-                </>
-              )}
-            </button>
+            <aside className="invite-side-card">
+              <div className="invite-side-card__header">
+                <span className="eyebrow">What they’ll get</span>
+                <h3>Preview before you send</h3>
+                <p>Keep the invite experience clear by reviewing role scope, permissions, and business access together.</p>
+              </div>
+              <RoleTemplatePreview permissions={inviteForm.permissions} />
+              <div className="help-list">
+                <div>
+                  <strong>Fast onboarding</strong>
+                  <span>Start with a preset and fine-tune it instead of building from scratch.</span>
+                </div>
+                <div>
+                  <strong>Business-first access</strong>
+                  <span>Choose the right scope before saving so the user sees the right data.</span>
+                </div>
+              </div>
+            </aside>
           </div>
         </form>
       </section>
@@ -831,6 +883,17 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       <StatusBadge tone="muted">
                         {businessAccessLabel(businessUnits, draft, owner)}
                       </StatusBadge>
+                    </div>
+                  </div>
+
+                  <div className="access-card__meta">
+                    <div className="access-card__meta-item">
+                      <span>Business access</span>
+                      <strong>{businessAccessLabel(businessUnits, draft, owner)}</strong>
+                    </div>
+                    <div className="access-card__meta-item">
+                      <span>Role preview</span>
+                      <strong>{payload.role_title}</strong>
                     </div>
                   </div>
 

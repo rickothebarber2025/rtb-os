@@ -36,8 +36,12 @@ export default function AppShell({
     userPreferences?.navigationStyle === 'full' ? 'nav-full' : 'nav-simple';
   const motionClass = userPreferences?.reduceMotion ? 'motion-reduced' : 'motion-standard';
 
+  const sidebarClass = sidebarOpen ? 'sidebar-open' : 'sidebar-closed';
+
   return (
-    <div className={`app-shell ${preferredTheme} ${densityClass} ${navigationClass} ${motionClass}`}>
+    <div
+      className={`app-shell ${preferredTheme} ${densityClass} ${navigationClass} ${motionClass} ${sidebarClass}`}
+    >
       <Sidebar
         activePage={activePage}
         businessOptions={businessOptions}

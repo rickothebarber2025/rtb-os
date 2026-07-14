@@ -175,6 +175,67 @@ export default function DashboardPage({
         </div>
       </section>
 
+      <section className="panel full-span priority-board">
+        <div className="section-header">
+          <div>
+            <span>Priority board</span>
+            <h2>What needs attention right now</h2>
+          </div>
+          <StatusBadge tone={actionSummary.total ? 'warning' : 'success'}>
+            {actionSummary.total ? `${actionSummary.total} open` : 'Everything clear'}
+          </StatusBadge>
+        </div>
+        <div className="priority-board__layout">
+          <div className="priority-board__summary">
+            <div className="priority-board__stats">
+              <div className="priority-board__stat">
+                <strong>{actionSummary.total}</strong>
+                <span>open actions</span>
+              </div>
+              <div className="priority-board__stat">
+                <strong>{actionSummary.urgent}</strong>
+                <span>urgent / high</span>
+              </div>
+            </div>
+            <p>
+              The dashboard now highlights the work that needs follow-up first so managers can act
+              quickly instead of hunting through reports.
+            </p>
+            <button className="primary-button" type="button" onClick={() => setActivePage('action-center')}>
+              Review action center
+            </button>
+          </div>
+          <div className="priority-board__list">
+            {topActions.length ? (
+              topActions.map((item) => {
+                const Icon = getPriorityIcon(item.category);
+                return (
+                  <button
+                    className={`priority-board__item ${item.priority}`}
+                    key={item.id}
+                    onClick={() => setActivePage(item.page)}
+                    type="button"
+                  >
+                    <div className="priority-board__item-icon">
+                      <Icon size={18} />
+                    </div>
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>{item.detail}</small>
+                    </span>
+                  </button>
+                );
+              })
+            ) : (
+              <div className="empty-state compact">
+                <h3>No urgent priorities</h3>
+                <p>This view looks clear right now.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="metrics-grid">
         <MetricCard
           icon={Users}
