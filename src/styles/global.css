@@ -10108,9 +10108,170 @@ tbody tr:hover,
 
 .staff-hub-daily-strip,
 .staff-hub-money-grid,
+.staff-hub-home-stat-grid,
+.staff-hub-home-nav-grid,
 .staff-hub-score-card {
   display: grid;
   gap: 0.85rem;
+}
+
+.staff-hub-priority-panel,
+.staff-hub-home-side,
+.staff-hub-nav-panel,
+.staff-hub-attention-panel,
+.staff-hub-feed-panel,
+.staff-hub-resource-panel {
+  align-content: start;
+}
+
+.staff-hub-priority-card {
+  align-items: center;
+  background:
+    radial-gradient(circle at 0 0, rgba(214, 173, 82, 0.18), transparent 18rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
+    rgba(7, 15, 24, 0.78);
+  border: 1px solid rgba(214, 173, 82, 0.24);
+  border-radius: 18px;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-bottom: 0.85rem;
+  min-height: 150px;
+  padding: clamp(1rem, 2.4vw, 1.35rem);
+}
+
+.staff-hub-priority-card.urgent {
+  border-color: rgba(232, 112, 95, 0.48);
+}
+
+.staff-hub-priority-icon {
+  align-items: center;
+  background: var(--rtb-gold);
+  border-radius: 16px;
+  color: var(--rtb-black);
+  display: flex;
+  height: 54px;
+  justify-content: center;
+  width: 54px;
+}
+
+.staff-hub-priority-card span,
+.staff-hub-home-stat-grid span,
+.staff-hub-side-card span {
+  color: var(--rtb-mid);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-hub-priority-card h3 {
+  color: var(--rtb-text);
+  font-size: clamp(1.45rem, 3vw, 2.15rem);
+  line-height: 1.03;
+  margin: 0.32rem 0 0.4rem;
+}
+
+.staff-hub-priority-card p {
+  color: var(--rtb-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.staff-hub-priority-card > strong {
+  color: var(--rtb-gold-strong);
+  font-size: clamp(1.1rem, 2.4vw, 1.55rem);
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.staff-hub-priority-card .primary-button {
+  grid-column: 2 / -1;
+  justify-self: start;
+}
+
+.staff-hub-home-stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.staff-hub-home-stat-grid > div,
+.staff-hub-side-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(214, 173, 82, 0.12);
+  border-radius: 14px;
+  padding: 0.85rem;
+}
+
+.staff-hub-home-stat-grid strong {
+  color: var(--rtb-text);
+  display: block;
+  font-size: clamp(1.08rem, 2vw, 1.45rem);
+  line-height: 1.1;
+  margin: 0.28rem 0;
+}
+
+.staff-hub-home-stat-grid small,
+.staff-hub-side-card small {
+  color: var(--rtb-muted);
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.staff-hub-side-stack {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
+.staff-hub-side-card {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.staff-hub-side-card.quiet {
+  opacity: 0.78;
+}
+
+.staff-hub-side-card strong {
+  color: var(--rtb-text);
+  line-height: 1.22;
+}
+
+.staff-hub-side-card .ghost-button {
+  justify-self: start;
+}
+
+.staff-hub-home-nav-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.staff-hub-home-nav-grid .staff-hub-tool {
+  align-content: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 116px;
+}
+
+.staff-hub-home-nav-grid .staff-hub-tool > svg:last-child {
+  display: none;
+}
+
+.staff-hub-attention-panel {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.staff-hub-feed-panel .staff-hub-section-stack {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.staff-hub-business-grid.compact {
+  grid-template-columns: 1fr;
 }
 
 .staff-hub-daily-strip {
@@ -10517,6 +10678,8 @@ tbody tr:hover,
 
   .staff-hub-daily-strip,
   .staff-hub-money-grid,
+  .staff-hub-home-stat-grid,
+  .staff-hub-home-nav-grid,
   .staff-hub-commission-stats,
   .staff-hub-commission-tiers,
   .staff-hub-score-card {
@@ -10572,6 +10735,8 @@ tbody tr:hover,
 
   .staff-hub-daily-strip,
   .staff-hub-money-grid,
+  .staff-hub-home-stat-grid,
+  .staff-hub-home-nav-grid,
   .staff-hub-commission-stats,
   .staff-hub-commission-tiers,
   .staff-hub-score-card,
@@ -10583,9 +10748,34 @@ tbody tr:hover,
   .staff-hub-daily-strip > div,
   .staff-hub-opportunity-card,
   .staff-hub-goal-card,
+  .staff-hub-priority-card,
   .staff-hub-commission-card,
   .staff-hub-score-card {
     border-radius: 14px;
+  }
+
+  .staff-hub-priority-card {
+    align-items: start;
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .staff-hub-priority-icon {
+    height: 48px;
+    width: 48px;
+  }
+
+  .staff-hub-priority-card > strong {
+    justify-self: start;
+  }
+
+  .staff-hub-priority-card .primary-button {
+    grid-column: auto;
+    width: 100%;
+  }
+
+  .staff-hub-home-nav-grid .staff-hub-tool {
+    min-height: 86px;
   }
 
   .staff-hub-commission-card__header {

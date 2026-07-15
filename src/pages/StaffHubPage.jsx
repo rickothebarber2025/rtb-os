@@ -462,6 +462,162 @@ export default function StaffHubPage({
     [latestEntry, ownPerformance, rank],
   );
   const performanceTotal = sum(performanceSummary, 'total_net_sales');
+  const nextTask = pendingTasks.find((task) => isOverdueTask(task)) || pendingTasks[0] || null;
+  const latestUpdate = visibleAnnouncements.find((announcement) => announcement.pinned) || visibleAnnouncements[0] || null;
+  const focusCard = useMemo(() => {
+    if (!staffProfile && !ownerView) {
+      return {
+        actionLabel: '',
+        description: 'Ask an admin to connect this login to your roster profile so your earnings, schedule, and stats can load.',
+        icon: UserRound,
+        label: 'Account setup',
+        title: 'Connect your staff profile',
+        value: 'Needs match',
+      };
+    }
+
+    if (ownerView && !staffProfile) {
+      return {
+        actionLabel: allowedPageIds.has('access') ? 'Open Access' : '',
+        description: 'Match each staff login to a roster profile so staff can see their own hub without admin permissions.',
+        icon: ShieldCheck,
+        label: 'Owner setup',
+        page: 'access',
+        title: 'Finish staff portal setup',
+        value: 'Admin',
+      };
+    }
+
+    if (actionItems.length) {
+      return {
+        actionLabel: allowedPageIds.has('action-center') ? 'Review alerts' : '',
+        description: actionItems[0].detail,
+        icon: Bell,
+        label: 'Needs attention',
+        page: 'action-center',
+        title: `${actionItems.length} item${actionItems.length === 1 ? '' : 's'} need review`,
+        value: actionItems[0].label,
+      };
+    }
+
+    if (nextTask) {
+      return {
+        actionLabel: 'Open More',
+        description: nextTask.details || `${formatCategory(nextTask.category)}${nextTask.due_date ? ` due ${formatDate(nextTask.due_date)}` : ''}`,
+        icon: ClipboardCheck,
+        label: isOverdueTask(nextTask) ? 'Overdue task' : 'Assigned task',
+        tab: 'more',
+        title: nextTask.title,
+        value: isOverdueTask(nextTask) ? 'Overdue' : 'Open',
+      };
+    }
+
+    if (latestEntry && !incomeOpportunity.achievedFloor) {
+      return {
+        actionLabel: 'Open Money',
+        description: `You are ${formatCurrency(incomeOpportunity.needToFloor)} away from protecting your full commission rate for the latest payroll entry.`,
+        icon: CircleDollarSign,
+        label: 'Commission floor',
+        tab: 'money',
+        title: 'Protect your commission rate',
+        value: `${formatCurrency(incomeOpportunity.needToFloor)} short`,
+      };
+    }
+
+    if (rtbScore.score && rtbScore.score < 75) {
+      return {
+        actionLabel: 'Open Stats',
+        description: rtbScore.focus,
+        icon: TrendingUp,
+        label: 'Growth focus',
+        tab: 'stats',
+        title: 'Improve this week',
+        value: `${rtbScore.score}/100`,
+      };
+    }
+
+    if (scheduleRows.length) {
+      return {
+        actionLabel: 'Open Schedule',
+        description: 'Review imported appointments, submit availability, or request time off.',
+        icon: CalendarDays,
+        label: 'Today',
+        tab: 'schedule',
+        title: 'Check your schedule',
+        value: `${formatNumber(todayStats.appointmentsToday)} today`,
+      };
+    }
+
+    return {
+      actionLabel: 'Open Money',
+      description: 'Your main money, performance, and schedule cards are ready as soon as new payroll or appointment data is imported.',
+      icon: WalletCards,
+      label: 'Daily check-in',
+      tab: 'money',
+      title: 'Keep your numbers current',
+      value: latestEntry ? formatCurrency(latestEntry.take_home) : 'Ready',
+    };
+  }, [
+    actionItems,
+    allowedPageIds,
+    incomeOpportunity,
+    latestEntry,
+    nextTask,
+    ownerView,
+    rtbScore,
+    scheduleRows.length,
+    staffProfile,
+    todayStats.appointmentsToday,
+  ]);
+  const homeStats = useMemo(() => {
+    if (!staffProfile) {
+      return [
+        { label: 'Active staff', value: formatNumber(activeStaffCount), note: 'Selected view' },
+        { label: 'Businesses', value: formatNumber(businessCards.length), note: allBusinessesView ? 'Combined' : 'Selected business' },
+        { label: 'Payroll runs', value: formatNumber(payrollRuns.length), note: 'Saved history' },
+        { label: 'Recorded sales', value: formatCurrency(performanceTotal), note: 'Performance summary' },
+      ];
+    }
+
+    return [
+      {
+        label: 'Latest take-home',
+        note: latestEntry?.week_label || 'No payroll entry yet',
+        value: latestEntry ? formatCurrency(latestEntry.take_home) : 'Waiting',
+      },
+      {
+        label: '$500 floor',
+        note: 'Latest payroll entry',
+        value: latestEntry
+          ? incomeOpportunity.achievedFloor
+            ? 'Met'
+            : `${formatCurrency(incomeOpportunity.needToFloor)} short`
+          : 'Waiting',
+      },
+      {
+        label: 'RTB Score',
+        note: rtbScore.score ? 'Performance health' : 'Needs history',
+        value: rtbScore.score ? `${rtbScore.score}/100` : 'N/A',
+      },
+      {
+        label: 'Today',
+        note: 'Imported appointments',
+        value: `${formatNumber(todayStats.appointmentsToday)} appt${todayStats.appointmentsToday === 1 ? '' : 's'}`,
+      },
+    ];
+  }, [
+    activeStaffCount,
+    allBusinessesView,
+    businessCards.length,
+    incomeOpportunity,
+    latestEntry,
+    payrollRuns.length,
+    performanceTotal,
+    rtbScore.score,
+    staffProfile,
+    todayStats.appointmentsToday,
+  ]);
+  const FocusIcon = focusCard.icon;
   const canOpen = (pageId) => allowedPageIds.has(pageId);
   const profileName = staffProfile?.full_name || accessProfile?.full_name || user?.email || 'My Staff Account';
   const portalMode = staffProfile ? 'My staff portal' : ownerView ? 'Staff portal preview' : 'Staff access setup needed';
@@ -903,39 +1059,121 @@ export default function StaffHubPage({
 
       {activeTab === 'home' ? (
         <>
-          <section className="panel two-thirds staff-hub-overview-panel">
+          <section className="panel two-thirds staff-hub-priority-panel">
             <div className="section-header">
               <div>
-                <span>{ownerView && !staffProfile ? 'Setup' : 'Today'}</span>
-                <h2>{ownerView && !staffProfile ? 'Staff portal controls' : 'What moves your money today'}</h2>
+                <span>Start here</span>
+                <h2>What matters right now</h2>
               </div>
-              <Megaphone size={20} />
+              <FocusIcon size={20} />
             </div>
-            {staffProfile ? (
-              <div className="staff-hub-daily-strip">
-                <div>
-                  <span>Appointments today</span>
-                  <strong>{formatNumber(todayStats.appointmentsToday)}</strong>
-                  <small>From imported appointment data</small>
-                </div>
-                <div>
-                  <span>Revenue today</span>
-                  <strong>{formatCurrency(todayStats.importedRevenue)}</strong>
-                  <small>{todayStats.importedRevenue ? 'Imported appointments' : 'Waiting for today data'}</small>
-                </div>
-                <div>
-                  <span>Latest commission</span>
-                  <strong>{formatCurrency(todayStats.commissionLatest)}</strong>
-                  <small>{latestEntry?.week_label || 'No payroll week yet'}</small>
-                </div>
-                <div>
-                  <span>Current rank</span>
-                  <strong>{todayStats.rank ? `#${todayStats.rank}` : 'N/A'}</strong>
-                  <small>{businessUnit?.name || 'Assigned business'}</small>
-                </div>
+            <article className={`staff-hub-priority-card ${focusCard.value === 'Overdue' ? 'urgent' : ''}`}>
+              <div className="staff-hub-priority-icon">
+                <FocusIcon size={22} />
               </div>
-            ) : null}
-            <div className="staff-hub-action-grid">
+              <div>
+                <span>{focusCard.label}</span>
+                <h3>{focusCard.title}</h3>
+                <p>{focusCard.description}</p>
+              </div>
+              <strong>{focusCard.value}</strong>
+              {focusCard.actionLabel ? (
+                <button
+                  className="primary-button"
+                  disabled={focusCard.page ? !allowedPageIds.has(focusCard.page) : false}
+                  onClick={() => {
+                    if (focusCard.tab) setActiveTab(focusCard.tab);
+                    if (focusCard.page) openPage(focusCard.page);
+                  }}
+                  type="button"
+                >
+                  {focusCard.actionLabel}
+                </button>
+              ) : null}
+            </article>
+            <div className="staff-hub-home-stat-grid">
+              {homeStats.map((stat) => (
+                <div key={stat.label}>
+                  <span>{stat.label}</span>
+                  <strong>{stat.value}</strong>
+                  <small>{stat.note}</small>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel staff-hub-home-side">
+            <div className="section-header">
+              <div>
+                <span>Snapshot</span>
+                <h2>{staffProfile ? 'My profile' : 'Portal setup'}</h2>
+              </div>
+              <StatusBadge tone={staffProfile?.active || ownerView ? 'success' : 'muted'}>
+                {staffProfile?.active ? 'Active' : ownerView ? 'Ready' : 'Inactive'}
+              </StatusBadge>
+            </div>
+            <div className="role-summary-list compact">
+              <div>
+                <span>Business</span>
+                <strong>
+                  {ownerView && !staffProfile
+                    ? allBusinessesView
+                      ? 'Staff see assigned businesses'
+                      : businessUnit?.name
+                    : businessUnit?.name || staffProfile?.primary_business_name || 'Not set'}
+                </strong>
+              </div>
+              <div>
+                <span>Role</span>
+                <strong>{staffProfile?.role || accessProfile?.role_title || 'Staff'}</strong>
+              </div>
+              <div>
+                <span>Commission</span>
+                <strong>
+                  {staffProfile
+                    ? staffProfile.fixed_rate
+                      ? 'Fixed rate'
+                      : `${staffProfile.commission_rate || 0}%`
+                    : 'Set in roster'}
+                </strong>
+              </div>
+            </div>
+            <div className="staff-hub-side-stack">
+              {nextTask ? (
+                <article className="staff-hub-side-card">
+                  <span>{isOverdueTask(nextTask) ? 'Overdue task' : 'Next task'}</span>
+                  <strong>{nextTask.title}</strong>
+                  <small>{nextTask.due_date ? `Due ${formatDate(nextTask.due_date)}` : formatCategory(nextTask.category)}</small>
+                  <button className="ghost-button small" type="button" onClick={() => setActiveTab('more')}>
+                    Open tasks
+                  </button>
+                </article>
+              ) : (
+                <article className="staff-hub-side-card quiet">
+                  <span>Tasks</span>
+                  <strong>No open tasks</strong>
+                  <small>Assigned work will appear here.</small>
+                </article>
+              )}
+              {latestUpdate ? (
+                <article className="staff-hub-side-card">
+                  <span>{latestUpdate.pinned ? 'Pinned update' : 'Latest update'}</span>
+                  <strong>{latestUpdate.title}</strong>
+                  <small>{formatDate(latestUpdate.created_at)}</small>
+                </article>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="panel full-span staff-hub-nav-panel">
+            <div className="section-header">
+              <div>
+                <span>Navigate</span>
+                <h2>Open what you need</h2>
+              </div>
+              <ChevronRight size={20} />
+            </div>
+            <div className="staff-hub-home-nav-grid">
               {quickTools.map((tool) => {
                 const Icon = tool.icon;
                 return (
@@ -956,8 +1194,10 @@ export default function StaffHubPage({
                 );
               })}
             </div>
+          </section>
+
             {actionItems.length ? (
-              <div className="staff-hub-preview-list">
+            <section className="panel full-span staff-hub-attention-panel">
                 <div className="staff-hub-preview-list__header">
                   <strong>Needs attention</strong>
                   <button type="button" onClick={() => openPage('action-center')} disabled={!canOpen('action-center')}>
@@ -971,11 +1211,13 @@ export default function StaffHubPage({
                     <small>{formatDate(item.date)}</small>
                   </article>
                 ))}
-              </div>
+            </section>
             ) : null}
+
+          <section className="panel two-thirds staff-hub-feed-panel">
             <div className="staff-hub-section-stack">
               <div className="staff-hub-preview-list__header">
-                <strong>Home feed</strong>
+                <strong>Updates</strong>
                 <span>{formatNumber(visibleAnnouncements.length)} updates</span>
               </div>
               {canManageHub ? (
@@ -1038,7 +1280,7 @@ export default function StaffHubPage({
               ) : null}
               {visibleAnnouncements.length ? (
                 <div className="staff-hub-feed">
-                  {visibleAnnouncements.map((announcement) => {
+                  {visibleAnnouncements.slice(0, 5).map((announcement) => {
                     const isRead = readAnnouncementIds.has(announcement.id);
                     return (
                       <article className={isRead ? 'staff-hub-feed-card read' : 'staff-hub-feed-card'} key={announcement.id}>
@@ -1072,9 +1314,29 @@ export default function StaffHubPage({
                 />
               )}
             </div>
-            {businessCards.length ? (
-              <div className="staff-hub-business-grid">
-                {businessCards.map((card) => (
+          </section>
+
+          <section className="panel staff-hub-resource-panel">
+            <div className="section-header">
+              <div>
+                <span>Resources</span>
+                <h2>{latestNewsletter ? 'Weekly update' : 'Business context'}</h2>
+              </div>
+              <BookOpen size={20} />
+            </div>
+            {latestNewsletter ? (
+              <div className="staff-hub-newsletter">
+                <StatusBadge tone={latestNewsletter.published ? 'success' : 'warning'}>
+                  {latestNewsletter.published ? 'Published' : 'Draft'}
+                </StatusBadge>
+                <h3>Week of {formatDate(latestNewsletter.week_start)}</h3>
+                {latestNewsletter.weekly_goals ? <p><strong>Goals:</strong> {latestNewsletter.weekly_goals}</p> : null}
+                {latestNewsletter.reminders ? <p><strong>Reminders:</strong> {latestNewsletter.reminders}</p> : null}
+                {latestNewsletter.improvements_needed ? <p><strong>Improve:</strong> {latestNewsletter.improvements_needed}</p> : null}
+              </div>
+            ) : businessCards.length ? (
+              <div className="staff-hub-business-grid compact">
+                {businessCards.slice(0, 2).map((card) => (
                   <article className="staff-hub-business-card" key={card.id}>
                     <img src={card.logoUrl} alt="" />
                     <div>
@@ -1087,45 +1349,9 @@ export default function StaffHubPage({
                   </article>
                 ))}
               </div>
-            ) : null}
-          </section>
-
-          <section className="panel staff-hub-assignment-panel">
-            <div className="section-header">
-              <div>
-                <span>Account</span>
-                <h2>{ownerView && !staffProfile ? 'Business assignment rules' : 'Assigned business'}</h2>
-              </div>
-              <StatusBadge tone={staffProfile?.active || ownerView ? 'success' : 'muted'}>
-                {staffProfile?.active ? 'Active' : ownerView ? 'Ready' : 'Inactive'}
-              </StatusBadge>
-            </div>
-            <div className="role-summary-list compact">
-              <div>
-                <span>Business</span>
-                <strong>
-                  {ownerView && !staffProfile
-                    ? allBusinessesView
-                      ? 'Staff see only assigned businesses'
-                      : businessUnit?.name
-                    : businessUnit?.name || staffProfile?.primary_business_name || 'Not set'}
-                </strong>
-              </div>
-              <div>
-                <span>Email</span>
-                <strong>{staffProfile?.email || accessProfile?.email || 'Not set'}</strong>
-              </div>
-              <div>
-                <span>Commission</span>
-                <strong>
-                  {staffProfile
-                    ? staffProfile.fixed_rate
-                      ? 'Fixed rate'
-                      : `${staffProfile.commission_rate || 0}%`
-                    : 'Set per roster profile'}
-                </strong>
-              </div>
-            </div>
+            ) : (
+              <p className="subtle-text">Resources and weekly updates will show here.</p>
+            )}
           </section>
         </>
       ) : null}
