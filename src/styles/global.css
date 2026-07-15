@@ -10798,3 +10798,628 @@ tbody tr:hover,
     animation: none;
   }
 }
+
+/* Staff Hub daily app layout */
+.staff-hub-page {
+  --staff-card-bg: rgba(7, 14, 22, 0.86);
+  --staff-card-soft: rgba(255, 255, 255, 0.04);
+  --staff-card-border: rgba(214, 173, 82, 0.18);
+  --staff-green: #4cc56f;
+  --staff-warning: #f1b84a;
+}
+
+.staff-hub-command-panel {
+  background:
+    radial-gradient(circle at 11% 12%, rgba(214, 173, 82, 0.16), transparent 18rem),
+    linear-gradient(135deg, rgba(5, 11, 18, 0.96), rgba(9, 22, 30, 0.9) 56%, rgba(31, 22, 12, 0.86)),
+    var(--rtb-black);
+  border-color: rgba(214, 173, 82, 0.22);
+  overflow: hidden;
+  position: relative;
+}
+
+.staff-hub-command-panel::before {
+  background:
+    linear-gradient(90deg, transparent, rgba(214, 173, 82, 0.14), transparent),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 42px;
+  content: '';
+  inset: 0;
+  opacity: 0.45;
+  pointer-events: none;
+  position: absolute;
+}
+
+.staff-hub-command-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.staff-hub-command-header {
+  align-items: stretch;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.6fr);
+  margin-bottom: 1rem;
+}
+
+.staff-hub-command-profile {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.staff-hub-command-avatar {
+  align-items: center;
+  background: var(--rtb-black);
+  border: 2px solid rgba(214, 173, 82, 0.64);
+  border-radius: 28px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  color: var(--rtb-gold-strong);
+  display: flex;
+  font-size: 1.4rem;
+  font-weight: 950;
+  height: clamp(82px, 9vw, 118px);
+  justify-content: center;
+  overflow: hidden;
+  width: clamp(82px, 9vw, 118px);
+}
+
+.staff-hub-command-avatar img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.staff-hub-command-profile h2 {
+  color: var(--rtb-text);
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  letter-spacing: 0;
+  line-height: 0.98;
+  margin: 0.28rem 0 0.45rem;
+}
+
+.staff-hub-command-profile p,
+.staff-hub-score-widget p {
+  color: var(--rtb-muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.staff-hub-command-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.staff-hub-score-widget {
+  align-items: center;
+  background: rgba(3, 8, 14, 0.72);
+  border: 1px solid rgba(214, 173, 82, 0.22);
+  border-radius: 18px;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 1rem;
+}
+
+.staff-hub-score-widget strong {
+  color: var(--rtb-text);
+  display: block;
+  font-size: clamp(2.3rem, 5vw, 3.6rem);
+  line-height: 0.95;
+}
+
+.staff-hub-score-widget small {
+  color: var(--staff-green);
+  display: block;
+  font-weight: 900;
+  margin-top: 0.12rem;
+}
+
+.staff-hub-score-widget p {
+  grid-column: 1 / -1;
+}
+
+.staff-hub-score-ring {
+  align-items: center;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle at center, rgba(7, 14, 22, 0.98) 58%, transparent 59%),
+    conic-gradient(var(--staff-green) var(--score-progress), rgba(255, 255, 255, 0.12) 0);
+  border-radius: 999px;
+  display: flex;
+  justify-content: center;
+  width: 94px;
+}
+
+.staff-hub-score-ring span {
+  color: var(--rtb-text);
+  font-size: 1.55rem;
+  font-weight: 950;
+}
+
+.staff-hub-daily-strip {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+}
+
+.staff-hub-daily-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(214, 173, 82, 0.14);
+  border-radius: 16px;
+  display: grid;
+  gap: 0.35rem;
+  min-height: 132px;
+  padding: 0.9rem;
+}
+
+.staff-hub-daily-card__icon {
+  align-items: center;
+  background: rgba(214, 173, 82, 0.16);
+  border: 1px solid rgba(214, 173, 82, 0.24);
+  border-radius: 12px;
+  color: var(--rtb-gold-strong);
+  display: flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.staff-hub-daily-card span,
+.staff-hub-card-header span,
+.staff-hub-focus-card span {
+  color: var(--rtb-mid);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-hub-daily-card strong {
+  color: var(--rtb-text);
+  font-size: clamp(1.25rem, 2.5vw, 1.7rem);
+  line-height: 1.06;
+}
+
+.staff-hub-daily-card small,
+.staff-hub-daily-card em,
+.staff-hub-app-card small,
+.staff-hub-app-card p {
+  color: var(--rtb-muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.staff-hub-daily-card em {
+  color: var(--rtb-mid);
+  font-weight: 900;
+  margin-top: auto;
+}
+
+.staff-hub-daily-card.tone-success em,
+.staff-hub-comparison-list em.tone-success {
+  color: var(--staff-green);
+}
+
+.staff-hub-daily-card.tone-warning em,
+.staff-hub-comparison-list em.tone-warning {
+  color: var(--staff-warning);
+}
+
+.staff-hub-focus-band {
+  padding: 0.95rem;
+}
+
+.staff-hub-focus-card {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(214, 173, 82, 0.13), rgba(255, 255, 255, 0.03)),
+    rgba(7, 14, 22, 0.78);
+  border: 1px solid rgba(214, 173, 82, 0.28);
+  border-radius: 18px;
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  padding: 1rem;
+}
+
+.staff-hub-focus-card.urgent {
+  border-color: rgba(232, 112, 95, 0.42);
+}
+
+.staff-hub-focus-card h3 {
+  color: var(--rtb-text);
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+  line-height: 1.1;
+  margin: 0.18rem 0 0.25rem;
+}
+
+.staff-hub-focus-card p {
+  color: var(--rtb-muted);
+  margin: 0;
+}
+
+.staff-hub-focus-card > strong {
+  color: var(--rtb-gold-strong);
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
+.staff-hub-dashboard-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.staff-hub-app-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.016)),
+    var(--staff-card-bg);
+  border: 1px solid var(--staff-card-border);
+  border-radius: 18px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+  display: grid;
+  gap: 0.9rem;
+  grid-column: span 4;
+  min-width: 0;
+  padding: 1rem;
+}
+
+.staff-hub-app-card--wide {
+  grid-column: span 8;
+}
+
+.staff-hub-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.9rem;
+  justify-content: space-between;
+}
+
+.staff-hub-card-header h2 {
+  color: var(--rtb-text);
+  font-size: clamp(1.35rem, 2.8vw, 2rem);
+  line-height: 1.06;
+  margin: 0.22rem 0;
+}
+
+.staff-hub-mini-chart {
+  align-items: end;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-height: 150px;
+  padding-top: 0.5rem;
+}
+
+.staff-hub-mini-chart__bar {
+  align-items: center;
+  display: grid;
+  gap: 0.45rem;
+  grid-template-rows: minmax(96px, 1fr) auto;
+  justify-items: center;
+}
+
+.staff-hub-mini-chart__bar span {
+  align-self: end;
+  background: linear-gradient(180deg, var(--rtb-gold-strong), rgba(214, 173, 82, 0.18));
+  border-radius: 999px 999px 8px 8px;
+  box-shadow: 0 0 18px rgba(214, 173, 82, 0.12);
+  display: block;
+  min-height: 10px;
+  width: min(100%, 34px);
+}
+
+.staff-hub-mini-chart__bar small {
+  color: var(--rtb-muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.staff-hub-card-metrics {
+  border-top: 1px solid rgba(214, 173, 82, 0.12);
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 0.8rem;
+}
+
+.staff-hub-card-metrics span,
+.staff-hub-comparison-list span strong {
+  color: var(--rtb-mid);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.staff-hub-card-metrics strong {
+  color: var(--rtb-text);
+  display: block;
+  font-size: 1rem;
+  margin-top: 0.18rem;
+}
+
+.staff-hub-goal-summary .staff-hub-progress-track,
+.staff-hub-app-card .staff-hub-progress-track {
+  margin: 0.1rem 0;
+}
+
+.staff-hub-reminder-list,
+.staff-hub-schedule-preview,
+.staff-hub-activity-feed,
+.staff-hub-comparison-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.staff-hub-reminder,
+.staff-hub-schedule-preview > div,
+.staff-hub-activity-feed > div,
+.staff-hub-comparison-list > div {
+  align-items: center;
+  background: var(--staff-card-soft);
+  border: 1px solid rgba(214, 173, 82, 0.1);
+  border-radius: 14px;
+  color: var(--rtb-text);
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.72rem;
+  text-align: left;
+}
+
+.staff-hub-reminder {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.staff-hub-reminder svg,
+.staff-hub-activity-feed svg {
+  color: var(--rtb-gold-strong);
+}
+
+.staff-hub-reminder.tone-success svg {
+  color: var(--staff-green);
+}
+
+.staff-hub-reminder.tone-danger svg,
+.staff-hub-reminder.tone-warning svg {
+  color: var(--staff-warning);
+}
+
+.staff-hub-reminder strong,
+.staff-hub-schedule-preview strong,
+.staff-hub-activity-feed strong {
+  color: var(--rtb-text);
+  display: block;
+  line-height: 1.22;
+}
+
+.staff-hub-reminder small,
+.staff-hub-schedule-preview small,
+.staff-hub-activity-feed small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.staff-hub-schedule-preview > div {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.staff-hub-schedule-preview time {
+  color: var(--rtb-gold-strong);
+  font-size: 0.82rem;
+  font-weight: 950;
+  min-width: 4.2rem;
+}
+
+.staff-hub-achievement-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.staff-hub-achievement {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(214, 173, 82, 0.1);
+  border-radius: 16px;
+  display: grid;
+  gap: 0.28rem;
+  justify-items: start;
+  min-width: 0;
+  opacity: 0.74;
+  padding: 0.85rem;
+}
+
+.staff-hub-achievement.unlocked {
+  background:
+    radial-gradient(circle at top left, rgba(214, 173, 82, 0.2), transparent 8rem),
+    rgba(255, 255, 255, 0.04);
+  border-color: rgba(214, 173, 82, 0.28);
+  opacity: 1;
+}
+
+.staff-hub-achievement svg {
+  color: var(--rtb-gold-strong);
+}
+
+.staff-hub-achievement strong,
+.staff-hub-achievement span {
+  color: var(--rtb-text);
+}
+
+.staff-hub-achievement span {
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.staff-hub-comparison-list > div {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.staff-hub-comparison-list em {
+  color: var(--rtb-mid);
+  font-style: normal;
+  font-weight: 950;
+}
+
+.staff-hub-comparison-list b {
+  color: var(--rtb-text);
+  min-width: 4.5rem;
+  text-align: right;
+}
+
+.staff-hub-activity-feed > div {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.staff-hub-empty-compact {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px dashed rgba(214, 173, 82, 0.18);
+  border-radius: 14px;
+  color: var(--rtb-muted);
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.9rem;
+}
+
+.staff-hub-motivation-panel {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(214, 173, 82, 0.14), rgba(7, 14, 22, 0.88)),
+    var(--staff-card-bg);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.staff-hub-motivation-panel h2 {
+  color: var(--rtb-text);
+  font-size: clamp(1.1rem, 2.4vw, 1.65rem);
+  line-height: 1.18;
+  margin: 0.25rem 0 0.35rem;
+}
+
+.staff-hub-motivation-panel p {
+  color: var(--rtb-muted);
+  margin: 0;
+}
+
+@media (max-width: 1180px) {
+  .staff-hub-command-header {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-daily-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .staff-hub-app-card,
+  .staff-hub-app-card--wide {
+    grid-column: span 6;
+  }
+
+  .staff-hub-achievement-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .staff-hub-command-panel {
+    padding: 0.95rem;
+  }
+
+  .staff-hub-command-profile,
+  .staff-hub-score-widget,
+  .staff-hub-focus-card {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-command-avatar {
+    border-radius: 24px;
+    height: 84px;
+    width: 84px;
+  }
+
+  .staff-hub-command-profile h2 {
+    font-size: clamp(1.8rem, 11vw, 2.55rem);
+  }
+
+  .staff-hub-score-ring {
+    justify-self: start;
+    width: 82px;
+  }
+
+  .staff-hub-daily-strip,
+  .staff-hub-dashboard-grid,
+  .staff-hub-card-metrics,
+  .staff-hub-achievement-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-app-card,
+  .staff-hub-app-card--wide {
+    grid-column: 1 / -1;
+  }
+
+  .staff-hub-daily-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 0;
+  }
+
+  .staff-hub-daily-card__icon {
+    grid-row: span 3;
+  }
+
+  .staff-hub-daily-card strong,
+  .staff-hub-daily-card small {
+    grid-column: 2;
+  }
+
+  .staff-hub-daily-card em {
+    align-self: center;
+    grid-column: 3;
+    grid-row: 1 / 4;
+  }
+
+  .staff-hub-focus-card > strong {
+    white-space: normal;
+  }
+
+  .staff-hub-focus-card .primary-button,
+  .staff-hub-motivation-panel .primary-button,
+  .staff-hub-goal-summary .secondary-button,
+  .staff-hub-app-card .secondary-button {
+    width: 100%;
+  }
+
+  .staff-hub-mini-chart {
+    min-height: 126px;
+  }
+
+  .staff-hub-card-header,
+  .staff-hub-motivation-panel {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-schedule-preview > div,
+  .staff-hub-comparison-list > div {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-comparison-list b {
+    text-align: left;
+  }
+}

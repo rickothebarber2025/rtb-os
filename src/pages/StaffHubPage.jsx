@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BadgeCheck,
+  Award,
+  BarChart3,
   Bell,
   BookOpen,
   BriefcaseBusiness,
@@ -13,17 +14,19 @@ import {
   Clock3,
   FileText,
   Megaphone,
+  MessageSquare,
   Palette,
   ShieldCheck,
   Star,
+  Target,
   TrendingUp,
+  Trophy,
   UserRound,
   WalletCards,
   X,
 } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
-import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
 import {
@@ -314,6 +317,48 @@ function isOverdueTask(task) {
   return task.status !== 'completed' && task.due_date && task.due_date < todayKey();
 }
 
+function percentChange(current, previous) {
+  const currentValue = Number(current || 0);
+  const previousValue = Number(previous || 0);
+  if (!previousValue) return null;
+  return Math.round(((currentValue - previousValue) / previousValue) * 100);
+}
+
+function formatChange(delta) {
+  if (!Number.isFinite(delta)) return 'New data';
+  return `${delta >= 0 ? '+' : ''}${delta}%`;
+}
+
+function trendTone(delta) {
+  if (!Number.isFinite(delta)) return 'neutral';
+  return delta >= 0 ? 'success' : 'warning';
+}
+
+function safeTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(date);
+}
+
+function shortWeekLabel(entry) {
+  if (entry?.week_label) return entry.week_label.replace(/\s*,\s*\d{4}/g, '');
+  if (!entry?.week_start) return 'Week';
+  const date = new Date(entry.week_start);
+  if (Number.isNaN(date.getTime())) return 'Week';
+  return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' }).format(date);
+}
+
+function scheduleDisplayTime(row) {
+  return (
+    row.time ||
+    row.start_time ||
+    row.appointment_time ||
+    safeTime(row.start_at || row.starts_at || row.created_at || row.date) ||
+    'Time TBD'
+  );
+}
+
 export default function StaffHubPage({
   actionCenter,
   accessProfile,
@@ -400,7 +445,6 @@ export default function StaffHubPage({
     setMonthlyRevenueGoal(savedGoal);
     setMonthlyRevenueGoalDraft(String(savedGoal));
   }, [staffProfile, user]);
-  const activeStaffCount = staff.filter((member) => member.active).length;
   const allowedPageIds = useMemo(() => new Set(navItems.map((item) => item.id)), [navItems]);
   const businessCards = useMemo(() => {
     const units = allBusinessesView ? businessUnits : businessUnits?.filter((unit) => unit.id === businessUnit?.id);
@@ -492,9 +536,7 @@ export default function StaffHubPage({
     () => buildRtbScore({ latestEntry, ownPerformance, rank }),
     [latestEntry, ownPerformance, rank],
   );
-  const performanceTotal = sum(performanceSummary, 'total_net_sales');
   const nextTask = pendingTasks.find((task) => isOverdueTask(task)) || pendingTasks[0] || null;
-  const latestUpdate = visibleAnnouncements.find((announcement) => announcement.pinned) || visibleAnnouncements[0] || null;
   const focusCard = useMemo(() => {
     if (!staffProfile && !ownerView) {
       return {
@@ -600,60 +642,280 @@ export default function StaffHubPage({
     staffProfile,
     todayStats.appointmentsToday,
   ]);
-  const homeStats = useMemo(() => {
-    if (!staffProfile) {
-      return [
-        { label: 'Active staff', value: formatNumber(activeStaffCount), note: 'Selected view' },
-        { label: 'Businesses', value: formatNumber(businessCards.length), note: allBusinessesView ? 'Combined' : 'Selected business' },
-        { label: 'Payroll runs', value: formatNumber(payrollRuns.length), note: 'Saved history' },
-        { label: 'Recorded sales', value: formatCurrency(performanceTotal), note: 'Performance summary' },
-      ];
+  const previousEntry = ownEntries[1] || null;
+  const latestSalesDelta = percentChange(latestEntry?.net_sales, previousEntry?.net_sales);
+  const latestCommissionDelta = percentChange(
+    incomeOpportunity.currentCommission,
+    previousEntry
+      ? Number(previousEntry.net_sales || 0) *
+          (Number(previousEntry.applied_commission_rate || previousEntry.base_commission_rate || 0) / 100)
+      : 0,
+  );
+  const latestTipDelta = percentChange(latestEntry?.tips, previousEntry?.tips);
+  const latestTakeHomeDelta = percentChange(latestEntry?.take_home, previousEntry?.take_home);
+  const reviewCount = Number(ownActivityReviewSummary?.review_count || 0);
+  const fiveStarReviews = Number(ownActivityReviewSummary?.five_star_reviews || 0);
+  const reviewGoal = {
+    remaining: Math.max(0, 10 - fiveStarReviews),
+    target: 10,
+    percent: Math.min(100, Math.round((fiveStarReviews / 10) * 100)),
+  };
+  const weeklyTrend = useMemo(() => {
+    const rows = ownEntries.slice(0, 7).reverse();
+    const maxValue = Math.max(1, ...rows.map((entry) => Number(entry.take_home || 0)));
+
+    return rows.map((entry) => ({
+      height: Math.max(10, Math.round((Number(entry.take_home || 0) / maxValue) * 100)),
+      label: shortWeekLabel(entry),
+      sales: Number(entry.net_sales || 0),
+      takeHome: Number(entry.take_home || 0),
+      tips: Number(entry.tips || 0),
+    }));
+  }, [ownEntries]);
+  const dailyCards = useMemo(
+    () => [
+      {
+        change: formatChange(latestSalesDelta),
+        icon: BarChart3,
+        label: 'Latest revenue',
+        note: latestEntry?.week_label || 'Waiting for payroll',
+        tone: trendTone(latestSalesDelta),
+        value: formatCurrency(latestEntry?.net_sales),
+      },
+      {
+        change: formatChange(latestCommissionDelta),
+        icon: CircleDollarSign,
+        label: 'Commission',
+        note: latestEntry
+          ? `${latestEntry.applied_commission_rate || latestEntry.base_commission_rate || 0}% applied rate`
+          : 'Explained after payroll',
+        tone: trendTone(latestCommissionDelta),
+        value: formatCurrency(incomeOpportunity.currentCommission),
+      },
+      {
+        change: formatChange(latestTipDelta),
+        icon: Star,
+        label: 'Tips',
+        note: 'Latest saved entry',
+        tone: trendTone(latestTipDelta),
+        value: formatCurrency(latestEntry?.tips),
+      },
+      {
+        change: `${formatNumber(todayStats.appointmentsToday)} today`,
+        icon: CalendarDays,
+        label: 'Appointments',
+        note: scheduleRows.length ? 'Imported schedule rows' : 'Waiting for import',
+        tone: todayStats.appointmentsToday ? 'success' : 'neutral',
+        value: formatNumber(scheduleRows.length),
+      },
+      {
+        change: reviewCount ? `${fiveStarReviews} five-star` : 'No reviews yet',
+        icon: MessageSquare,
+        label: 'Reviews',
+        note: ownActivityReviewSummary?.average_rating
+          ? `${ownActivityReviewSummary.average_rating}/5 average`
+          : 'Booksy + Google',
+        tone: fiveStarReviews ? 'success' : 'neutral',
+        value: formatNumber(reviewCount),
+      },
+    ],
+    [
+      fiveStarReviews,
+      incomeOpportunity.currentCommission,
+      latestCommissionDelta,
+      latestEntry,
+      latestSalesDelta,
+      latestTipDelta,
+      ownActivityReviewSummary,
+      reviewCount,
+      scheduleRows.length,
+      todayStats.appointmentsToday,
+    ],
+  );
+  const reminders = useMemo(() => {
+    const items = [];
+
+    if (nextTask) {
+      items.push({
+        detail: nextTask.due_date ? `Due ${formatDate(nextTask.due_date)}` : formatCategory(nextTask.category),
+        icon: ClipboardCheck,
+        title: nextTask.title,
+        tone: isOverdueTask(nextTask) ? 'danger' : 'gold',
+        tab: 'more',
+      });
     }
 
-    return [
+    if (latestEntry && !incomeOpportunity.achievedFloor) {
+      items.push({
+        detail: `${formatCurrency(incomeOpportunity.needToFloor)} more revenue protects your full rate.`,
+        icon: CircleDollarSign,
+        title: 'Commission floor',
+        tone: 'warning',
+        tab: 'money',
+      });
+    }
+
+    if (reviewGoal.remaining > 0) {
+      items.push({
+        detail: `${reviewGoal.remaining} more five-star review${reviewGoal.remaining === 1 ? '' : 's'} to hit this goal.`,
+        icon: Star,
+        title: 'Review goal',
+        tone: 'gold',
+        tab: 'stats',
+      });
+    }
+
+    if (scheduleRows.length) {
+      items.push({
+        detail: `${formatNumber(scheduleRows.length)} imported appointment row${scheduleRows.length === 1 ? '' : 's'} ready to review.`,
+        icon: CalendarDays,
+        title: 'Check schedule',
+        tone: 'success',
+        tab: 'schedule',
+      });
+    }
+
+    if (!items.length) {
+      items.push({
+        detail: 'New payroll, task, schedule, and review updates will appear here first.',
+        icon: Bell,
+        title: 'Nothing urgent',
+        tone: 'neutral',
+        tab: 'home',
+      });
+    }
+
+    return items.slice(0, 4);
+  }, [incomeOpportunity, latestEntry, nextTask, reviewGoal.remaining, scheduleRows.length]);
+  const achievementCards = useMemo(
+    () => [
       {
-        label: 'Latest take-home',
-        note: latestEntry?.week_label || 'No payroll entry yet',
-        value: latestEntry ? formatCurrency(latestEntry.take_home) : 'Waiting',
+        detail: fiveStarReviews >= 5 ? 'Unlocked' : `${Math.max(0, 5 - fiveStarReviews)} more five-star reviews`,
+        icon: Star,
+        title: '5-star streak',
+        unlocked: fiveStarReviews >= 5,
+        value: `${formatNumber(fiveStarReviews)}/5`,
       },
       {
-        label: '$500 floor',
-        note: 'Latest payroll entry',
-        value: latestEntry
-          ? incomeOpportunity.achievedFloor
-            ? 'Met'
-            : `${formatCurrency(incomeOpportunity.needToFloor)} short`
-          : 'Waiting',
+        detail: latestEntry && Number(latestEntry.net_sales || 0) >= 1000 ? 'Strong sales week' : 'Hit $1k in a saved week',
+        icon: Trophy,
+        title: 'High performer',
+        unlocked: latestEntry && Number(latestEntry.net_sales || 0) >= 1000,
+        value: latestEntry ? formatCurrency(latestEntry.net_sales) : '$0',
       },
       {
-        label: 'RTB Score',
-        note: rtbScore.score ? 'Performance health' : 'Needs history',
-        value: rtbScore.score ? `${rtbScore.score}/100` : 'N/A',
+        detail: monthlyGoal.percentComplete >= 100 ? 'Monthly goal met' : `${monthlyGoal.percentComplete}% of monthly goal`,
+        icon: Target,
+        title: 'Goal closer',
+        unlocked: monthlyGoal.percentComplete >= 100,
+        value: `${monthlyGoal.percentComplete}%`,
       },
       {
-        label: 'Today',
-        note: 'Imported appointments',
-        value: `${formatNumber(todayStats.appointmentsToday)} appt${todayStats.appointmentsToday === 1 ? '' : 's'}`,
+        detail: rank && rank <= 3 ? 'Top 3 in selected view' : 'Aim for top 3',
+        icon: Award,
+        title: 'Leaderboard',
+        unlocked: Boolean(rank && rank <= 3),
+        value: rank ? `#${rank}` : 'N/A',
+      },
+    ],
+    [fiveStarReviews, latestEntry, monthlyGoal.percentComplete, rank],
+  );
+  const activityFeed = useMemo(() => {
+    const items = [];
+
+    if (latestEntry) {
+      items.push({
+        date: latestEntry.week_start || latestEntry.created_at,
+        detail: `${formatCurrency(latestEntry.take_home)} take-home from ${formatCurrency(latestEntry.net_sales)} sales.`,
+        icon: WalletCards,
+        id: `payroll-${latestEntry.id || latestEntry.week_label}`,
+        title: 'Payroll entry saved',
+      });
+    }
+
+    visibleAnnouncements.slice(0, 2).forEach((announcement) => {
+      items.push({
+        date: announcement.created_at,
+        detail: announcement.body,
+        icon: Megaphone,
+        id: `announcement-${announcement.id}`,
+        title: announcement.title,
+      });
+    });
+
+    pendingTasks.slice(0, 2).forEach((task) => {
+      items.push({
+        date: task.due_date || task.created_at,
+        detail: task.details || formatCategory(task.category),
+        icon: ClipboardCheck,
+        id: `task-${task.id}`,
+        title: task.title,
+      });
+    });
+
+    scheduleRows.slice(0, 2).forEach((row, index) => {
+      items.push({
+        date: row.date || row.created_at,
+        detail: `${row.client || row.customer || 'Client'} · ${row.service || row.item || 'Service'}`,
+        icon: CalendarDays,
+        id: `schedule-${row.id || index}`,
+        title: `${row.schedule_type || 'Appointment'} ${scheduleDisplayTime(row)}`,
+      });
+    });
+
+    if (reviewCount) {
+      items.push({
+        date: new Date().toISOString(),
+        detail: `${formatNumber(fiveStarReviews)} five-star reviews from ${formatNumber(reviewCount)} total verified reviews.`,
+        icon: MessageSquare,
+        id: 'reviews-summary',
+        title: 'Review momentum updated',
+      });
+    }
+
+    contentSubmissions.slice(0, 2).forEach((item) => {
+      items.push({
+        date: item.created_at,
+        detail: item.caption || item.media_url || formatCategory(item.content_type),
+        icon: Camera,
+        id: `content-${item.id}`,
+        title: `Content ${item.status || 'submitted'}`,
+      });
+    });
+
+    return items
+      .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+      .slice(0, 6);
+  }, [contentSubmissions, fiveStarReviews, latestEntry, pendingTasks, reviewCount, scheduleRows, visibleAnnouncements]);
+  const weekComparisons = useMemo(
+    () => [
+      {
+        current: formatCurrency(latestEntry?.net_sales),
+        delta: latestSalesDelta,
+        label: 'Revenue',
+        previous: formatCurrency(previousEntry?.net_sales),
       },
       {
+        current: formatCurrency(latestEntry?.take_home),
+        delta: latestTakeHomeDelta,
+        label: 'Take-home',
+        previous: formatCurrency(previousEntry?.take_home),
+      },
+      {
+        current: formatCurrency(latestEntry?.tips),
+        delta: latestTipDelta,
+        label: 'Tips',
+        previous: formatCurrency(previousEntry?.tips),
+      },
+      {
+        current: formatNumber(reviewCount),
+        delta: null,
         label: 'Reviews',
-        note: ownActivityReviewSummary?.average_rating ? `${ownActivityReviewSummary.average_rating}/5 average` : 'Booksy + Google',
-        value: formatNumber(ownActivityReviewSummary?.review_count || 0),
+        previous: 'Booksy + Google',
       },
-    ];
-  }, [
-    activeStaffCount,
-    allBusinessesView,
-    businessCards.length,
-    incomeOpportunity,
-    latestEntry,
-    payrollRuns.length,
-    performanceTotal,
-    rtbScore.score,
-    staffProfile,
-    ownActivityReviewSummary,
-    todayStats.appointmentsToday,
-  ]);
+    ],
+    [latestEntry, latestSalesDelta, latestTakeHomeDelta, latestTipDelta, previousEntry, reviewCount],
+  );
   const FocusIcon = focusCard.icon;
   const canOpen = (pageId) => allowedPageIds.has(pageId);
   const profileName = staffProfile?.full_name || accessProfile?.full_name || user?.email || 'My Staff Account';
@@ -1051,31 +1313,65 @@ export default function StaffHubPage({
         </section>
       ) : null}
 
-      <section className="metrics-grid full-span">
-        <MetricCard
-          icon={WalletCards}
-          label={staffProfile ? 'Latest take-home' : 'Active staff'}
-          trend={staffProfile ? latestEntry?.week_label || 'No payroll entry yet' : 'Across selected view'}
-          value={staffProfile ? formatCurrency(latestEntry?.take_home) : formatNumber(activeStaffCount)}
-        />
-        <MetricCard
-          icon={CircleDollarSign}
-          label={staffProfile ? 'Total take-home' : 'Payroll runs'}
-          trend={staffProfile ? `${formatNumber(ownEntries.length)} recorded weeks` : 'Saved payroll history'}
-          value={staffProfile ? formatCurrency(totalTakeHome) : formatNumber(payrollRuns.length)}
-        />
-        <MetricCard
-          icon={TrendingUp}
-          label={staffProfile ? 'Recorded sales' : 'Recorded sales'}
-          trend={ownPerformance ? `${ownPerformance.weeks_recorded || 0} performance weeks` : 'Performance summary'}
-          value={formatCurrency(staffProfile ? ownPerformance?.total_net_sales : performanceTotal)}
-        />
-        <MetricCard
-          icon={BadgeCheck}
-          label={staffProfile ? 'Business rank' : 'Businesses'}
-          trend={businessUnit?.name || 'Assigned business'}
-          value={staffProfile ? (rank ? `#${rank}` : 'N/A') : formatNumber(businessCards.length)}
-        />
+      <section className="panel full-span staff-hub-command-panel">
+        <div className="staff-hub-command-header">
+          <div className="staff-hub-command-profile">
+            <div className="staff-hub-command-avatar">
+              {profilePhoto ? <img src={profilePhoto} alt="" /> : <span>{initials(profileName)}</span>}
+            </div>
+            <div>
+              <span className="eyebrow">{portalMode}</span>
+              <h2>Welcome back, {firstName}</h2>
+              <p>
+                One place to check earnings, commission, goals, schedule, reviews, and tasks before the day starts.
+              </p>
+              <div className="staff-hub-command-badges">
+                <StatusBadge tone={staffProfile?.active || ownerView ? 'success' : 'warning'}>
+                  {staffProfile?.active ? 'Active staff' : ownerView ? 'Owner preview' : 'Needs profile match'}
+                </StatusBadge>
+                <StatusBadge tone="gold">
+                  {staffProfile?.role || accessProfile?.role_title || 'Staff'}
+                </StatusBadge>
+                <StatusBadge tone={commissionExplanation.adjusted ? 'warning' : 'success'}>
+                  {commissionExplanation.appliedRate || staffProfile?.commission_rate || 0}% commission
+                </StatusBadge>
+              </div>
+            </div>
+          </div>
+
+          <article className="staff-hub-score-widget">
+            <div>
+              <span className="eyebrow">RTB Score</span>
+              <strong>{rtbScore.score}</strong>
+              <small>{rtbScore.score >= 85 ? 'Excellent' : rtbScore.score >= 70 ? 'Solid' : rtbScore.score ? 'Needs focus' : 'Needs history'}</small>
+            </div>
+            <div
+              aria-label={`RTB Score ${rtbScore.score} out of 100`}
+              className="staff-hub-score-ring"
+              style={{ '--score-progress': `${Math.min(100, rtbScore.score)}%` }}
+            >
+              <span>{rtbScore.score}</span>
+            </div>
+            <p>{rtbScore.focus}</p>
+          </article>
+        </div>
+
+        <div className="staff-hub-daily-strip" aria-label="Daily Staff Hub metrics">
+          {dailyCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <article className={`staff-hub-daily-card tone-${card.tone}`} key={card.label}>
+                <div className="staff-hub-daily-card__icon">
+                  <Icon size={18} />
+                </div>
+                <span>{card.label}</span>
+                <strong>{card.value}</strong>
+                <small>{card.note}</small>
+                <em>{card.change}</em>
+              </article>
+            );
+          })}
+        </div>
       </section>
 
       <section className="panel full-span staff-hub-tabs-panel">
@@ -1096,15 +1392,8 @@ export default function StaffHubPage({
 
       {activeTab === 'home' ? (
         <>
-          <section className="panel two-thirds staff-hub-priority-panel">
-            <div className="section-header">
-              <div>
-                <span>Start here</span>
-                <h2>What matters right now</h2>
-              </div>
-              <FocusIcon size={20} />
-            </div>
-            <article className={`staff-hub-priority-card ${focusCard.value === 'Overdue' ? 'urgent' : ''}`}>
+          <section className="panel full-span staff-hub-focus-band">
+            <article className={`staff-hub-focus-card ${focusCard.value === 'Overdue' ? 'urgent' : ''}`}>
               <div className="staff-hub-priority-icon">
                 <FocusIcon size={22} />
               </div>
@@ -1128,118 +1417,242 @@ export default function StaffHubPage({
                 </button>
               ) : null}
             </article>
-            <div className="staff-hub-home-stat-grid">
-              {homeStats.map((stat) => (
-                <div key={stat.label}>
-                  <span>{stat.label}</span>
-                  <strong>{stat.value}</strong>
-                  <small>{stat.note}</small>
-                </div>
-              ))}
-            </div>
-            <div className="staff-hub-home-stat-grid compact">
-              <div>
-                <span>Verified bookings</span>
-                <strong>{formatNumber(ownActivityReviewSummary?.appointments_created || 0)}</strong>
-                <small>Booksy activity sync</small>
-              </div>
-              <div>
-                <span>Cancellations</span>
-                <strong>{formatNumber(ownActivityReviewSummary?.cancellations || 0)}</strong>
-                <small>Watch follow-up opportunities</small>
-              </div>
-              <div>
-                <span>Reschedules</span>
-                <strong>{formatNumber(ownActivityReviewSummary?.reschedules || 0)}</strong>
-                <small>Schedule movement</small>
-              </div>
-              <div>
-                <span>5-star reviews</span>
-                <strong>{formatNumber(ownActivityReviewSummary?.five_star_reviews || 0)}</strong>
-                <small>Review goal progress</small>
-              </div>
-            </div>
           </section>
 
-          <section className="panel staff-hub-home-side">
-            <div className="section-header">
-              <div>
-                <span>Snapshot</span>
-                <h2>{staffProfile ? 'My profile' : 'Portal setup'}</h2>
+          <section className="staff-hub-dashboard-grid full-span" aria-label="Staff Hub daily dashboard">
+            <article className="staff-hub-app-card staff-hub-app-card--wide staff-hub-earnings-card">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Earnings overview</span>
+                  <h2>{latestEntry ? formatCurrency(latestEntry.take_home) : 'Waiting for payroll'}</h2>
+                  <p>{latestEntry?.week_label || 'Saved payroll entries will build this trend.'}</p>
+                </div>
+                <button className="ghost-button small" type="button" onClick={() => setActiveTab('money')}>
+                  Money
+                </button>
               </div>
-              <StatusBadge tone={staffProfile?.active || ownerView ? 'success' : 'muted'}>
-                {staffProfile?.active ? 'Active' : ownerView ? 'Ready' : 'Inactive'}
-              </StatusBadge>
-            </div>
-            <div className="role-summary-list compact">
-              <div>
-                <span>Business</span>
-                <strong>
-                  {ownerView && !staffProfile
-                    ? allBusinessesView
-                      ? 'Staff see assigned businesses'
-                      : businessUnit?.name
-                    : businessUnit?.name || staffProfile?.primary_business_name || 'Not set'}
-                </strong>
-              </div>
-              <div>
-                <span>Role</span>
-                <strong>{staffProfile?.role || accessProfile?.role_title || 'Staff'}</strong>
-              </div>
-              <div>
-                <span>Commission</span>
-                <strong>
-                  {staffProfile
-                    ? staffProfile.fixed_rate
-                      ? 'Fixed rate'
-                      : `${staffProfile.commission_rate || 0}%`
-                    : 'Set in roster'}
-                </strong>
-              </div>
-            </div>
-            <div className="staff-hub-side-stack">
-              {nextTask ? (
-                <article className="staff-hub-side-card">
-                  <span>{isOverdueTask(nextTask) ? 'Overdue task' : 'Next task'}</span>
-                  <strong>{nextTask.title}</strong>
-                  <small>{nextTask.due_date ? `Due ${formatDate(nextTask.due_date)}` : formatCategory(nextTask.category)}</small>
-                  <button className="ghost-button small" type="button" onClick={() => setActiveTab('more')}>
-                    Open tasks
-                  </button>
-                </article>
+              {weeklyTrend.length ? (
+                <div className="staff-hub-mini-chart" role="img" aria-label="Weekly take-home trend">
+                  {weeklyTrend.map((point) => (
+                    <div className="staff-hub-mini-chart__bar" key={point.label}>
+                      <span style={{ height: `${point.height}%` }} />
+                      <small>{point.label}</small>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <article className="staff-hub-side-card quiet">
-                  <span>Tasks</span>
-                  <strong>No open tasks</strong>
-                  <small>Assigned work will appear here.</small>
-                </article>
+                <div className="staff-hub-empty-compact">
+                  <WalletCards size={22} />
+                  <span>Payroll history will show here after a saved run.</span>
+                </div>
               )}
-              <article className="staff-hub-side-card quiet">
-                <span>Review score</span>
-                <strong>
-                  {ownActivityReviewSummary?.average_rating
-                    ? `${ownActivityReviewSummary.average_rating}/5`
-                    : 'Waiting'}
-                </strong>
-                <small>
-                  {formatNumber(ownActivityReviewSummary?.review_count || 0)} verified review{Number(ownActivityReviewSummary?.review_count || 0) === 1 ? '' : 's'}
-                </small>
-              </article>
-              {latestUpdate ? (
-                <article className="staff-hub-side-card">
-                  <span>{latestUpdate.pinned ? 'Pinned update' : 'Latest update'}</span>
-                  <strong>{latestUpdate.title}</strong>
-                  <small>{formatDate(latestUpdate.created_at)}</small>
-                </article>
-              ) : null}
-            </div>
+              <div className="staff-hub-card-metrics">
+                <div>
+                  <span>Total earned</span>
+                  <strong>{formatCurrency(totalTakeHome)}</strong>
+                </div>
+                <div>
+                  <span>Total tips</span>
+                  <strong>{formatCurrency(totalTips)}</strong>
+                </div>
+                <div>
+                  <span>Recorded weeks</span>
+                  <strong>{formatNumber(ownEntries.length)}</strong>
+                </div>
+              </div>
+            </article>
+
+            <article className="staff-hub-app-card staff-hub-goal-summary">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Goal progress</span>
+                  <h2>{formatCurrency(monthlyGoal.currentRevenue)}</h2>
+                  <p>Monthly revenue goal: {formatCurrency(monthlyGoal.goal)}</p>
+                </div>
+              </div>
+              <div className="staff-hub-progress-track">
+                <span style={{ width: `${monthlyGoal.percentComplete}%` }} />
+              </div>
+              <strong>{monthlyGoal.percentComplete}% complete</strong>
+              <small>Need {formatCurrency(monthlyGoal.remaining)} more this month.</small>
+              <button className="secondary-button" type="button" onClick={() => setActiveTab('money')}>
+                Adjust goal
+              </button>
+            </article>
+
+            <article className="staff-hub-app-card">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Reminders</span>
+                  <h2>Today’s focus</h2>
+                </div>
+                <button className="ghost-button small" type="button" onClick={() => setActiveTab('more')}>
+                  Tasks
+                </button>
+              </div>
+              <div className="staff-hub-reminder-list">
+                {reminders.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      className={`staff-hub-reminder tone-${item.tone}`}
+                      key={`${item.title}-${item.detail}`}
+                      onClick={() => setActiveTab(item.tab)}
+                      type="button"
+                    >
+                      <Icon size={17} />
+                      <span>
+                        <strong>{item.title}</strong>
+                        <small>{item.detail}</small>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </article>
+
+            <article className="staff-hub-app-card">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Schedule</span>
+                  <h2>Next appointments</h2>
+                </div>
+                <button className="ghost-button small" type="button" onClick={() => setActiveTab('schedule')}>
+                  View
+                </button>
+              </div>
+              {scheduleRows.length ? (
+                <div className="staff-hub-schedule-preview">
+                  {scheduleRows.slice(0, 4).map((row, index) => (
+                    <div key={`${row.date || row.created_at || index}-${row.client || row.service || index}`}>
+                      <time>{scheduleDisplayTime(row)}</time>
+                      <span>
+                        <strong>{row.service || row.item || 'Service'}</strong>
+                        <small>{row.client || row.customer || 'Client not listed'}</small>
+                      </span>
+                      <StatusBadge tone={row.schedule_type === 'Upcoming' ? 'gold' : 'muted'}>
+                        {row.schedule_type || 'Imported'}
+                      </StatusBadge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="staff-hub-empty-compact">
+                  <CalendarDays size={22} />
+                  <span>Imported Booksy or Square appointments will appear here.</span>
+                </div>
+              )}
+            </article>
+
+            <article className="staff-hub-app-card">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Reviews</span>
+                  <h2>
+                    {ownActivityReviewSummary?.average_rating
+                      ? `${ownActivityReviewSummary.average_rating}/5`
+                      : 'Waiting'}
+                  </h2>
+                  <p>{formatNumber(reviewCount)} verified review{reviewCount === 1 ? '' : 's'}</p>
+                </div>
+                <MessageSquare size={22} />
+              </div>
+              <div className="staff-hub-progress-track">
+                <span style={{ width: `${reviewGoal.percent}%` }} />
+              </div>
+              <small>
+                {formatNumber(fiveStarReviews)} five-star reviews · {reviewGoal.remaining} left for the next goal.
+              </small>
+              <button className="secondary-button" type="button" onClick={() => setActiveTab('stats')}>
+                Review stats
+              </button>
+            </article>
+
+            <article className="staff-hub-app-card staff-hub-app-card--wide">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Achievements</span>
+                  <h2>Progress badges</h2>
+                </div>
+                <Trophy size={22} />
+              </div>
+              <div className="staff-hub-achievement-grid">
+                {achievementCards.map((achievement) => {
+                  const Icon = achievement.icon;
+                  return (
+                    <div
+                      className={achievement.unlocked ? 'staff-hub-achievement unlocked' : 'staff-hub-achievement'}
+                      key={achievement.title}
+                    >
+                      <Icon size={20} />
+                      <strong>{achievement.title}</strong>
+                      <span>{achievement.value}</span>
+                      <small>{achievement.detail}</small>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+
+            <article className="staff-hub-app-card">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Week vs previous</span>
+                  <h2>Momentum</h2>
+                </div>
+                <TrendingUp size={22} />
+              </div>
+              <div className="staff-hub-comparison-list">
+                {weekComparisons.map((item) => (
+                  <div key={item.label}>
+                    <span>
+                      <strong>{item.label}</strong>
+                      <small>{item.previous}</small>
+                    </span>
+                    <em className={`tone-${trendTone(item.delta)}`}>{formatChange(item.delta)}</em>
+                    <b>{item.current}</b>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="staff-hub-app-card">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Activity feed</span>
+                  <h2>Latest updates</h2>
+                </div>
+                <Bell size={22} />
+              </div>
+              {activityFeed.length ? (
+                <div className="staff-hub-activity-feed">
+                  {activityFeed.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <div key={item.id}>
+                        <Icon size={16} />
+                        <span>
+                          <strong>{item.title}</strong>
+                          <small>{item.detail}</small>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="staff-hub-empty-compact">
+                  <Bell size={22} />
+                  <span>Updates, tasks, schedule rows, and payroll activity will appear here.</span>
+                </div>
+              )}
+            </article>
           </section>
 
           <section className="panel full-span staff-hub-nav-panel">
             <div className="section-header">
               <div>
                 <span>Navigate</span>
-                <h2>Open what you need</h2>
+                <h2>Quick tools</h2>
               </div>
               <ChevronRight size={20} />
             </div>
@@ -1264,6 +1677,20 @@ export default function StaffHubPage({
                 );
               })}
             </div>
+          </section>
+
+          <section className="panel full-span staff-hub-motivation-panel">
+            <div>
+              <span className="eyebrow">Coaching note</span>
+              <h2>{rtbScore.focus}</h2>
+              <p>
+                The fastest path to better income is simple: protect the $500 floor, ask for the review while the client is happiest,
+                and rebook before they leave.
+              </p>
+            </div>
+            <button className="primary-button" type="button" onClick={() => setActiveTab('stats')}>
+              View recommendations
+            </button>
           </section>
 
             {actionItems.length ? (
