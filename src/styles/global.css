@@ -9027,6 +9027,8 @@ tbody tr {
   --rtb-gold-deep: #9c7832;
   --rtb-white: #f8f4ec;
   --rtb-mid: #a3b4c2;
+  --rtb-text: var(--rtb-white);
+  --rtb-muted: var(--rtb-mid);
   --rtb-faint: #7b8e9e;
   --rtb-paper: #edf1f4;
   --rtb-positive: #5fc79b;
