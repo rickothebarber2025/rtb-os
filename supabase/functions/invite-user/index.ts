@@ -93,6 +93,59 @@ function normalizePermissionsPayload(value: unknown) {
   };
 }
 
+function hasAssignedModuleAccess(permissions: ReturnType<typeof normalizePermissionsPayload>) {
+  return MODULE_IDS.some((moduleId) => permissions.modules[moduleId] !== "none");
+}
+
+function applyStaffPortalDefaults(
+  permissions: ReturnType<typeof normalizePermissionsPayload>,
+  businessUnitId: string | null,
+) {
+  const businessUnitIds = permissions.business_unit_ids.length
+    ? permissions.business_unit_ids
+    : businessUnitId
+      ? [businessUnitId]
+      : [];
+
+  return {
+    ...permissions,
+    business_scope: permissions.business_scope === "all" ? "all" : "selected",
+    business_unit_ids: permissions.business_scope === "all"
+      ? [ALL_BUSINESSES_ACCESS]
+      : businessUnitIds,
+    expectations:
+      permissions.expectations ||
+      "Use Staff Hub to review your own profile, role expectations, and assigned business.",
+    modules: {
+      ...permissions.modules,
+      dashboard: "view",
+      roster: "view",
+    },
+    responsibilities: permissions.responsibilities.length
+      ? permissions.responsibilities
+      : [
+          "Review your Staff Hub updates",
+          "Keep your staff profile details accurate",
+          "Check your assigned business and role expectations",
+          "Report schedule, profile, or access issues to management",
+        ],
+    restrictions: permissions.restrictions.length
+      ? permissions.restrictions
+      : [
+          "No payroll editing.",
+          "No access management.",
+          "No business settings changes.",
+          "No deleting or changing other staff records.",
+        ],
+    role_description:
+      permissions.role_description === "Custom access profile."
+        ? "Basic staff login for Staff Hub, My Role, and read-only roster context."
+        : permissions.role_description,
+    role_template: "staff_portal",
+    role_title: "Staff Portal",
+  };
+}
+
 function legacyAccessPermission(profile: { role?: string | null } | null) {
   const role = String(profile?.role || "").trim().toLowerCase();
   return role === "admin" || role === "owner" ? "admin" : "none";
@@ -206,8 +259,12 @@ Deno.serve(async (req) => {
     const fullName = String(body.full_name || email).trim();
     const role = String(body.role || "staff").trim().toLowerCase();
     const businessUnitId = body.business_unit_id ? String(body.business_unit_id) : null;
-    const permissions = normalizePermissionsPayload(body.permissions);
+    let permissions = normalizePermissionsPayload(body.permissions);
     const redirectTo = cleanRedirectTo(body.redirectTo, req.headers.get("Origin"));
+
+    if (role === "staff" && !hasAssignedModuleAccess(permissions)) {
+      permissions = applyStaffPortalDefaults(permissions, businessUnitId);
+    }
 
     if (!email || !email.includes("@")) {
       return jsonResponse({ error: "Enter a valid email address." }, 400);

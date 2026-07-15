@@ -174,6 +174,31 @@ test('staff portal template lets invited staff sign in without admin access', ()
   assert.equal(getEffectivePermissionsPayload(staffPortal).role_title, 'Staff Portal');
 });
 
+test('active staff with blank access is automatically treated as Staff Portal', () => {
+  const emptyCustomStaff = {
+    active: true,
+    business_unit_id: 'beauty',
+    permissions: buildPermissionsFromTemplate('custom', {
+      business_unit_ids: ['beauty'],
+    }),
+    role: 'staff',
+  };
+  const legacyNullStaff = {
+    active: true,
+    business_unit_id: 'lounge',
+    permissions: null,
+    role: 'staff',
+  };
+
+  assert.equal(canUseApp(emptyCustomStaff), true);
+  assert.equal(canAccessPage(emptyCustomStaff, 'staff-hub'), true);
+  assert.equal(canAccessPage(emptyCustomStaff, 'access'), false);
+  assert.equal(getEffectivePermissionsPayload(emptyCustomStaff).role_template, 'staff_portal');
+  assert.equal(canUseApp(legacyNullStaff), true);
+  assert.equal(canAccessPage(legacyNullStaff, 'staff-hub'), true);
+  assert.equal(getEffectivePermissionsPayload(legacyNullStaff).role_title, 'Staff Portal');
+});
+
 test('role workspace surfaces allowed role-specific actions', () => {
   const appointmentCoordinator = {
     active: true,

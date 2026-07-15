@@ -106,6 +106,45 @@ export function createModulePermissions(level = 'none') {
   );
 }
 
+function hasAssignedModuleAccess(payload) {
+  return MODULE_IDS.some(
+    (moduleId) => normalizePermissionLevel(payload?.modules?.[moduleId]) !== 'none',
+  );
+}
+
+function isStaffRole(profile = {}) {
+  return String(profile.role || '').trim().toLowerCase() === 'staff';
+}
+
+function createStaffPortalPermissions(profile = {}) {
+  const businessUnitIds = profile.business_unit_id ? [profile.business_unit_id] : [];
+
+  return buildPermissionsPayload({
+    business_unit_ids: businessUnitIds,
+    expectations: 'Use Staff Hub to review your own profile, role expectations, and assigned business.',
+    modules: {
+      ...createModulePermissions(),
+      dashboard: 'view',
+      roster: 'view',
+    },
+    responsibilities: [
+      'Review your Staff Hub updates',
+      'Keep your staff profile details accurate',
+      'Check your assigned business and role expectations',
+      'Report schedule, profile, or access issues to management',
+    ],
+    restrictions: [
+      'No payroll editing.',
+      'No access management.',
+      'No business settings changes.',
+      'No deleting or changing other staff records.',
+    ],
+    role_description: 'Basic staff login for Staff Hub, My Role, and read-only roster context.',
+    role_template: 'staff_portal',
+    role_title: 'Staff Portal',
+  });
+}
+
 export function normalizeModulePermissions(value) {
   const raw = safeObject(value);
   return MODULE_IDS.reduce(
@@ -218,20 +257,7 @@ export function createLegacyPermissionsFromRole(profile = {}) {
   }
 
   if (role === 'staff') {
-    return buildPermissionsPayload({
-      business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [],
-      expectations: 'Legacy staff fallback. Ask an access admin to save an explicit role template.',
-      modules: {
-        ...createModulePermissions(),
-        dashboard: 'view',
-        operations: 'view',
-      },
-      responsibilities: ['Review assigned information and report issues to management.'],
-      restrictions: ['Cannot edit business records until permissions are customized.'],
-      role_description: 'Temporary fallback for an existing staff profile without saved permissions.',
-      role_template: 'legacy_staff',
-      role_title: 'Legacy Staff',
-    });
+    return createStaffPortalPermissions(profile);
   }
 
   return normalizePermissionsPayload(null);
@@ -325,6 +351,10 @@ export function getEffectivePermissionsPayload(profile) {
 
   const profilePayload = mergeProfilePermissionFields(profile || {});
   const payload = normalizePermissionsPayload(profilePayload.permissions);
+  if (isStaffRole(profile) && !hasAssignedModuleAccess(payload)) {
+    return createStaffPortalPermissions(profile);
+  }
+
   if (payload.role_title !== DEFAULT_PAYLOAD_META.role_title) return payload;
 
   const role = String(profile?.role || '').trim();
