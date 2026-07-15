@@ -78,6 +78,7 @@ import {
   staffBelongsToBusiness,
 } from '../src/utils/staffBusiness.js';
 import {
+  buildCommissionExplanation,
   buildIncomeOpportunity,
   buildMonthlyGoalProgress,
   buildRtbScore,
@@ -989,6 +990,57 @@ test('staff hub income tracker focuses on useful money opportunities', () => {
   assert.equal(today.appointmentsToday, 2);
   assert.equal(today.importedRevenue, 200);
   assert.equal(today.rank, 2);
+});
+
+test('staff hub explains commission adjustments clearly', () => {
+  const standard = buildCommissionExplanation({
+    latestEntry: {
+      adjusted: true,
+      applied_commission_rate: 55,
+      base_commission_rate: 60,
+      deduction: 5,
+      net_sales: 400,
+      take_home: 255,
+      tier_snapshot: 'standard',
+      tips: 40,
+    },
+  });
+
+  assert.equal(standard.title, 'Commission adjusted to 55%');
+  assert.equal(standard.amountToFloor, 100);
+  assert.equal(standard.adjustmentImpact, 20);
+  assert.equal(standard.projectedFloorGain, 80);
+  assert.equal(standard.takeHome, 255);
+  assert.match(standard.message, /\$500/);
+
+  const fixed = buildCommissionExplanation({
+    latestEntry: {
+      adjusted: true,
+      applied_commission_rate: 65,
+      base_commission_rate: 70,
+      fixed_rate_snapshot: true,
+      net_sales: 400,
+      tier_snapshot: 'elite',
+    },
+  });
+
+  assert.equal(fixed.title, 'Fixed commission lowered 5 points');
+  assert.equal(fixed.adjustmentPoints, 5);
+  assert.match(fixed.message, /Fixed-rate staff/);
+
+  const probation = buildCommissionExplanation({
+    latestEntry: {
+      adjusted: false,
+      applied_commission_rate: 50,
+      base_commission_rate: 50,
+      net_sales: 400,
+      tier_snapshot: 'probation',
+    },
+  });
+
+  assert.equal(probation.title, 'Probation stays at 50/50');
+  assert.equal(probation.adjusted, false);
+  assert.equal(probation.adjustmentImpact, 0);
 });
 
 test('staff hub RTB score returns a simple coaching focus', () => {

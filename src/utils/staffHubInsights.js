@@ -1,5 +1,32 @@
-const COMMISSION_FLOOR = 500;
+import {
+  ADJUSTED_COMMISSION_RATE,
+  ENTRY_DEDUCTION,
+  FIXED_RATE_LOW_SALES_ADJUSTMENT,
+  LOW_SALES_THRESHOLD,
+} from './constants.js';
+
+const COMMISSION_FLOOR = LOW_SALES_THRESHOLD;
 const DEFAULT_MONTHLY_GOAL = 5000;
+
+export const STAFF_HUB_COMMISSION_TIERS = [
+  { label: 'Probation', rule: '50/50', note: 'First 90 days' },
+  { label: 'Standard RTB', rule: '60/40', note: 'After probation' },
+  { label: 'Performance Review', rule: '55/45', note: 'If standards drop' },
+  { label: 'Growth Performer', rule: '65/35', note: 'Management approval' },
+  { label: 'Elite RTB', rule: '70/30 max', note: 'Top performers' },
+  { label: 'Booth Rent', rule: 'Keep 100%', note: 'Rent model' },
+];
+
+const TIER_LABELS = {
+  booth: 'Booth Rent Tier',
+  elite: 'Elite RTB Tier',
+  growth: 'Growth Performer Tier',
+  performance: 'Performance Review Tier',
+  performance_review: 'Performance Review Tier',
+  probation: 'Probation Tier',
+  review: 'Performance Review Tier',
+  standard: 'Standard RTB Tier',
+};
 
 function safeNumber(value, fallback = 0) {
   const number = Number(value);
@@ -71,6 +98,97 @@ export function buildIncomeOpportunity(latestEntry = null) {
     floor: COMMISSION_FLOOR,
     needToFloor: money(needToFloor),
     potentialExtraCommission: money(potentialExtraCommission),
+  };
+}
+
+export function buildCommissionExplanation({ latestEntry = null, staffProfile = null } = {}) {
+  const hasEntry = Boolean(latestEntry);
+  const netSales = safeNumber(latestEntry?.net_sales);
+  const tips = safeNumber(latestEntry?.tips);
+  const deduction = safeNumber(latestEntry?.deduction, hasEntry ? ENTRY_DEDUCTION : 0);
+  const baseRate = safeNumber(latestEntry?.base_commission_rate || staffProfile?.commission_rate || 0);
+  const appliedRate = safeNumber(latestEntry?.applied_commission_rate || baseRate);
+  const tierKey = String(latestEntry?.tier_snapshot || staffProfile?.tier || 'standard').toLowerCase();
+  const fixedRate = Boolean(latestEntry?.fixed_rate_snapshot ?? staffProfile?.fixed_rate);
+  const belowFloor = hasEntry && netSales < COMMISSION_FLOOR;
+  const amountToFloor = belowFloor ? COMMISSION_FLOOR - netSales : 0;
+  const adjusted = hasEntry && (Boolean(latestEntry?.adjusted) || appliedRate !== baseRate);
+  const commissionAtAppliedRate = netSales * (appliedRate / 100);
+  const commissionAtBaseRate = netSales * (baseRate / 100);
+  const commissionAtFloorBaseRate = COMMISSION_FLOOR * (baseRate / 100);
+  const adjustmentImpact = adjusted ? Math.max(0, commissionAtBaseRate - commissionAtAppliedRate) : 0;
+  const projectedFloorGain = belowFloor
+    ? Math.max(0, commissionAtFloorBaseRate - commissionAtAppliedRate)
+    : 0;
+  const takeHome = safeNumber(
+    latestEntry?.take_home,
+    commissionAtAppliedRate + tips - deduction,
+  );
+  const adjustmentPoints = Math.max(0, baseRate - appliedRate);
+  const tierLabel = TIER_LABELS[tierKey] || `${tierKey || 'standard'} tier`;
+
+  if (!hasEntry) {
+    return {
+      adjusted: false,
+      adjustmentImpact: 0,
+      adjustmentPoints: 0,
+      amountToFloor: 0,
+      appliedRate,
+      baseRate,
+      belowFloor: false,
+      commissionAtAppliedRate: 0,
+      deduction: 0,
+      fixedRate,
+      floor: COMMISSION_FLOOR,
+      message: 'Once a payroll entry is saved, this will explain the exact commission rate and take-home calculation.',
+      projectedFloorGain: 0,
+      status: 'empty',
+      takeHome: 0,
+      tierLabel,
+      title: 'Commission details will show after payroll',
+    };
+  }
+
+  let title = 'Full commission protected';
+  let message = `Your weekly net sales met the $${money(COMMISSION_FLOOR)} floor, so RTB OS kept your full ${baseRate}% rate.`;
+  let status = 'success';
+
+  if (belowFloor && fixedRate) {
+    title = `Fixed commission lowered ${FIXED_RATE_LOW_SALES_ADJUSTMENT} points`;
+    message = `Fixed-rate staff keep their custom rate at $${money(COMMISSION_FLOOR)} or more. Below the floor, RTB OS subtracts ${FIXED_RATE_LOW_SALES_ADJUSTMENT} points for that payroll entry.`;
+    status = 'warning';
+  } else if (belowFloor && tierKey === 'probation') {
+    title = 'Probation stays at 50/50';
+    message = `Probation starts at 50/50, so RTB OS does not drop it again below the $${money(COMMISSION_FLOOR)} floor.`;
+    status = 'neutral';
+  } else if (belowFloor && adjusted) {
+    title = `Commission adjusted to ${appliedRate}%`;
+    message = `Weekly net sales were below $${money(COMMISSION_FLOOR)}, so RTB OS used the ${ADJUSTED_COMMISSION_RATE}% performance review rate for this payroll entry.`;
+    status = 'warning';
+  } else if (belowFloor) {
+    title = `Below the $${money(COMMISSION_FLOOR)} floor`;
+    message = `This entry is below the floor, but your current tier already applies at ${appliedRate}%.`;
+    status = 'neutral';
+  }
+
+  return {
+    adjusted,
+    adjustmentImpact: money(adjustmentImpact),
+    adjustmentPoints: money(adjustmentPoints),
+    amountToFloor: money(amountToFloor),
+    appliedRate,
+    baseRate,
+    belowFloor,
+    commissionAtAppliedRate: money(commissionAtAppliedRate),
+    deduction: money(deduction),
+    fixedRate,
+    floor: COMMISSION_FLOOR,
+    message,
+    projectedFloorGain: money(projectedFloorGain),
+    status,
+    takeHome: money(takeHome),
+    tierLabel,
+    title,
   };
 }
 

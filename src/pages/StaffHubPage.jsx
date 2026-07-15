@@ -44,6 +44,8 @@ import { normalizeActionCenterState } from '../utils/actionCenter';
 import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from '../utils/formatters';
 import {
+  STAFF_HUB_COMMISSION_TIERS,
+  buildCommissionExplanation,
   buildIncomeOpportunity,
   buildMonthlyGoalProgress,
   buildRtbScore,
@@ -447,6 +449,10 @@ export default function StaffHubPage({
     [latestEntry, rank, scheduleRows],
   );
   const incomeOpportunity = useMemo(() => buildIncomeOpportunity(latestEntry), [latestEntry]);
+  const commissionExplanation = useMemo(
+    () => buildCommissionExplanation({ latestEntry, staffProfile }),
+    [latestEntry, staffProfile],
+  );
   const monthlyGoal = useMemo(
     () => buildMonthlyGoalProgress({ entries: ownEntries, goal: monthlyRevenueGoal }),
     [monthlyRevenueGoal, ownEntries],
@@ -1193,6 +1199,75 @@ export default function StaffHubPage({
               </form>
             </article>
           </div>
+          <article className={`staff-hub-commission-card ${commissionExplanation.status}`}>
+            <div className="staff-hub-commission-card__header">
+              <div>
+                <span className="eyebrow">RTB commission structure</span>
+                <h3>{commissionExplanation.title}</h3>
+                <p>{commissionExplanation.message}</p>
+              </div>
+              <StatusBadge tone={latestEntry ? (commissionExplanation.adjusted ? 'warning' : 'success') : 'muted'}>
+                {latestEntry ? (commissionExplanation.adjusted ? 'Adjusted' : 'Full rate') : 'Waiting'}
+              </StatusBadge>
+            </div>
+            <div className="staff-hub-commission-stats">
+              <div>
+                <span>Your tier</span>
+                <strong>{commissionExplanation.tierLabel}</strong>
+                <small>{commissionExplanation.fixedRate ? 'Fixed-rate rule applies' : 'Standard rule applies'}</small>
+              </div>
+              <div>
+                <span>Base rate</span>
+                <strong>{commissionExplanation.baseRate || 0}%</strong>
+                <small>Rate before weekly floor check</small>
+              </div>
+              <div>
+                <span>Applied rate</span>
+                <strong>{commissionExplanation.appliedRate || 0}%</strong>
+                <small>{commissionExplanation.adjusted ? `${commissionExplanation.adjustmentPoints} point adjustment` : 'No rate drop'}</small>
+              </div>
+              <div>
+                <span>$500 floor</span>
+                <strong>
+                  {latestEntry
+                    ? commissionExplanation.belowFloor
+                      ? `${formatCurrency(commissionExplanation.amountToFloor)} short`
+                      : 'Met'
+                    : 'Waiting'}
+                </strong>
+                <small>Weekly net sales requirement</small>
+              </div>
+              <div>
+                <span>Take-home</span>
+                <strong>{formatCurrency(commissionExplanation.takeHome)}</strong>
+                <small>After tips and $5 entry deduction</small>
+              </div>
+            </div>
+            {latestEntry ? (
+              <div className="staff-hub-commission-formula">
+                <strong>
+                  {formatCurrency(latestEntry.net_sales)} x {commissionExplanation.appliedRate}% +{' '}
+                  {formatCurrency(latestEntry.tips)} tips - {formatCurrency(commissionExplanation.deduction)}
+                </strong>
+                <span>= {formatCurrency(commissionExplanation.takeHome)} take-home</span>
+                {commissionExplanation.adjusted ? (
+                  <small>
+                    This rate adjustment changed commission by {formatCurrency(commissionExplanation.adjustmentImpact)} at current sales.
+                    Reaching the $500 floor would add about {formatCurrency(commissionExplanation.projectedFloorGain)} before tips and deduction.
+                  </small>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="staff-hub-commission-tiers" aria-label="RTB commission tier summary">
+              {STAFF_HUB_COMMISSION_TIERS.map((tier) => (
+                <div className="staff-hub-commission-tier-chip" key={tier.label}>
+                  <strong>{tier.rule}</strong>
+                  <span>{tier.label}</span>
+                  <small>{tier.note}</small>
+                </div>
+              ))}
+            </div>
+          </article>
           {ownEntries.length ? (
             <DataTable>
               <table>
@@ -1219,7 +1294,14 @@ export default function StaffHubPage({
                       </td>
                       <td>{formatCurrency(entry.net_sales)}</td>
                       <td>{formatCurrency(entry.tips)}</td>
-                      <td>{entry.applied_commission_rate || entry.base_commission_rate || 0}%</td>
+                      <td>
+                        <strong>{entry.applied_commission_rate || entry.base_commission_rate || 0}%</strong>
+                        <span className="subtle-text">
+                          {entry.adjusted
+                            ? `Adjusted from ${entry.base_commission_rate || 0}%`
+                            : `Base ${entry.base_commission_rate || entry.applied_commission_rate || 0}%`}
+                        </span>
+                      </td>
                       <td>
                         <strong>{formatCurrency(entry.take_home)}</strong>
                       </td>
