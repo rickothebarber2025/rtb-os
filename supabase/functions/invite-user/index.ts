@@ -11,6 +11,7 @@ const ROLE_VALUES = new Set(["admin", "manager", "staff", "pending"]);
 const OWNER_EMAIL = "rickothebarber@gmail.com";
 const ALL_BUSINESSES_ACCESS = "all-businesses";
 const MODULE_IDS = [
+  "staff_hub",
   "dashboard",
   "roster",
   "payroll",
@@ -115,17 +116,17 @@ function applyStaffPortalDefaults(
       : businessUnitIds,
     expectations:
       permissions.expectations ||
-      "Use Staff Hub to review your own profile, role expectations, and assigned business.",
+      "Use Staff Hub to review your own profile, earnings, performance, role expectations, and assigned business.",
     modules: {
       ...permissions.modules,
-      dashboard: "view",
-      roster: "view",
+      staff_hub: "view",
     },
     responsibilities: permissions.responsibilities.length
       ? permissions.responsibilities
       : [
           "Review your Staff Hub updates",
           "Keep your staff profile details accurate",
+          "Check your payroll and performance history",
           "Check your assigned business and role expectations",
           "Report schedule, profile, or access issues to management",
         ],
@@ -139,7 +140,7 @@ function applyStaffPortalDefaults(
         ],
     role_description:
       permissions.role_description === "Custom access profile."
-        ? "Basic staff login for Staff Hub, My Role, and read-only roster context."
+        ? "Staff-only login for Staff Hub with personal payroll and performance history."
         : permissions.role_description,
     role_template: "staff_portal",
     role_title: "Staff Portal",

@@ -4,6 +4,7 @@ export const ALL_BUSINESSES_ACCESS = 'all-businesses';
 export const PERMISSION_LEVELS = ['none', 'view', 'edit', 'admin'];
 
 export const MODULE_IDS = [
+  'staff_hub',
   'dashboard',
   'roster',
   'payroll',
@@ -25,6 +26,7 @@ export const MODULE_LABELS = {
   performance: 'Performance',
   roster: 'Roster',
   settings: 'Settings',
+  staff_hub: 'Staff Hub',
 };
 
 export const PAGE_MODULE_MAP = {
@@ -39,7 +41,7 @@ export const PAGE_MODULE_MAP = {
   operations: 'operations',
   payroll: 'payroll',
   performance: 'performance',
-  'staff-hub': 'dashboard',
+  'staff-hub': 'staff_hub',
   staff: 'roster',
   system: 'settings',
 };
@@ -121,15 +123,15 @@ function createStaffPortalPermissions(profile = {}) {
 
   return buildPermissionsPayload({
     business_unit_ids: businessUnitIds,
-    expectations: 'Use Staff Hub to review your own profile, role expectations, and assigned business.',
+    expectations: 'Use Staff Hub to review your own profile, earnings, performance, role expectations, and assigned business.',
     modules: {
       ...createModulePermissions(),
-      dashboard: 'view',
-      roster: 'view',
+      staff_hub: 'view',
     },
     responsibilities: [
       'Review your Staff Hub updates',
       'Keep your staff profile details accurate',
+      'Check your payroll and performance history',
       'Check your assigned business and role expectations',
       'Report schedule, profile, or access issues to management',
     ],
@@ -139,7 +141,7 @@ function createStaffPortalPermissions(profile = {}) {
       'No business settings changes.',
       'No deleting or changing other staff records.',
     ],
-    role_description: 'Basic staff login for Staff Hub, My Role, and read-only roster context.',
+    role_description: 'Staff-only login for Staff Hub with personal payroll and performance history.',
     role_template: 'staff_portal',
     role_title: 'Staff Portal',
   });

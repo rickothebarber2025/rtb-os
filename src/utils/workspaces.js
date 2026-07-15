@@ -17,6 +17,7 @@ const PAGE_BY_MODULE = {
   performance: 'performance',
   roster: 'staff',
   settings: 'system',
+  staff_hub: 'staff-hub',
 };
 
 const WORKSPACE_PRESETS = {
@@ -61,8 +62,8 @@ const WORKSPACE_PRESETS = {
     title: 'Payroll Workspace',
   },
   staff_portal: {
-    description: 'Use Staff Hub to review your own profile, role expectations, and assigned business.',
-    focus: ['staff-hub', 'my-role', 'dashboard', 'staff'],
+    description: 'Use Staff Hub to review your own profile, earnings, performance, and assigned business.',
+    focus: ['staff-hub'],
     title: 'Staff Portal',
   },
   view_only: {
@@ -109,7 +110,12 @@ export function buildRoleWorkspace(profile, navItems = [], businessUnit = null) 
   const payload = getEffectivePermissionsPayload(profile);
   const preset = inferPreset(profile);
   const allowedPageIds = new Set(navItems.map((item) => item.id));
-  const focusPages = unique([...preset.focus, ...pagesFromPermissions(profile), 'my-role'])
+  const includeMyRole = payload.role_template !== 'staff_portal';
+  const focusPages = unique([
+    ...preset.focus,
+    ...pagesFromPermissions(profile),
+    ...(includeMyRole ? ['my-role'] : []),
+  ])
     .filter((pageId) => allowedPageIds.has(pageId))
     .slice(0, 6);
   const editableModules = Object.entries(payload.modules)

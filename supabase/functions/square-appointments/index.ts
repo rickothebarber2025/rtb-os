@@ -23,6 +23,7 @@ const SCOPES = [
 const OWNER_EMAIL = "rickothebarber@gmail.com";
 const ALL_BUSINESSES_ACCESS = "all-businesses";
 const MODULE_IDS = [
+  "staff_hub",
   "dashboard",
   "roster",
   "payroll",

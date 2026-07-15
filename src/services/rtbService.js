@@ -262,6 +262,22 @@ export async function saveStaff(staff) {
   return requireData(result);
 }
 
+export async function saveMyStaffPortalProfile(profile) {
+  const client = requireClient();
+  const { data, error } = await client.rpc('update_my_staff_portal_profile', {
+    p_profile: cleanObject({
+      bio: profile.bio || null,
+      phone: profile.phone || null,
+      photo_url: profile.photo_url || null,
+      services_offered: Array.isArray(profile.services_offered) ? profile.services_offered : [],
+      social_handle: profile.social_handle || null,
+    }),
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 export async function deactivateStaff(staffId) {
   const client = requireClient();
   return requireData(
@@ -502,6 +518,13 @@ export async function getMonthlyPerformanceSummary(businessUnitId) {
   }
 
   return requireData(await query);
+}
+
+export async function getMyStaffPortalSummary() {
+  const client = requireClient();
+  const { data, error } = await client.rpc('get_my_staff_portal_summary');
+  if (error) throw error;
+  return data || {};
 }
 
 export async function getBoothRent(businessUnitId) {

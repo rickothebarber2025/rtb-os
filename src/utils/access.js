@@ -1,5 +1,6 @@
 import { NAV_ITEMS } from './constants.js';
 import {
+  getEffectivePermissionsPayload,
   getModulePermission,
   hasAnyModulePermission,
   hasModulePermission,
@@ -54,7 +55,9 @@ export function canUseApp(profile) {
 export function canAccessPage(profile, pageId) {
   if (!canUseApp(profile)) return false;
   const moduleId = PAGE_MODULE_MAP[pageId] || PAGE_MODULE_MAP.dashboard;
-  if (moduleId === 'profile') return true;
+  if (moduleId === 'profile') {
+    return getEffectivePermissionsPayload(profile).role_template !== 'staff_portal';
+  }
   return hasModulePermission(profile, moduleId, 'view');
 }
 

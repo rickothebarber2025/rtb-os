@@ -4,6 +4,7 @@ import {
   getBoothRent,
   getBusinessUnits,
   getMonthlyPerformanceSummary,
+  getMyStaffPortalSummary,
   getPayrollRuns,
   getPerformanceSummary,
   getSquareStatus,
@@ -12,6 +13,7 @@ import {
 } from '../services/rtbService';
 import { ACTION_CENTER_SETTING_KEY, normalizeActionCenterState } from '../utils/actionCenter';
 import { canUsePayroll } from '../utils/access';
+import { hasModulePermission } from '../lib/permissions';
 import {
   ALL_BUSINESSES_UNIT,
   BUSINESS_PROFILES_KEY,
@@ -49,6 +51,7 @@ const EMPTY_STATE = {
     tasks: [],
     timeOffRequests: [],
   },
+  staffPortalSummary: null,
   staffBusinessMetadata: {},
   warnings: [],
 };
@@ -61,6 +64,7 @@ const LOAD_LABELS = {
   payrollRuns: 'Payroll history',
   performanceSummary: 'Performance summary',
   staffBusinessMetadataRecord: 'Staff business profile settings',
+  staffPortalSummary: 'Staff portal payroll and performance',
   squareStatus: 'Square connection status',
   staff: 'Staff roster',
   staffHub: 'Staff Hub records',
@@ -161,21 +165,38 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
       }
 
       const shouldLoadPayroll = canUsePayroll(accessProfile);
+      const canViewActionCenter =
+        hasModulePermission(accessProfile, 'operations', 'view') ||
+        hasModulePermission(accessProfile, 'access', 'admin') ||
+        hasModulePermission(accessProfile, 'settings', 'admin');
+      const canViewAppointments = hasModulePermission(accessProfile, 'appointments', 'view');
+      const canViewBoothRent = hasModulePermission(accessProfile, 'booth_rent', 'view');
+      const canViewPerformance = hasModulePermission(accessProfile, 'performance', 'view');
+      const canViewRoster = hasModulePermission(accessProfile, 'roster', 'view');
+      const canViewStaffHub = hasModulePermission(accessProfile, 'staff_hub', 'view');
+      const canViewStaffMetadata =
+        canViewRoster ||
+        hasModulePermission(accessProfile, 'access', 'admin') ||
+        hasModulePermission(accessProfile, 'settings', 'admin');
       const requests = {
-        actionCenterRecord: getAppSettingRecord(ACTION_CENTER_SETTING_KEY),
-        boothRent: isAllBusinesses
+        actionCenterRecord: canViewActionCenter
+          ? getAppSettingRecord(ACTION_CENTER_SETTING_KEY)
+          : Promise.resolve(null),
+        boothRent: !canViewBoothRent
+          ? Promise.resolve([])
+          : isAllBusinesses
           ? loadAcrossBusinessUnits(businessUnits, (unit) =>
               getBoothRent(unit.id).then((rows) =>
                 rows.map((row) => ({ ...row, business_name: unit.name })),
               ),
             )
           : getBoothRent(activeUnit.id),
-        masterDashboardRecord: isAllBusinesses
+        masterDashboardRecord: isAllBusinesses || !canViewAppointments
           ? Promise.resolve(null)
           : getAppSettingRecord(getAppointmentSettingKey(activeUnit)),
-        monthlyPerformanceSummary: getMonthlyPerformanceSummary(
-          isAllBusinesses ? null : activeUnit.id,
-        ),
+        monthlyPerformanceSummary: canViewPerformance
+          ? getMonthlyPerformanceSummary(isAllBusinesses ? null : activeUnit.id)
+          : Promise.resolve([]),
         payrollRuns: shouldLoadPayroll
           ? isAllBusinesses
             ? loadAcrossBusinessUnits(businessUnits, (unit) =>
@@ -185,12 +206,19 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
               )
             : getPayrollRuns(activeUnit.id)
           : Promise.resolve([]),
-        performanceSummary: getPerformanceSummary(isAllBusinesses ? null : activeUnit.id),
-        squareStatus: !isAllBusinesses && usesSquareAppointments(activeUnit)
+        performanceSummary: canViewPerformance
+          ? getPerformanceSummary(isAllBusinesses ? null : activeUnit.id)
+          : Promise.resolve([]),
+        squareStatus: canViewAppointments && !isAllBusinesses && usesSquareAppointments(activeUnit)
           ? getSquareStatus(activeUnit.id)
           : Promise.resolve(null),
-        staff: loadAcrossBusinessUnits(businessUnits, (unit) => getStaff(unit.id, true)),
-        staffBusinessMetadataRecord: getAppSettingRecord(STAFF_BUSINESS_METADATA_KEY),
+        staff: canViewRoster
+          ? loadAcrossBusinessUnits(businessUnits, (unit) => getStaff(unit.id, true))
+          : Promise.resolve([]),
+        staffBusinessMetadataRecord: canViewStaffMetadata
+          ? getAppSettingRecord(STAFF_BUSINESS_METADATA_KEY)
+          : Promise.resolve(null),
+        staffPortalSummary: canViewStaffHub ? getMyStaffPortalSummary() : Promise.resolve(null),
       };
       const entries = Object.entries(requests);
       const results = await Promise.allSettled(entries.map(([, request]) => request));
@@ -208,7 +236,8 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
           key === 'masterDashboardRecord' ||
           key === 'squareStatus' ||
           key === 'actionCenterRecord' ||
-          key === 'staffBusinessMetadataRecord'
+          key === 'staffBusinessMetadataRecord' ||
+          key === 'staffPortalSummary'
             ? null
             : [];
         warnings.push(
@@ -219,15 +248,17 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
       const staffBusinessMetadata = normalizeStaffBusinessMetadata(
         loaded.staffBusinessMetadataRecord?.value,
       );
+      const staffPortalSummary = loaded.staffPortalSummary || null;
+      const portalStaffProfile = staffPortalSummary?.staff_profile || null;
       const allStaff = enrichStaffWithBusinessMetadata(
-        uniqueById(loaded.staff),
+        uniqueById([...(loaded.staff || []), portalStaffProfile].filter(Boolean)),
         staffBusinessMetadata,
         businessUnits,
       );
       const scopedStaff = isAllBusinesses
         ? allStaff
         : allStaff.filter((member) => staffBelongsToBusiness(member, activeUnit.id));
-      const linkedStaffProfile = findLinkedStaffProfile(scopedStaff, accessProfile);
+      const linkedStaffProfile = findLinkedStaffProfile(scopedStaff, accessProfile) || portalStaffProfile;
       let staffHub = EMPTY_STATE.staffHub;
 
       try {
@@ -251,6 +282,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         squareStatus: loaded.squareStatus,
         staff: scopedStaff,
         staffHub,
+        staffPortalSummary,
         staffBusinessMetadata,
         warnings,
       });

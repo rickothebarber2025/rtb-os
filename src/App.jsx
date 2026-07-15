@@ -127,6 +127,7 @@ export default function App() {
       squareStatus: data.squareStatus,
       staff: data.staff,
       staffHub: data.staffHub,
+      staffPortalSummary: data.staffPortalSummary,
       staffBusinessMetadata: data.staffBusinessMetadata,
       accessProfile: auth.profile,
       setUserPreferences,
@@ -190,7 +191,7 @@ export default function App() {
         );
       case 'staff-hub':
         return (
-          <ModuleGate module="dashboard">
+          <ModuleGate module="staff_hub">
             <StaffHubPage {...pageProps} />
           </ModuleGate>
         );

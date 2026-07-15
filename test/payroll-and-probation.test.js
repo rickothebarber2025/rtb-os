@@ -166,8 +166,10 @@ test('staff portal template lets invited staff sign in without admin access', ()
 
   assert.equal(canUseApp(staffPortal), true);
   assert.equal(canAccessPage(staffPortal, 'staff-hub'), true);
-  assert.equal(canAccessPage(staffPortal, 'my-role'), true);
-  assert.equal(canAccessPage(staffPortal, 'staff'), true);
+  assert.equal(canAccessPage(staffPortal, 'my-role'), false);
+  assert.equal(canAccessPage(staffPortal, 'staff'), false);
+  assert.equal(canAccessPage(staffPortal, 'payroll'), false);
+  assert.equal(canAccessPage(staffPortal, 'performance'), false);
   assert.equal(canAccessPage(staffPortal, 'access'), false);
   assert.equal(canUsePayroll(staffPortal), false);
   assert.equal(canManageAccess(staffPortal), false);

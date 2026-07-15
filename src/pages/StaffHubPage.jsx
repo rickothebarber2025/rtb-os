@@ -24,12 +24,13 @@ import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
-import { isOwnerProfile } from '../lib/permissions';
+import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
 import {
   decideContentSubmission,
   decideTimeOffRequest,
   markStaffAnnouncementRead,
   saveContentSubmission,
+  saveMyStaffPortalProfile,
   saveStaff,
   saveStaffAnnouncement,
   saveStaffAvailability,
@@ -272,6 +273,7 @@ export default function StaffHubPage({
   setActivePage,
   staff,
   staffHub = EMPTY_STAFF_HUB,
+  staffPortalSummary,
   user,
 }) {
   const [activeTab, setActiveTab] = useState('home');
@@ -322,11 +324,14 @@ export default function StaffHubPage({
   });
   const [profileForm, setProfileForm] = useState(() => createProfileForm(null, user));
   const [profileTheme, setProfileTheme] = useState('business');
+  const summaryStaffProfile = staffPortalSummary?.staff_profile || null;
   const staffProfile = useMemo(
-    () => findStaffProfile({ accessProfile, staff, user }),
-    [accessProfile, staff, user],
+    () => summaryStaffProfile || findStaffProfile({ accessProfile, staff, user }),
+    [accessProfile, staff, summaryStaffProfile, user],
   );
   const ownerView = isOwnerProfile(accessProfile);
+  const staffOnlyPortal =
+    !ownerView && getEffectivePermissionsPayload(accessProfile).role_template === 'staff_portal';
   const canManageHub = ownerView || canManageOperations(accessProfile);
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const businessProfile = getBusinessProfile(businessUnit);
@@ -351,16 +356,25 @@ export default function StaffHubPage({
       };
     });
   }, [allBusinessesView, businessUnit?.id, businessUnits, staff]);
-  const ownEntries = useMemo(
-    () =>
-      getRunEntryRows(payrollRuns)
-        .filter((entry) => entryBelongsToStaff(entry, staffProfile))
-        .sort((a, b) => getEntryWeekTime(b) - getEntryWeekTime(a)),
-    [payrollRuns, staffProfile],
+  const portalPayrollEntries = useMemo(
+    () => getRows(staffPortalSummary?.payroll_entries),
+    [staffPortalSummary],
   );
+  const ownEntries = useMemo(() => {
+    if (portalPayrollEntries.length) {
+      return [...portalPayrollEntries].sort((a, b) => getEntryWeekTime(b) - getEntryWeekTime(a));
+    }
+
+    return getRunEntryRows(payrollRuns)
+      .filter((entry) => entryBelongsToStaff(entry, staffProfile))
+      .sort((a, b) => getEntryWeekTime(b) - getEntryWeekTime(a));
+  }, [payrollRuns, portalPayrollEntries, staffProfile]);
   const ownPerformance = useMemo(
-    () => performanceSummary.find((row) => rowBelongsToStaff(row, staffProfile)) || null,
-    [performanceSummary, staffProfile],
+    () =>
+      staffPortalSummary?.performance_summary ||
+      performanceSummary.find((row) => rowBelongsToStaff(row, staffProfile)) ||
+      null,
+    [performanceSummary, staffPortalSummary, staffProfile],
   );
   const scheduleRows = useMemo(
     () =>
@@ -392,7 +406,7 @@ export default function StaffHubPage({
   const totalTakeHome = sum(ownEntries, 'take_home');
   const totalTips = sum(ownEntries, 'tips');
   const latestEntry = ownEntries[0] || null;
-  const rank = getRank(performanceSummary, staffProfile);
+  const rank = ownPerformance?.rank || getRank(performanceSummary, staffProfile);
   const performanceTotal = sum(performanceSummary, 'total_net_sales');
   const canOpen = (pageId) => allowedPageIds.has(pageId);
   const profileName = staffProfile?.full_name || accessProfile?.full_name || user?.email || 'My Staff Account';
@@ -401,33 +415,60 @@ export default function StaffHubPage({
   const firstName = String(profileName).split(/\s+/)[0] || 'there';
   const businessThemeClass = businessProfile.portal_theme || 'theme-combined';
   const profileThemeClass = `tone-${profileTheme}`;
-  const quickTools = [
-    {
-      description: 'Role, tier, expectations, and probation status',
-      icon: BriefcaseBusiness,
-      id: ownerView && !staffProfile ? 'access' : 'my-role',
-      label: ownerView && !staffProfile ? 'Access setup' : 'My role',
-    },
-    {
-      description: 'Weekly earnings and payroll history',
-      icon: CircleDollarSign,
-      id: 'payroll',
-      label: 'Payroll history',
-    },
-    {
-      description: 'Sales, rank, goals, and client performance',
-      icon: TrendingUp,
-      id: 'performance',
-      label: 'Performance',
-    },
-    {
-      description: 'Imported appointments and schedule data',
-      icon: CalendarDays,
-      id: 'insights',
-      label: 'Schedule',
-    },
-  ];
-  const moreOptions = [
+  const quickTools = staffOnlyPortal
+    ? [
+        {
+          description: 'Weekly earnings and payroll history',
+          icon: CircleDollarSign,
+          label: 'Payroll history',
+          tab: 'money',
+        },
+        {
+          description: 'Sales, goals, and client performance',
+          icon: TrendingUp,
+          label: 'Performance',
+          tab: 'stats',
+        },
+        {
+          description: 'Availability, time off, and schedule notes',
+          icon: CalendarDays,
+          label: 'Schedule',
+          tab: 'schedule',
+        },
+        {
+          description: 'Profile, content, and personal settings',
+          icon: BriefcaseBusiness,
+          label: 'Profile tools',
+          tab: 'more',
+        },
+      ]
+    : [
+        {
+          description: 'Role, tier, expectations, and probation status',
+          icon: BriefcaseBusiness,
+          id: ownerView && !staffProfile ? 'access' : 'my-role',
+          label: ownerView && !staffProfile ? 'Access setup' : 'My role',
+        },
+        {
+          description: 'Weekly earnings and payroll history',
+          icon: CircleDollarSign,
+          id: 'payroll',
+          label: 'Payroll history',
+        },
+        {
+          description: 'Sales, rank, goals, and client performance',
+          icon: TrendingUp,
+          id: 'performance',
+          label: 'Performance',
+        },
+        {
+          description: 'Imported appointments and schedule data',
+          icon: CalendarDays,
+          id: 'insights',
+          label: 'Schedule',
+        },
+      ];
+  const moreOptions = staffOnlyPortal ? [] : [
     {
       description: 'Opening, closing, policies, forms, and operating standards',
       icon: BookOpen,
@@ -483,6 +524,19 @@ export default function StaffHubPage({
 
   function openPage(pageId) {
     if (canOpen(pageId)) setActivePage(pageId);
+  }
+
+  function canOpenTool(tool) {
+    return Boolean(tool.tab) || canOpen(tool.id);
+  }
+
+  function openTool(tool) {
+    if (tool.tab) {
+      setActiveTab(tool.tab);
+      return;
+    }
+
+    openPage(tool.id);
   }
 
   function updateAnnouncementForm(field, value) {
@@ -632,8 +686,20 @@ export default function StaffHubPage({
       .filter(Boolean);
     await runHubAction(
       'profile',
-      () =>
-        saveStaff({
+      () => {
+        const personalProfile = {
+          bio: profileForm.bio,
+          phone: profileForm.phone,
+          photo_url: profileForm.photo_url,
+          services_offered: services,
+          social_handle: profileForm.social_handle,
+        };
+
+        if (staffOnlyPortal) {
+          return saveMyStaffPortalProfile(personalProfile);
+        }
+
+        return saveStaff({
           ...staffProfile,
           bio: profileForm.bio,
           full_name: profileForm.full_name || staffProfile.full_name,
@@ -641,7 +707,8 @@ export default function StaffHubPage({
           photo_url: profileForm.photo_url,
           services_offered: services,
           social_handle: profileForm.social_handle,
-        }),
+        });
+      },
       'Profile updated.',
     );
   }
@@ -786,9 +853,9 @@ export default function StaffHubPage({
                 return (
                   <button
                     className="staff-hub-tool"
-                    disabled={!canOpen(tool.id)}
+                    disabled={!canOpenTool(tool)}
                     key={tool.label}
-                    onClick={() => openPage(tool.id)}
+                    onClick={() => openTool(tool)}
                     type="button"
                   >
                     <Icon size={17} />
@@ -1651,7 +1718,7 @@ export default function StaffHubPage({
                   <label className="field">
                     <span>Display name</span>
                     <input
-                      disabled={!staffProfile}
+                      disabled={!staffProfile || staffOnlyPortal}
                       value={profileForm.full_name}
                       onChange={(event) => updateProfileForm('full_name', event.target.value)}
                     />

@@ -92,6 +92,7 @@ export function getBearerToken(req: Request) {
 const OWNER_EMAIL = "rickothebarber@gmail.com";
 const ALL_BUSINESSES_ACCESS = "all-businesses";
 const MODULE_IDS = [
+  "staff_hub",
   "dashboard",
   "roster",
   "payroll",
@@ -146,7 +147,7 @@ function legacyPermission(profile: { role?: string | null } | null, moduleId: st
     if (["dashboard", "payroll", "settings"].includes(moduleId)) return "view";
     return "edit";
   }
-  if (role === "staff" && ["dashboard", "operations"].includes(moduleId)) return "view";
+  if (role === "staff" && moduleId === "staff_hub") return "view";
   return "none";
 }
 

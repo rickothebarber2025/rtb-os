@@ -24,16 +24,16 @@ export const ROLE_TEMPLATES = [
     title: 'Custom Role',
   },
   {
-    description: 'Basic staff login for Staff Hub, My Role, and read-only roster context.',
-    expectations: 'Use Staff Hub to review role details, assigned business information, and staff profile updates.',
+    description: 'Staff-only login for Staff Hub with personal payroll and performance history.',
+    expectations: 'Use Staff Hub to review role details, assigned business information, staff profile updates, earnings, and performance.',
     id: 'staff_portal',
     permissions: permissions({
-      dashboard: 'view',
-      roster: 'view',
+      staff_hub: 'view',
     }),
     responsibilities: [
       'Review your Staff Hub updates',
       'Keep your staff profile details accurate',
+      'Check your payroll and performance history',
       'Check your assigned business and role expectations',
       'Report schedule, profile, or access issues to management',
     ],
