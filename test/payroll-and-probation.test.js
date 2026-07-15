@@ -121,6 +121,12 @@ test('explicit permissions are required for app and page access', () => {
   assert.equal(canManagePerformance(performanceEditor), true);
 });
 
+test('permission helpers tolerate profile loading states', () => {
+  assert.equal(getEffectivePermissionsPayload(null).role_title, 'Custom Role');
+  assert.equal(canUseApp(null), false);
+  assert.equal(canAccessPage(null, 'dashboard'), false);
+});
+
 test('legacy null permissions get temporary role fallback only until saved', () => {
   const legacyManager = {
     active: true,

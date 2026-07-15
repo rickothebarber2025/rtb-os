@@ -115,7 +115,8 @@ function hasAssignedModuleAccess(payload) {
 }
 
 function isStaffRole(profile = {}) {
-  return String(profile.role || '').trim().toLowerCase() === 'staff';
+  const safeProfile = profile || {};
+  return String(safeProfile.role || '').trim().toLowerCase() === 'staff';
 }
 
 function createStaffPortalPermissions(profile = {}) {
