@@ -43,6 +43,13 @@ import { canManageOperations } from '../utils/access';
 import { normalizeActionCenterState } from '../utils/actionCenter';
 import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from '../utils/formatters';
+import {
+  buildIncomeOpportunity,
+  buildMonthlyGoalProgress,
+  buildRtbScore,
+  buildTodayMoneyStats,
+  getDefaultMonthlyGoal,
+} from '../utils/staffHubInsights';
 
 const TABS = [
   { id: 'home', label: 'Home' },
@@ -92,6 +99,29 @@ function saveThemePreference(user, staffProfile, theme) {
     window.localStorage.setItem(profileThemeKey(user, staffProfile), theme);
   } catch {
     // Local personalization should never block the staff portal.
+  }
+}
+
+function monthlyGoalKey(user, staffProfile) {
+  return `rtb_staff_hub_monthly_goal_${staffProfile?.id || user?.email || 'guest'}`;
+}
+
+function readMonthlyGoal(user, staffProfile) {
+  if (typeof window === 'undefined') return getDefaultMonthlyGoal();
+  try {
+    const saved = Number(window.localStorage.getItem(monthlyGoalKey(user, staffProfile)));
+    return Number.isFinite(saved) && saved > 0 ? saved : getDefaultMonthlyGoal();
+  } catch {
+    return getDefaultMonthlyGoal();
+  }
+}
+
+function saveMonthlyGoal(user, staffProfile, goal) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(monthlyGoalKey(user, staffProfile), String(goal));
+  } catch {
+    // Personal goal saving should never block the staff portal.
   }
 }
 
@@ -322,6 +352,8 @@ export default function StaffHubPage({
     media_type: 'idea',
     media_url: '',
   });
+  const [monthlyRevenueGoal, setMonthlyRevenueGoal] = useState(getDefaultMonthlyGoal());
+  const [monthlyRevenueGoalDraft, setMonthlyRevenueGoalDraft] = useState(String(getDefaultMonthlyGoal()));
   const [profileForm, setProfileForm] = useState(() => createProfileForm(null, user));
   const [profileTheme, setProfileTheme] = useState('business');
   const summaryStaffProfile = staffPortalSummary?.staff_profile || null;
@@ -338,6 +370,9 @@ export default function StaffHubPage({
   useEffect(() => {
     setProfileForm(createProfileForm(staffProfile, user));
     setProfileTheme(readSavedTheme(user, staffProfile));
+    const savedGoal = readMonthlyGoal(user, staffProfile);
+    setMonthlyRevenueGoal(savedGoal);
+    setMonthlyRevenueGoalDraft(String(savedGoal));
   }, [staffProfile, user]);
   const activeStaffCount = staff.filter((member) => member.active).length;
   const allowedPageIds = useMemo(() => new Set(navItems.map((item) => item.id)), [navItems]);
@@ -407,6 +442,19 @@ export default function StaffHubPage({
   const totalTips = sum(ownEntries, 'tips');
   const latestEntry = ownEntries[0] || null;
   const rank = ownPerformance?.rank || getRank(performanceSummary, staffProfile);
+  const todayStats = useMemo(
+    () => buildTodayMoneyStats({ latestEntry, rank, scheduleRows }),
+    [latestEntry, rank, scheduleRows],
+  );
+  const incomeOpportunity = useMemo(() => buildIncomeOpportunity(latestEntry), [latestEntry]);
+  const monthlyGoal = useMemo(
+    () => buildMonthlyGoalProgress({ entries: ownEntries, goal: monthlyRevenueGoal }),
+    [monthlyRevenueGoal, ownEntries],
+  );
+  const rtbScore = useMemo(
+    () => buildRtbScore({ latestEntry, ownPerformance, rank }),
+    [latestEntry, ownPerformance, rank],
+  );
   const performanceTotal = sum(performanceSummary, 'total_net_sales');
   const canOpen = (pageId) => allowedPageIds.has(pageId);
   const profileName = staffProfile?.full_name || accessProfile?.full_name || user?.email || 'My Staff Account';
@@ -565,6 +613,16 @@ export default function StaffHubPage({
 
   function updateProfileForm(field, value) {
     setProfileForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function submitMonthlyGoal(event) {
+    event.preventDefault();
+    const nextGoal = Math.max(1, Number(monthlyRevenueGoalDraft) || getDefaultMonthlyGoal());
+    setMonthlyRevenueGoal(nextGoal);
+    setMonthlyRevenueGoalDraft(String(nextGoal));
+    saveMonthlyGoal(user, staffProfile, nextGoal);
+    setHubError('');
+    setHubMessage('Monthly revenue goal saved.');
   }
 
   function chooseProfileTheme(theme) {
@@ -843,10 +901,34 @@ export default function StaffHubPage({
             <div className="section-header">
               <div>
                 <span>{ownerView && !staffProfile ? 'Setup' : 'Today'}</span>
-                <h2>{ownerView && !staffProfile ? 'Staff portal controls' : 'Staff home'}</h2>
+                <h2>{ownerView && !staffProfile ? 'Staff portal controls' : 'What moves your money today'}</h2>
               </div>
               <Megaphone size={20} />
             </div>
+            {staffProfile ? (
+              <div className="staff-hub-daily-strip">
+                <div>
+                  <span>Appointments today</span>
+                  <strong>{formatNumber(todayStats.appointmentsToday)}</strong>
+                  <small>From imported appointment data</small>
+                </div>
+                <div>
+                  <span>Revenue today</span>
+                  <strong>{formatCurrency(todayStats.importedRevenue)}</strong>
+                  <small>{todayStats.importedRevenue ? 'Imported appointments' : 'Waiting for today data'}</small>
+                </div>
+                <div>
+                  <span>Latest commission</span>
+                  <strong>{formatCurrency(todayStats.commissionLatest)}</strong>
+                  <small>{latestEntry?.week_label || 'No payroll week yet'}</small>
+                </div>
+                <div>
+                  <span>Current rank</span>
+                  <strong>{todayStats.rank ? `#${todayStats.rank}` : 'N/A'}</strong>
+                  <small>{businessUnit?.name || 'Assigned business'}</small>
+                </div>
+              </div>
+            ) : null}
             <div className="staff-hub-action-grid">
               {quickTools.map((tool) => {
                 const Icon = tool.icon;
@@ -1047,11 +1129,69 @@ export default function StaffHubPage({
           <div className="section-header">
             <div>
               <span>Weekly earnings</span>
-              <h2>My payroll entries</h2>
+              <h2>Income tracker</h2>
             </div>
             <StatusBadge tone={ownEntries.length ? 'success' : 'muted'}>
               {ownEntries.length ? `${ownEntries.length} weeks` : 'No entries'}
             </StatusBadge>
+          </div>
+          <div className="staff-hub-money-grid">
+            <article className="staff-hub-opportunity-card">
+              <span className="eyebrow">Commission opportunity</span>
+              {latestEntry ? (
+                <>
+                  <h3>
+                    {incomeOpportunity.achievedFloor
+                      ? 'You are above the $500 floor'
+                      : `${formatCurrency(incomeOpportunity.needToFloor)} more revenue protects your rate`}
+                  </h3>
+                  <p>
+                    {incomeOpportunity.achievedFloor
+                      ? 'Stay consistent, pre-book your next clients, and use one smart add-on conversation per appointment.'
+                      : `Potential extra commission if you reach the floor: ${formatCurrency(incomeOpportunity.potentialExtraCommission)}.`}
+                  </p>
+                  <div className="staff-hub-progress-track" aria-label="Commission floor progress">
+                    <span style={{ width: `${Math.min(100, Math.round((Number(latestEntry.net_sales || 0) / incomeOpportunity.floor) * 100))}%` }} />
+                  </div>
+                  <small>
+                    Current week sales: {formatCurrency(latestEntry.net_sales)} · floor: {formatCurrency(incomeOpportunity.floor)}
+                  </small>
+                </>
+              ) : (
+                <>
+                  <h3>No payroll week yet</h3>
+                  <p>Once payroll is saved, RTB OS will show how close you are to the commission floor.</p>
+                </>
+              )}
+            </article>
+
+            <article className="staff-hub-goal-card">
+              <span className="eyebrow">Monthly goal</span>
+              <div className="staff-hub-goal-ring" style={{ '--goal-progress': `${monthlyGoal.percentComplete}%` }}>
+                <strong>{monthlyGoal.percentComplete}%</strong>
+                <span>complete</span>
+              </div>
+              <div>
+                <h3>{formatCurrency(monthlyGoal.currentRevenue)} of {formatCurrency(monthlyGoal.goal)}</h3>
+                <p>
+                  Need {formatCurrency(monthlyGoal.remaining)} more. Average needed per remaining day:{' '}
+                  {formatCurrency(monthlyGoal.dailyNeeded)}.
+                </p>
+              </div>
+              <form className="staff-hub-goal-form" onSubmit={submitMonthlyGoal}>
+                <label className="field">
+                  <span>Goal</span>
+                  <input
+                    inputMode="numeric"
+                    min="1"
+                    type="number"
+                    value={monthlyRevenueGoalDraft}
+                    onChange={(event) => setMonthlyRevenueGoalDraft(event.target.value)}
+                  />
+                </label>
+                <button className="secondary-button" type="submit">Save</button>
+              </form>
+            </article>
           </div>
           {ownEntries.length ? (
             <DataTable>
@@ -1113,6 +1253,26 @@ export default function StaffHubPage({
             </div>
             {rank ? <StatusBadge tone="gold">Rank #{rank}</StatusBadge> : null}
           </div>
+          <article className="staff-hub-score-card">
+            <div className="staff-hub-score-card__main">
+              <span className="eyebrow">RTB Score</span>
+              <strong>{rtbScore.score}/100</strong>
+              <p>{rtbScore.focus}</p>
+            </div>
+            <div className="staff-hub-score-bars">
+              {rtbScore.components.map((component) => (
+                <div key={component.label}>
+                  <span>
+                    {component.label}
+                    <strong>{component.score}</strong>
+                  </span>
+                  <div className="staff-hub-progress-track">
+                    <span style={{ width: `${Math.min(100, component.score)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
           {ownPerformance ? (
             <div className="staff-hub-performance-grid">
               <div>

@@ -10106,6 +10106,168 @@ tbody tr:hover,
   display: none;
 }
 
+.staff-hub-daily-strip,
+.staff-hub-money-grid,
+.staff-hub-score-card {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.staff-hub-daily-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 1rem;
+}
+
+.staff-hub-daily-strip > div,
+.staff-hub-opportunity-card,
+.staff-hub-goal-card,
+.staff-hub-score-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    rgba(7, 15, 24, 0.72);
+  border: 1px solid rgba(214, 173, 82, 0.16);
+  border-radius: 16px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2);
+}
+
+.staff-hub-daily-strip > div {
+  padding: 0.95rem;
+}
+
+.staff-hub-daily-strip span,
+.staff-hub-opportunity-card .eyebrow,
+.staff-hub-goal-card .eyebrow,
+.staff-hub-score-card .eyebrow {
+  color: var(--rtb-mid);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-hub-daily-strip strong {
+  color: var(--rtb-text);
+  display: block;
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  line-height: 1.1;
+  margin-top: 0.35rem;
+}
+
+.staff-hub-daily-strip small,
+.staff-hub-opportunity-card small,
+.staff-hub-goal-card p,
+.staff-hub-score-card p {
+  color: var(--rtb-muted);
+}
+
+.staff-hub-money-grid {
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  margin-bottom: 1rem;
+}
+
+.staff-hub-opportunity-card,
+.staff-hub-goal-card,
+.staff-hub-score-card {
+  padding: clamp(1rem, 2vw, 1.25rem);
+}
+
+.staff-hub-opportunity-card h3,
+.staff-hub-goal-card h3 {
+  color: var(--rtb-text);
+  font-size: clamp(1.2rem, 2.5vw, 1.7rem);
+  line-height: 1.1;
+  margin: 0.45rem 0 0.5rem;
+}
+
+.staff-hub-progress-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  height: 10px;
+  margin: 0.75rem 0 0.5rem;
+  overflow: hidden;
+}
+
+.staff-hub-progress-track span {
+  background: linear-gradient(90deg, var(--rtb-gold), var(--rtb-gold-strong));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  min-width: 4px;
+}
+
+.staff-hub-goal-card {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.staff-hub-goal-ring {
+  align-content: center;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle at center, rgba(7, 15, 24, 0.96) 58%, transparent 59%),
+    conic-gradient(var(--rtb-gold) var(--goal-progress), rgba(255, 255, 255, 0.1) 0);
+  border: 1px solid rgba(214, 173, 82, 0.18);
+  border-radius: 999px;
+  display: grid;
+  justify-items: center;
+  width: 96px;
+}
+
+.staff-hub-goal-ring strong {
+  color: var(--rtb-text);
+  font-size: 1.35rem;
+}
+
+.staff-hub-goal-ring span {
+  color: var(--rtb-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.staff-hub-goal-form {
+  align-items: end;
+  display: grid;
+  gap: 0.6rem;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.staff-hub-score-card {
+  align-items: center;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  margin-bottom: 1rem;
+}
+
+.staff-hub-score-card__main strong {
+  color: var(--rtb-gold-strong);
+  display: block;
+  font-size: clamp(2.4rem, 7vw, 4.2rem);
+  line-height: 1;
+  margin: 0.35rem 0;
+}
+
+.staff-hub-score-bars {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.staff-hub-score-bars > div > span {
+  align-items: center;
+  color: var(--rtb-muted);
+  display: flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  justify-content: space-between;
+}
+
+.staff-hub-score-bars strong {
+  color: var(--rtb-text);
+}
+
 @media (max-width: 1024px) {
   .topbar {
     align-items: stretch;
@@ -10254,6 +10416,17 @@ tbody tr:hover,
     backdrop-filter: blur(5px);
     z-index: 90;
   }
+
+  .staff-hub-daily-strip,
+  .staff-hub-money-grid,
+  .staff-hub-score-card {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .staff-hub-score-card__main,
+  .staff-hub-score-bars {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 620px) {
@@ -10291,6 +10464,25 @@ tbody tr:hover,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .staff-hub-daily-strip,
+  .staff-hub-money-grid,
+  .staff-hub-score-card,
+  .staff-hub-goal-card,
+  .staff-hub-goal-form {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-daily-strip > div,
+  .staff-hub-opportunity-card,
+  .staff-hub-goal-card,
+  .staff-hub-score-card {
+    border-radius: 14px;
+  }
+
+  .staff-hub-goal-ring {
+    width: 86px;
   }
 }
 

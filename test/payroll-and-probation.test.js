@@ -77,6 +77,12 @@ import {
   enrichStaffWithBusinessMetadata,
   staffBelongsToBusiness,
 } from '../src/utils/staffBusiness.js';
+import {
+  buildIncomeOpportunity,
+  buildMonthlyGoalProgress,
+  buildRtbScore,
+  buildTodayMoneyStats,
+} from '../src/utils/staffHubInsights.js';
 import { buildRoleWorkspace } from '../src/utils/workspaces.js';
 
 function profileWithPermissions(modules, extra = {}) {
@@ -944,4 +950,62 @@ test('staff performance feedback generates coaching recommendations from perform
   assert.match(feedback[1].summary, /strong and steady/i);
   assert.match(feedback[1].growthTip, /maintenance schedule/i);
   assert.match(feedback[1].tipTip, /Tips are strong/i);
+});
+
+test('staff hub income tracker focuses on useful money opportunities', () => {
+  const latestEntry = {
+    applied_commission_rate: 55,
+    base_commission_rate: 60,
+    net_sales: 400,
+    tips: 40,
+  };
+  const opportunity = buildIncomeOpportunity(latestEntry);
+  assert.equal(opportunity.needToFloor, 100);
+  assert.equal(opportunity.potentialExtraCommission, 80);
+
+  const goal = buildMonthlyGoalProgress({
+    entries: [
+      { net_sales: 900, week_start: '2026-07-01' },
+      { net_sales: 700, week_start: '2026-07-08' },
+      { net_sales: 999, week_start: '2026-06-25' },
+    ],
+    goal: 2000,
+    today: '2026-07-15',
+  });
+  assert.equal(goal.currentRevenue, 1600);
+  assert.equal(goal.percentComplete, 80);
+  assert.equal(Math.round(goal.remaining), 400);
+
+  const today = buildTodayMoneyStats({
+    latestEntry,
+    rank: 2,
+    scheduleRows: [
+      { amount: 120, date: '2026-07-15' },
+      { amount: 80, date: '2026-07-15T13:00:00Z' },
+      { amount: 60, date: '2026-07-14' },
+    ],
+    today: '2026-07-15',
+  });
+  assert.equal(today.appointmentsToday, 2);
+  assert.equal(today.importedRevenue, 200);
+  assert.equal(today.rank, 2);
+});
+
+test('staff hub RTB score returns a simple coaching focus', () => {
+  const score = buildRtbScore({
+    latestEntry: { net_sales: 650 },
+    ownPerformance: {
+      avg_weekly_net: 600,
+      best_week_net: 900,
+      total_net_sales: 2400,
+      total_tips: 180,
+      under_minimum_weeks: 1,
+      weeks_recorded: 4,
+    },
+    rank: 3,
+  });
+
+  assert.ok(score.score > 0);
+  assert.equal(score.components.length, 4);
+  assert.match(score.focus, /Focus this week/);
 });
