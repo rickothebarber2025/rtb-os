@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pencil, Plus, RotateCcw, Trash2, UserMinus, Users } from 'lucide-react';
+import { MailPlus, Pencil, Plus, RotateCcw, Trash2, UserMinus, Users } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
@@ -9,12 +9,14 @@ import StatusBadge from '../components/StatusBadge';
 import {
   deactivateStaff,
   deleteStaff,
+  inviteUserProfile,
   saveAppSetting,
   saveStaff,
   saveStaffAlias,
   saveStaffSourceIdentity,
 } from '../services/rtbService';
-import { canDeleteStaff, canManageStaff } from '../utils/access';
+import { canManageAccess, canDeleteStaff, canManageStaff } from '../utils/access';
+import { buildPermissionsFromTemplate } from '../lib/roleTemplates.js';
 import {
   getBusinessProfile,
   isAllBusinessesUnit,
@@ -55,6 +57,7 @@ const blankStaff = {
   probation_start_date: '',
   role: 'Staff',
   start_date: '',
+  staff_hub_access_enabled: false,
   tier: 'standard',
 };
 
@@ -67,6 +70,7 @@ export default function StaffPage({
   staffBusinessMetadata,
 }) {
   const canManage = canManageStaff(accessProfile);
+  const canInviteStaffHub = canManageAccess(accessProfile);
   const canDelete = canDeleteStaff(accessProfile);
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const [filter, setFilter] = useState('active');
@@ -105,6 +109,7 @@ export default function StaffPage({
       business_unit_id: businessUnit?.id,
       instagram_rule: selectedBusinessProfile.instagram_format,
       role: selectedBusinessProfile.staff_roles[0] || 'Staff',
+      staff_hub_access_enabled: true,
     });
     setError('');
     setNotice('');
@@ -132,6 +137,7 @@ export default function StaffPage({
       preferred_name: member.preferred_name || '',
       probation_start_date: member.probation_start_date || '',
       start_date: member.start_date || '',
+      staff_hub_access_enabled: false,
     });
     setError('');
     setNotice('');
@@ -223,6 +229,53 @@ export default function StaffPage({
     });
   }
 
+  function staffHubInvitePayload(member, assignedBusinessIds = []) {
+    const primaryBusinessId = member.business_unit_id || businessUnit?.id || '';
+    const businessIds = [
+      ...new Set([primaryBusinessId, ...assignedBusinessIds].filter(Boolean)),
+    ];
+
+    return {
+      active: true,
+      business_unit_id: primaryBusinessId,
+      email: member.email,
+      full_name: member.full_name,
+      permissions: buildPermissionsFromTemplate('staff_portal', {
+        business_scope: 'selected',
+        business_unit_ids: businessIds,
+      }),
+      role: 'staff',
+    };
+  }
+
+  async function sendStaffHubAccess(member, assignedBusinessIds = []) {
+    if (!canInviteStaffHub) {
+      throw new Error('Only Access admins can send Staff Hub login access.');
+    }
+    if (!member.email) {
+      throw new Error('Add an email before sending Staff Hub login access.');
+    }
+
+    return inviteUserProfile(staffHubInvitePayload(member, assignedBusinessIds));
+  }
+
+  async function handleSendStaffHubAccess(member) {
+    if (!canInviteStaffHub || !member.email) return;
+    setSaving(true);
+    setError('');
+    setNotice('');
+
+    try {
+      await sendStaffHubAccess(member, staffBusinessIds(member));
+      setNotice(`Staff Hub access was sent to ${member.email}.`);
+      await onRefresh();
+    } catch (err) {
+      setError(err.message || 'Unable to send Staff Hub access.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (!canManage) return;
@@ -286,8 +339,20 @@ export default function StaffPage({
             })
           : Promise.resolve(null),
       ]);
+      let accessNotice = '';
+      if (form.staff_hub_access_enabled && form.email && canInviteStaffHub) {
+        try {
+          await sendStaffHubAccess(saved, [
+            primaryBusinessId,
+            ...(form.assigned_business_ids || []),
+          ]);
+          accessNotice = ` Staff Hub access was sent to ${form.email}.`;
+        } catch (accessErr) {
+          accessNotice = ` Staff profile saved, but Staff Hub access was not sent: ${accessErr.message || 'check Access permissions.'}`;
+        }
+      }
       await onRefresh();
-      setNotice(`${saved.full_name} was saved.`);
+      setNotice(`${saved.full_name} was saved.${accessNotice}`);
       closeModal();
     } catch (err) {
       setError(err.message || 'Unable to save staff profile.');
@@ -592,6 +657,17 @@ export default function StaffPage({
                             <Pencil size={14} />
                             Edit
                           </button>
+                          {canInviteStaffHub && member.email ? (
+                            <button
+                              className="ghost-button small"
+                              disabled={saving}
+                              type="button"
+                              onClick={() => handleSendStaffHubAccess(member)}
+                            >
+                              <MailPlus size={14} />
+                              Hub access
+                            </button>
+                          ) : null}
                           {member.active && !isProbationStaff(member) ? (
                             <button
                               className="ghost-button small"
@@ -860,6 +936,41 @@ export default function StaffPage({
                     </label>
                   ))}
                 </div>
+              </div>
+              <div className="staff-hub-access-panel wide">
+                <div>
+                  <span className="eyebrow">Staff Hub login</span>
+                  <strong>Give this staff member access to their hub</strong>
+                  <p>
+                    Sends Staff Portal access only: their own Staff Hub, earnings, performance,
+                    role details, and assigned business. No payroll, roster, access, or settings
+                    edits.
+                  </p>
+                </div>
+                <label className="check-row">
+                  <input
+                    checked={Boolean(form.staff_hub_access_enabled && form.email && canInviteStaffHub)}
+                    disabled={!form.email || !canInviteStaffHub}
+                    onChange={(event) =>
+                      updateField('staff_hub_access_enabled', event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                  <span>
+                    {editing
+                      ? 'Send or resend Staff Hub access after saving'
+                      : 'Invite to Staff Hub after saving'}
+                  </span>
+                </label>
+                {!form.email ? (
+                  <small>Add an email address to enable Staff Hub access.</small>
+                ) : !canInviteStaffHub ? (
+                  <small>Only an Access admin can invite staff logins.</small>
+                ) : (
+                  <small>
+                    Access will be sent to {form.email} with the Staff Portal role template.
+                  </small>
+                )}
               </div>
               <label className="field wide">
                 <span>Notes</span>

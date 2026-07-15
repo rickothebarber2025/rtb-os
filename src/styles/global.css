@@ -10810,6 +10810,35 @@ tbody tr:hover,
   --staff-warning: #f1b84a;
 }
 
+.staff-hub-access-panel {
+  background:
+    linear-gradient(135deg, rgba(214, 173, 82, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(7, 14, 22, 0.72);
+  border: 1px solid rgba(214, 173, 82, 0.22);
+  border-radius: 16px;
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.95rem;
+}
+
+.staff-hub-access-panel strong {
+  color: var(--rtb-text);
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.staff-hub-access-panel p,
+.staff-hub-access-panel small {
+  color: var(--rtb-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.staff-hub-access-panel .check-row {
+  border-color: rgba(214, 173, 82, 0.24);
+}
+
 .staff-hub-command-panel {
   background:
     radial-gradient(circle at 11% 12%, rgba(214, 173, 82, 0.16), transparent 18rem),
