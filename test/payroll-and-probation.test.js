@@ -85,6 +85,11 @@ import {
   buildTodayMoneyStats,
 } from '../src/utils/staffHubInsights.js';
 import { buildRoleWorkspace } from '../src/utils/workspaces.js';
+import { parseBooksyCsvRows, parseBooksyEmail } from '../supabase/functions/_shared/booksy-parser.js';
+import {
+  buildStaffCandidates,
+  matchStaffAssignment,
+} from '../supabase/functions/_shared/source-attribution.js';
 
 function profileWithPermissions(modules, extra = {}) {
   return {
@@ -254,6 +259,161 @@ test('staff portal workspace focuses on staff self-service pages', () => {
   assert.equal(workspace.focusPages.some((page) => page.id === 'staff-hub'), true);
   assert.equal(workspace.focusPages.some((page) => page.id === 'access'), false);
   assert.equal(workspace.editableModules.length, 0);
+});
+
+test('Booksy email parser extracts appointment and review notifications', () => {
+  const appointment = parseBooksyEmail({
+    body: [
+      'New appointment',
+      'Staff: Sara Hairstylist',
+      'Client: Client One',
+      'Service: Silk press',
+      'Appointment date: July 20, 2026',
+      'Appointment time: 2:30 PM',
+      'Booking ID: BKG-100',
+      'Price: $85.00',
+      'Location: RTB Lounge',
+    ].join('\n'),
+    headers: { date: 'Wed, 15 Jul 2026 16:00:00 +0000' },
+    messageId: 'gmail-1',
+    subject: 'Booksy - New appointment',
+    threadId: 'thread-1',
+  });
+  const review = parseBooksyEmail({
+    body: [
+      'New review',
+      'Reviewer: Client Two',
+      'Staff: Nail Tech One',
+      'Rating: 5',
+      'Review: Loved my nails and the clean space.',
+    ].join('\n'),
+    headers: { date: 'not-a-real-date' },
+    messageId: 'gmail-2',
+    subject: 'Booksy - New review',
+  });
+
+  assert.equal(appointment.events[0].eventType, 'appointment_created');
+  assert.equal(appointment.events[0].bookingIdentifier, 'BKG-100');
+  assert.equal(appointment.events[0].staffName, 'Sara Hairstylist');
+  assert.equal(appointment.events[0].price, 85);
+  assert.equal(review.events[0].eventType, 'new_review');
+  assert.equal(review.events[0].rating, 5);
+  assert.match(review.events[0].sourceTimestamp, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('Booksy CSV rows use the shared appointment and review event shape', () => {
+  const events = parseBooksyCsvRows([
+    {
+      appointment_id: 'csv-1',
+      client_name: 'Client One',
+      date_time: '2026-07-20T14:30:00Z',
+      price: '$85',
+      service: 'Silk press',
+      staff: 'Sara Hairstylist',
+      status: 'completed',
+    },
+    {
+      id: 'csv-review-1',
+      rating: '5',
+      review_text: 'Ricko gave a great cut.',
+      staff_name: '',
+    },
+  ]);
+
+  assert.equal(events[0].eventType, 'appointment_created');
+  assert.equal(events[0].sourceEventId, 'csv-1');
+  assert.equal(events[1].eventType, 'new_review');
+  assert.equal(events[1].rating, 5);
+});
+
+test('staff assignment matches IDs, emails, names, aliases, and avoids ambiguous guesses', () => {
+  const candidates = buildStaffCandidates({
+    aliases: [
+      { alias: 'Sara | Hairstylist', staff_id: 'sara' },
+      { alias: 'Ricko Joseph', staff_id: 'ricko' },
+    ],
+    identities: [
+      {
+        business_location: 'RTB Lounge',
+        services: ['Haircut'],
+        source_display_name: 'Ricko',
+        source_email: 'ricko@example.com',
+        source_staff_id: 'booksy-ricko',
+        staff_id: 'ricko',
+      },
+      {
+        business_location: 'RTB Lounge',
+        services: ['Silk press'],
+        source_display_name: 'Sara Hairstylist',
+        source_email: 'sara@example.com',
+        source_staff_id: 'booksy-sara',
+        staff_id: 'sara',
+      },
+    ],
+    staff: [
+      {
+        active: true,
+        business_location: 'RTB Lounge',
+        business_unit_id: 'lounge',
+        email: 'ricko@example.com',
+        full_name: 'Ricko Joseph',
+        id: 'ricko',
+        preferred_name: 'Ricko',
+        services_offered: ['Haircut'],
+      },
+      {
+        active: true,
+        business_location: 'RTB Lounge',
+        business_unit_id: 'lounge',
+        email: 'sara@example.com',
+        full_name: 'Sara Brown',
+        id: 'sara',
+        preferred_name: 'Sara',
+        services_offered: ['Silk press'],
+      },
+    ],
+  });
+
+  assert.equal(
+    matchStaffAssignment({ sourceStaffId: 'booksy-ricko' }, candidates).status,
+    'auto_assigned',
+  );
+  assert.equal(matchStaffAssignment({ staffEmail: 'sara@example.com' }, candidates).staffId, 'sara');
+  assert.equal(matchStaffAssignment({ staffName: 'Sara | Hairstylist' }, candidates).confidence, 95);
+
+  const ambiguous = buildStaffCandidates({
+    aliases: [],
+    identities: [],
+    staff: [
+      { active: true, full_name: 'Mia Lee', id: 'mia-1' },
+      { active: true, full_name: 'Mia Lee', id: 'mia-2' },
+    ],
+  });
+  const ambiguousMatch = matchStaffAssignment({ staffName: 'Mia Lee' }, ambiguous);
+  assert.equal(ambiguousMatch.status, 'unresolved');
+  assert.equal(ambiguousMatch.staffId, null);
+});
+
+test('general Google-style reviews stay business-level when no staff signal exists', () => {
+  const candidates = buildStaffCandidates({
+    aliases: [{ alias: 'Ricko', staff_id: 'ricko' }],
+    staff: [{ active: true, full_name: 'Ricko Joseph', id: 'ricko' }],
+  });
+  const generalReview = matchStaffAssignment(
+    { reviewText: 'Great atmosphere and clean shop.' },
+    candidates,
+    { allowGeneralBusiness: true },
+  );
+  const mentionedReview = matchStaffAssignment(
+    { reviewText: 'Ricko gave me a sharp haircut.' },
+    candidates,
+    { allowGeneralBusiness: true },
+  );
+
+  assert.equal(generalReview.status, 'general_business');
+  assert.equal(generalReview.staffId, null);
+  assert.equal(mentionedReview.status, 'flagged_for_audit');
+  assert.equal(mentionedReview.staffId, 'ricko');
 });
 
 test('business access can be one business, many businesses, or all businesses', () => {

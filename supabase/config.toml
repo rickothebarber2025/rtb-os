@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.feedback-public]
 verify_jwt = false
+
+[functions.booksy-gmail-sync]
+verify_jwt = false
+
+[functions.booksy-csv-reconcile]
+verify_jwt = false
+
+[functions.google-reviews-sync]
+verify_jwt = false

@@ -279,6 +279,37 @@ function mapAppointmentRows(rows, staffChoices, serviceChoices) {
   });
 }
 
+function findRawValue(row, labels) {
+  const normalizedLabels = labels.map(normalizeImportName);
+  const entry = Object.entries(row || {}).find(([key]) =>
+    normalizedLabels.some((label) => normalizeImportName(key).includes(label))
+  );
+
+  return entry?.[1] || '';
+}
+
+function mapSourceRows(rows, staffChoices, serviceChoices) {
+  return getRows(rows)
+    .map((row) => {
+      const staffName = findRawValue(row, ['staff', 'barber', 'provider', 'employee', 'specialist', 'team member']);
+      const serviceName = findRawValue(row, ['service', 'service name', 'appointment service', 'treatment']);
+      const staffChoice = staffChoices.get(normalizeImportName(staffName));
+      const serviceChoice = serviceChoices.get(normalizeImportName(serviceName));
+
+      if (staffChoice?.action === 'ignore' || serviceChoice?.action === 'ignore') return null;
+
+      const nextStaff = targetForChoice(staffChoice, staffName);
+      const nextService = targetForChoice(serviceChoice, serviceName);
+
+      return {
+        ...row,
+        service: nextService || row.service,
+        staff: nextStaff || row.staff,
+      };
+    })
+    .filter(Boolean);
+}
+
 export function applyBooksyImportReview(dashboard, staffReview, serviceReview) {
   const staffChoices = new Map(staffReview.map((choice) => [choice.key, choice]));
   const serviceChoices = new Map(serviceReview.map((choice) => [choice.key, choice]));
@@ -294,6 +325,7 @@ export function applyBooksyImportReview(dashboard, staffReview, serviceReview) {
     },
     recentTransactions: mapAppointmentRows(dashboard.recentTransactions, staffChoices, serviceChoices),
     services: mergeServiceRows(dashboard.services, serviceChoices),
+    sourceRows: mapSourceRows(dashboard.sourceRows, staffChoices, serviceChoices),
     staff: mergeStaffRows(dashboard.staff, staffChoices),
     upcomingAppointments: mapAppointmentRows(dashboard.upcomingAppointments, staffChoices, serviceChoices),
   };

@@ -126,6 +126,7 @@ export default function App() {
       setActivePage,
       squareStatus: data.squareStatus,
       staff: data.staff,
+      staffActivityReviewSummary: data.staffActivityReviewSummary,
       staffHub: data.staffHub,
       staffPortalSummary: data.staffPortalSummary,
       staffBusinessMetadata: data.staffBusinessMetadata,

@@ -20,6 +20,7 @@ import StatusBadge from '../components/StatusBadge';
 import {
   clearAppSetting,
   getAppSetting,
+  reconcileBooksyCsvRows,
   saveAppSetting,
   saveStaff,
   startSquareConnection,
@@ -1293,12 +1294,30 @@ export default function BooksyInsightsPage({
 
       await saveAppSetting('rtb_master_dashboard', dashboard);
       await saveAppSetting(BOOKSY_IMPORT_MAPPINGS_KEY, mappings);
+
+      let reconciliationResult = null;
+      let reconciliationError = '';
+      if (Array.isArray(dashboard.sourceRows) && dashboard.sourceRows.length) {
+        try {
+          reconciliationResult = await reconcileBooksyCsvRows(businessUnit.id, dashboard.sourceRows, {
+            maxRows: dashboard.sourceRows.length,
+          });
+        } catch (err) {
+          reconciliationError = err.message || 'Booksy attribution sync did not run.';
+        }
+      }
+
       await onRefresh?.();
       setImportWizard(null);
       setActiveTab('overview');
       setActionMessage(
-        `Booksy imported ${formatNumber(dashboard.summary?.allTimeBookings)} appointments with reviewed staff and service mappings.`,
+        reconciliationResult
+          ? `Booksy imported ${formatNumber(dashboard.summary?.allTimeBookings)} appointments and synced ${formatNumber(reconciliationResult.inserted)} new activity records. ${formatNumber(reconciliationResult.unresolved)} need manager review.`
+          : `Booksy imported ${formatNumber(dashboard.summary?.allTimeBookings)} appointments with reviewed staff and service mappings.`,
       );
+      if (reconciliationError) {
+        setActionError(`Booksy report saved, but activity attribution did not sync: ${reconciliationError}`);
+      }
     } catch (err) {
       setActionError(err.message || 'Booksy import could not be saved.');
     } finally {

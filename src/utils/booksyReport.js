@@ -173,6 +173,7 @@ function parseBooksyStatsReport(text, fileName) {
     ],
     recentTransactions: [],
     services: serviceRows,
+    sourceRows: [],
     source: 'Booksy Stats & Reports PDF',
     staff: [],
     summary: {
@@ -455,6 +456,7 @@ export function parseBooksyReport(text, fileName = 'Booksy report') {
         staffer: record.staff,
       })),
     services: serviceRows,
+    sourceRows: rawRows,
     source: 'Booksy File Import',
     staff: staffRows,
     summary: {

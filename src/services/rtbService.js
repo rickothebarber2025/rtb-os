@@ -20,10 +20,27 @@ function requireData({ data, error }) {
   return data;
 }
 
+async function optionalData(promise, fallback) {
+  try {
+    return requireData(await promise);
+  } catch (_err) {
+    return fallback;
+  }
+}
+
 function cleanObject(payload) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined),
   );
+}
+
+function sourceAliasKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
 }
 
 const USER_PROFILE_SELECT = [
@@ -228,6 +245,7 @@ export async function saveStaff(staff) {
   const payload = cleanObject({
     active: staff.active ?? true,
     bio: staff.bio || null,
+    business_location: staff.business_location || null,
     business_unit_id: staff.business_unit_id,
     commission_rate: isProbation ? PROBATION_RATE : Number(staff.commission_rate || 0),
     email: staff.email || null,
@@ -236,6 +254,7 @@ export async function saveStaff(staff) {
     notes: staff.notes || null,
     phone: staff.phone || null,
     photo_url: staff.photo_url || null,
+    preferred_name: staff.preferred_name || null,
     probation_end_date: staff.probation_end_date || null,
     probation_start_date: isProbation
       ? staff.probation_start_date || staff.start_date || toDateKey()
@@ -260,6 +279,85 @@ export async function saveStaff(staff) {
 
   const result = await client.from('staff').insert(payload).select().single();
   return requireData(result);
+}
+
+export async function saveStaffSourceIdentity(identity) {
+  const client = requireClient();
+  const payload = cleanObject({
+    active: identity.active ?? true,
+    business_location: identity.business_location || null,
+    business_unit_id: identity.business_unit_id || null,
+    metadata: identity.metadata || {},
+    preferred_name: identity.preferred_name || null,
+    services: Array.isArray(identity.services) ? identity.services : [],
+    source: identity.source || 'booksy',
+    source_display_name: identity.source_display_name || null,
+    source_email: identity.source_email || null,
+    source_staff_id: identity.source_staff_id || null,
+    staff_id: identity.staff_id,
+    updated_at: new Date().toISOString(),
+  });
+
+  const existing = requireData(
+    await client
+      .from('staff_source_identities')
+      .select('id')
+      .eq('staff_id', payload.staff_id)
+      .eq('source', payload.source)
+      .eq('business_unit_id', payload.business_unit_id)
+      .limit(1)
+      .maybeSingle(),
+  );
+
+  if (existing?.id) {
+    return requireData(
+      await client
+        .from('staff_source_identities')
+        .update(payload)
+        .eq('id', existing.id)
+        .select()
+        .single(),
+    );
+  }
+
+  return requireData(
+    await client.from('staff_source_identities').insert(payload).select().single(),
+  );
+}
+
+export async function saveStaffAlias(alias) {
+  const client = requireClient();
+  const aliasText = String(alias.alias || '').trim();
+  const aliasKey = sourceAliasKey(aliasText);
+  if (!aliasText || !aliasKey) return null;
+
+  const payload = {
+    alias: aliasText,
+    alias_key: aliasKey,
+    business_unit_id: alias.business_unit_id || null,
+    source: alias.source || 'booksy',
+    staff_id: alias.staff_id,
+    updated_at: new Date().toISOString(),
+  };
+  const existing = requireData(
+    await client
+      .from('staff_aliases')
+      .select('id')
+      .eq('staff_id', payload.staff_id)
+      .eq('source', payload.source)
+      .eq('business_unit_id', payload.business_unit_id)
+      .eq('alias_key', payload.alias_key)
+      .limit(1)
+      .maybeSingle(),
+  );
+
+  if (existing?.id) {
+    return requireData(
+      await client.from('staff_aliases').update(payload).eq('id', existing.id).select().single(),
+    );
+  }
+
+  return requireData(await client.from('staff_aliases').insert(payload).select().single());
 }
 
 export async function saveMyStaffPortalProfile(profile) {
@@ -1032,6 +1130,50 @@ export async function runStaffPerformanceCoaching(businessId) {
   });
 }
 
+export async function syncBooksyGmail(businessUnitId, options = {}) {
+  return invokeFunction('booksy-gmail-sync', {
+    ...options,
+    businessUnitId,
+  });
+}
+
+export async function reconcileBooksyCsvRows(businessUnitId, rows, options = {}) {
+  return invokeFunction('booksy-csv-reconcile', {
+    ...options,
+    businessUnitId,
+    rows,
+  });
+}
+
+export async function syncGoogleBusinessReviews(businessUnitId, options = {}) {
+  return invokeFunction('google-reviews-sync', {
+    ...options,
+    businessUnitId,
+  });
+}
+
+export async function resolveAttributionItem(itemId, action, staffId = null, note = '') {
+  const client = requireClient();
+  return requireData(
+    await client.rpc('resolve_assignment_item', {
+      p_action: action,
+      p_note: note || null,
+      p_staff_id: staffId || null,
+      p_unresolved_item_id: itemId,
+    }),
+  );
+}
+
+export async function getStaffActivityReviewSummary(businessUnitId = null) {
+  const client = requireClient();
+  const query = scopedByBusiness(
+    client.from('staff_activity_review_summary').select('*'),
+    'business_unit_id',
+    businessUnitId,
+  );
+  return requireData(await query);
+}
+
 function scopedByBusiness(query, field, businessUnitId) {
   return businessUnitId ? query.eq(field, businessUnitId) : query;
 }
@@ -1078,22 +1220,74 @@ export async function getFeedbackDashboard(businessUnitId = null) {
     'business_id',
     businessUnitId,
   );
+  const attributionQueueQuery = scopedByBusiness(
+    client
+      .from('attribution_review_queue')
+      .select('*')
+      .eq('status', 'unresolved')
+      .order('created_at', { ascending: false })
+      .limit(100),
+    'business_unit_id',
+    businessUnitId,
+  );
+  const sourceReviewsQuery = scopedByBusiness(
+    client
+      .from('reviews')
+      .select('id,business_unit_id,staff_id,source,reviewer_name,customer_name,rating,review_text,source_timestamp,published_at,location,service_name,assignment_status,assignment_confidence,assignment_reason')
+      .order('source_timestamp', { ascending: false, nullsFirst: false })
+      .limit(100),
+    'business_unit_id',
+    businessUnitId,
+  );
+  const staffActivitySummaryQuery = scopedByBusiness(
+    client.from('staff_activity_review_summary').select('*'),
+    'business_unit_id',
+    businessUnitId,
+  );
+  const syncRunsQuery = scopedByBusiness(
+    client
+      .from('sync_runs')
+      .select('*')
+      .in('source', ['booksy_gmail', 'booksy_csv', 'google_business_profile'])
+      .order('started_at', { ascending: false })
+      .limit(25),
+    'business_unit_id',
+    businessUnitId,
+  );
 
-  const [summary, feedback, requests, projects, recurringIssues] = await Promise.all([
+  const [
+    summary,
+    feedback,
+    requests,
+    projects,
+    recurringIssues,
+    attributionQueue,
+    sourceReviews,
+    staffActivitySummary,
+    syncRuns,
+  ] = await Promise.all([
     requireData(await summaryQuery),
     requireData(await feedbackQuery),
     requireData(await requestsQuery),
     requireData(await projectsQuery),
     requireData(await recurringQuery),
+    optionalData(attributionQueueQuery, []),
+    optionalData(sourceReviewsQuery, []),
+    optionalData(staffActivitySummaryQuery, []),
+    optionalData(syncRunsQuery, []),
   ]);
 
   return {
+    attributionQueue,
     feedback,
     projects,
     recurringIssues,
     requests,
+    sourceReviews,
+    staffActivitySummary,
     summary: businessUnitId ? summary[0] || null : null,
     summaries: summary,
+    syncRuns,
   };
 }
 

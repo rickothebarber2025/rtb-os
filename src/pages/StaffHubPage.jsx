@@ -15,6 +15,7 @@ import {
   Megaphone,
   Palette,
   ShieldCheck,
+  Star,
   TrendingUp,
   UserRound,
   WalletCards,
@@ -191,6 +192,28 @@ function sum(rows, field) {
   return rows.reduce((total, row) => total + Number(row[field] || 0), 0);
 }
 
+function weightedAverage(rows, valueField, countField) {
+  const weighted = rows.reduce((total, row) => {
+    const value = Number(row[valueField] || 0);
+    const count = Number(row[countField] || 0);
+    return total + value * count;
+  }, 0);
+  const count = sum(rows, countField);
+  return count ? Number((weighted / count).toFixed(2)) : null;
+}
+
+function aggregateActivitySummary(rows) {
+  return {
+    appointments_created: sum(rows, 'appointments_created'),
+    average_rating: weightedAverage(rows, 'average_rating', 'review_count'),
+    cancellations: sum(rows, 'cancellations'),
+    client_activity: sum(rows, 'client_activity'),
+    five_star_reviews: sum(rows, 'five_star_reviews'),
+    reschedules: sum(rows, 'reschedules'),
+    review_count: sum(rows, 'review_count'),
+  };
+}
+
 function getRank(performanceSummary, staffProfile) {
   if (!staffProfile) return null;
   const sorted = [...performanceSummary].sort(
@@ -304,6 +327,7 @@ export default function StaffHubPage({
   performanceSummary,
   setActivePage,
   staff,
+  staffActivityReviewSummary = [],
   staffHub = EMPTY_STAFF_HUB,
   staffPortalSummary,
   user,
@@ -413,6 +437,13 @@ export default function StaffHubPage({
       null,
     [performanceSummary, staffPortalSummary, staffProfile],
   );
+  const ownActivityReviewSummary = useMemo(() => {
+    if (staffProfile) {
+      return staffActivityReviewSummary.find((row) => row.staff_id === staffProfile.id) || null;
+    }
+
+    return aggregateActivitySummary(staffActivityReviewSummary || []);
+  }, [staffActivityReviewSummary, staffProfile]);
   const scheduleRows = useMemo(
     () =>
       getDashboardScheduleRows(masterDashboard)
@@ -604,6 +635,11 @@ export default function StaffHubPage({
         note: 'Imported appointments',
         value: `${formatNumber(todayStats.appointmentsToday)} appt${todayStats.appointmentsToday === 1 ? '' : 's'}`,
       },
+      {
+        label: 'Reviews',
+        note: ownActivityReviewSummary?.average_rating ? `${ownActivityReviewSummary.average_rating}/5 average` : 'Booksy + Google',
+        value: formatNumber(ownActivityReviewSummary?.review_count || 0),
+      },
     ];
   }, [
     activeStaffCount,
@@ -615,6 +651,7 @@ export default function StaffHubPage({
     performanceTotal,
     rtbScore.score,
     staffProfile,
+    ownActivityReviewSummary,
     todayStats.appointmentsToday,
   ]);
   const FocusIcon = focusCard.icon;
@@ -1100,6 +1137,28 @@ export default function StaffHubPage({
                 </div>
               ))}
             </div>
+            <div className="staff-hub-home-stat-grid compact">
+              <div>
+                <span>Verified bookings</span>
+                <strong>{formatNumber(ownActivityReviewSummary?.appointments_created || 0)}</strong>
+                <small>Booksy activity sync</small>
+              </div>
+              <div>
+                <span>Cancellations</span>
+                <strong>{formatNumber(ownActivityReviewSummary?.cancellations || 0)}</strong>
+                <small>Watch follow-up opportunities</small>
+              </div>
+              <div>
+                <span>Reschedules</span>
+                <strong>{formatNumber(ownActivityReviewSummary?.reschedules || 0)}</strong>
+                <small>Schedule movement</small>
+              </div>
+              <div>
+                <span>5-star reviews</span>
+                <strong>{formatNumber(ownActivityReviewSummary?.five_star_reviews || 0)}</strong>
+                <small>Review goal progress</small>
+              </div>
+            </div>
           </section>
 
           <section className="panel staff-hub-home-side">
@@ -1155,6 +1214,17 @@ export default function StaffHubPage({
                   <small>Assigned work will appear here.</small>
                 </article>
               )}
+              <article className="staff-hub-side-card quiet">
+                <span>Review score</span>
+                <strong>
+                  {ownActivityReviewSummary?.average_rating
+                    ? `${ownActivityReviewSummary.average_rating}/5`
+                    : 'Waiting'}
+                </strong>
+                <small>
+                  {formatNumber(ownActivityReviewSummary?.review_count || 0)} verified review{Number(ownActivityReviewSummary?.review_count || 0) === 1 ? '' : 's'}
+                </small>
+              </article>
               {latestUpdate ? (
                 <article className="staff-hub-side-card">
                   <span>{latestUpdate.pinned ? 'Pinned update' : 'Latest update'}</span>
@@ -1607,6 +1677,18 @@ export default function StaffHubPage({
                 <span>Total take-home</span>
                 <strong>{formatCurrency(ownPerformance.total_take_home)}</strong>
               </div>
+              <div>
+                <span>Average rating</span>
+                <strong>
+                  {ownActivityReviewSummary?.average_rating
+                    ? `${ownActivityReviewSummary.average_rating}/5`
+                    : 'N/A'}
+                </strong>
+              </div>
+              <div>
+                <span>5-star reviews</span>
+                <strong>{formatNumber(ownActivityReviewSummary?.five_star_reviews || 0)}</strong>
+              </div>
             </div>
           ) : (
             <EmptyState
@@ -1615,6 +1697,19 @@ export default function StaffHubPage({
               message="Saved performance data connected to your staff profile will show here."
             />
           )}
+          <article className="staff-hub-score-card">
+            <div className="staff-hub-score-card__main">
+              <span className="eyebrow">Review goal</span>
+              <strong>
+                <Star size={20} />
+                {formatNumber(ownActivityReviewSummary?.review_count || 0)} reviews
+              </strong>
+              <p>
+                Verified Booksy and Google reviews count here after they are auto-matched or approved
+                in Customer IQ.
+              </p>
+            </div>
+          </article>
         </section>
       ) : null}
 

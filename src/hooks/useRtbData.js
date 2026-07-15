@@ -9,6 +9,7 @@ import {
   getPerformanceSummary,
   getSquareStatus,
   getStaff,
+  getStaffActivityReviewSummary,
   getStaffHubRecords,
 } from '../services/rtbService';
 import { ACTION_CENTER_SETTING_KEY, normalizeActionCenterState } from '../utils/actionCenter';
@@ -42,6 +43,7 @@ const EMPTY_STATE = {
   performanceSummary: [],
   squareStatus: null,
   staff: [],
+  staffActivityReviewSummary: [],
   staffHub: {
     announcementReads: [],
     announcements: [],
@@ -64,6 +66,7 @@ const LOAD_LABELS = {
   payrollRuns: 'Payroll history',
   performanceSummary: 'Performance summary',
   staffBusinessMetadataRecord: 'Staff business profile settings',
+  staffActivityReviewSummary: 'Booksy and review attribution summary',
   staffPortalSummary: 'Staff portal payroll and performance',
   squareStatus: 'Square connection status',
   staff: 'Staff roster',
@@ -215,6 +218,10 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         staff: canViewRoster
           ? loadAcrossBusinessUnits(businessUnits, (unit) => getStaff(unit.id, true))
           : Promise.resolve([]),
+        staffActivityReviewSummary:
+          canViewPerformance || canViewAppointments || canViewStaffHub
+            ? getStaffActivityReviewSummary(isAllBusinesses ? null : activeUnit.id)
+            : Promise.resolve([]),
         staffBusinessMetadataRecord: canViewStaffMetadata
           ? getAppSettingRecord(STAFF_BUSINESS_METADATA_KEY)
           : Promise.resolve(null),
@@ -281,6 +288,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         performanceSummary: loaded.performanceSummary,
         squareStatus: loaded.squareStatus,
         staff: scopedStaff,
+        staffActivityReviewSummary: loaded.staffActivityReviewSummary || [],
         staffHub,
         staffPortalSummary,
         staffBusinessMetadata,

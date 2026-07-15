@@ -6,7 +6,14 @@ import EmptyState from '../components/EmptyState';
 import Modal from '../components/Modal';
 import ProbationProgressCard from '../components/ProbationProgressCard';
 import StatusBadge from '../components/StatusBadge';
-import { deactivateStaff, deleteStaff, saveAppSetting, saveStaff } from '../services/rtbService';
+import {
+  deactivateStaff,
+  deleteStaff,
+  saveAppSetting,
+  saveStaff,
+  saveStaffAlias,
+  saveStaffSourceIdentity,
+} from '../services/rtbService';
 import { canDeleteStaff, canManageStaff } from '../utils/access';
 import {
   getBusinessProfile,
@@ -37,12 +44,14 @@ const blankStaff = {
   email: '',
   fixed_rate: false,
   full_name: '',
+  business_location: '',
   instagram_handle: '',
   instagram_manual_override: false,
   instagram_rule: 'firstname.rtb_lounge',
   notes: '',
   phone: '',
   pos_profile: '',
+  preferred_name: '',
   probation_start_date: '',
   role: 'Staff',
   start_date: '',
@@ -92,6 +101,7 @@ export default function StaffPage({
     setForm({
       ...blankStaff,
       assigned_business_ids: [businessUnit?.id].filter(Boolean),
+      business_location: businessUnit?.name || '',
       business_unit_id: businessUnit?.id,
       instagram_rule: selectedBusinessProfile.instagram_format,
       role: selectedBusinessProfile.staff_roles[0] || 'Staff',
@@ -112,12 +122,14 @@ export default function StaffPage({
       commission_rate: Number(member.commission_rate || 0),
       commission_type: member.commission_type || (member.fixed_rate ? 'Fixed rate' : 'Commission'),
       email: member.email || '',
+      business_location: member.business_location || primaryBusiness?.name || '',
       instagram_handle: member.instagram_handle || '',
       instagram_manual_override: Boolean(member.instagram_manual_override),
       instagram_rule: member.instagram_rule || primaryProfile.instagram_format,
       notes: member.notes || '',
       phone: member.phone || '',
       pos_profile: member.pos_profile || member.full_name || '',
+      preferred_name: member.preferred_name || '',
       probation_start_date: member.probation_start_date || '',
       start_date: member.start_date || '',
     });
@@ -151,6 +163,7 @@ export default function StaffPage({
           ...new Set([businessUnitId, ...(current.assigned_business_ids || [])]),
         ],
         business_unit_id: businessUnitId,
+        business_location: current.business_location || nextBusiness?.name || '',
         instagram_rule: current.instagram_rule || profile.instagram_format,
         role: current.role || profile.staff_roles[0] || 'Staff',
       };
@@ -246,6 +259,33 @@ export default function StaffPage({
           pos_profile: form.pos_profile || saved.full_name,
         }),
       );
+      await Promise.allSettled([
+        saveStaffSourceIdentity({
+          business_location: form.business_location || formBusiness?.name || '',
+          business_unit_id: primaryBusinessId,
+          preferred_name: form.preferred_name || saved.full_name,
+          source: 'booksy',
+          source_display_name: form.booking_platform_profile || saved.full_name,
+          source_email: form.email || saved.email || '',
+          staff_id: saved.id,
+        }),
+        form.booking_platform_profile && form.booking_platform_profile !== saved.full_name
+          ? saveStaffAlias({
+              alias: form.booking_platform_profile,
+              business_unit_id: primaryBusinessId,
+              source: 'booksy',
+              staff_id: saved.id,
+            })
+          : Promise.resolve(null),
+        form.preferred_name && form.preferred_name !== saved.full_name
+          ? saveStaffAlias({
+              alias: form.preferred_name,
+              business_unit_id: primaryBusinessId,
+              source: 'manual',
+              staff_id: saved.id,
+            })
+          : Promise.resolve(null),
+      ]);
       await onRefresh();
       setNotice(`${saved.full_name} was saved.`);
       closeModal();
@@ -649,6 +689,14 @@ export default function StaffPage({
                 />
               </label>
               <label className="field">
+                <span>Preferred name</span>
+                <input
+                  onChange={(event) => updateField('preferred_name', event.target.value)}
+                  placeholder="Name clients or Booksy may use"
+                  value={form.preferred_name || ''}
+                />
+              </label>
+              <label className="field">
                 <span>Role</span>
                 <select
                   onChange={(event) => updateField('role', event.target.value)}
@@ -690,6 +738,14 @@ export default function StaffPage({
                   onChange={(event) => updateField('email', event.target.value)}
                   type="email"
                   value={form.email}
+                />
+              </label>
+              <label className="field">
+                <span>Business location</span>
+                <input
+                  onChange={(event) => updateField('business_location', event.target.value)}
+                  placeholder={formBusiness?.name || 'RTB location'}
+                  value={form.business_location || ''}
                 />
               </label>
               <label className="field">

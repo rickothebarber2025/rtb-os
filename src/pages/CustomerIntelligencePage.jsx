@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
+  Building2,
+  CheckCircle2,
   ClipboardCheck,
   Link,
   Mail,
@@ -11,6 +14,8 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
@@ -23,10 +28,13 @@ import {
   expireOldFeedbackRequests,
   getFeedbackDashboard,
   processFeedbackQueue,
+  resolveAttributionItem,
+  syncBooksyGmail,
+  syncGoogleBusinessReviews,
   updateImprovementProject,
   updateImprovementTask,
 } from '../services/rtbService';
-import { canManagePerformance } from '../utils/access';
+import { canManageAppointments, canManageOperations, canManagePerformance } from '../utils/access';
 import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import {
   buildCustomerInsightSections,
@@ -73,6 +81,28 @@ function FeedbackList({ items, title }) {
   );
 }
 
+function getReasons(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function getAlternatives(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
 export default function CustomerIntelligencePage({
   accessProfile,
   businessUnit,
@@ -81,6 +111,8 @@ export default function CustomerIntelligencePage({
   staff,
 }) {
   const canEditPerformance = canManagePerformance(accessProfile);
+  const canEditAppointments = canManageAppointments(accessProfile);
+  const canEditOperations = canManageOperations(accessProfile);
   const [data, setData] = useState(null);
   const [requestForm, setRequestForm] = useState(() => blankRequest(businessUnit, staff));
   const [lastSurveyUrl, setLastSurveyUrl] = useState('');
@@ -88,9 +120,17 @@ export default function CustomerIntelligencePage({
   const [working, setWorking] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [selectedStaffByItem, setSelectedStaffByItem] = useState({});
 
   const scopedBusinessId = isAllBusinessesUnit(businessUnit) ? null : businessUnit?.id;
   const canCreateRequest = Boolean(scopedBusinessId) && canEditPerformance;
+  const canRunBooksySync = Boolean(scopedBusinessId) && (canEditAppointments || canEditOperations);
+  const canRunGoogleReviewSync =
+    Boolean(scopedBusinessId) && (canEditPerformance || canEditAppointments || canEditOperations);
+  const canReviewAttribution = canRunGoogleReviewSync;
+  const attributionQueue = data?.attributionQueue || [];
+  const sourceReviews = data?.sourceReviews || [];
+  const syncRuns = data?.syncRuns || [];
   const metrics = useMemo(
     () =>
       calculateFeedbackMetrics({
@@ -169,8 +209,15 @@ export default function CustomerIntelligencePage({
   }
 
   async function runAction(action) {
-    if (!canEditPerformance) {
-      setError('Performance edit access is required to run feedback automation.');
+    const allowed =
+      action === 'booksy-gmail'
+        ? canRunBooksySync
+        : action === 'google-reviews'
+        ? canRunGoogleReviewSync
+        : canEditPerformance;
+
+    if (!allowed) {
+      setError('You do not have the required access for this action.');
       return;
     }
 
@@ -194,9 +241,59 @@ export default function CustomerIntelligencePage({
         setNotice(`${formatNumber(result.processed)} feedback analysis jobs processed.`);
       }
 
+      if (action === 'booksy-gmail') {
+        const result = await syncBooksyGmail(scopedBusinessId, { maxMessages: 25 });
+        setNotice(
+          `Booksy Gmail sync complete: ${formatNumber(result.inserted)} new, ${formatNumber(result.updated)} updated, ${formatNumber(result.unresolved)} need review.`,
+        );
+      }
+
+      if (action === 'google-reviews') {
+        const result = await syncGoogleBusinessReviews(scopedBusinessId, { maxPages: 1 });
+        setNotice(
+          `Google review sync complete: ${formatNumber(result.inserted)} new, ${formatNumber(result.updated)} updated, ${formatNumber(result.unresolved)} need review.`,
+        );
+      }
+
       await loadDashboard();
     } catch (err) {
       setError(err.message || 'Action failed.');
+    } finally {
+      setWorking('');
+    }
+  }
+
+  function updateSelectedStaff(itemId, staffId) {
+    setSelectedStaffByItem((current) => ({ ...current, [itemId]: staffId }));
+  }
+
+  async function resolveQueueItem(item, action) {
+    if (!canReviewAttribution) {
+      setError('Choose one business and use performance, appointments, or operations edit access to review attribution.');
+      return;
+    }
+
+    const staffId = action === 'correct'
+      ? selectedStaffByItem[item.id]
+      : action === 'approve'
+      ? item.proposed_staff_id
+      : null;
+
+    if (['approve', 'correct'].includes(action) && !staffId) {
+      setError('Choose a staff member before assigning this item.');
+      return;
+    }
+
+    setWorking(`${action}-${item.id}`);
+    setError('');
+    setNotice('');
+
+    try {
+      await resolveAttributionItem(item.id, action, staffId);
+      setNotice('Attribution review saved.');
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message || 'Unable to resolve attribution item.');
     } finally {
       setWorking('');
     }
@@ -430,6 +527,26 @@ export default function CustomerIntelligencePage({
             Process AI queue
           </button>
           <button
+            className="secondary-button"
+            disabled={working === 'booksy-gmail' || !canRunBooksySync}
+            title={!canRunBooksySync ? 'Choose one business and use appointments or operations edit access.' : undefined}
+            type="button"
+            onClick={() => runAction('booksy-gmail')}
+          >
+            <RefreshCw size={16} />
+            Sync Booksy Gmail
+          </button>
+          <button
+            className="secondary-button"
+            disabled={working === 'google-reviews' || !canRunGoogleReviewSync}
+            title={!canRunGoogleReviewSync ? 'Choose one business and use performance, appointments, or operations edit access.' : undefined}
+            type="button"
+            onClick={() => runAction('google-reviews')}
+          >
+            <Star size={16} />
+            Sync Google reviews
+          </button>
+          <button
             className="ghost-button"
             disabled={working === 'expire' || !canEditPerformance}
             title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
@@ -439,9 +556,139 @@ export default function CustomerIntelligencePage({
             Expire old links
           </button>
           <p className="subtle-text">
-            Email requires `RESEND_API_KEY`; SMS requires Twilio secrets. Manual links work now.
+            Feedback email requires `RESEND_API_KEY`; Booksy Gmail and Google reviews require their Supabase function secrets.
           </p>
+          {syncRuns[0] ? (
+            <div className="survey-link-box">
+              <span>Last source sync</span>
+              <code>
+                {syncRuns[0].source} - {syncRuns[0].status} - {formatDateTime(syncRuns[0].started_at)}
+              </code>
+            </div>
+          ) : null}
         </div>
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div>
+            <span>Attribution review</span>
+            <h2>Booksy and Google matches needing manager review</h2>
+          </div>
+          <StatusBadge tone={attributionQueue.length ? 'warning' : 'success'}>
+            {attributionQueue.length ? `${attributionQueue.length} open` : 'Clear'}
+          </StatusBadge>
+        </div>
+
+        {attributionQueue.length ? (
+          <div className="project-grid">
+            {attributionQueue.slice(0, 12).map((item) => {
+              const reasons = getReasons(item.matching_reasons);
+              const alternatives = getAlternatives(item.alternative_matches);
+              const selectedStaffId = selectedStaffByItem[item.id] || item.proposed_staff_id || '';
+              return (
+                <article className="project-card" key={item.id}>
+                  <div className="project-card__header">
+                    <div>
+                      <StatusBadge tone={Number(item.confidence_score) >= 75 ? 'warning' : 'danger'}>
+                        {Math.round(Number(item.confidence_score || 0))}% match
+                      </StatusBadge>
+                      <h3>{item.activity_type || 'Review'}</h3>
+                      <p>
+                        {item.customer_name || 'Unknown customer'}
+                        {item.service_name ? ` - ${item.service_name}` : ''}
+                        {item.source_time ? ` - ${formatDateTime(item.source_time)}` : ''}
+                      </p>
+                    </div>
+                    <AlertTriangle size={20} />
+                  </div>
+                  {item.review_text ? <p className="subtle-text">"{item.review_text}"</p> : null}
+                  <div className="role-summary-list compact">
+                    <div>
+                      <span>Proposed</span>
+                      <strong>{item.proposed_staff_name || 'No safe match'}</strong>
+                    </div>
+                    <div>
+                      <span>Location</span>
+                      <strong>{item.location || item.business_name || 'Not provided'}</strong>
+                    </div>
+                  </div>
+                  <div className="project-meta">
+                    {reasons.length ? reasons.slice(0, 3).map((reason) => <span key={reason}>{reason}</span>) : <span>No strong reason found</span>}
+                  </div>
+                  {alternatives.length ? (
+                    <div className="project-tasks">
+                      {alternatives.slice(0, 3).map((match) => (
+                        <button type="button" key={`${item.id}-${match.staff_id}`} disabled>
+                          <UserCheck size={15} />
+                          {match.staff_name} - {Math.round(Number(match.confidence || 0))}%
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <label className="field">
+                    <span>Correct staff</span>
+                    <select
+                      disabled={!canReviewAttribution}
+                      value={selectedStaffId}
+                      onChange={(event) => updateSelectedStaff(item.id, event.target.value)}
+                    >
+                      <option value="">Choose staff</option>
+                      {staff.filter((member) => member.active !== false).map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.full_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="action-row">
+                    <button
+                      className="ghost-button small success-action"
+                      disabled={!item.proposed_staff_id || working === `approve-${item.id}`}
+                      type="button"
+                      onClick={() => resolveQueueItem(item, 'approve')}
+                    >
+                      <CheckCircle2 size={15} />
+                      Approve
+                    </button>
+                    <button
+                      className="ghost-button small"
+                      disabled={!selectedStaffId || working === `correct-${item.id}`}
+                      type="button"
+                      onClick={() => resolveQueueItem(item, 'correct')}
+                    >
+                      Correct
+                    </button>
+                    <button
+                      className="ghost-button small"
+                      disabled={working === `general_business-${item.id}`}
+                      type="button"
+                      onClick={() => resolveQueueItem(item, 'general_business')}
+                    >
+                      <Building2 size={15} />
+                      General
+                    </button>
+                    <button
+                      className="ghost-button small danger-action"
+                      disabled={working === `unassign-${item.id}`}
+                      type="button"
+                      onClick={() => resolveQueueItem(item, 'unassign')}
+                    >
+                      <UserX size={15} />
+                      Unassign
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={UserCheck}
+            title="No attribution reviews open"
+            message="Low-confidence or ambiguous Booksy and Google matches will appear here for manager review."
+          />
+        )}
       </section>
 
       <section className="panel full-span">
@@ -456,6 +703,45 @@ export default function CustomerIntelligencePage({
           <FeedbackList items={insights.topComplaints} title="Top complaints" />
           <FeedbackList items={insights.recurringIssues} title="Recurring issues" />
         </div>
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div>
+            <span>External reviews</span>
+            <h2>Booksy and Google review feed</h2>
+          </div>
+        </div>
+        <DataTable>
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Customer</th>
+                <th>Rating</th>
+                <th>Service</th>
+                <th>Assignment</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sourceReviews.slice(0, 20).map((review) => (
+                <tr key={review.id}>
+                  <td>{review.source}</td>
+                  <td>{review.reviewer_name || review.customer_name || 'Unknown'}</td>
+                  <td>{review.rating ? `${review.rating}/5` : '-'}</td>
+                  <td>{review.service_name || '-'}</td>
+                  <td>
+                    <StatusBadge tone={review.assignment_status === 'auto_assigned' ? 'success' : review.assignment_status === 'general_business' ? 'muted' : 'warning'}>
+                      {review.assignment_status}
+                    </StatusBadge>
+                  </td>
+                  <td>{formatDateTime(review.source_timestamp || review.published_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DataTable>
       </section>
 
       <section className="panel full-span">
