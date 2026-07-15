@@ -35,13 +35,14 @@ import {
 import { canManageAccess, getRoleLabel, ROLE_OPTIONS } from '../utils/access';
 
 function makeBlankInvite() {
+  const defaultTemplate = 'staff_portal';
   return {
     active: true,
     business_unit_id: '',
     email: '',
     full_name: '',
-    permissions: buildPermissionsFromTemplate('custom'),
-    role: getTemplateRoleValue('custom'),
+    permissions: buildPermissionsFromTemplate(defaultTemplate),
+    role: getTemplateRoleValue(defaultTemplate),
   };
 }
 
@@ -571,6 +572,11 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
       return;
     }
 
+    if (inviteForm.active && !hasAnyModulePermission(inviteForm)) {
+      setError('Choose Staff Portal or another role template before inviting an active user.');
+      return;
+    }
+
     setInviting(true);
     setError('');
     setMessage('');
@@ -616,6 +622,11 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
 
     if (!hasBusinessAccess(draft, businessUnits) && !isOwnerEmail(profile.email)) {
       setError('Choose at least one business before saving this user.');
+      return false;
+    }
+
+    if (draft.active && !hasAnyModulePermission(draft)) {
+      setError('Choose Staff Portal or another role template before saving an active user.');
       return false;
     }
 

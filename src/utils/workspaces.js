@@ -60,6 +60,11 @@ const WORKSPACE_PRESETS = {
     focus: ['payroll', 'action-center', 'staff', 'performance'],
     title: 'Payroll Workspace',
   },
+  staff_portal: {
+    description: 'Use Staff Hub to review your own profile, role expectations, and assigned business.',
+    focus: ['staff-hub', 'my-role', 'dashboard', 'staff'],
+    title: 'Staff Portal',
+  },
   view_only: {
     description: 'Review assigned reports and raise issues without changing records.',
     focus: ['dashboard', 'performance', 'insights', 'operations'],

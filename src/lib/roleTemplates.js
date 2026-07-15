@@ -24,6 +24,29 @@ export const ROLE_TEMPLATES = [
     title: 'Custom Role',
   },
   {
+    description: 'Basic staff login for Staff Hub, My Role, and read-only roster context.',
+    expectations: 'Use Staff Hub to review role details, assigned business information, and staff profile updates.',
+    id: 'staff_portal',
+    permissions: permissions({
+      dashboard: 'view',
+      roster: 'view',
+    }),
+    responsibilities: [
+      'Review your Staff Hub updates',
+      'Keep your staff profile details accurate',
+      'Check your assigned business and role expectations',
+      'Report schedule, profile, or access issues to management',
+    ],
+    restrictions: [
+      'No payroll editing.',
+      'No access management.',
+      'No business settings changes.',
+      'No deleting or changing other staff records.',
+    ],
+    roleValue: 'staff',
+    title: 'Staff Portal',
+  },
+  {
     description: 'Owner-level access across every business and module.',
     expectations: 'Own final decisions and keep access, payroll, and operating standards accurate.',
     id: 'owner',

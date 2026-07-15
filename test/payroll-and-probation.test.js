@@ -155,6 +155,25 @@ test('role templates carry expectations and module permissions', () => {
   assert.match(getProfileExpectations(appointmentCoordinator), /appointment data/i);
 });
 
+test('staff portal template lets invited staff sign in without admin access', () => {
+  const staffPortal = {
+    active: true,
+    business_unit_id: 'beauty',
+    permissions: buildPermissionsFromTemplate('staff_portal', {
+      business_unit_ids: ['beauty'],
+    }),
+  };
+
+  assert.equal(canUseApp(staffPortal), true);
+  assert.equal(canAccessPage(staffPortal, 'staff-hub'), true);
+  assert.equal(canAccessPage(staffPortal, 'my-role'), true);
+  assert.equal(canAccessPage(staffPortal, 'staff'), true);
+  assert.equal(canAccessPage(staffPortal, 'access'), false);
+  assert.equal(canUsePayroll(staffPortal), false);
+  assert.equal(canManageAccess(staffPortal), false);
+  assert.equal(getEffectivePermissionsPayload(staffPortal).role_title, 'Staff Portal');
+});
+
 test('role workspace surfaces allowed role-specific actions', () => {
   const appointmentCoordinator = {
     active: true,
@@ -174,6 +193,27 @@ test('role workspace surfaces allowed role-specific actions', () => {
   assert.equal(workspace.focusPages.some((page) => page.id === 'insights'), true);
   assert.equal(workspace.focusPages.some((page) => page.id === 'payroll'), false);
   assert.equal(workspace.onboarding.every((item) => item.complete), true);
+});
+
+test('staff portal workspace focuses on staff self-service pages', () => {
+  const staffPortal = {
+    active: true,
+    business_unit_id: 'beauty',
+    permissions: buildPermissionsFromTemplate('staff_portal', {
+      business_unit_ids: ['beauty'],
+    }),
+  };
+  const allowedNav = NAV_ITEMS.filter((item) => canAccessPage(staffPortal, item.id));
+  const workspace = buildRoleWorkspace(
+    staffPortal,
+    allowedNav,
+    { id: 'beauty', name: 'RTB Beauty Lounge' },
+  );
+
+  assert.equal(workspace.title, 'Staff Portal');
+  assert.equal(workspace.focusPages.some((page) => page.id === 'staff-hub'), true);
+  assert.equal(workspace.focusPages.some((page) => page.id === 'access'), false);
+  assert.equal(workspace.editableModules.length, 0);
 });
 
 test('business access can be one business, many businesses, or all businesses', () => {
