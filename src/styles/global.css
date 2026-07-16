@@ -12483,3 +12483,335 @@ tbody tr:hover,
     -webkit-line-clamp: 2;
   }
 }
+
+/* Categorized app surfaces for dense history pages */
+.payroll-overview-page {
+  gap: 0.85rem;
+}
+
+.payroll-overview-hero {
+  background:
+    radial-gradient(circle at top left, rgba(214, 173, 82, 0.12), transparent 22rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(7, 14, 22, 0.84);
+}
+
+.payroll-overview-note {
+  align-items: center;
+  background: rgba(214, 173, 82, 0.1);
+  border: 1px solid rgba(214, 173, 82, 0.24);
+  border-radius: 14px;
+  color: var(--rtb-text);
+  display: flex;
+  gap: 0.6rem;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+  padding: 0.78rem 0.9rem;
+}
+
+.payroll-overview-note strong {
+  color: var(--rtb-gold-strong);
+  white-space: nowrap;
+}
+
+.payroll-overview-note span {
+  color: var(--rtb-muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.payroll-overview-summary {
+  display: grid;
+  gap: 0.72rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.payroll-overview-summary article {
+  background: rgba(3, 7, 13, 0.42);
+  border: 1px solid rgba(214, 173, 82, 0.14);
+  border-radius: 14px;
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.78rem;
+}
+
+.payroll-overview-summary span,
+.payroll-business-group header span,
+.payroll-run-tile small {
+  color: var(--rtb-mid);
+  font-size: 0.7rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.payroll-overview-summary strong {
+  color: var(--rtb-text);
+  font-size: clamp(1.05rem, 2vw, 1.55rem);
+  line-height: 1.08;
+}
+
+.payroll-grouped-history {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.payroll-business-groups {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.payroll-business-group {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.016)),
+    rgba(8, 13, 20, 0.68);
+  border: 1px solid rgba(214, 173, 82, 0.16);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.payroll-business-group header {
+  align-items: center;
+  background: rgba(214, 173, 82, 0.07);
+  border-bottom: 1px solid rgba(214, 173, 82, 0.14);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+}
+
+.payroll-business-group h3 {
+  color: var(--rtb-text);
+  font-size: clamp(1.12rem, 2vw, 1.45rem);
+  line-height: 1.12;
+  margin: 0.16rem 0 0;
+}
+
+.payroll-business-totals {
+  display: grid;
+  gap: 0.1rem;
+  text-align: right;
+}
+
+.payroll-business-totals span {
+  color: var(--rtb-mid);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.payroll-business-totals strong {
+  color: var(--rtb-gold-strong);
+  font-size: 1.08rem;
+}
+
+.payroll-run-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  padding: 0.8rem;
+}
+
+.payroll-run-tile {
+  background: rgba(3, 7, 13, 0.52);
+  border: 1px solid rgba(214, 173, 82, 0.12);
+  border-radius: 15px;
+  display: grid;
+  gap: 0.72rem;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.payroll-run-tile.status-voided {
+  border-color: rgba(232, 112, 95, 0.32);
+  opacity: 0.78;
+}
+
+.payroll-run-tile__top {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.8rem;
+  justify-content: space-between;
+}
+
+.payroll-run-tile__top strong {
+  color: var(--rtb-text);
+  display: block;
+  font-size: 0.98rem;
+  line-height: 1.18;
+}
+
+.payroll-run-tile__top span {
+  color: var(--rtb-muted);
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 800;
+  margin-top: 0.16rem;
+}
+
+.payroll-run-tile__metrics {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.payroll-run-tile__metrics > span {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(214, 173, 82, 0.08);
+  border-radius: 11px;
+  display: grid;
+  gap: 0.16rem;
+  min-width: 0;
+  padding: 0.52rem;
+}
+
+.payroll-run-tile__metrics strong {
+  color: var(--rtb-text);
+  font-size: 0.9rem;
+  line-height: 1.1;
+}
+
+/* Staff Hub app-mode refinement: dark RTB dashboard on mobile and desktop */
+.staff-hub-pro-dashboard {
+  --pro-black: #f8f4ec;
+  --pro-ink: #f8f4ec;
+  --pro-muted: #a9b4bf;
+  --pro-soft: #778494;
+  --pro-paper: #07101a;
+  --pro-paper-2: #111b27;
+  --pro-line: rgba(214, 173, 82, 0.18);
+  --pro-gold: #d6ad52;
+  --pro-gold-strong: #f0cb6a;
+  --pro-green: #5fc79b;
+  --pro-red: #e8705f;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(214, 173, 82, 0.18), transparent 18rem),
+    linear-gradient(180deg, rgba(17, 27, 39, 0.98), rgba(5, 10, 16, 0.98));
+  border-color: rgba(214, 173, 82, 0.22);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
+}
+
+.staff-hub-pro-score-card,
+.staff-hub-pro-metric,
+.staff-hub-pro-signal-card {
+  background: rgba(248, 244, 236, 0.055);
+  border-color: rgba(214, 173, 82, 0.14);
+}
+
+.staff-hub-pro-range button,
+.staff-hub-pro-insight em {
+  background: rgba(214, 173, 82, 0.13);
+}
+
+.staff-hub-pro-tabs button.active {
+  background: rgba(214, 173, 82, 0.18);
+}
+
+.staff-hub-pro-insight {
+  border-bottom: 1px solid rgba(214, 173, 82, 0.08);
+  border-radius: 0;
+}
+
+.staff-hub-pro-insight:hover {
+  background: rgba(248, 244, 236, 0.045);
+}
+
+.staff-hub-pro-score-ring {
+  background:
+    radial-gradient(circle at center, #07101a 57%, transparent 58%),
+    conic-gradient(var(--pro-green) var(--score-progress), rgba(248, 244, 236, 0.13) 0);
+}
+
+.staff-hub-pro-signal-list > div > div {
+  background: rgba(248, 244, 236, 0.11);
+}
+
+@media (max-width: 900px) {
+  .payroll-overview-note {
+    align-items: flex-start;
+    display: grid;
+  }
+
+  .payroll-overview-note strong {
+    white-space: normal;
+  }
+
+  .payroll-overview-note span {
+    text-align: left;
+  }
+
+  .payroll-overview-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .payroll-overview-page {
+    gap: 0.65rem;
+  }
+
+  .payroll-business-group header {
+    align-items: flex-start;
+    display: grid;
+  }
+
+  .payroll-business-totals {
+    text-align: left;
+  }
+
+  .payroll-run-grid {
+    grid-template-columns: 1fr;
+    padding: 0.62rem;
+  }
+
+  .payroll-run-tile__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-pro-dashboard {
+    border-radius: 18px;
+    gap: 0.7rem;
+    padding: 0.72rem;
+  }
+
+  .staff-hub-pro-topbar {
+    min-height: 2.8rem;
+  }
+
+  .staff-hub-pro-title span {
+    font-size: 0.95rem;
+  }
+
+  .staff-hub-pro-score-card {
+    border-radius: 15px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .staff-hub-pro-metrics {
+    grid-auto-columns: minmax(9.1rem, 58vw);
+  }
+
+  .staff-hub-pro-insight-list {
+    background: rgba(248, 244, 236, 0.035);
+    border: 1px solid rgba(214, 173, 82, 0.1);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .staff-hub-pro-insight {
+    padding: 0.62rem;
+  }
+
+  .staff-hub-pro-insight:last-child {
+    border-bottom: 0;
+  }
+
+  .staff-hub-pro-insight-icon {
+    height: 38px;
+    width: 38px;
+  }
+
+  .staff-hub-pro-signal-card {
+    border-radius: 16px;
+  }
+}

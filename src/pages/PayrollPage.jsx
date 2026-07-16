@@ -56,6 +56,38 @@ function runStatusTone(status) {
   return 'success';
 }
 
+function summarizePayrollRuns(runs) {
+  return runs.reduce(
+    (totals, run) => ({
+      count: totals.count + 1,
+      rtbNet: totals.rtbNet + Number(run.rtb_net || 0),
+      staffPayout: totals.staffPayout + Number(run.total_staff_payout || 0),
+      totalSales: totals.totalSales + Number(run.total_net_sales || 0),
+    }),
+    { count: 0, rtbNet: 0, staffPayout: 0, totalSales: 0 },
+  );
+}
+
+function groupPayrollRunsByBusiness(runs) {
+  const groups = new Map();
+
+  runs.forEach((run) => {
+    const businessName = run.business_name || 'RTB';
+    const key = run.business_unit_id || businessName;
+    const current = groups.get(key) || {
+      businessName,
+      runs: [],
+      summary: { count: 0, rtbNet: 0, staffPayout: 0, totalSales: 0 },
+    };
+
+    current.runs.push(run);
+    current.summary = summarizePayrollRuns(current.runs);
+    groups.set(key, current);
+  });
+
+  return [...groups.values()].sort((a, b) => a.businessName.localeCompare(b.businessName));
+}
+
 export default function PayrollPage({
   accessProfile,
   businessUnit,
@@ -119,6 +151,18 @@ export default function PayrollPage({
   const { activeRuns: activePayrollRuns, voidedRuns: voidedPayrollRuns } = useMemo(
     () => splitPayrollRunsByVoidStatus(sortedPayrollRuns),
     [sortedPayrollRuns],
+  );
+  const visibleCombinedRuns = useMemo(
+    () => [...activePayrollRuns, ...(showVoidedRuns ? voidedPayrollRuns : [])],
+    [activePayrollRuns, showVoidedRuns, voidedPayrollRuns],
+  );
+  const combinedPayrollSummary = useMemo(
+    () => summarizePayrollRuns(activePayrollRuns),
+    [activePayrollRuns],
+  );
+  const combinedBusinessGroups = useMemo(
+    () => groupPayrollRunsByBusiness(visibleCombinedRuns),
+    [visibleCombinedRuns],
   );
   const replacementByVoidedRunId = useMemo(() => {
     return getPayrollReplacementMap(sortedPayrollRuns);
@@ -299,8 +343,8 @@ export default function PayrollPage({
 
   if (allBusinessesView) {
     return (
-      <div className="page-grid">
-        <section className="panel full-span">
+      <div className="page-grid payroll-overview-page">
+        <section className="panel full-span payroll-overview-hero">
           <div className="section-header">
             <div>
               <span>Payroll</span>
@@ -308,20 +352,37 @@ export default function PayrollPage({
             </div>
             <StatusBadge tone="warning">Read only</StatusBadge>
           </div>
-          <div className="alert warning">
-            <strong>Select one business to run payroll.</strong>
-            <span>
-              All Businesses mode intentionally combines history only. Drafts, corrections,
-              payouts, and exports stay inside RTB Lounge or RTB Beauty Lounge.
-            </span>
+          <div className="payroll-overview-note">
+            <strong>Choose one business before editing payroll.</strong>
+            <span>All Businesses is for review only. Drafts, corrections, payouts, and exports stay separated.</span>
           </div>
+          <div className="payroll-overview-summary">
+            <article>
+              <span>Runs</span>
+              <strong>{combinedPayrollSummary.count}</strong>
+            </article>
+            <article>
+              <span>Net sales</span>
+              <strong>{formatCurrency(combinedPayrollSummary.totalSales)}</strong>
+            </article>
+            <article>
+              <span>Staff payout</span>
+              <strong>{formatCurrency(combinedPayrollSummary.staffPayout)}</strong>
+            </article>
+            <article>
+              <span>RTB net</span>
+              <strong>{formatCurrency(combinedPayrollSummary.rtbNet)}</strong>
+            </article>
+          </div>
+        </section>
 
-          {voidedPayrollRuns.length ? (
-            <div className="history-filter-row">
-              <span>
-                {voidedPayrollRuns.length} voided payroll run
-                {voidedPayrollRuns.length === 1 ? '' : 's'} hidden
-              </span>
+        <section className="panel full-span payroll-grouped-history">
+          <div className="section-header">
+            <div>
+              <span>History</span>
+              <h2>Grouped by business</h2>
+            </div>
+            {voidedPayrollRuns.length ? (
               <button
                 className="ghost-button small"
                 type="button"
@@ -329,42 +390,62 @@ export default function PayrollPage({
               >
                 {showVoidedRuns ? 'Hide voided' : 'Show voided'}
               </button>
+            ) : null}
+          </div>
+
+          {voidedPayrollRuns.length ? (
+            <div className="history-filter-row">
+              <span>
+                {voidedPayrollRuns.length} voided payroll run
+                {voidedPayrollRuns.length === 1 ? '' : 's'} {showVoidedRuns ? 'shown' : 'hidden'}
+              </span>
             </div>
           ) : null}
 
-          {activePayrollRuns.length || (showVoidedRuns && voidedPayrollRuns.length) ? (
-            <DataTable>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Business</th>
-                    <th>Week</th>
-                    <th>Status</th>
-                    <th>Net sales</th>
-                    <th>Staff payout</th>
-                    <th>RTB net</th>
-                    <th>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...activePayrollRuns, ...(showVoidedRuns ? voidedPayrollRuns : [])].map((run) => (
-                    <tr key={run.id}>
-                      <td>{run.business_name || 'RTB'}</td>
-                      <td>{run.week_label}</td>
-                      <td>
-                        <StatusBadge tone={runStatusTone(run.status)}>
-                          {run.status}
-                        </StatusBadge>
-                      </td>
-                      <td>{formatCurrency(run.total_net_sales)}</td>
-                      <td>{formatCurrency(run.total_staff_payout)}</td>
-                      <td>{formatCurrency(run.rtb_net)}</td>
-                      <td>{formatDate(run.created_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </DataTable>
+          {combinedBusinessGroups.length ? (
+            <div className="payroll-business-groups">
+              {combinedBusinessGroups.map((group) => (
+                <article className="payroll-business-group" key={group.businessName}>
+                  <header>
+                    <div>
+                      <span>Business</span>
+                      <h3>{group.businessName}</h3>
+                    </div>
+                    <div className="payroll-business-totals">
+                      <span>{group.summary.count} run{group.summary.count === 1 ? '' : 's'}</span>
+                      <strong>{formatCurrency(group.summary.totalSales)}</strong>
+                    </div>
+                  </header>
+                  <div className="payroll-run-grid">
+                    {group.runs.map((run) => (
+                      <div className={`payroll-run-tile status-${run.status}`} key={run.id}>
+                        <div className="payroll-run-tile__top">
+                          <div>
+                            <strong>{run.week_label}</strong>
+                            <span>{formatDate(run.created_at)}</span>
+                          </div>
+                          <StatusBadge tone={runStatusTone(run.status)}>{run.status}</StatusBadge>
+                        </div>
+                        <div className="payroll-run-tile__metrics">
+                          <span>
+                            <small>Sales</small>
+                            <strong>{formatCurrency(run.total_net_sales)}</strong>
+                          </span>
+                          <span>
+                            <small>Payout</small>
+                            <strong>{formatCurrency(run.total_staff_payout)}</strong>
+                          </span>
+                          <span>
+                            <small>RTB net</small>
+                            <strong>{formatCurrency(run.rtb_net)}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
           ) : (
             <EmptyState
               icon={CheckCircle2}
