@@ -48,6 +48,32 @@ RTB Lounge uses Booksy data. Booksy does not expose the same public OAuth API su
 as Square, so RTB OS currently expects Booksy reports to be imported into
 `app_settings.rtb_master_dashboard`.
 
+Booksy Gmail ingestion reads Gmail messages that carry the dedicated label
+`RTB-OS/Booksy`. The Gmail sync runs inside a Supabase Edge Function, so Google
+credentials must be set as Supabase secrets, not Vite or browser variables.
+
+Preferred production setup uses a Google OAuth refresh token:
+
+```bash
+supabase secrets set --project-ref qbeficojfoqgzjxrzxyg \
+  GOOGLE_GMAIL_CLIENT_ID=your_google_oauth_client_id \
+  GOOGLE_GMAIL_CLIENT_SECRET=your_google_oauth_client_secret \
+  GOOGLE_GMAIL_REFRESH_TOKEN=your_google_oauth_refresh_token \
+  BOOKSY_GMAIL_LABEL="RTB-OS/Booksy" \
+  BOOKSY_GMAIL_USER=me
+```
+
+A short-lived access token can unblock testing, but it will expire and should not
+be used as the permanent setup:
+
+```bash
+supabase secrets set --project-ref qbeficojfoqgzjxrzxyg \
+  GOOGLE_GMAIL_ACCESS_TOKEN=your_short_lived_google_access_token
+```
+
+After setting secrets, apply the `RTB-OS/Booksy` Gmail label to Booksy emails and
+run the Booksy Gmail sync from Customer IQ.
+
 RTB Beauty Lounge uses Square Appointments. Square secrets must be stored as
 Supabase Edge Function secrets, never in React code.
 
