@@ -4750,7 +4750,8 @@ select {
   gap: 0.45rem;
 }
 
-.project-tasks button {
+.project-tasks button,
+.project-task-chip {
   align-items: center;
   background: rgba(248, 244, 236, 0.035);
   border: 1px solid var(--line);
@@ -4762,6 +4763,11 @@ select {
   min-height: 38px;
   padding: 0.55rem 0.65rem;
   text-align: left;
+}
+
+.project-task-chip {
+  color: var(--muted);
+  cursor: default;
 }
 
 .project-tasks button.done {
@@ -12157,13 +12163,15 @@ tbody tr:hover,
   font-weight: 950;
 }
 
-.staff-hub-pro-range button {
+.staff-hub-pro-pill {
   background: rgba(0, 0, 0, 0.06);
   border: 0;
   border-radius: 9px;
   color: var(--pro-black);
+  display: inline-flex;
   font-size: 0.7rem;
   font-weight: 950;
+  align-items: center;
   min-height: 1.85rem;
   padding: 0 0.58rem;
 }
@@ -12698,7 +12706,7 @@ tbody tr:hover,
   border-color: rgba(214, 173, 82, 0.14);
 }
 
-.staff-hub-pro-range button,
+.staff-hub-pro-pill,
 .staff-hub-pro-insight em {
   background: rgba(214, 173, 82, 0.13);
 }

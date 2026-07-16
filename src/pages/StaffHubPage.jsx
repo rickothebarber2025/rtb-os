@@ -1122,6 +1122,8 @@ export default function StaffHubPage({
       label: 'System tools',
     },
   ];
+  const visibleQuickTools = quickTools.filter((tool) => Boolean(tool.tab) || canOpen(tool.id));
+  const visibleMoreOptions = moreOptions.filter((option) => canOpen(option.id));
 
   async function runHubAction(actionKey, action, successMessage) {
     setHubError('');
@@ -1140,10 +1142,6 @@ export default function StaffHubPage({
 
   function openPage(pageId) {
     if (canOpen(pageId)) setActivePage(pageId);
-  }
-
-  function canOpenTool(tool) {
-    return Boolean(tool.tab) || canOpen(tool.id);
   }
 
   function openTool(tool) {
@@ -1437,22 +1435,8 @@ export default function StaffHubPage({
           </div>
         </div>
 
-        <div className="staff-hub-pro-tabs" role="tablist" aria-label="Staff Hub sections">
-          {TABS.map((tab) => (
-            <button
-              aria-selected={activeTab === tab.id}
-              className={activeTab === tab.id ? 'active' : ''}
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              type="button"
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
         <div className="staff-hub-pro-range">
-          <button type="button">Last 28 days</button>
+          <span className="staff-hub-pro-pill">Last 28 days</span>
           <span>{recentRangeLabel(28)}</span>
         </div>
 
@@ -1475,21 +1459,15 @@ export default function StaffHubPage({
           {dailyCards.slice(0, 4).map((card) => {
             const Icon = card.icon;
             return (
-              <button
+              <article
                 className={`staff-hub-pro-metric tone-${card.tone}`}
                 key={card.label}
-                onClick={() => {
-                  if (card.label === 'Latest revenue' || card.label === 'Commission') setActiveTab('money');
-                  else if (card.label === 'Reviews') setActiveTab('stats');
-                  else setActiveTab('schedule');
-                }}
-                type="button"
               >
                 <Icon size={17} />
                 <span>{card.label}</span>
                 <strong>{card.value}</strong>
                 <small>{card.change}</small>
-              </button>
+              </article>
             );
           })}
         </div>
@@ -1890,12 +1868,11 @@ export default function StaffHubPage({
               <ChevronRight size={20} />
             </div>
             <div className="staff-hub-home-nav-grid">
-              {quickTools.map((tool) => {
+              {visibleQuickTools.map((tool) => {
                 const Icon = tool.icon;
                 return (
                   <button
                     className="staff-hub-tool"
-                    disabled={!canOpenTool(tool)}
                     key={tool.label}
                     onClick={() => openTool(tool)}
                     type="button"
@@ -1909,6 +1886,9 @@ export default function StaffHubPage({
                   </button>
                 );
               })}
+              {!visibleQuickTools.length ? (
+                <p className="subtle-text">No quick tools are available for this role yet.</p>
+              ) : null}
             </div>
           </section>
 
@@ -1927,12 +1907,14 @@ export default function StaffHubPage({
           </section>
 
             {actionItems.length ? (
-            <section className="panel full-span staff-hub-attention-panel">
+          <section className="panel full-span staff-hub-attention-panel">
                 <div className="staff-hub-preview-list__header">
                   <strong>Needs attention</strong>
-                  <button type="button" onClick={() => openPage('action-center')} disabled={!canOpen('action-center')}>
-                    View all
-                  </button>
+                  {canOpen('action-center') ? (
+                    <button type="button" onClick={() => openPage('action-center')}>
+                      View all
+                    </button>
+                  ) : null}
                 </div>
                 {actionItems.map((item) => (
                   <article className="staff-hub-alert-row" key={item.id}>
@@ -2583,12 +2565,11 @@ export default function StaffHubPage({
               <ClipboardCheck size={20} />
             </div>
             <div className="staff-hub-more-grid">
-              {moreOptions.map((option) => {
+              {visibleMoreOptions.map((option) => {
                 const Icon = option.icon;
                 return (
                   <button
                     className="staff-hub-more-card"
-                    disabled={!canOpen(option.id)}
                     key={option.label}
                     onClick={() => openPage(option.id)}
                     type="button"
@@ -2602,6 +2583,9 @@ export default function StaffHubPage({
                   </button>
                 );
               })}
+              {!visibleMoreOptions.length ? (
+                <p className="subtle-text">Manager tools are hidden for this role.</p>
+              ) : null}
             </div>
           </section>
 

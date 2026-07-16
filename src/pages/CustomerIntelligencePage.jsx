@@ -619,10 +619,10 @@ export default function CustomerIntelligencePage({
                   {alternatives.length ? (
                     <div className="project-tasks">
                       {alternatives.slice(0, 3).map((match) => (
-                        <button type="button" key={`${item.id}-${match.staff_id}`} disabled>
+                        <span className="project-task-chip" key={`${item.id}-${match.staff_id}`}>
                           <UserCheck size={15} />
                           {match.staff_name} - {Math.round(Number(match.confidence || 0))}%
-                        </button>
+                        </span>
                       ))}
                     </div>
                   ) : null}
