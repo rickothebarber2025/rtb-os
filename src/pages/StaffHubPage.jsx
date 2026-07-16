@@ -58,9 +58,9 @@ import {
 } from '../utils/staffHubInsights';
 
 const TABS = [
-  { id: 'home', label: 'Home' },
-  { id: 'money', label: 'Money' },
-  { id: 'stats', label: 'Stats' },
+  { id: 'home', label: 'Today' },
+  { id: 'money', label: 'Earnings' },
+  { id: 'stats', label: 'Performance' },
   { id: 'schedule', label: 'Schedule' },
   { id: 'more', label: 'More' },
 ];
@@ -357,6 +357,19 @@ function scheduleDisplayTime(row) {
     safeTime(row.start_at || row.starts_at || row.created_at || row.date) ||
     'Time TBD'
   );
+}
+
+function shortMonthDay(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' }).format(date);
+}
+
+function recentRangeLabel(days = 28) {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - (days - 1));
+  return `${shortMonthDay(start)} - ${shortMonthDay(end)}`;
 }
 
 export default function StaffHubPage({
@@ -887,6 +900,101 @@ export default function StaffHubPage({
       .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
       .slice(0, 6);
   }, [contentSubmissions, fiveStarReviews, latestEntry, pendingTasks, reviewCount, scheduleRows, visibleAnnouncements]);
+  const FocusIcon = focusCard.icon;
+  const professionalInsightRows = useMemo(() => {
+    const rows = [
+      {
+        action: 'money',
+        detail: latestEntry
+          ? commissionExplanation.adjusted
+            ? `${formatCurrency(commissionExplanation.amountToFloor)} more sales protects the full rate.`
+            : `${commissionExplanation.appliedRate || 0}% applied rate is protected.`
+          : 'Payroll imports will explain commission automatically.',
+        icon: CircleDollarSign,
+        label: 'Commission',
+        meta: latestEntry?.week_label || 'Latest payroll',
+        tone: commissionExplanation.adjusted ? 'warning' : 'success',
+        title: latestEntry
+          ? commissionExplanation.adjusted
+            ? 'Commission adjusted this week'
+            : 'Full commission rate active'
+          : 'Waiting for payroll',
+      },
+      {
+        action: 'stats',
+        detail: reviewCount
+          ? `${formatNumber(fiveStarReviews)} five-star reviews · ${reviewGoal.remaining} left for the next goal.`
+          : 'Matched Booksy and Google reviews will show here.',
+        icon: Star,
+        label: 'Reviews',
+        meta: ownActivityReviewSummary?.average_rating
+          ? `${ownActivityReviewSummary.average_rating}/5 average`
+          : 'Booksy + Google',
+        tone: fiveStarReviews ? 'success' : 'neutral',
+        title: reviewCount ? `${formatNumber(reviewCount)} verified reviews` : 'No reviews yet',
+      },
+      {
+        action: 'schedule',
+        detail: scheduleRows.length
+          ? `Next: ${scheduleRows[0]?.service || scheduleRows[0]?.item || 'Service'} at ${scheduleDisplayTime(scheduleRows[0])}.`
+          : 'Booksy or Square appointment imports will fill this card.',
+        icon: CalendarDays,
+        label: 'Schedule',
+        meta: `${formatNumber(todayStats.appointmentsToday)} today`,
+        tone: scheduleRows.length ? 'success' : 'neutral',
+        title: scheduleRows.length ? `${formatNumber(scheduleRows.length)} appointment rows` : 'No imported appointments',
+      },
+      {
+        action: nextTask ? 'more' : focusCard.tab || 'home',
+        detail: nextTask?.details || focusCard.description,
+        icon: nextTask ? ClipboardCheck : FocusIcon,
+        label: nextTask ? 'Task' : focusCard.label,
+        meta: nextTask?.due_date ? formatDate(nextTask.due_date) : focusCard.value,
+        tone: nextTask && isOverdueTask(nextTask) ? 'warning' : 'neutral',
+        title: nextTask?.title || focusCard.title,
+      },
+    ];
+
+    return rows;
+  }, [
+    FocusIcon,
+    commissionExplanation,
+    fiveStarReviews,
+    focusCard,
+    latestEntry,
+    nextTask,
+    ownActivityReviewSummary,
+    reviewCount,
+    reviewGoal.remaining,
+    scheduleRows,
+    todayStats.appointmentsToday,
+  ]);
+  const clientSignalRows = useMemo(() => {
+    const rows = [
+      {
+        label: 'Appointments',
+        value: Number(ownActivityReviewSummary?.appointments_created || scheduleRows.length || 0),
+      },
+      {
+        label: 'Clients',
+        value: Number(ownActivityReviewSummary?.client_activity || todayStats.clientsToday || 0),
+      },
+      {
+        label: 'Reviews',
+        value: reviewCount,
+      },
+      {
+        label: 'Cancellations',
+        value: Number(ownActivityReviewSummary?.cancellations || 0),
+      },
+    ];
+    const maxValue = Math.max(1, ...rows.map((row) => row.value));
+
+    return rows.map((row) => ({
+      ...row,
+      percent: Math.max(8, Math.round((row.value / maxValue) * 100)),
+    }));
+  }, [ownActivityReviewSummary, reviewCount, scheduleRows.length, todayStats.clientsToday]);
   const weekComparisons = useMemo(
     () => [
       {
@@ -916,7 +1024,6 @@ export default function StaffHubPage({
     ],
     [latestEntry, latestSalesDelta, latestTakeHomeDelta, latestTipDelta, previousEntry, reviewCount],
   );
-  const FocusIcon = focusCard.icon;
   const canOpen = (pageId) => allowedPageIds.has(pageId);
   const profileName = staffProfile?.full_name || accessProfile?.full_name || user?.email || 'My Staff Account';
   const portalMode = staffProfile ? 'My staff portal' : ownerView ? 'Staff portal preview' : 'Staff access setup needed';
@@ -1312,6 +1419,132 @@ export default function StaffHubPage({
           </div>
         </section>
       ) : null}
+
+      <section className="full-span staff-hub-pro-dashboard">
+        <div className="staff-hub-pro-topbar">
+          <div className="staff-hub-pro-title">
+            <span>Professional dashboard</span>
+            <strong>Insights</strong>
+          </div>
+          <div className="staff-hub-pro-profile">
+            <div>
+              <strong>{firstName}</strong>
+              <span>{staffProfile?.role || accessProfile?.role_title || 'Staff'}</span>
+            </div>
+            <div className="staff-hub-pro-avatar">
+              {profilePhoto ? <img src={profilePhoto} alt="" /> : <span>{initials(profileName)}</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="staff-hub-pro-tabs" role="tablist" aria-label="Staff Hub sections">
+          {TABS.map((tab) => (
+            <button
+              aria-selected={activeTab === tab.id}
+              className={activeTab === tab.id ? 'active' : ''}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="staff-hub-pro-range">
+          <button type="button">Last 28 days</button>
+          <span>{recentRangeLabel(28)}</span>
+        </div>
+
+        <div className="staff-hub-pro-score-card">
+          <div className="staff-hub-pro-score-copy">
+            <span>RTB Score</span>
+            <strong>{rtbScore.score || '--'}</strong>
+            <small>{rtbScore.focus}</small>
+          </div>
+          <div
+            aria-label={`RTB Score ${rtbScore.score} out of 100`}
+            className="staff-hub-pro-score-ring"
+            style={{ '--score-progress': `${Math.min(100, Number(rtbScore.score || 0))}%` }}
+          >
+            <span>{rtbScore.score || 0}</span>
+          </div>
+        </div>
+
+        <div className="staff-hub-pro-metrics" aria-label="Staff Hub quick metrics">
+          {dailyCards.slice(0, 4).map((card) => {
+            const Icon = card.icon;
+            return (
+              <button
+                className={`staff-hub-pro-metric tone-${card.tone}`}
+                key={card.label}
+                onClick={() => {
+                  if (card.label === 'Latest revenue' || card.label === 'Commission') setActiveTab('money');
+                  else if (card.label === 'Reviews') setActiveTab('stats');
+                  else setActiveTab('schedule');
+                }}
+                type="button"
+              >
+                <Icon size={17} />
+                <span>{card.label}</span>
+                <strong>{card.value}</strong>
+                <small>{card.change}</small>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="staff-hub-pro-section-heading">
+          <strong>Popular with your clients</strong>
+          <button type="button" onClick={() => setActiveTab('stats')}>
+            See all
+          </button>
+        </div>
+
+        <div className="staff-hub-pro-insight-list">
+          {professionalInsightRows.map((row) => {
+            const Icon = row.icon;
+            return (
+              <button
+                className={`staff-hub-pro-insight tone-${row.tone}`}
+                key={`${row.label}-${row.title}`}
+                onClick={() => setActiveTab(row.action)}
+                type="button"
+              >
+                <div className="staff-hub-pro-insight-icon">
+                  <Icon size={18} />
+                </div>
+                <span>
+                  <strong>{row.title}</strong>
+                  <small>{row.detail}</small>
+                  <em>{row.meta}</em>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="staff-hub-pro-signal-card">
+          <div className="staff-hub-pro-section-heading">
+            <strong>Client activity</strong>
+            <span>{recentRangeLabel(28)}</span>
+          </div>
+          <div className="staff-hub-pro-signal-list">
+            {clientSignalRows.map((row) => (
+              <div key={row.label}>
+                <span>
+                  <strong>{row.label}</strong>
+                  <em>{formatNumber(row.value)}</em>
+                </span>
+                <div>
+                  <i style={{ width: `${row.percent}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="panel full-span staff-hub-command-panel">
         <div className="staff-hub-command-header">
