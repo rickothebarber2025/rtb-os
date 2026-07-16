@@ -31,8 +31,10 @@ export default function MobileTabBar({ activePage, navItems, onMoreClick, setAct
           return (
             <button
               aria-current={active ? 'page' : undefined}
+              aria-label={item.label}
               className={`mobile-tabbar__item ${active ? 'active' : ''}`}
               key={item.id}
+              title={item.label}
               type="button"
               onClick={() => setActivePage(item.id)}
             >
@@ -43,7 +45,9 @@ export default function MobileTabBar({ activePage, navItems, onMoreClick, setAct
         })}
         <button
           aria-current={moreActive ? 'page' : undefined}
+          aria-label="Open full navigation"
           className={`mobile-tabbar__item ${moreActive ? 'active' : ''}`}
+          title="More"
           type="button"
           onClick={onMoreClick}
         >
