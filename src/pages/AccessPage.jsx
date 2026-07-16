@@ -5,8 +5,10 @@ import {
   MailPlus,
   RefreshCw,
   RotateCcw,
+  Search,
   ShieldCheck,
   Undo2,
+  UserPlus,
   Users,
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -78,63 +80,6 @@ function textToList(value) {
     .map((item) => item.trim())
     .filter(Boolean);
 }
-
-const ADMIN_CONTROL_ITEMS = [
-  {
-    detail: 'Owner workspace, staff hub, combined business status, and quick links.',
-    moduleId: 'dashboard',
-    page: 'My Workspace / Staff Hub',
-    write: 'View only',
-  },
-  {
-    detail: 'Create staff, edit staff profiles, manage probation, deactivate, restore, and delete.',
-    moduleId: 'roster',
-    page: 'Roster',
-    write: 'Edit staff; Admin deletes',
-  },
-  {
-    detail: 'Build payroll drafts, save runs, correct old runs, and finalize payroll.',
-    moduleId: 'payroll',
-    page: 'Payroll',
-    write: 'Edit drafts; Admin finalizes',
-  },
-  {
-    detail: 'Booksy imports, Square appointment sync, appointment review, and import cleanup.',
-    moduleId: 'appointments',
-    page: 'Appointments',
-    write: 'Edit imports and syncs',
-  },
-  {
-    detail: 'Create rent records, mark paid, reopen, and remove mistakes.',
-    moduleId: 'booth_rent',
-    page: 'Booth Rent',
-    write: 'Edit records; Admin deletes',
-  },
-  {
-    detail: 'Action Center records, SOP checklists, hiring workflows, forms, and change logs.',
-    moduleId: 'operations',
-    page: 'Action Center / Operations',
-    write: 'Edit records; Admin deletes/resets',
-  },
-  {
-    detail: 'Performance reporting, Customer IQ requests, feedback queue, and improvement projects.',
-    moduleId: 'performance',
-    page: 'Performance / Customer IQ',
-    write: 'Edit Customer IQ projects',
-  },
-  {
-    detail: 'Invite staff, assign businesses, revoke users, and change role templates.',
-    moduleId: 'access',
-    page: 'Access',
-    write: 'Admin only',
-  },
-  {
-    detail: 'Backups, exports, health checks, support bundle, and recovery links.',
-    moduleId: 'settings',
-    page: 'System Tools',
-    write: 'View/export tools',
-  },
-];
 
 function uniqueIds(ids) {
   return [...new Set((ids || []).filter(Boolean).map(String))];
@@ -293,45 +238,6 @@ function PermissionMatrix({ disabled, permissions, onChange }) {
   );
 }
 
-function permissionTone(level) {
-  if (level === 'admin') return 'gold';
-  if (level === 'edit') return 'success';
-  if (level === 'view') return 'muted';
-  return 'danger';
-}
-
-function AdminControlOverview({ accessProfile }) {
-  const payload = getEffectivePermissionsPayload(accessProfile);
-
-  return (
-    <section className="panel full-span admin-control-overview">
-      <div className="section-header">
-        <div>
-          <span>Admin control map</span>
-          <h2>What each access switch controls</h2>
-        </div>
-        <StatusBadge tone="gold">{payload.role_title}</StatusBadge>
-      </div>
-      <div className="admin-control-grid">
-        {ADMIN_CONTROL_ITEMS.map((item) => {
-          const level = payload.modules[item.moduleId] || 'none';
-          return (
-            <article className="admin-control-card" key={item.moduleId}>
-              <div>
-                <strong>{MODULE_LABELS[item.moduleId]}</strong>
-                <span>{item.page}</span>
-              </div>
-              <StatusBadge tone={permissionTone(level)}>{level}</StatusBadge>
-              <p>{item.detail}</p>
-              <small>{item.write}</small>
-            </article>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 function ResponsibilitiesEditor({ disabled, permissions, onChange }) {
   const payload = normalizePermissionsPayload(permissions);
 
@@ -409,15 +315,18 @@ function RoleTemplatePreview({ permissions }) {
 
 export default function AccessPage({ accessProfile, businessUnits, currentUserId }) {
   const accessAdmin = canManageAccess(accessProfile);
+  const [expandedProfileId, setExpandedProfileId] = useState('');
   const [drafts, setDrafts] = useState({});
   const [accessTarget, setAccessTarget] = useState(null);
   const [error, setError] = useState('');
+  const [filter, setFilter] = useState('all');
   const [inviteForm, setInviteForm] = useState(() => makeBlankInvite());
   const [inviting, setInviting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [profiles, setProfiles] = useState([]);
   const [savingId, setSavingId] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const pendingCount = useMemo(
     () =>
@@ -430,6 +339,39 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
     () => profiles.filter((profile) => profile.active && !isOwnerProfile(profile)).length,
     [profiles],
   );
+  const adminCount = useMemo(
+    () => profiles.filter((profile) => isOwnerProfile(profile) || getModulePermission(profile, 'access') === 'admin').length,
+    [profiles],
+  );
+  const filteredProfiles = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+
+    return profiles.filter((profile) => {
+      const draft = getDraft(profile, drafts);
+      const owner = isOwnerProfile(profile);
+      const payload = getEffectivePermissionsPayload(draft);
+      const needsSetup =
+        !owner &&
+        (!draft.active || !hasAnyModulePermission(draft) || !hasBusinessAccess(draft, businessUnits));
+      const text = [
+        draft.full_name,
+        profile.email,
+        payload.role_title,
+        payload.role_template,
+        businessAccessLabel(businessUnits, draft, owner),
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      if (term && !text.includes(term)) return false;
+      if (filter === 'needs') return needsSetup;
+      if (filter === 'active') return Boolean(draft.active || owner);
+      if (filter === 'inactive') return !draft.active && !owner;
+      if (filter === 'staff') return payload.role_template === 'staff_portal';
+      if (filter === 'admins') return owner || getModulePermission(draft, 'access') === 'admin';
+      return true;
+    });
+  }, [businessUnits, drafts, filter, profiles, searchTerm]);
 
   async function loadProfiles() {
     setLoading(true);
@@ -670,59 +612,47 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
 
   return (
     <div className="page-grid access-page">
-      <section className="hero-panel access-hero">
+      <section className="panel full-span access-command-panel">
         <div>
-          <span className="eyebrow">Users & access</span>
-          <h2>Role templates and module permissions</h2>
+          <span className="eyebrow">Access control</span>
+          <h2>Team logins</h2>
           <p>
-            Templates are quick presets. Permissions control access. Responsibilities explain the
-            work expected from each user.
+            Assign the right business, role template, and module access without opening every
+            permission at once.
           </p>
         </div>
-        <div className="hero-meta">
-          <strong>{pendingCount}</strong>
-          <span>need setup</span>
+        <div className="access-command-stats">
+          <div>
+            <strong>{profiles.length}</strong>
+            <span>Total</span>
+          </div>
+          <div>
+            <strong>{activeCount}</strong>
+            <span>Active</span>
+          </div>
+          <div>
+            <strong>{pendingCount}</strong>
+            <span>Needs setup</span>
+          </div>
+          <div>
+            <strong>{adminCount}</strong>
+            <span>Admins</span>
+          </div>
         </div>
       </section>
 
-      <section className="panel full-span access-overview">
-        <div className="section-header">
-          <div>
-            <span>Access overview</span>
-            <h2>Less hunting, more clarity</h2>
-          </div>
-          <StatusBadge tone="muted">Built for faster decisions</StatusBadge>
-        </div>
-        <div className="access-overview-grid">
-          <article className="access-overview-card">
-            <span className="eyebrow">At a glance</span>
-            <strong>{activeCount} active team logins</strong>
-            <p>Everyone who can work in RTB OS is surfaced in one place.</p>
-          </article>
-          <article className="access-overview-card">
-            <span className="eyebrow">Needs attention</span>
-            <strong>{pendingCount} users need setup</strong>
-            <p>Invite or update profiles before they start using the app.</p>
-          </article>
-          <article className="access-overview-card">
-            <span className="eyebrow">Templates ready</span>
-            <strong>{ROLE_TEMPLATES.length} role presets</strong>
-            <p>Use a starting point and tailor it without rebuilding permissions.</p>
-          </article>
-        </div>
-      </section>
-
-      <AdminControlOverview accessProfile={accessProfile} />
-
-      <section className="panel full-span">
-        <div className="section-header">
-          <div>
-            <span>Invite</span>
-            <h2>Add team login</h2>
-          </div>
-          {!accessAdmin ? <StatusBadge tone="danger">Access admin required</StatusBadge> : null}
-        </div>
-
+      <details className="panel full-span access-create-panel">
+        <summary>
+          <span>
+            <UserPlus size={18} />
+            Add team login
+          </span>
+          {!accessAdmin ? (
+            <StatusBadge tone="danger">Access admin required</StatusBadge>
+          ) : (
+            <StatusBadge tone="gold">Invite</StatusBadge>
+          )}
+        </summary>
         <form className="access-template-form" onSubmit={sendInvite}>
           <div className="invite-layout">
             <div className="invite-form-stack">
@@ -845,13 +775,13 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
             </aside>
           </div>
         </form>
-      </section>
+      </details>
 
       <section className="panel full-span">
         <div className="section-header">
           <div>
-            <span>Access control</span>
-            <h2>Team logins</h2>
+            <span>Manage access</span>
+            <h2>{filteredProfiles.length} user{filteredProfiles.length === 1 ? '' : 's'} shown</h2>
           </div>
           <button className="secondary-button" type="button" onClick={loadProfiles}>
             <RefreshCw size={17} />
@@ -859,18 +789,53 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
           </button>
         </div>
 
+        <div className="access-toolbar">
+          <label className="access-search">
+            <Search size={16} />
+            <input
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search name, email, role, business..."
+              value={searchTerm}
+            />
+          </label>
+          <div className="access-filter-tabs" role="tablist" aria-label="Access user filters">
+            {[
+              ['all', 'All'],
+              ['needs', 'Needs setup'],
+              ['active', 'Active'],
+              ['staff', 'Staff Hub'],
+              ['admins', 'Admins'],
+              ['inactive', 'Inactive'],
+            ].map(([id, label]) => (
+              <button
+                className={filter === id ? 'active' : ''}
+                key={id}
+                onClick={() => setFilter(id)}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {error ? <div className="alert danger">{error}</div> : null}
         {message ? <div className="alert success">{message}</div> : null}
 
-        {profiles.length ? (
+        {filteredProfiles.length ? (
           <div className="access-card-list">
-            {profiles.map((profile) => {
+            {filteredProfiles.map((profile) => {
               const draft = getDraft(profile, drafts);
               const owner = isOwnerProfile(profile);
               const isCurrentUser = profile.id === currentUserId;
               const disabled = !accessAdmin || owner;
               const payload = getEffectivePermissionsPayload(draft);
               const template = getRoleTemplate(payload.role_template);
+              const needsSetup =
+                !owner &&
+                (!draft.active ||
+                  !hasAnyModulePermission(draft) ||
+                  !hasBusinessAccess(draft, businessUnits));
               const isDirty =
                 JSON.stringify(comparable(draft)) !==
                 JSON.stringify(comparable({ ...profile, permissions: normalizePermissionsPayload(profile.permissions) }));
@@ -887,6 +852,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       <span>{profile.email}</span>
                     </div>
                     <div className="business-chip-list">
+                      {needsSetup ? <StatusBadge tone="warning">Needs setup</StatusBadge> : null}
                       <StatusBadge tone={draft.active || owner ? 'success' : 'muted'}>
                         {draft.active || owner ? 'Active' : 'Inactive'}
                       </StatusBadge>
@@ -894,17 +860,6 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       <StatusBadge tone="muted">
                         {businessAccessLabel(businessUnits, draft, owner)}
                       </StatusBadge>
-                    </div>
-                  </div>
-
-                  <div className="access-card__meta">
-                    <div className="access-card__meta-item">
-                      <span>Business access</span>
-                      <strong>{businessAccessLabel(businessUnits, draft, owner)}</strong>
-                    </div>
-                    <div className="access-card__meta-item">
-                      <span>Role preview</span>
-                      <strong>{payload.role_title}</strong>
                     </div>
                   </div>
 
@@ -950,12 +905,19 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
 
                   <details
                     className="access-details"
-                    open={isDirty || (!owner && !hasAnyModulePermission(draft))}
+                    onToggle={(event) => {
+                      if (event.currentTarget.open) {
+                        setExpandedProfileId(profile.id);
+                      } else if (expandedProfileId === profile.id) {
+                        setExpandedProfileId('');
+                      }
+                    }}
+                    open={expandedProfileId === profile.id || isDirty}
                   >
                     <summary>
                       <span>Business, permissions, and role notes</span>
                       <StatusBadge tone={isDirty ? 'warning' : 'muted'}>
-                        {isDirty ? 'Unsaved' : 'Manage'}
+                        {isDirty ? 'Unsaved' : 'Open'}
                       </StatusBadge>
                     </summary>
 
@@ -1046,6 +1008,12 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
               );
             })}
           </div>
+        ) : profiles.length ? (
+          <EmptyState
+            icon={Search}
+            title="No matching users"
+            message="Clear the search or choose a different filter."
+          />
         ) : (
           <EmptyState
             icon={loading ? ShieldCheck : Users}

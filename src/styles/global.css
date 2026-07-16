@@ -11602,3 +11602,399 @@ tbody tr:hover,
     width: 20px;
   }
 }
+
+/* RTB OS app-layout cleanup: compact access control and native app shell */
+.app-shell {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.main-area {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.content {
+  flex: 1 1 auto;
+  height: calc(100dvh - 78px);
+  max-width: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 2rem;
+}
+
+.panel,
+.hero-panel,
+.metric-card,
+.auth-card {
+  border-radius: 14px;
+}
+
+.page-grid {
+  align-content: start;
+}
+
+.access-page {
+  gap: 0.72rem;
+  max-width: 1320px;
+}
+
+.access-command-panel {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 0;
+  padding: 0.9rem 1rem;
+}
+
+.access-command-panel h2 {
+  font-size: clamp(1.28rem, 2vw, 1.7rem);
+  margin: 0.1rem 0 0;
+}
+
+.access-command-panel p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin: 0.28rem 0 0;
+  max-width: 58rem;
+}
+
+.access-command-stats {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(4, minmax(4.8rem, 1fr));
+}
+
+.access-command-stats > div {
+  background: rgba(248, 244, 236, 0.04);
+  border: 1px solid rgba(214, 173, 82, 0.16);
+  border-radius: 12px;
+  display: grid;
+  gap: 0.12rem;
+  min-height: 3.3rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.access-command-stats strong {
+  color: var(--rtb-white);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.access-command-stats span {
+  color: var(--rtb-mid);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.access-create-panel {
+  padding: 0;
+}
+
+.access-create-panel > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 3.5rem;
+  padding: 0 0.9rem;
+}
+
+.access-create-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.access-create-panel > summary > span:first-child {
+  align-items: center;
+  color: var(--rtb-white);
+  display: inline-flex;
+  font-weight: 900;
+  gap: 0.55rem;
+}
+
+.access-create-panel > summary svg {
+  color: var(--rtb-gold);
+}
+
+.access-create-panel[open] > summary {
+  border-bottom: 1px solid rgba(214, 173, 82, 0.14);
+}
+
+.access-create-panel .access-template-form {
+  padding: 0.8rem;
+}
+
+.access-toolbar {
+  align-items: center;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: minmax(18rem, 0.9fr) minmax(0, 1.4fr);
+  margin-bottom: 0.72rem;
+}
+
+.access-search {
+  align-items: center;
+  background: rgba(3, 7, 13, 0.58);
+  border: 1px solid rgba(214, 173, 82, 0.16);
+  border-radius: 14px;
+  display: flex;
+  gap: 0.5rem;
+  min-height: 2.7rem;
+  padding: 0 0.75rem;
+}
+
+.access-search svg {
+  color: var(--rtb-gold);
+  flex: 0 0 auto;
+}
+
+.access-search input {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  min-height: 0;
+  padding: 0;
+}
+
+.access-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.access-filter-tabs button {
+  background: rgba(248, 244, 236, 0.035);
+  border: 1px solid rgba(214, 173, 82, 0.14);
+  border-radius: 999px;
+  color: var(--rtb-mid);
+  font-size: 0.76rem;
+  font-weight: 850;
+  min-height: 2.35rem;
+  padding: 0 0.78rem;
+}
+
+.access-filter-tabs button.active {
+  background: rgba(214, 173, 82, 0.16);
+  border-color: rgba(214, 173, 82, 0.42);
+  color: var(--rtb-gold-strong);
+}
+
+.access-card-list {
+  gap: 0.48rem;
+}
+
+.access-page .access-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.018)),
+    rgba(3, 7, 13, 0.52);
+  border-color: rgba(214, 173, 82, 0.14);
+  border-radius: 14px;
+  padding: 0.62rem;
+}
+
+.access-card__header {
+  grid-template-columns: minmax(16rem, 1fr) auto;
+}
+
+.access-card__header .person-cell input {
+  background: transparent;
+  border-color: transparent;
+  color: var(--rtb-white);
+  font-size: 0.98rem;
+  font-weight: 900;
+  min-height: 2rem;
+  padding: 0;
+}
+
+.access-card__header .person-cell input:focus {
+  background: rgba(248, 244, 236, 0.04);
+  border-color: rgba(214, 173, 82, 0.3);
+  padding: 0 0.55rem;
+}
+
+.access-page .access-card__controls {
+  align-items: end;
+  grid-template-columns: minmax(14rem, 1fr) minmax(10rem, 0.65fr) minmax(8rem, auto);
+}
+
+.access-card__meta {
+  display: none;
+}
+
+.access-page .access-details {
+  background: rgba(248, 244, 236, 0.02);
+  border-color: rgba(214, 173, 82, 0.12);
+  padding: 0.5rem 0.6rem;
+}
+
+.access-page .access-details summary {
+  min-height: 2.25rem;
+}
+
+.access-page .access-details[open] summary {
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.55rem;
+}
+
+.access-page .business-access-picker {
+  background: rgba(3, 7, 13, 0.42);
+  border-color: rgba(214, 173, 82, 0.12);
+  grid-template-columns: minmax(12rem, 0.6fr) minmax(0, 1fr) auto;
+}
+
+.access-page .business-access-picker p {
+  display: none;
+}
+
+.access-page .business-access-options {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.access-page .permission-matrix {
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+}
+
+.access-page .permission-cell {
+  border-radius: 12px;
+  padding: 0.48rem;
+}
+
+.access-page .role-detail-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.access-page .role-detail-grid .field {
+  grid-column: span 2;
+}
+
+.access-page .role-detail-grid .full-width {
+  grid-column: span 4;
+}
+
+.access-page .role-detail-grid textarea {
+  min-height: 4.4rem;
+}
+
+.access-page .template-preview {
+  border-color: rgba(214, 173, 82, 0.13);
+  border-radius: 12px;
+  padding: 0.58rem;
+}
+
+@media (min-width: 1025px) {
+  .topbar {
+    min-height: 70px;
+  }
+
+  .content {
+    height: calc(100dvh - 70px);
+  }
+
+  .sidebar {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+}
+
+@media (max-width: 1180px) {
+  .access-command-panel,
+  .access-toolbar,
+  .access-card__header,
+  .access-page .access-card__controls,
+  .access-page .business-access-picker,
+  .access-page .role-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .access-filter-tabs {
+    justify-content: flex-start;
+  }
+
+  .access-command-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .access-page .role-detail-grid .field,
+  .access-page .role-detail-grid .full-width {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1024px) {
+  .main-area,
+  .app-shell {
+    height: 100dvh;
+  }
+
+  .content {
+    height: 100dvh;
+    padding-top: calc(0.82rem + env(safe-area-inset-top));
+  }
+
+  .topbar {
+    border-radius: 0 0 20px 20px;
+    margin: 0;
+  }
+
+  .access-page {
+    max-width: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .access-command-panel {
+    padding: 0.78rem;
+  }
+
+  .access-command-panel p {
+    display: none;
+  }
+
+  .access-command-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .access-command-stats > div {
+    min-height: 3rem;
+    padding: 0.48rem 0.38rem;
+  }
+
+  .access-command-stats span {
+    font-size: 0.56rem;
+  }
+
+  .access-toolbar {
+    gap: 0.5rem;
+  }
+
+  .access-filter-tabs {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    margin-inline: -0.1rem;
+    overflow-x: auto;
+    padding-bottom: 0.12rem;
+  }
+
+  .access-filter-tabs button {
+    flex: 0 0 auto;
+    min-height: 2.2rem;
+  }
+
+  .access-card__header .business-chip-list {
+    justify-content: flex-start;
+  }
+
+  .access-page .access-card {
+    padding: 0.54rem;
+  }
+
+  .access-create-panel > summary {
+    min-height: 3.15rem;
+  }
+}
