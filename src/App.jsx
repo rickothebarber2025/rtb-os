@@ -6,10 +6,17 @@ import { useSyncAuthProfile } from './contexts/AuthProfileContext.jsx';
 import AccessPendingPage from './pages/AccessPendingPage';
 import AuthPage from './pages/AuthPage';
 import { useAuth } from './hooks/useAuth';
+import { useLiveRefresh, useSquareAutoSync } from './hooks/useLiveRefresh';
 import { useRtbData } from './hooks/useRtbData';
 import { useUserPreferences } from './hooks/useUserPreferences';
 import { saveStaff } from './services/rtbService';
-import { canAccessPage, canManageStaff, canUseApp, getAllowedNavItems } from './utils/access';
+import {
+  canAccessPage,
+  canManageAppointments,
+  canManageStaff,
+  canUseApp,
+  getAllowedNavItems,
+} from './utils/access';
 import {
   getBusinessSelectionOptions,
   isAllBusinessesId,
@@ -56,6 +63,18 @@ export default function App() {
   const autoGraduatingRef = useRef(false);
   const appEnabled = auth.isConfigured && Boolean(auth.session) && canUseApp(auth.profile);
   const data = useRtbData(selectedBusinessUnitId, appEnabled, auth.profile);
+  useLiveRefresh({
+    enabled: appEnabled,
+    loading: data.loading,
+    refresh: data.refresh,
+    scope: `${auth.user?.id || 'anon'}-${selectedBusinessUnitId || 'none'}`,
+  });
+  useSquareAutoSync({
+    businessUnit: data.selectedBusinessUnit,
+    enabled: appEnabled && !data.loading && canManageAppointments(auth.profile),
+    refresh: data.refresh,
+    squareStatus: data.squareStatus,
+  });
   const navItems = useMemo(() => getAllowedNavItems(auth.profile), [auth.profile]);
   const businessOptions = useMemo(
     () => getBusinessSelectionOptions(data.businessUnits, auth.profile),

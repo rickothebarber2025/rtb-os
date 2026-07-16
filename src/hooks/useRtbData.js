@@ -129,14 +129,18 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
     [accessProfile, data.businessUnits, selectedBusinessUnitId],
   );
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options = {}) => {
+    const silent = Boolean(options?.silent);
+
     if (!enabled) {
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
 
-    setLoading(true);
-    setError('');
+    if (!silent) {
+      setLoading(true);
+      setError('');
+    }
 
     try {
       const [rawBusinessUnits, businessProfilesRecord] = await Promise.all([
@@ -294,10 +298,15 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         staffBusinessMetadata,
         warnings,
       });
+      setError('');
     } catch (err) {
-      setError(err.message || 'Unable to load RTB OS data.');
+      if (silent) {
+        console.warn('RTB OS background refresh failed:', err);
+      } else {
+        setError(err.message || 'Unable to load RTB OS data.');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [accessProfile, enabled, selectedBusinessUnitId]);
 
