@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
+import { useState } from 'react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
@@ -96,6 +97,15 @@ export default function DashboardPage({
   const actionSummary = getActionCenterSummary(actionItems);
   const topActions = actionItems.slice(0, 3);
   const workspace = buildRoleWorkspace(accessProfile, navItems, businessUnit);
+  const hasAppointmentSnapshot = Boolean(booksySummary || squareSummary);
+  const [mobileTab, setMobileTab] = useState('overview');
+  const mobileTabs = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'actions', label: 'Actions' },
+    ...(hasAppointmentSnapshot ? [{ id: 'appointments', label: 'Appointments' }] : []),
+    { id: 'payroll', label: 'Payroll' },
+  ];
+  const mobileGroupClass = (id) => (mobileTab === id ? 'is-active-mobile-tab' : '');
 
   return (
     <div className="page-grid dashboard-page">
@@ -121,7 +131,21 @@ export default function DashboardPage({
         ) : null}
       </section>
 
-      <section className="panel full-span workspace-panel">
+      <nav className="dashboard-mobile-tabs" aria-label="Dashboard sections">
+        {mobileTabs.map((tab) => (
+          <button
+            aria-current={mobileTab === tab.id ? 'page' : undefined}
+            className={`dashboard-mobile-tabs__item ${mobileTab === tab.id ? 'active' : ''}`}
+            key={tab.id}
+            type="button"
+            onClick={() => setMobileTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <section className={`panel full-span workspace-panel ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <div className="section-header">
           <div>
             <span>{workspace.roleTitle}</span>
@@ -175,7 +199,7 @@ export default function DashboardPage({
         </div>
       </section>
 
-      <section className="panel full-span priority-board">
+      <section className={`panel full-span priority-board ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <div className="section-header">
           <div>
             <span>Priority board</span>
@@ -236,7 +260,7 @@ export default function DashboardPage({
         </div>
       </section>
 
-      <section className="metrics-grid">
+      <section className={`metrics-grid ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <MetricCard
           icon={Users}
           label="Active staff"
@@ -273,7 +297,7 @@ export default function DashboardPage({
         />
       </section>
 
-      <section className="panel full-span">
+      <section className={`panel full-span ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <div className="section-header">
           <div>
             <span>Setup</span>
@@ -299,7 +323,7 @@ export default function DashboardPage({
         </div>
       </section>
 
-      <section className="panel full-span">
+      <section className={`panel full-span ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <div className="section-header">
           <div>
             <span>Operations</span>
@@ -327,7 +351,7 @@ export default function DashboardPage({
         </div>
       </section>
 
-      <section className="panel full-span action-center-snapshot">
+      <section className={`panel full-span action-center-snapshot ${mobileGroupClass('actions')}`} data-mobile-group="actions">
         <div className="section-header">
           <div>
             <span>Action Center</span>
@@ -373,7 +397,7 @@ export default function DashboardPage({
       </section>
 
       {booksySummary ? (
-        <section className="panel full-span">
+        <section className={`panel full-span ${mobileGroupClass('appointments')}`} data-mobile-group="appointments">
           <div className="section-header">
             <div>
               <span>Booksy import</span>
@@ -405,7 +429,7 @@ export default function DashboardPage({
       ) : null}
 
       {isBeautyLounge && squareSummary ? (
-        <section className="panel full-span">
+        <section className={`panel full-span ${mobileGroupClass('appointments')}`} data-mobile-group="appointments">
           <div className="section-header">
             <div>
               <span>Square Appointments</span>
@@ -437,7 +461,7 @@ export default function DashboardPage({
       ) : null}
 
       {isBeautyLounge && !squareSummary ? (
-        <section className="panel full-span">
+        <section className={`panel full-span ${mobileGroupClass('appointments')}`} data-mobile-group="appointments">
           <div className="section-header">
             <div>
               <span>Square Appointments</span>
@@ -455,7 +479,7 @@ export default function DashboardPage({
       ) : null}
 
       {payrollAllowed ? (
-      <section className="panel two-thirds">
+      <section className={`panel two-thirds ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
         <div className="section-header">
           <div>
             <span>Payroll</span>
@@ -512,7 +536,7 @@ export default function DashboardPage({
       </section>
       ) : null}
 
-      <section className="panel">
+      <section className={`panel ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
         <div className="section-header">
           <div>
             <span>Performance</span>
@@ -542,7 +566,7 @@ export default function DashboardPage({
         )}
       </section>
 
-      <section className="panel">
+      <section className={`panel ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
         <div className="section-header">
           <div>
             <span>Roster</span>
@@ -574,7 +598,7 @@ export default function DashboardPage({
         </div>
       </section>
 
-      <section className="panel">
+      <section className={`panel ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
         <div className="section-header">
           <div>
             <span>Booth rent</span>
