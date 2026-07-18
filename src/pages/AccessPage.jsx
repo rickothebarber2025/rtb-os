@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Ban,
   Check,
+  Link2,
   MailPlus,
   RefreshCw,
   RotateCcw,
@@ -14,7 +15,7 @@ import {
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
-import { getUserProfiles, inviteUserProfile, updateUserProfile } from '../services/rtbService';
+import { getUserProfiles, inviteUserProfile, linkUserProfile, updateUserProfile } from '../services/rtbService';
 import {
   ALL_BUSINESSES_ACCESS,
   getEffectivePermissionsPayload,
@@ -322,6 +323,9 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
   const [filter, setFilter] = useState('all');
   const [inviteForm, setInviteForm] = useState(() => makeBlankInvite());
   const [inviting, setInviting] = useState(false);
+  const [linkPicker, setLinkPicker] = useState({});
+  const [linkTarget, setLinkTarget] = useState(null);
+  const [linking, setLinking] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [profiles, setProfiles] = useState([]);
@@ -608,6 +612,42 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
     if (!accessTarget) return;
     const saved = await saveProfile(accessTarget.profile, accessTarget.next);
     if (saved) setAccessTarget(null);
+  }
+
+  function setLinkChoice(profileId, keepProfileId) {
+    setLinkPicker((current) => ({ ...current, [profileId]: keepProfileId }));
+  }
+
+  function openLinkConfirm(signInProfile) {
+    const keepProfileId = linkPicker[signInProfile.id];
+    const keepProfile = profiles.find((candidate) => candidate.id === keepProfileId);
+    if (!keepProfile) return;
+    setLinkTarget({ keepProfile, signInProfile });
+  }
+
+  async function confirmLink() {
+    if (!linkTarget) return;
+    setLinking(true);
+    setError('');
+    setMessage('');
+
+    try {
+      await linkUserProfile(linkTarget.signInProfile.id, linkTarget.keepProfile.id);
+      setMessage(
+        `Linked ${linkTarget.signInProfile.email} to ${linkTarget.keepProfile.full_name || linkTarget.keepProfile.email}.`,
+      );
+      setLinkPicker((current) => {
+        const next = { ...current };
+        delete next[linkTarget.signInProfile.id];
+        return next;
+      });
+      setLinkTarget(null);
+      await loadProfiles();
+    } catch (err) {
+      setError(err.message || 'Unable to link accounts.');
+    } finally {
+      setLinking(false);
+    }
   }
 
   return (
@@ -1004,6 +1044,35 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       </button>
                     ) : null}
                   </div>
+
+                  {!owner && !isCurrentUser && profiles.length > 1 ? (
+                    <div className="row-actions link-account-row">
+                      <select
+                        aria-label={`Link ${profile.email} to an existing profile`}
+                        disabled={!accessAdmin}
+                        onChange={(event) => setLinkChoice(profile.id, event.target.value)}
+                        value={linkPicker[profile.id] || ''}
+                      >
+                        <option value="">Duplicate sign-in? Link to existing profile...</option>
+                        {profiles
+                          .filter((candidate) => candidate.id !== profile.id && !isOwnerProfile(candidate))
+                          .map((candidate) => (
+                            <option key={candidate.id} value={candidate.id}>
+                              {candidate.full_name || candidate.email} ({candidate.email})
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        className="ghost-button small"
+                        disabled={!accessAdmin || !linkPicker[profile.id]}
+                        onClick={() => openLinkConfirm(profile)}
+                        type="button"
+                      >
+                        <Link2 size={14} />
+                        Link
+                      </button>
+                    </div>
+                  ) : null}
                 </article>
               );
             })}
@@ -1040,6 +1109,25 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
           onConfirm={confirmAccessChange}
           title={accessTarget.next.active ? 'Restore user access' : 'Revoke user access'}
           tone={accessTarget.next.active ? 'warning' : 'danger'}
+        >
+          {error ? <div className="alert danger">{error}</div> : null}
+        </ConfirmDialog>
+      ) : null}
+
+      {linkTarget ? (
+        <ConfirmDialog
+          busy={linking}
+          confirmLabel="Link accounts"
+          description={
+            `${linkTarget.signInProfile.email} signed in as a separate login. Linking keeps ` +
+            `${linkTarget.keepProfile.full_name || linkTarget.keepProfile.email}'s role, permissions, and ` +
+            `business access, moves them onto the ${linkTarget.signInProfile.email} sign-in, and removes the ` +
+            `duplicate profile.`
+          }
+          onClose={() => setLinkTarget(null)}
+          onConfirm={confirmLink}
+          title="Link duplicate sign-in"
+          tone="warning"
         >
           {error ? <div className="alert danger">{error}</div> : null}
         </ConfirmDialog>
