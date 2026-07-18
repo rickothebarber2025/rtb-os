@@ -1,0 +1,250 @@
+From 3c8a7f08de03e724904a2e9b868af62140c73715 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.local>
+Date: Sat, 18 Jul 2026 16:13:39 +0000
+Subject: [PATCH] Add in-page mobile tabs to Dashboard to reduce scrolling
+
+The Dashboard stacks 13+ sections vertically (quick actions, priority
+board, metrics, business profile, checks, action center, appointment
+snapshots, payroll runs, leaderboard, commission profile, booth rent),
+all shown at once. On mobile that meant a long scroll through
+everything just to check one thing.
+
+Added a small tab bar (Overview / Actions / Appointments / Payroll)
+that groups these sections, mobile-only, at max-width: 900px. Each
+section got a data-mobile-group attribute and a conditional
+is-active-mobile-tab class; the CSS hides non-active groups only
+below that breakpoint. Desktop is completely unchanged -- every
+section still renders exactly as before, all at once, regardless of
+tab state.
+
+Verified: production build succeeds with no errors, and a computed-
+style check confirms mobile shows only the active group with the tab
+bar visible, while desktop shows every group with the tab bar
+hidden.
+---
+ src/pages/DashboardPage.jsx | 50 +++++++++++++++++++++++++----------
+ src/styles/global.css       | 52 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 89 insertions(+), 13 deletions(-)
+
+diff --git a/src/pages/DashboardPage.jsx b/src/pages/DashboardPage.jsx
+index 9396c0b..67cf516 100644
+--- a/src/pages/DashboardPage.jsx
++++ b/src/pages/DashboardPage.jsx
+@@ -11,6 +11,7 @@ import {
+   TrendingUp,
+   Users,
+ } from 'lucide-react';
++import { useState } from 'react';
+ import DataTable from '../components/DataTable';
+ import EmptyState from '../components/EmptyState';
+ import MetricCard from '../components/MetricCard';
+@@ -96,6 +97,15 @@ export default function DashboardPage({
+   const actionSummary = getActionCenterSummary(actionItems);
+   const topActions = actionItems.slice(0, 3);
+   const workspace = buildRoleWorkspace(accessProfile, navItems, businessUnit);
++  const hasAppointmentSnapshot = Boolean(booksySummary || squareSummary);
++  const [mobileTab, setMobileTab] = useState('overview');
++  const mobileTabs = [
++    { id: 'overview', label: 'Overview' },
++    { id: 'actions', label: 'Actions' },
++    ...(hasAppointmentSnapshot ? [{ id: 'appointments', label: 'Appointments' }] : []),
++    { id: 'payroll', label: 'Payroll' },
++  ];
++  const mobileGroupClass = (id) => (mobileTab === id ? 'is-active-mobile-tab' : '');
+ 
+   return (
+     <div className="page-grid dashboard-page">
+@@ -121,7 +131,21 @@ export default function DashboardPage({
+         ) : null}
+       </section>
+ 
+-      <section className="panel full-span workspace-panel">
++      <nav className="dashboard-mobile-tabs" aria-label="Dashboard sections">
++        {mobileTabs.map((tab) => (
++          <button
++            aria-current={mobileTab === tab.id ? 'page' : undefined}
++            className={`dashboard-mobile-tabs__item ${mobileTab === tab.id ? 'active' : ''}`}
++            key={tab.id}
++            type="button"
++            onClick={() => setMobileTab(tab.id)}
++          >
++            {tab.label}
++          </button>
++        ))}
++      </nav>
++
++      <section className={`panel full-span workspace-panel ${mobileGroupClass('overview')}`} data-mobile-group="overview">
+         <div className="section-header">
+           <div>
+             <span>{workspace.roleTitle}</span>
+@@ -175,7 +199,7 @@ export default function DashboardPage({
+         </div>
+       </section>
+ 
+-      <section className="panel full-span priority-board">
++      <section className={`panel full-span priority-board ${mobileGroupClass('overview')}`} data-mobile-group="overview">
+         <div className="section-header">
+           <div>
+             <span>Priority board</span>
+@@ -236,7 +260,7 @@ export default function DashboardPage({
+         </div>
+       </section>
+ 
+-      <section className="metrics-grid">
++      <section className={`metrics-grid ${mobileGroupClass('overview')}`} data-mobile-group="overview">
+         <MetricCard
+           icon={Users}
+           label="Active staff"
+@@ -273,7 +297,7 @@ export default function DashboardPage({
+         />
+       </section>
+ 
+-      <section className="panel full-span">
++      <section className={`panel full-span ${mobileGroupClass('overview')}`} data-mobile-group="overview">
+         <div className="section-header">
+           <div>
+             <span>Setup</span>
+@@ -299,7 +323,7 @@ export default function DashboardPage({
+         </div>
+       </section>
+ 
+-      <section className="panel full-span">
++      <section className={`panel full-span ${mobileGroupClass('overview')}`} data-mobile-group="overview">
+         <div className="section-header">
+           <div>
+             <span>Operations</span>
+@@ -327,7 +351,7 @@ export default function DashboardPage({
+         </div>
+       </section>
+ 
+-      <section className="panel full-span action-center-snapshot">
++      <section className={`panel full-span action-center-snapshot ${mobileGroupClass('actions')}`} data-mobile-group="actions">
+         <div className="section-header">
+           <div>
+             <span>Action Center</span>
+@@ -373,7 +397,7 @@ export default function DashboardPage({
+       </section>
+ 
+       {booksySummary ? (
+-        <section className="panel full-span">
++        <section className={`panel full-span ${mobileGroupClass('appointments')}`} data-mobile-group="appointments">
+           <div className="section-header">
+             <div>
+               <span>Booksy import</span>
+@@ -405,7 +429,7 @@ export default function DashboardPage({
+       ) : null}
+ 
+       {isBeautyLounge && squareSummary ? (
+-        <section className="panel full-span">
++        <section className={`panel full-span ${mobileGroupClass('appointments')}`} data-mobile-group="appointments">
+           <div className="section-header">
+             <div>
+               <span>Square Appointments</span>
+@@ -437,7 +461,7 @@ export default function DashboardPage({
+       ) : null}
+ 
+       {isBeautyLounge && !squareSummary ? (
+-        <section className="panel full-span">
++        <section className={`panel full-span ${mobileGroupClass('appointments')}`} data-mobile-group="appointments">
+           <div className="section-header">
+             <div>
+               <span>Square Appointments</span>
+@@ -455,7 +479,7 @@ export default function DashboardPage({
+       ) : null}
+ 
+       {payrollAllowed ? (
+-      <section className="panel two-thirds">
++      <section className={`panel two-thirds ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
+         <div className="section-header">
+           <div>
+             <span>Payroll</span>
+@@ -512,7 +536,7 @@ export default function DashboardPage({
+       </section>
+       ) : null}
+ 
+-      <section className="panel">
++      <section className={`panel ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
+         <div className="section-header">
+           <div>
+             <span>Performance</span>
+@@ -542,7 +566,7 @@ export default function DashboardPage({
+         )}
+       </section>
+ 
+-      <section className="panel">
++      <section className={`panel ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
+         <div className="section-header">
+           <div>
+             <span>Roster</span>
+@@ -574,7 +598,7 @@ export default function DashboardPage({
+         </div>
+       </section>
+ 
+-      <section className="panel">
++      <section className={`panel ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
+         <div className="section-header">
+           <div>
+             <span>Booth rent</span>
+diff --git a/src/styles/global.css b/src/styles/global.css
+index 817879e..e80a9a2 100644
+--- a/src/styles/global.css
++++ b/src/styles/global.css
+@@ -12823,3 +12823,55 @@ tbody tr:hover,
+     border-radius: 16px;
+   }
+ }
++
++/* ============================================================
++   Dashboard in-page mobile tabs
++   Requested fix: the dashboard stacked 13+ sections vertically
++   on mobile, requiring a lot of scrolling/swiping to reach
++   payroll, leaderboard, and appointment data. On narrow screens
++   only, group those sections behind a small tab bar so one
++   section shows at a time. Desktop is completely unaffected --
++   every section still renders, unchanged, all at once.
++   ============================================================ */
++.dashboard-mobile-tabs {
++  display: none;
++}
++
++@media (max-width: 900px) {
++  .dashboard-mobile-tabs {
++    display: flex;
++    gap: 0.4rem;
++    overflow-x: auto;
++    padding: 0.2rem 0.1rem 0.6rem;
++    scrollbar-width: none;
++    -ms-overflow-style: none;
++  }
++
++  .dashboard-mobile-tabs::-webkit-scrollbar {
++    display: none;
++  }
++
++  .dashboard-mobile-tabs__item {
++    background: transparent;
++    border: 1px solid rgba(255, 255, 255, 0.14);
++    border-radius: 999px;
++    color: var(--muted);
++    cursor: pointer;
++    flex: 0 0 auto;
++    font-size: 0.78rem;
++    font-weight: 700;
++    padding: 0.5rem 0.95rem;
++    white-space: nowrap;
++  }
++
++  .dashboard-mobile-tabs__item.active {
++    background: var(--gold-soft);
++    border-color: rgba(255, 255, 255, 0.32);
++    color: var(--gold-strong);
++    box-shadow: inset 0 -2px 0 0 var(--shell-accent);
++  }
++
++  .dashboard-page [data-mobile-group]:not(.is-active-mobile-tab) {
++    display: none !important;
++  }
++}
+-- 
+2.43.0
+
