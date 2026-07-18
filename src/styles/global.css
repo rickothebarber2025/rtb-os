@@ -12986,7 +12986,7 @@ tbody tr:hover,
   }
 
   .mobile-tabbar {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     width: min(100%, 640px);
     max-width: 640px;
     max-height: none;
@@ -12995,12 +12995,24 @@ tbody tr:hover,
 
   .mobile-tabbar__item {
     aspect-ratio: auto;
+    border-radius: var(--radius);
+    font-size: 0.6rem;
+    font-weight: 850;
+    gap: 0.18rem;
+    min-height: 50px;
+    padding: 0.3rem 0.1rem;
+  }
+
+  .mobile-tabbar__item svg {
+    height: 19px;
+    width: 19px;
   }
 
   .mobile-tabbar__item span {
     height: auto;
-    font-size: 0.62rem;
+    font-size: 0.58rem;
     overflow: visible;
+    line-height: 1.05;
   }
 }
 
@@ -13016,5 +13028,23 @@ tbody tr:hover,
 
   .mobile-tabbar {
     width: min(100%, 620px);
+  }
+
+  .mobile-tabbar__item {
+    font-size: 0.56rem;
+    padding: 0.26rem 0.08rem;
+  }
+
+  .mobile-tabbar__item svg {
+    height: 18px;
+    width: 18px;
+  }
+
+  .mobile-tabbar__item span {
+    font-size: 0.54rem;
+    height: auto;
+    overflow: visible;
+    position: static;
+    width: auto;
   }
 }
