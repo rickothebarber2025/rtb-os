@@ -121,6 +121,8 @@ export default function CustomerIntelligencePage({
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [selectedStaffByItem, setSelectedStaffByItem] = useState({});
+  const [mobileTab, setMobileTab] = useState('overview');
+  const mobileGroupClass = (id) => (mobileTab === id ? 'is-active-mobile-tab' : '');
 
   const scopedBusinessId = isAllBusinessesUnit(businessUnit) ? null : businessUnit?.id;
   const canCreateRequest = Boolean(scopedBusinessId) && canEditPerformance;
@@ -379,14 +381,32 @@ export default function CustomerIntelligencePage({
         </div>
       ) : null}
 
-      <section className="metrics-grid">
+      <nav className="dashboard-mobile-tabs" aria-label="Customer Intelligence sections">
+        {[
+          { id: 'overview', label: 'Overview' },
+          { id: 'reviews', label: 'Reviews' },
+          { id: 'activity', label: 'Activity' },
+        ].map((tab) => (
+          <button
+            aria-current={mobileTab === tab.id ? 'page' : undefined}
+            className={`dashboard-mobile-tabs__item ${mobileTab === tab.id ? 'active' : ''}`}
+            key={tab.id}
+            type="button"
+            onClick={() => setMobileTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <section className={`metrics-grid ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <MetricCard icon={Star} label="Average rating" trend="1-5 customer score" value={metrics.averageRating || '0'} />
         <MetricCard icon={Target} label="Customer satisfaction" trend="4+ star responses" value={formatPercent(metrics.customerSatisfaction)} />
         <MetricCard icon={TrendingUp} label="NPS score" trend="Promoters minus detractors" value={metrics.npsScore} />
         <MetricCard icon={MessageSquareText} label="Response rate" trend={`${formatNumber(metrics.completedResponses)} of ${formatNumber(metrics.totalRequests)}`} value={formatPercent(metrics.responseRate)} />
       </section>
 
-      <section className="panel two-thirds">
+      <section className={`panel two-thirds ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <div className="section-header">
           <div>
             <span>Request feedback</span>
@@ -498,7 +518,7 @@ export default function CustomerIntelligencePage({
         ) : null}
       </section>
 
-      <section className="panel">
+      <section className={`panel ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <div className="section-header">
           <div>
             <span>Automation</span>
@@ -569,7 +589,7 @@ export default function CustomerIntelligencePage({
         </div>
       </section>
 
-      <section className="panel full-span">
+      <section className={`panel full-span ${mobileGroupClass('reviews')}`} data-mobile-group="reviews">
         <div className="section-header">
           <div>
             <span>Attribution review</span>
@@ -691,7 +711,7 @@ export default function CustomerIntelligencePage({
         )}
       </section>
 
-      <section className="panel full-span">
+      <section className={`panel full-span ${mobileGroupClass('reviews')}`} data-mobile-group="reviews">
         <div className="section-header">
           <div>
             <span>Patterns</span>
@@ -705,7 +725,7 @@ export default function CustomerIntelligencePage({
         </div>
       </section>
 
-      <section className="panel full-span">
+      <section className={`panel full-span ${mobileGroupClass('reviews')}`} data-mobile-group="reviews">
         <div className="section-header">
           <div>
             <span>External reviews</span>
@@ -744,7 +764,7 @@ export default function CustomerIntelligencePage({
         </DataTable>
       </section>
 
-      <section className="panel full-span">
+      <section className={`panel full-span ${mobileGroupClass('activity')}`} data-mobile-group="activity">
         <div className="section-header">
           <div>
             <span>Projects</span>
@@ -828,7 +848,7 @@ export default function CustomerIntelligencePage({
         )}
       </section>
 
-      <section className="panel full-span">
+      <section className={`panel full-span ${mobileGroupClass('activity')}`} data-mobile-group="activity">
         <div className="section-header">
           <div>
             <span>Responses</span>
