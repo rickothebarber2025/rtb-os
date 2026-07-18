@@ -13077,3 +13077,87 @@ tbody tr:hover,
     white-space: nowrap;
   }
 }
+
+/* ============================================================
+   Dashboard compact stat strip
+   Replaces the 4 padded, icon-boxed metric cards (128px min-
+   height each) with a tight, number-forward strip -- label,
+   big value, small trend, divided by thin separators instead of
+   individual bordered/padded cards. Applies on both desktop and
+   mobile (not mobile-only): the old cards were tall on every
+   screen size, not just phones. Scoped to .stat-strip so the
+   shared MetricCard component used on six other pages is
+   untouched.
+   ============================================================ */
+.stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  background: linear-gradient(180deg, rgba(248, 244, 236, 0.045), rgba(248, 244, 236, 0.018));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 0.1rem 0;
+}
+
+.stat-strip .metric-card {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  border-right: 1px solid var(--line);
+  box-shadow: none;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 130px;
+  padding: 0.85rem 1rem;
+}
+
+.stat-strip .metric-card:last-child {
+  border-right: 0;
+}
+
+.stat-strip .metric-card__icon {
+  display: none;
+}
+
+.stat-strip .metric-card p {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: 0 0 0.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.stat-strip .metric-card strong {
+  display: block;
+  font-size: 1.3rem;
+  line-height: 1.15;
+}
+
+.stat-strip .metric-card span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.leaderboard-table td:first-child {
+  color: var(--gold-strong);
+  font-weight: 900;
+  width: 2.2rem;
+}
+
+@media (max-width: 900px) {
+  .stat-strip .metric-card {
+    flex: 1 1 45%;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .stat-strip .metric-card:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .stat-strip .metric-card:nth-last-child(-n+2) {
+    border-bottom: 0;
+  }
+}

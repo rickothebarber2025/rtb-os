@@ -260,7 +260,7 @@ export default function DashboardPage({
         </div>
       </section>
 
-      <section className={`metrics-grid ${mobileGroupClass('overview')}`} data-mobile-group="overview">
+      <section className={`metrics-grid stat-strip ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <MetricCard
           icon={Users}
           label="Active staff"
@@ -545,18 +545,28 @@ export default function DashboardPage({
         </div>
 
         {topPerformers.length ? (
-          <div className="leaderboard">
-            {topPerformers.map((row, index) => (
-              <div className="leaderboard-row" key={row.staff_id || row.full_name}>
-                <span>{index + 1}</span>
-                <div>
-                  <strong>{row.full_name}</strong>
-                  <small>{row.role || 'Staff'}</small>
-                </div>
-                <b>{formatCompactCurrency(row.total_net_sales)}</b>
-              </div>
-            ))}
-          </div>
+          <DataTable>
+            <table className="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Staff</th>
+                  <th>Role</th>
+                  <th>Net sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topPerformers.map((row, index) => (
+                  <tr key={row.staff_id || row.full_name}>
+                    <td>{index + 1}</td>
+                    <td>{row.full_name}</td>
+                    <td>{row.role || 'Staff'}</td>
+                    <td>{formatCompactCurrency(row.total_net_sales)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DataTable>
         ) : (
           <EmptyState
             icon={TrendingUp}
