@@ -12948,3 +12948,73 @@ tbody tr:hover,
     white-space: nowrap;
   }
 }
+
+/* ============================================================
+   Restore a real bottom navigation bar on mobile
+   The whole-app mobile nav (Dashboard/Actions/Payroll/Hub/Roster
+   + More) was originally designed as a horizontal bottom tab bar,
+   but two later @media (max-width: 1024px) blocks in this file
+   both target .mobile-app-nav, and the later one wins: it turns
+   the bar into a narrow, icon-only rail pinned to the LEFT edge
+   and vertically centered instead. Confirmed via computed styles
+   in a real browser before writing this fix (left ~7px, width
+   ~49px, transform centering it vertically -- not a bottom bar
+   at all). That's an awkward, thumb-unfriendly pattern on a phone
+   and is very likely the real driver of "too much scrolling" --
+   switching between pages needed reaching across to a cramped
+   side rail instead of a natural bottom-of-thumb tab bar.
+   This restores bottom, horizontal positioning by winning the
+   cascade with a later, equally-specific override, and undoes the
+   left-side content padding those old rules reserved, replacing
+   it with bottom padding to clear the restored bar.
+   ============================================================ */
+@media (max-width: 1024px) {
+  .content {
+    padding-left: 0.9rem;
+    padding-bottom: calc(6.4rem + env(safe-area-inset-bottom));
+  }
+
+  .mobile-app-nav {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    transform: none;
+    width: auto;
+    height: auto;
+    padding: 0 0.75rem calc(0.7rem + env(safe-area-inset-bottom));
+  }
+
+  .mobile-tabbar {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    width: min(100%, 640px);
+    max-width: 640px;
+    max-height: none;
+    height: auto;
+  }
+
+  .mobile-tabbar__item {
+    aspect-ratio: auto;
+  }
+
+  .mobile-tabbar__item span {
+    height: auto;
+    font-size: 0.62rem;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 700px) {
+  .content {
+    padding-left: 0.72rem;
+  }
+
+  .mobile-app-nav {
+    left: 0;
+    width: auto;
+  }
+
+  .mobile-tabbar {
+    width: min(100%, 620px);
+  }
+}
