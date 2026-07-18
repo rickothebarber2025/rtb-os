@@ -3,6 +3,7 @@ import {
   authorizeManager,
   corsHeaders,
   getAdminClient,
+  googleTokenRefreshError,
   jsonResponse,
   maxBatchSize,
   readJson,
@@ -85,10 +86,7 @@ async function getGoogleAccessToken() {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok || !payload.access_token) {
-    throw new RequestError(
-      payload.error_description || payload.error || "Google Business Profile connection expired or could not be refreshed.",
-      502,
-    );
+    throw googleTokenRefreshError(payload, "Google Business Profile sync", "GOOGLE_BUSINESS_PROFILE_REFRESH_TOKEN");
   }
 
   return payload.access_token as string;

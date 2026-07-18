@@ -249,3 +249,26 @@ export function maxBatchSize(value: unknown, fallback = 5, max = 25) {
   const requested = numberValue(value, fallback);
   return Math.max(1, Math.min(max, Math.floor(requested)));
 }
+
+export function googleTokenRefreshError(
+  payload: Record<string, unknown>,
+  integrationLabel: string,
+  secretName: string,
+) {
+  const errorCode = String(payload?.error || "");
+  const description = String(payload?.error_description || "");
+  const isRevoked = errorCode === "invalid_grant" || /expired|revoked/i.test(description);
+
+  if (isRevoked) {
+    return new RequestError(
+      `${integrationLabel} access has expired or been revoked. Reconnect it by generating a new Google OAuth ` +
+        `refresh token and updating the ${secretName} Supabase secret.`,
+      401,
+    );
+  }
+
+  return new RequestError(
+    description || errorCode || `${integrationLabel} connection could not be refreshed.`,
+    502,
+  );
+}
