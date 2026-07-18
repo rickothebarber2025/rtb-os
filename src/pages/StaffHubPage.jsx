@@ -1601,6 +1601,20 @@ export default function StaffHubPage({
         </div>
       </section>
 
+      <nav className="staff-hub-sticky-tabs" role="tablist" aria-label="Staff Hub sections">
+        {TABS.map((tab) => (
+          <button
+            aria-selected={activeTab === tab.id}
+            className={activeTab === tab.id ? 'active' : ''}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
       {activeTab === 'home' ? (
         <>
           <section className="panel full-span staff-hub-focus-band">

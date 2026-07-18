@@ -12875,3 +12875,76 @@ tbody tr:hover,
     display: none !important;
   }
 }
+
+
+/* ============================================================
+   Staff Hub sticky section tabs
+   The Staff Hub's original tab strip (.staff-hub-tabs-panel) is
+   intentionally hidden site-wide by the "professional dashboard"
+   redesign further down this file -- navigation between sections
+   (Today/Earnings/Performance/Schedule/More) was left to scattered
+   inline buttons inside dashboard cards, with no persistent,
+   always-reachable control. That meant hunting back through the
+   page (a lot of scrolling) just to switch sections.
+   This is a new, genuinely visible tab bar, styled consistently
+   with the rest of the app, that stays reachable while scrolling
+   on mobile without needing a second stacked bottom bar (the
+   whole-app page nav already occupies that spot).
+   ============================================================ */
+.staff-hub-sticky-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  background: rgba(248, 244, 236, 0.025);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.staff-hub-sticky-tabs button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--muted);
+  font-weight: 800;
+  min-height: 34px;
+  padding: 0 0.78rem;
+  cursor: pointer;
+}
+
+.staff-hub-sticky-tabs button.active {
+  background: var(--gold-soft);
+  border-color: color-mix(in srgb, var(--gold-strong) 36%, transparent);
+  color: var(--gold-strong);
+}
+
+@media (max-width: 900px) {
+  .staff-hub-sticky-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    background: rgba(3, 7, 13, 0.94);
+    backdrop-filter: blur(12px);
+    border-radius: 0;
+    border-inline: 0;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    margin-inline: -1rem;
+    margin-bottom: 0.75rem;
+    padding-inline: 1rem;
+    position: sticky;
+    top: 0;
+    top: env(safe-area-inset-top);
+    z-index: 30;
+  }
+
+  .staff-hub-sticky-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .staff-hub-sticky-tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
