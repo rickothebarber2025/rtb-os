@@ -29,6 +29,27 @@ function addHours(hours: number) {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 }
 
+// Basic, deliberately permissive format checks -- these exist to
+// catch obvious typos (missing @, letters in a phone number) before
+// a request reaches Resend, not to fully validate deliverability.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Accepts optional +country code, then 7-15 digits, allowing common
+// separators (space, dash, dot, parentheses) which are stripped first.
+const PHONE_DIGITS_PATTERN = /^\+?[0-9]{7,15}$/;
+
+function assertValidEmail(email: string) {
+  if (!EMAIL_PATTERN.test(email)) {
+    throw new RequestError(`"${email}" doesn't look like a valid email address.`);
+  }
+}
+
+function assertValidPhone(phone: string) {
+  const stripped = phone.replace(/[\s\-.()]/g, "");
+  if (!PHONE_DIGITS_PATTERN.test(stripped)) {
+    throw new RequestError(`"${phone}" doesn't look like a valid phone number.`);
+  }
+}
+
 function normalizeRequest(payload: Record<string, unknown>) {
   const businessId = cleanText(payload.business_id || payload.businessId);
   const customerName = cleanText(payload.customer_name || payload.customerName);
@@ -41,6 +62,8 @@ function normalizeRequest(payload: Record<string, unknown>) {
   if (!customerEmail && !customerPhone) {
     throw new RequestError("Add a customer email or phone number.");
   }
+  if (customerEmail) assertValidEmail(customerEmail);
+  if (customerPhone) assertValidPhone(customerPhone);
 
   return {
     appointment_id: cleanText(payload.appointment_id || payload.appointmentId) || null,
