@@ -31,6 +31,7 @@ import {
   resolveAttributionItem,
   syncBooksyGmail,
   syncGoogleBusinessReviews,
+  syncRankingCoachReviews,
   updateImprovementProject,
   updateImprovementTask,
 } from '../services/rtbService';
@@ -129,6 +130,7 @@ export default function CustomerIntelligencePage({
   const canRunBooksySync = Boolean(scopedBusinessId) && (canEditAppointments || canEditOperations);
   const canRunGoogleReviewSync =
     Boolean(scopedBusinessId) && (canEditPerformance || canEditAppointments || canEditOperations);
+  const canRunRankingCoachSync = canRunGoogleReviewSync;
   const canReviewAttribution = canRunGoogleReviewSync;
   const attributionQueue = data?.attributionQueue || [];
   const sourceReviews = data?.sourceReviews || [];
@@ -254,6 +256,13 @@ export default function CustomerIntelligencePage({
         const result = await syncGoogleBusinessReviews(scopedBusinessId, { maxPages: 1 });
         setNotice(
           `Google review sync complete: ${formatNumber(result.inserted)} new, ${formatNumber(result.updated)} updated, ${formatNumber(result.unresolved)} need review.`,
+        );
+      }
+
+      if (action === 'rankingcoach') {
+        const result = await syncRankingCoachReviews(scopedBusinessId, { maxMessages: 25 });
+        setNotice(
+          `Google review email sync complete: ${formatNumber(result.inserted)} new, ${formatNumber(result.updated)} updated, ${formatNumber(result.unresolved)} need review.`,
         );
       }
 
@@ -567,6 +576,16 @@ export default function CustomerIntelligencePage({
             Sync Google reviews
           </button>
           <button
+            className="secondary-button"
+            disabled={working === 'rankingcoach' || !canRunRankingCoachSync}
+            title={!canRunRankingCoachSync ? 'Choose one business and use performance, appointments, or operations edit access.' : undefined}
+            type="button"
+            onClick={() => runAction('rankingcoach')}
+          >
+            <Star size={16} />
+            Sync Google reviews (email)
+          </button>
+          <button
             className="ghost-button"
             disabled={working === 'expire' || !canEditPerformance}
             title={!canEditPerformance ? 'Performance edit access is required.' : undefined}
@@ -576,7 +595,9 @@ export default function CustomerIntelligencePage({
             Expire old links
           </button>
           <p className="subtle-text">
-            Feedback email requires `RESEND_API_KEY`; Booksy Gmail and Google reviews require their Supabase function secrets.
+            Feedback email requires `RESEND_API_KEY`; Booksy Gmail and Google reviews require their Supabase function
+            secrets. &quot;Sync Google reviews (email)&quot; reuses the Booksy Gmail connection and needs the
+            RTB-OS/GoogleReviews label set up on rankingCoach&apos;s emails first.
           </p>
           {syncRuns[0] ? (
             <div className="survey-link-box">

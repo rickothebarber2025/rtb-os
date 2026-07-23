@@ -1165,6 +1165,13 @@ export async function syncGoogleBusinessReviews(businessUnitId, options = {}) {
   });
 }
 
+export async function syncRankingCoachReviews(businessUnitId, options = {}) {
+  return invokeFunction('rankingcoach-review-sync', {
+    ...options,
+    businessUnitId,
+  });
+}
+
 export async function resolveAttributionItem(itemId, action, staffId = null, note = '') {
   const client = requireClient();
   return requireData(
