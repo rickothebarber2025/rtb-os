@@ -779,7 +779,7 @@ Deno.serve(async (req) => {
 
       const [{ data: business, error: businessError }, { data: performance, error: performanceError }, { data: staffRows, error: staffError }] = await Promise.all([
         admin.from("business_units").select("id,name,type").eq("id", businessId).maybeSingle(),
-        admin.from("staff_performance_summary").select("*").eq("business_id", businessId),
+        admin.from("staff_performance_summary").select("*").eq("business_unit_id", businessId),
         admin.from("staff").select("id,full_name,role,fixed_rate").eq("business_unit_id", businessId),
       ]);
 
