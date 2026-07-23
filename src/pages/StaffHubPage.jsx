@@ -1211,7 +1211,10 @@ export default function StaffHubPage({
   }
 
   async function markAnnouncementRead(announcementId) {
-    if (!staffProfile) return;
+    if (!staffProfile) {
+      setHubError('Your staff profile could not be matched yet, so this can\'t be saved. Try refreshing, or ask an admin to check your Staff Hub link.');
+      return;
+    }
     await runHubAction(
       `read-${announcementId}`,
       () => markStaffAnnouncementRead(announcementId, staffProfile.id),
@@ -1221,7 +1224,10 @@ export default function StaffHubPage({
 
   async function submitAvailability(event) {
     event.preventDefault();
-    if (!staffProfile) return;
+    if (!staffProfile) {
+      setHubError('Your staff profile could not be matched yet, so this can\'t be saved. Try refreshing, or ask an admin to check your Staff Hub link.');
+      return;
+    }
     await runHubAction(
       'availability',
       () =>
@@ -1236,7 +1242,10 @@ export default function StaffHubPage({
 
   async function submitTimeOff(event) {
     event.preventDefault();
-    if (!staffProfile) return;
+    if (!staffProfile) {
+      setHubError('Your staff profile could not be matched yet, so this can\'t be saved. Try refreshing, or ask an admin to check your Staff Hub link.');
+      return;
+    }
     await runHubAction(
       'time-off',
       () =>
@@ -1287,7 +1296,10 @@ export default function StaffHubPage({
 
   async function submitContent(event) {
     event.preventDefault();
-    if (!staffProfile) return;
+    if (!staffProfile) {
+      setHubError('Your staff profile could not be matched yet, so this can\'t be saved. Try refreshing, or ask an admin to check your Staff Hub link.');
+      return;
+    }
     await runHubAction(
       'content',
       () =>
@@ -1303,7 +1315,10 @@ export default function StaffHubPage({
 
   async function submitProfile(event) {
     event.preventDefault();
-    if (!staffProfile) return;
+    if (!staffProfile) {
+      setHubError('Your staff profile could not be matched yet, so this can\'t be saved. Try refreshing, or ask an admin to check your Staff Hub link.');
+      return;
+    }
     const services = profileForm.services_text
       .split(',')
       .map((item) => item.trim())
