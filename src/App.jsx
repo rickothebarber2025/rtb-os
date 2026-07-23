@@ -131,6 +131,7 @@ export default function App() {
     () => ({
       actionCenter: data.actionCenter,
       boothRent: data.boothRent,
+      instagramInsights: data.instagramInsights,
       businessUnit: data.selectedBusinessUnit,
       businessUnits: data.businessUnits,
       businessOptions,

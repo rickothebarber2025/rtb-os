@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getAppSettingRecord,
   getBoothRent,
+  getInstagramInsights,
   getBusinessUnits,
   getMonthlyPerformanceSummary,
   getMyStaffPortalSummary,
@@ -36,6 +37,7 @@ const EMPTY_STATE = {
   actionCenter: normalizeActionCenterState(null),
   boothRent: [],
   businessUnits: [],
+  instagramInsights: null,
   masterDashboard: null,
   masterDashboardUpdatedAt: null,
   monthlyPerformanceSummary: [],
@@ -61,6 +63,7 @@ const EMPTY_STATE = {
 const LOAD_LABELS = {
   actionCenterRecord: 'Action Center',
   boothRent: 'Booth rent records',
+  instagramInsights: 'Instagram insights',
   masterDashboardRecord: 'Appointment data',
   monthlyPerformanceSummary: 'Monthly performance',
   payrollRuns: 'Payroll history',
@@ -178,6 +181,8 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         hasModulePermission(accessProfile, 'settings', 'admin');
       const canViewAppointments = hasModulePermission(accessProfile, 'appointments', 'view');
       const canViewBoothRent = hasModulePermission(accessProfile, 'booth_rent', 'view');
+      const canViewOperations = hasModulePermission(accessProfile, 'operations', 'view');
+
       const canViewPerformance = hasModulePermission(accessProfile, 'performance', 'view');
       const canViewRoster = hasModulePermission(accessProfile, 'roster', 'view');
       const canViewStaffHub = hasModulePermission(accessProfile, 'staff_hub', 'view');
@@ -201,6 +206,9 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         masterDashboardRecord: isAllBusinesses || !canViewAppointments
           ? Promise.resolve(null)
           : getAppSettingRecord(getAppointmentSettingKey(activeUnit)),
+        instagramInsights: isAllBusinesses || !canViewOperations
+          ? Promise.resolve(null)
+          : getInstagramInsights(activeUnit.id).catch(() => null),
         monthlyPerformanceSummary: canViewPerformance
           ? getMonthlyPerformanceSummary(isAllBusinesses ? null : activeUnit.id)
           : Promise.resolve([]),
@@ -285,6 +293,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         actionCenter: normalizeActionCenterState(loaded.actionCenterRecord?.value),
         boothRent: sortByCreatedAtDesc(loaded.boothRent),
         businessUnits,
+        instagramInsights: loaded.instagramInsights || null,
         masterDashboard: loaded.masterDashboardRecord?.value || null,
         masterDashboardUpdatedAt: loaded.masterDashboardRecord?.updated_at || null,
         monthlyPerformanceSummary: loaded.monthlyPerformanceSummary,

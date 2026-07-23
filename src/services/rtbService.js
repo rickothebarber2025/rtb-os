@@ -625,6 +625,19 @@ export async function getMyStaffPortalSummary() {
   return data || {};
 }
 
+export async function getInstagramInsights(businessUnitId) {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('instagram_insights')
+    .select('*')
+    .eq('business_unit_id', businessUnitId)
+    .order('synced_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function getBoothRent(businessUnitId) {
   const client = requireClient();
   return requireData(

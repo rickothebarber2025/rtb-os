@@ -36,11 +36,74 @@ const OPERATION_ICONS = {
   warning: AlertTriangle,
 };
 
+// Turns Instagram's hour-by-hour follower-online data into a short,
+// readable "best time to post" summary -- e.g. "6-8 PM" -- by
+// finding the top consecutive block of high-activity hours rather
+// than just listing the single busiest hour.
+function formatBestPostingWindows(hourMap) {
+  const entries = Object.entries(hourMap || {}).map(([hour, count]) => [Number(hour), Number(count) || 0]);
+  if (!entries.length) return 'Not enough data yet';
+
+  const max = Math.max(...entries.map(([, count]) => count));
+  if (max <= 0) return 'Not enough data yet';
+
+  const threshold = max * 0.85;
+  const topHours = entries.filter(([, count]) => count >= threshold).map(([hour]) => hour).sort((a, b) => a - b);
+
+  const formatHour = (hour) => {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const display = hour % 12 === 0 ? 12 : hour % 12;
+    return `${display} ${period}`;
+  };
+
+  if (topHours.length === 1) return formatHour(topHours[0]);
+  if (topHours.length === 24) return 'All day';
+
+  // Real follower activity is often bimodal (a lunch peak and an
+  // evening peak), so this finds every separate contiguous block --
+  // a gap of more than 1 hour between consecutive top hours marks a
+  // real break -- rather than assuming there's only ever one window.
+  const n = topHours.length;
+  const gaps = topHours.map((hour, i) => {
+    const next = topHours[(i + 1) % n];
+    return ((next - hour + 24) % 24) || 24;
+  });
+
+  const breakIndices = gaps
+    .map((gap, i) => (gap > 1 ? i : -1))
+    .filter((i) => i !== -1);
+
+  // No real gaps at all (topHours is one solid run, possibly
+  // wrapping midnight) -- treat the largest gap as the seam.
+  const seams = breakIndices.length ? breakIndices : [gaps.indexOf(Math.max(...gaps))];
+
+  const blocks = seams.map((seamIndex, i) => {
+    const nextSeamIndex = seams[(i + 1) % seams.length];
+    const start = topHours[(seamIndex + 1) % n];
+    const end = topHours[nextSeamIndex];
+    return { start, end };
+  });
+
+  const formatBlock = (block) =>
+    block.start === block.end
+      ? formatHour(block.start)
+      : `${formatHour(block.start)}-${formatHour((block.end + 1) % 24)}`;
+
+  // Cap at 2 windows so this stays a quick read, not a data dump.
+  // Sort chronologically (by start hour) for a natural reading order.
+  return blocks
+    .slice(0, 2)
+    .sort((a, b) => a.start - b.start)
+    .map(formatBlock)
+    .join(' and ');
+}
+
 export default function DashboardPage({
   accessProfile,
   actionCenter,
   boothRent,
   businessUnit,
+  instagramInsights,
   masterDashboard,
   masterDashboardUpdatedAt,
   navItems,
@@ -296,6 +359,39 @@ export default function DashboardPage({
           value={formatCompactCurrency(performanceTotal)}
         />
       </section>
+
+      {instagramInsights ? (
+        <section className={`panel full-span ${mobileGroupClass('overview')}`} data-mobile-group="overview">
+          <div className="section-header">
+            <div>
+              <span>Marketing</span>
+              <h2>Instagram performance</h2>
+            </div>
+            <StatusBadge tone="muted">
+              Synced {new Date(instagramInsights.synced_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+            </StatusBadge>
+          </div>
+          <div className="workspace-grid">
+            <div className="workspace-card">
+              <span>Best times to post</span>
+              <strong>{formatBestPostingWindows(instagramInsights.online_followers_by_hour)}</strong>
+              <small>Based on when your followers are actually online</small>
+            </div>
+            <div className="workspace-card">
+              <span>Followers</span>
+              <strong>{instagramInsights.followers_count ?? '—'}</strong>
+            </div>
+            <div className="workspace-card">
+              <span>Reach, last 7 days</span>
+              <strong>{instagramInsights.reach_7d ?? '—'}</strong>
+            </div>
+            <div className="workspace-card">
+              <span>Avg. engagement rate</span>
+              <strong>{instagramInsights.avg_engagement_rate != null ? `${instagramInsights.avg_engagement_rate}%` : '—'}</strong>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className={`panel full-span ${mobileGroupClass('overview')}`} data-mobile-group="overview">
         <div className="section-header">
