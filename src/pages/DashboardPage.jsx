@@ -133,7 +133,9 @@ export default function DashboardPage({
     (total, row) => total + Number(row.total_net_sales || 0),
     0,
   );
-  const topPerformers = performanceSummary.slice(0, 5);
+  const topPerformers = performanceSummary
+    .filter((row) => !row.exclude_from_leaderboard)
+    .slice(0, 5);
   const isBeautyLounge = businessUnit?.name === 'RTB Beauty Lounge';
   const booksySummary = businessUnit?.name === 'RTB Lounge' ? masterDashboard?.summary : null;
   const squareSummary = isBeautyLounge ? masterDashboard?.summary : null;

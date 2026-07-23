@@ -43,7 +43,10 @@ export default function PerformancePage({
     [performanceSummary, staff],
   );
   const monthlyRows = useMemo(
-    () => monthlyPerformanceSummary.filter((row) => row.month_start === selectedMonth),
+    () =>
+      monthlyPerformanceSummary.filter(
+        (row) => row.month_start === selectedMonth && !row.exclude_from_leaderboard,
+      ),
     [monthlyPerformanceSummary, selectedMonth],
   );
   const topPerformer = monthlyRows[0] || null;
