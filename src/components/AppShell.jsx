@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import MobileTabBar from './MobileTabBar';
 import Sidebar from './Sidebar';
+import StaffDailyOperationsCard from './StaffDailyOperationsCard';
 import Topbar from './Topbar';
 import { getBusinessProfile } from '../utils/businessProfiles';
 
@@ -70,7 +71,12 @@ export default function AppShell({
           user={user}
           userPreferences={userPreferences}
         />
-        <main className={`content ${pageClass}`}>{children}</main>
+        <main className={`content ${pageClass}`}>
+          {activePage === 'staff-hub' ? (
+            <StaffDailyOperationsCard businessUnitId={selectedBusinessUnitId} />
+          ) : null}
+          {children}
+        </main>
         <MobileTabBar
           activePage={activePage}
           navItems={navItems}
