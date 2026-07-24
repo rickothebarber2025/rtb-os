@@ -5,6 +5,7 @@ export default function Sidebar({
   activePage,
   businessOptions,
   isOpen,
+  navBadges,
   navItems,
   onClose,
   selectedBusinessUnitId,
@@ -42,6 +43,7 @@ export default function Sidebar({
             {items.map((item) => {
               const Icon = item.icon;
               const active = activePage === item.id;
+              const badgeCount = Number(navBadges?.[item.id] || 0);
 
               return (
                 <button
@@ -55,6 +57,11 @@ export default function Sidebar({
                 >
                   <Icon size={18} />
                   <span>{item.label}</span>
+                  {badgeCount > 0 ? (
+                    <span className="nav-item__badge" aria-label={`${badgeCount} unread`}>
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}

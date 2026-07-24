@@ -9,6 +9,7 @@ export default function AppShell({
   businessOptions,
   businessUnits,
   children,
+  navBadges,
   onRefresh,
   navItems,
   profile,
@@ -48,6 +49,7 @@ export default function AppShell({
         activePage={activePage}
         businessOptions={businessOptions}
         isOpen={sidebarOpen}
+        navBadges={navBadges}
         navItems={navItems}
         onClose={() => setSidebarOpen(false)}
         selectedBusinessUnitId={selectedBusinessUnitId}
@@ -73,6 +75,7 @@ export default function AppShell({
         <main className={`content ${pageClass}`}>{children}</main>
         <MobileTabBar
           activePage={activePage}
+          navBadges={navBadges}
           navItems={navItems}
           onMoreClick={() => setSidebarOpen(true)}
           setActivePage={setActivePage}

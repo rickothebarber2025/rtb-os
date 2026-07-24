@@ -13161,3 +13161,47 @@ tbody tr:hover,
     border-bottom: 0;
   }
 }
+
+/* Unread nav badges (Staff Hub announcements, etc.) -- appended at
+   the end of the file so they always win the cascade, matching this
+   file's established pattern where later rules take precedence. */
+.nav-item {
+  justify-content: space-between;
+}
+
+.nav-item__badge {
+  align-items: center;
+  background: var(--red);
+  border-radius: 999px;
+  color: #1a0f0f;
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-weight: 800;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 0.4rem;
+}
+
+.mobile-tabbar__icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.mobile-tabbar__badge {
+  align-items: center;
+  background: var(--red);
+  border: 2px solid var(--rtb-bg, #14100c);
+  border-radius: 999px;
+  color: #1a0f0f;
+  display: inline-flex;
+  font-size: 0.6rem;
+  font-weight: 800;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 0.28rem;
+  position: absolute;
+  right: -8px;
+  top: -6px;
+}
