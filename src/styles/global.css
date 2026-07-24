@@ -6207,6 +6207,201 @@ tbody tr:hover {
   }
 }
 
+/* Daily Operations */
+.daily-ops-hero {
+  min-height: 132px;
+}
+
+.daily-ops-hero h2 {
+  font-size: clamp(1.7rem, 3vw, 2.7rem);
+}
+
+.daily-ops-score {
+  align-items: center;
+  background:
+    radial-gradient(circle at top, var(--shell-accent-soft), transparent 72%),
+    rgba(255, 255, 255, 0.035);
+  border: 1px solid color-mix(in srgb, var(--shell-accent) 32%, transparent);
+  border-radius: var(--radius);
+  display: grid;
+  justify-items: center;
+  min-width: 160px;
+  padding: 0.95rem;
+}
+
+.daily-ops-score span,
+.daily-ops-score small,
+.daily-ops-card span,
+.daily-ops-card small,
+.daily-ops-manager-strip span {
+  color: var(--muted);
+}
+
+.daily-ops-score strong {
+  color: var(--shell-accent-strong);
+  font-size: 2.45rem;
+  line-height: 1;
+}
+
+.daily-ops-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.daily-ops-card {
+  align-content: start;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.daily-ops-card--wide {
+  grid-column: span 2;
+}
+
+.daily-ops-shift-times {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.daily-ops-shift-times div,
+.daily-ops-mini-list div,
+.daily-ops-task-list button {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.daily-ops-shift-times div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.68rem;
+}
+
+.daily-ops-shift-times strong {
+  font-size: 1rem;
+}
+
+.daily-ops-actions {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.daily-ops-status-grid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.daily-ops-status-grid button {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  min-height: 38px;
+  padding: 0 0.55rem;
+}
+
+.daily-ops-status-grid button.active,
+.daily-ops-status-grid button:hover:not(:disabled) {
+  background: var(--shell-accent-soft);
+  border-color: color-mix(in srgb, var(--shell-accent) 35%, transparent);
+  color: var(--shell-accent-strong);
+}
+
+.daily-ops-mini-list,
+.daily-ops-task-list,
+.daily-ops-form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.daily-ops-mini-list div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem;
+}
+
+.daily-ops-mini-list button {
+  justify-self: start;
+  margin-top: 0.35rem;
+}
+
+.daily-ops-task-list button {
+  align-items: center;
+  color: var(--text);
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 54px;
+  padding: 0.7rem;
+  text-align: left;
+}
+
+.daily-ops-task-list button:hover {
+  background: var(--shell-accent-soft);
+  border-color: color-mix(in srgb, var(--shell-accent) 30%, transparent);
+}
+
+.daily-ops-task-list button.overdue {
+  border-color: rgba(255, 113, 109, 0.34);
+}
+
+.daily-ops-form textarea {
+  min-height: 86px;
+}
+
+.daily-ops-manager-strip {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.daily-ops-manager-strip div {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.24rem;
+  padding: 0.75rem;
+}
+
+.daily-ops-manager-strip strong {
+  color: var(--shell-accent-strong);
+  font-size: 1.15rem;
+}
+
+@media (max-width: 1100px) {
+  .daily-ops-grid,
+  .daily-ops-manager-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-ops-card--wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .daily-ops-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .daily-ops-score {
+    justify-items: start;
+    width: 100%;
+  }
+
+  .daily-ops-shift-times,
+  .daily-ops-actions,
+  .daily-ops-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Calm product UI pass: simple Figma-style system */
 :root {
   --bg: #172836;

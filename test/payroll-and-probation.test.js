@@ -84,6 +84,11 @@ import {
   buildRtbScore,
   buildTodayMoneyStats,
 } from '../src/utils/staffHubInsights.js';
+import {
+  buildDailyOperationsSummary,
+  getLatestShopStatus,
+  getUnacknowledgedPolicies,
+} from '../src/utils/dailyOperations.js';
 import { buildRoleWorkspace } from '../src/utils/workspaces.js';
 import { parseBooksyCsvRows, parseBooksyEmail } from '../supabase/functions/_shared/booksy-parser.js';
 import {
@@ -259,6 +264,70 @@ test('staff portal workspace focuses on staff self-service pages', () => {
   assert.equal(workspace.focusPages.some((page) => page.id === 'staff-hub'), true);
   assert.equal(workspace.focusPages.some((page) => page.id === 'access'), false);
   assert.equal(workspace.editableModules.length, 0);
+});
+
+test('daily operations summary combines shifts tasks policies and shop status', () => {
+  const summary = buildDailyOperationsSummary({
+    checklistRuns: [
+      {
+        checklist_type: 'opening',
+        items: [{ completed: true }, { completed: true }],
+        run_date: '2026-07-23',
+        status: 'completed',
+      },
+    ],
+    operationsRequests: [
+      { priority: 'low', status: 'completed', title: 'Done', request_type: 'maintenance' },
+      { priority: 'urgent', status: 'pending', title: 'Chair broken', request_type: 'maintenance' },
+    ],
+    policyAcknowledgements: [{ policy_id: 'policy-1', staff_id: 'staff-1' }],
+    policyDocuments: [
+      { id: 'policy-1', requires_acknowledgement: true, title: 'Late policy' },
+      { id: 'policy-2', requires_acknowledgement: true, title: 'Safety policy' },
+    ],
+    shiftRecords: [
+      {
+        checked_in_at: '2026-07-23T13:55:00.000Z',
+        late_minutes: 0,
+        shift_date: '2026-07-23',
+        staff_id: 'staff-1',
+        status: 'active',
+      },
+    ],
+    shopStatusEvents: [
+      { created_at: '2026-07-23T13:00:00.000Z', status: 'opening' },
+      { created_at: '2026-07-23T14:00:00.000Z', status: 'open' },
+    ],
+    staffId: 'staff-1',
+    tasks: [
+      { due_date: '2026-07-20', status: 'pending', title: 'Restock towels' },
+      { status: 'completed', title: 'Clean station' },
+    ],
+    today: '2026-07-23',
+  });
+
+  assert.equal(summary.todayShift.status, 'active');
+  assert.equal(summary.shopStatus.label, 'Open');
+  assert.equal(summary.checklistCompletion, 100);
+  assert.equal(summary.openRequests[0].title, 'Chair broken');
+  assert.equal(summary.unacknowledgedPolicies.length, 1);
+  assert.equal(summary.overdueTasks.length, 1);
+  assert.equal(summary.operationsScore, 76);
+});
+
+test('daily operations helpers sort status and policy acknowledgements safely', () => {
+  assert.equal(getLatestShopStatus([]).label, 'Not set');
+  assert.deepEqual(
+    getUnacknowledgedPolicies(
+      [
+        { id: 'a', requires_acknowledgement: true },
+        { id: 'b', requires_acknowledgement: false },
+      ],
+      [],
+      'staff-1',
+    ).map((policy) => policy.id),
+    ['a'],
+  );
 });
 
 test('Booksy email parser extracts appointment and review notifications', () => {

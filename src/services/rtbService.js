@@ -239,6 +239,20 @@ export async function getStaff(businessUnitId, includeInactive = true) {
   return requireData(await query);
 }
 
+function staffHubOperationsFallback() {
+  return {
+    auditLogs: [],
+    checklistRuns: [],
+    checklistTemplates: [],
+    operationsRequests: [],
+    policyAcknowledgements: [],
+    policyDocuments: [],
+    shiftNotes: [],
+    shiftRecords: [],
+    shopStatusEvents: [],
+  };
+}
+
 export async function saveStaff(staff) {
   const client = requireClient();
   const isProbation = staff.tier === 'probation';
@@ -702,6 +716,7 @@ export async function getStaffHubRecords({ businessUnitId = null, staffId = null
     tasks,
     newsletters,
     contentSubmissions,
+    operations,
   ] = await Promise.all([
     requireData(
       await applyNullableBusinessScope(
@@ -773,6 +788,7 @@ export async function getStaffHubRecords({ businessUnitId = null, staffId = null
         businessUnitId,
       ),
     ),
+    getStaffHubOperationsRecords({ businessUnitId, staffId }),
   ]);
 
   return {
@@ -781,9 +797,336 @@ export async function getStaffHubRecords({ businessUnitId = null, staffId = null
     availability,
     contentSubmissions,
     newsletters,
+    ...operations,
     tasks,
     timeOffRequests,
   };
+}
+
+export async function getStaffHubOperationsRecords({ businessUnitId = null, staffId = null } = {}) {
+  const client = requireClient();
+  const fallback = staffHubOperationsFallback();
+  const [
+    shiftRecords,
+    shopStatusEvents,
+    checklistTemplates,
+    checklistRuns,
+    operationsRequests,
+    policyDocuments,
+    policyAcknowledgements,
+    shiftNotes,
+    auditLogs,
+  ] = await Promise.all([
+    optionalData(
+      applyBusinessScope(
+        client
+          .from('staff_shift_records')
+          .select('*')
+          .order('shift_date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(80),
+        businessUnitId,
+      ),
+      fallback.shiftRecords,
+    ),
+    optionalData(
+      applyBusinessScope(
+        client
+          .from('shop_status_events')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(40),
+        businessUnitId,
+      ),
+      fallback.shopStatusEvents,
+    ),
+    optionalData(
+      applyNullableBusinessScope(
+        client
+          .from('operation_checklist_templates')
+          .select('*,items:operation_checklist_items(*)')
+          .eq('active', true)
+          .order('checklist_type', { ascending: true })
+          .order('created_at', { ascending: true }),
+        businessUnitId,
+      ),
+      fallback.checklistTemplates,
+    ),
+    optionalData(
+      applyBusinessScope(
+        client
+          .from('operation_checklist_runs')
+          .select('*,items:operation_checklist_run_items(*)')
+          .order('run_date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(80),
+        businessUnitId,
+      ),
+      fallback.checklistRuns,
+    ),
+    optionalData(
+      applyBusinessScope(
+        client
+          .from('staff_operations_requests')
+          .select('*')
+          .order('status', { ascending: true })
+          .order('priority', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(120),
+        businessUnitId,
+      ),
+      fallback.operationsRequests,
+    ),
+    optionalData(
+      applyNullableBusinessScope(
+        client
+          .from('policy_documents')
+          .select('*')
+          .eq('active', true)
+          .order('category', { ascending: true })
+          .order('updated_at', { ascending: false })
+          .limit(80),
+        businessUnitId,
+      ),
+      fallback.policyDocuments,
+    ),
+    staffId
+      ? optionalData(
+          client
+            .from('policy_acknowledgements')
+            .select('*')
+            .eq('staff_id', staffId),
+          fallback.policyAcknowledgements,
+        )
+      : fallback.policyAcknowledgements,
+    optionalData(
+      applyBusinessScope(
+        client
+          .from('shift_notes')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(80),
+        businessUnitId,
+      ),
+      fallback.shiftNotes,
+    ),
+    optionalData(
+      applyBusinessScope(
+        client
+          .from('operations_audit_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50),
+        businessUnitId,
+      ),
+      fallback.auditLogs,
+    ),
+  ]);
+
+  return {
+    auditLogs,
+    checklistRuns,
+    checklistTemplates: checklistTemplates.map((template) => ({
+      ...template,
+      items: [...(template.items || [])].sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)),
+    })),
+    operationsRequests,
+    policyAcknowledgements,
+    policyDocuments,
+    shiftNotes,
+    shiftRecords,
+    shopStatusEvents,
+  };
+}
+
+export async function saveStaffShiftRecord(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    checked_in_at: record.checked_in_at || null,
+    checked_out_at: record.checked_out_at || null,
+    after_hours_reason: record.after_hours_reason || null,
+    after_hours_minutes: Number(record.after_hours_minutes || 0),
+    break_minutes: Number(record.break_minutes || 0),
+    business_unit_id: record.business_unit_id,
+    correction_note: record.correction_note || record.edit_reason || null,
+    edit_reason: record.edit_reason || null,
+    early_leave_minutes: Number(record.early_leave_minutes || 0),
+    grace_minutes: Number(record.grace_minutes ?? 5),
+    late_minutes: Number(record.late_minutes || 0),
+    missed_checkout: Boolean(record.missed_checkout),
+    missed_shift: Boolean(record.missed_shift),
+    overtime_minutes: Number(record.overtime_minutes || 0),
+    scheduled_end: record.scheduled_end || null,
+    scheduled_start: record.scheduled_start || null,
+    shift_date: record.shift_date || new Date().toISOString().slice(0, 10),
+    staff_id: record.staff_id,
+    status: record.status || 'scheduled',
+    updated_at: new Date().toISOString(),
+  });
+
+  if (record.id) {
+    return requireData(
+      await client.from('staff_shift_records').update(payload).eq('id', record.id).select().single(),
+    );
+  }
+
+  return requireData(
+    await client
+      .from('staff_shift_records')
+      .upsert(payload, { onConflict: 'business_unit_id,staff_id,shift_date' })
+      .select()
+      .single(),
+  );
+}
+
+export async function saveShopStatusEvent(record) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('shop_status_events')
+      .insert({
+        business_unit_id: record.business_unit_id,
+        note: record.note || null,
+        staff_id: record.staff_id || null,
+        status: record.status,
+      })
+      .select()
+      .single(),
+  );
+}
+
+export async function saveChecklistRun(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    business_unit_id: record.business_unit_id,
+    checklist_type: ['opening', 'closing'].includes(record.checklist_type)
+      ? record.checklist_type
+      : 'opening',
+    completion_percent: Number(record.completion_percent || 0),
+    completed_at: record.completed_at || null,
+    note: record.note || null,
+    run_date: record.run_date || new Date().toISOString().slice(0, 10),
+    staff_id: record.staff_id || record.assigned_staff_id,
+    started_at: record.started_at || new Date().toISOString(),
+    status: ['in_progress', 'completed', 'overdue'].includes(record.status)
+      ? record.status
+      : 'in_progress',
+    template_id: record.template_id || null,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (record.id) {
+    return requireData(
+      await client.from('operation_checklist_runs').update(payload).eq('id', record.id).select().single(),
+    );
+  }
+
+  return requireData(await client.from('operation_checklist_runs').insert(payload).select().single());
+}
+
+export async function updateChecklistRunItem(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    completed: Boolean(record.completed),
+    completed_at: record.completed ? new Date().toISOString() : null,
+    completed_by_staff_id: record.completed_by_staff_id || record.completed_by || null,
+    note: record.note || null,
+    photo_url: record.photo_url || null,
+    updated_at: new Date().toISOString(),
+  });
+
+  return requireData(
+    await client
+      .from('operation_checklist_run_items')
+      .update(payload)
+      .eq('id', record.id)
+      .select()
+      .single(),
+  );
+}
+
+export async function saveStaffOperationsRequest(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    assigned_to: record.assigned_to || null,
+    business_unit_id: record.business_unit_id,
+    category: record.category || 'general',
+    details: record.details || null,
+    manager_note: record.manager_note || null,
+    photo_urls: Array.isArray(record.photo_urls) ? record.photo_urls : [],
+    priority: record.priority || 'normal',
+    request_type: record.request_type || 'maintenance',
+    resolved_at: record.status === 'completed' ? new Date().toISOString() : record.resolved_at || null,
+    staff_id: record.staff_id || null,
+    status: record.status || 'pending',
+    title: record.title,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (record.id) {
+    return requireData(
+      await client.from('staff_operations_requests').update(payload).eq('id', record.id).select().single(),
+    );
+  }
+
+  return requireData(await client.from('staff_operations_requests').insert(payload).select().single());
+}
+
+export async function savePolicyDocument(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    active: record.active ?? true,
+    body: record.body,
+    business_unit_id: record.business_unit_id || null,
+    category: record.category || 'policy',
+    requires_acknowledgement: record.requires_acknowledgement ?? true,
+    title: record.title,
+    updated_at: new Date().toISOString(),
+    version: record.version || '1.0',
+  });
+
+  if (record.id) {
+    return requireData(
+      await client.from('policy_documents').update(payload).eq('id', record.id).select().single(),
+    );
+  }
+
+  return requireData(await client.from('policy_documents').insert(payload).select().single());
+}
+
+export async function acknowledgePolicyDocument(policyId, staffId) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('policy_acknowledgements')
+      .upsert(
+        {
+          acknowledged_at: new Date().toISOString(),
+          policy_id: policyId,
+          staff_id: staffId,
+        },
+        { onConflict: 'policy_id,staff_id' },
+      )
+      .select()
+      .single(),
+  );
+}
+
+export async function saveShiftNote(record) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('shift_notes')
+      .insert({
+        business_unit_id: record.business_unit_id,
+        note: record.note,
+        shift_date: record.shift_date || new Date().toISOString().slice(0, 10),
+        staff_id: record.staff_id || null,
+        visibility: record.visibility || 'team',
+      })
+      .select()
+      .single(),
+  );
 }
 
 export async function saveStaffAnnouncement(record) {

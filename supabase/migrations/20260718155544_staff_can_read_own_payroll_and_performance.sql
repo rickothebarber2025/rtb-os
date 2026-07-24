@@ -24,6 +24,8 @@ begin;
 -- own payroll entries, the payroll runs those entries belong to, and
 -- their own performance history -- nothing belonging to anyone else.
 
+drop policy if exists "staff_read_own_payroll_entries" on public.payroll_entries;
+
 create policy "staff_read_own_payroll_entries" on public.payroll_entries
 for select
 using (
@@ -75,9 +77,13 @@ grant execute on function private.staff_owns_payroll_run(uuid) to authenticated;
 -- statement. Routing the cross-table check through a SECURITY
 -- DEFINER function (the same pattern already used elsewhere in this
 -- codebase, e.g. private.can_access_business_unit) avoids the cycle.
+drop policy if exists "staff_read_own_payroll_runs" on public.payroll_runs;
+
 create policy "staff_read_own_payroll_runs" on public.payroll_runs
 for select
 using (private.staff_owns_payroll_run(id));
+
+drop policy if exists "staff_read_own_performance_history" on public.performance_history;
 
 create policy "staff_read_own_performance_history" on public.performance_history
 for select
