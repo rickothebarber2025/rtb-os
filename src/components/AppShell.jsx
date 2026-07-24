@@ -3,7 +3,7 @@ import MobileTabBar from './MobileTabBar';
 import Sidebar from './Sidebar';
 import StaffDailyOperationsCard from './StaffDailyOperationsCard';
 import Topbar from './Topbar';
-import { getBusinessProfile } from '../utils/businessProfiles';
+import { getBusinessProfile, isAllBusinessesId } from '../utils/businessProfiles';
 
 export default function AppShell({
   activePage,
@@ -39,6 +39,7 @@ export default function AppShell({
 
   const sidebarClass = sidebarOpen ? 'sidebar-open' : 'sidebar-closed';
   const pageClass = `page-${activePage}`;
+  const showDailyOperations = activePage === 'staff-hub' && !isAllBusinessesId(selectedBusinessUnitId);
 
   return (
     <div
@@ -72,7 +73,7 @@ export default function AppShell({
           userPreferences={userPreferences}
         />
         <main className={`content ${pageClass}`}>
-          {activePage === 'staff-hub' ? (
+          {showDailyOperations ? (
             <StaffDailyOperationsCard businessUnitId={selectedBusinessUnitId} />
           ) : null}
           {children}
