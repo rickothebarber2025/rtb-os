@@ -112,9 +112,23 @@ async function findLabelId(accessToken: string, userId: string, labelName: strin
   if (explicitLabelId) return explicitLabelId;
 
   const payload = await gmailRequest(accessToken, `/users/${encodeURIComponent(userId)}/labels`);
-  const label = (payload.labels || []).find((item: Record<string, unknown>) =>
-    String(item.name || "").trim().toLowerCase() === labelName.trim().toLowerCase()
+  const labels = payload.labels || [];
+  const normalizedExpected = labelName.trim().toLowerCase();
+  const expectedLastSegment = normalizedExpected.split("/").pop() || normalizedExpected;
+
+  // Exact match first. Fall back to matching on the label's final
+  // path segment (e.g. "Booksy") so an accidental double-nested
+  // label (e.g. "RTB-OS/RTB-OS/Booksy", created by nesting a label
+  // whose own name already included the parent prefix) still
+  // resolves correctly instead of hard-failing on a cosmetic Gmail
+  // organization mistake.
+  const exact = labels.find((item: Record<string, unknown>) =>
+    String(item.name || "").trim().toLowerCase() === normalizedExpected
   );
+  const label = exact || labels.find((item: Record<string, unknown>) => {
+    const name = String(item.name || "").trim().toLowerCase();
+    return name === expectedLastSegment || name.endsWith(`/${expectedLastSegment}`);
+  });
 
   if (!label?.id) {
     throw new RequestError(`Gmail label "${labelName}" was not found. Create it first and apply it to Booksy emails.`, 400);
