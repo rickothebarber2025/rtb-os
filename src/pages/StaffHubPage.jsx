@@ -41,7 +41,6 @@ import {
   saveStaffAvailability,
   saveStaffNewsletter,
   saveStaffOperationsRequest,
-  saveStaffShiftRecord,
   saveStaffTask,
   saveShiftNote,
   saveShopStatusEvent,
@@ -1345,49 +1344,6 @@ export default function StaffHubPage({
     );
   }
 
-  async function startShift() {
-    if (!staffProfile || !operationsBusinessId) {
-      setHubError('Select one business and match this login to a roster profile before starting a shift.');
-      return;
-    }
-
-    await runHubAction(
-      'start-shift',
-      () =>
-        saveStaffShiftRecord({
-          ...(dailyOperations.todayShift || {}),
-          business_unit_id: operationsBusinessId,
-          checked_in_at: new Date().toISOString(),
-          shift_date: operationsTodayKey,
-          staff_id: staffProfile.id,
-          status: 'active',
-        }),
-      'Shift started.',
-    );
-  }
-
-  async function endShift() {
-    if (!staffProfile || !operationsBusinessId) {
-      setHubError('Select one business and match this login to a roster profile before ending a shift.');
-      return;
-    }
-
-    await runHubAction(
-      'end-shift',
-      () =>
-        saveStaffShiftRecord({
-          ...(dailyOperations.todayShift || {}),
-          business_unit_id: operationsBusinessId,
-          checked_out_at: new Date().toISOString(),
-          missed_checkout: false,
-          shift_date: operationsTodayKey,
-          staff_id: staffProfile.id,
-          status: 'completed',
-        }),
-      'Shift ended.',
-    );
-  }
-
   async function updateShopStatus(status) {
     if (!operationsBusinessId) {
       setHubError('Choose one business before changing shop status.');
@@ -1842,48 +1798,6 @@ export default function StaffHubPage({
           ) : null}
 
           <section className="daily-ops-grid full-span">
-            <article className="panel daily-ops-card daily-ops-shift-card">
-              <div className="section-header">
-                <div>
-                  <span>Shift</span>
-                  <h2>{dailyOperations.todayShift?.status ? formatCategory(dailyOperations.todayShift.status) : 'Ready to work'}</h2>
-                </div>
-                <Clock3 size={20} />
-              </div>
-              <div className="daily-ops-shift-times">
-                <div>
-                  <span>Check in</span>
-                  <strong>{dailyOperations.todayShift?.checked_in_at ? safeTime(dailyOperations.todayShift.checked_in_at) : '--'}</strong>
-                </div>
-                <div>
-                  <span>Check out</span>
-                  <strong>{dailyOperations.todayShift?.checked_out_at ? safeTime(dailyOperations.todayShift.checked_out_at) : '--'}</strong>
-                </div>
-                <div>
-                  <span>Late</span>
-                  <strong>{formatNumber(dailyOperations.todayShift?.late_minutes || 0)} min</strong>
-                </div>
-              </div>
-              <div className="daily-ops-actions">
-                <button
-                  className="primary-button"
-                  disabled={!staffProfile || !operationsBusinessId || Boolean(dailyOperations.todayShift?.checked_in_at) || savingHubAction === 'start-shift'}
-                  onClick={startShift}
-                  type="button"
-                >
-                  Start Shift
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!staffProfile || !operationsBusinessId || !dailyOperations.todayShift?.checked_in_at || Boolean(dailyOperations.todayShift?.checked_out_at) || savingHubAction === 'end-shift'}
-                  onClick={endShift}
-                  type="button"
-                >
-                  End Shift
-                </button>
-              </div>
-            </article>
-
             <article className="panel daily-ops-card">
               <div className="section-header">
                 <div>
@@ -1948,37 +1862,23 @@ export default function StaffHubPage({
               <div className="section-header">
                 <div>
                   <span>Required Work</span>
-                  <h2>Tasks and reminders</h2>
+                  <h2>
+                    {pendingTasks.length
+                      ? `${pendingTasks.length} task${pendingTasks.length === 1 ? '' : 's'} assigned`
+                      : 'Nothing assigned'}
+                  </h2>
                 </div>
                 <StatusBadge tone={dailyOperations.overdueTasks.length ? 'danger' : 'success'}>
                   {dailyOperations.overdueTasks.length ? `${dailyOperations.overdueTasks.length} overdue` : 'On track'}
                 </StatusBadge>
               </div>
-              <div className="daily-ops-task-list">
-                {pendingTasks.length ? (
-                  pendingTasks.slice(0, 6).map((task) => (
-                    <button
-                      className={isOverdueTask(task) ? 'overdue' : ''}
-                      key={task.id}
-                      onClick={() => completeTask(task)}
-                      type="button"
-                    >
-                      <ClipboardCheck size={17} />
-                      <span>
-                        <strong>{task.title}</strong>
-                        <small>{formatCategory(task.category)}{task.due_date ? ` · ${formatDate(task.due_date)}` : ''}</small>
-                      </span>
-                      <ChevronRight size={17} />
-                    </button>
-                  ))
-                ) : (
-                  <EmptyState
-                    icon={ClipboardCheck}
-                    title="No required tasks"
-                    message="Assigned cleaning, restocking, follow-up, content, and general tasks will show here."
-                  />
-                )}
-              </div>
+              <p className="subtle-text">
+                Assigned cleaning, restocking, follow-up, content, and general tasks live in one place under More.
+              </p>
+              <button className="secondary-button small" type="button" onClick={() => setActiveTab('more')}>
+                View tasks
+                <ChevronRight size={16} />
+              </button>
             </article>
 
             <article className="panel daily-ops-card">
@@ -2128,25 +2028,6 @@ export default function StaffHubPage({
                 ) : null}
               </div>
             </article>
-          </section>
-
-          <section className="panel full-span daily-ops-manager-strip">
-            <div>
-              <span>Manager Snapshot</span>
-              <strong>{formatNumber(hubRecords.shiftRecords.filter((shift) => shift.status === 'checked_in').length)} working</strong>
-            </div>
-            <div>
-              <span>Late staff</span>
-              <strong>{formatNumber(hubRecords.shiftRecords.filter((shift) => Number(shift.late_minutes || 0) > 0 && shift.shift_date === operationsTodayKey).length)}</strong>
-            </div>
-            <div>
-              <span>Missed checkout</span>
-              <strong>{formatNumber(hubRecords.shiftRecords.filter((shift) => shift.missed_checkout && shift.shift_date === operationsTodayKey).length)}</strong>
-            </div>
-            <div>
-              <span>Unread policies</span>
-              <strong>{formatNumber(dailyOperations.unacknowledgedPolicies.length)}</strong>
-            </div>
           </section>
         </>
       ) : null}
