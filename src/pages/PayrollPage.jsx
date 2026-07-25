@@ -650,6 +650,43 @@ export default function PayrollPage({
             />
           )}
         </section>
+
+        {payrollEditable ? (
+          <section className="panel full-span payroll-fix-panel" aria-label="Import Square sales for both businesses">
+            <div>
+              <span>Square import -- both businesses</span>
+              <strong>Upload one export, populate both businesses' drafts</strong>
+              <p>
+                Square tags every transaction with which location it happened at, so one CSV covering
+                both RTB Lounge and RTB Beauty Lounge saves a draft for each -- using the current week.
+                Nothing is finalized automatically; open each business to review first.
+              </p>
+            </div>
+            <div className="payroll-fix-panel__actions">
+              <input
+                accept=".csv"
+                hidden
+                ref={bothBusinessCsvInputRef}
+                type="file"
+                onChange={(event) => {
+                  handleSquareCsvUploadBothBusinesses(event.target.files?.[0]);
+                  event.target.value = '';
+                }}
+              />
+              <button
+                className="secondary-button small"
+                disabled={bothBusinessImporting}
+                type="button"
+                onClick={() => bothBusinessCsvInputRef.current?.click()}
+              >
+                <Upload size={15} />
+                {bothBusinessImporting ? 'Importing...' : 'Upload Square CSV (both businesses)'}
+              </button>
+            </div>
+            {error ? <div className="alert danger">{error}</div> : null}
+            {notice ? <div className="alert success">{notice}</div> : null}
+          </section>
+        ) : null}
       </div>
     );
   }
@@ -894,41 +931,6 @@ export default function PayrollPage({
                 ))}
               </div>
             ) : null}
-          </section>
-        ) : null}
-
-        {payrollEditable ? (
-          <section className="payroll-fix-panel" aria-label="Import Square sales for both businesses">
-            <div>
-              <span>Square import -- both businesses</span>
-              <strong>Upload one export, populate both businesses' drafts</strong>
-              <p>
-                Square tags every transaction with which location it happened at, so one CSV covering
-                both RTB Lounge and RTB Beauty Lounge saves a draft for each -- using the week currently
-                loaded above. Nothing is finalized automatically; open each business to review first.
-              </p>
-            </div>
-            <div className="payroll-fix-panel__actions">
-              <input
-                accept=".csv"
-                hidden
-                ref={bothBusinessCsvInputRef}
-                type="file"
-                onChange={(event) => {
-                  handleSquareCsvUploadBothBusinesses(event.target.files?.[0]);
-                  event.target.value = '';
-                }}
-              />
-              <button
-                className="secondary-button small"
-                disabled={bothBusinessImporting}
-                type="button"
-                onClick={() => bothBusinessCsvInputRef.current?.click()}
-              >
-                <Upload size={15} />
-                {bothBusinessImporting ? 'Importing...' : 'Upload Square CSV (both businesses)'}
-              </button>
-            </div>
           </section>
         ) : null}
 
