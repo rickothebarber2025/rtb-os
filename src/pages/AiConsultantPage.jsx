@@ -3,6 +3,8 @@ import {
   Brain,
   ClipboardCheck,
   FileText,
+  MessageCircle,
+  Newspaper,
   RefreshCw,
   Sparkles,
   Target,
@@ -14,7 +16,10 @@ import LoadingState from '../components/LoadingState';
 import MetricCard from '../components/MetricCard';
 import StatusBadge from '../components/StatusBadge';
 import {
+  askBusinessAssistant,
+  createHubTaskFromAssistant,
   deleteBusinessIntelligenceSource,
+  draftBusinessNewsletter,
   getBusinessConsultantData,
   runBusinessConsultantAnalysis,
   runStaffPerformanceCoaching,
@@ -130,6 +135,11 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
     () => buildStaffPerformanceFeedback(performanceSummary || [], staff || []),
     [performanceSummary, staff],
   );
+  const [question, setQuestion] = useState('');
+  const [askAnswer, setAskAnswer] = useState(null);
+  const [asking, setAsking] = useState(false);
+  const [taskDrafts, setTaskDrafts] = useState({});
+  const [draftingNewsletter, setDraftingNewsletter] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -263,6 +273,79 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
     }
   }
 
+  async function askAssistant(event) {
+    event.preventDefault();
+    if (!scopedBusinessId || !question.trim()) return;
+
+    setAsking(true);
+    setError('');
+    setAskAnswer(null);
+
+    try {
+      const result = await askBusinessAssistant(scopedBusinessId, question.trim());
+      setAskAnswer(result);
+      const drafts = {};
+      (result.suggested_tasks || []).forEach((task, index) => {
+        const guessedStaff = (staff || []).find(
+          (member) => member.full_name?.toLowerCase() === task.suggested_staff_name?.toLowerCase(),
+        );
+        drafts[index] = { staffId: guessedStaff?.id || '' };
+      });
+      setTaskDrafts(drafts);
+    } catch (err) {
+      setError(err.message || 'Unable to get an answer from the assistant.');
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  async function createTaskFromSuggestion(task, index) {
+    const staffId = taskDrafts[index]?.staffId;
+    if (!staffId) {
+      setError('Choose which staff member should own this task first.');
+      return;
+    }
+
+    setWorking(`suggested-task-${index}`);
+    setError('');
+    setNotice('');
+
+    try {
+      await createHubTaskFromAssistant(scopedBusinessId, {
+        category: task.category,
+        details: task.details,
+        staffId,
+        title: task.title,
+      });
+      setNotice(`Task "${task.title}" created.`);
+      setTaskDrafts((current) => ({ ...current, [index]: { ...current[index], created: true } }));
+    } catch (err) {
+      setError(err.message || 'Unable to create that task.');
+    } finally {
+      setWorking('');
+    }
+  }
+
+  async function draftNewsletterNow() {
+    if (!scopedBusinessId) return;
+    setDraftingNewsletter(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const result = await draftBusinessNewsletter(scopedBusinessId);
+      setNotice(
+        result.unmatched_top_performer
+          ? `Newsletter draft saved. Note: could not match "${result.unmatched_top_performer}" to a staff record -- assign manually.`
+          : 'Newsletter draft saved. Review and publish it from the Staff Hub newsletter tool.',
+      );
+    } catch (err) {
+      setError(err.message || 'Unable to draft the newsletter.');
+    } finally {
+      setDraftingNewsletter(false);
+    }
+  }
+
   if (loading) return <LoadingState label="Loading AI Business Consultant" />;
 
   return (
@@ -300,6 +383,15 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
             <RefreshCw size={16} />
             {coachingLoading ? 'Refreshing coaching...' : 'Refresh coaching'}
           </button>
+          <button
+            className="secondary-button"
+            disabled={!scopedBusinessId || draftingNewsletter}
+            type="button"
+            onClick={draftNewsletterNow}
+          >
+            <Newspaper size={16} />
+            {draftingNewsletter ? 'Drafting newsletter...' : 'Draft this week\'s newsletter'}
+          </button>
         </div>
       </section>
 
@@ -311,6 +403,91 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
           <span>All Businesses view can show combined data, but AI reports are saved per business.</span>
         </div>
       ) : null}
+
+      <section className="panel full-span ask-assistant-panel">
+        <div className="section-header">
+          <div>
+            <span>Ask anything</span>
+            <h2>RTB Business Assistant</h2>
+          </div>
+        </div>
+        <p className="subtle-text">
+          Ask about staff, payroll, performance, time off, booth rent, or customer feedback --
+          "Who needs attention this week?" or "What's hurting profit?"
+        </p>
+        <form className="form-grid" onSubmit={askAssistant}>
+          <label className="field wide">
+            <span>Your question</span>
+            <textarea
+              disabled={!scopedBusinessId}
+              placeholder="What should I fix first at this business?"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+            />
+          </label>
+          <div className="action-row end wide">
+            <button
+              className="primary-button"
+              disabled={!scopedBusinessId || asking || !question.trim()}
+              type="submit"
+            >
+              <MessageCircle size={16} />
+              {asking ? 'Asking...' : 'Ask assistant'}
+            </button>
+          </div>
+        </form>
+
+        {askAnswer ? (
+          <div className="consultant-answer-block">
+            <p>{askAnswer.answer}</p>
+            {askAnswer.suggested_tasks?.length ? (
+              <div className="suggested-tasks-list">
+                <span>Suggested tasks</span>
+                {askAnswer.suggested_tasks.map((task, index) => (
+                  <article className="suggested-task-card" key={`${task.title}-${index}`}>
+                    <div>
+                      <strong>{task.title}</strong>
+                      <p>{task.details}</p>
+                      <small>Suggested for: {task.suggested_staff_name}</small>
+                    </div>
+                    {taskDrafts[index]?.created ? (
+                      <StatusBadge tone="success">Created</StatusBadge>
+                    ) : (
+                      <div className="action-row">
+                        <select
+                          value={taskDrafts[index]?.staffId || ''}
+                          onChange={(event) =>
+                            setTaskDrafts((current) => ({
+                              ...current,
+                              [index]: { ...current[index], staffId: event.target.value },
+                            }))
+                          }
+                        >
+                          <option value="">Assign to...</option>
+                          {(staff || []).map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {member.full_name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="secondary-button small"
+                          disabled={working === `suggested-task-${index}` || !taskDrafts[index]?.staffId}
+                          type="button"
+                          onClick={() => createTaskFromSuggestion(task, index)}
+                        >
+                          <ClipboardCheck size={14} />
+                          {working === `suggested-task-${index}` ? 'Creating...' : 'Create task'}
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
 
       <section className="metrics-grid">
         <MetricCard icon={Brain} label="Intelligence sources" trend="Reviews, notes, docs" value={formatNumber(data?.sources?.length || 0)} />

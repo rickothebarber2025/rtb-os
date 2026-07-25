@@ -8953,6 +8953,7 @@ th {
 .staff-insight-card,
 .project-card,
 .feedback-card,
+.suggested-task-card,
 .probation-card,
 .staff-hub-business-card,
 .staff-hub-more-card,
@@ -13399,4 +13400,36 @@ tbody tr:hover,
   position: absolute;
   right: -8px;
   top: -6px;
+}
+
+.consultant-answer-block {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+}
+
+.suggested-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.suggested-tasks-list > span {
+  color: var(--faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.suggested-task-card {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  padding: var(--space-3);
+}
+
+.suggested-task-card small {
+  color: var(--faint);
 }

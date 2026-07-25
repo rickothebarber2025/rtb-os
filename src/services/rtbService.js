@@ -1486,6 +1486,34 @@ export async function runStaffPerformanceCoaching(businessId) {
   });
 }
 
+export async function askBusinessAssistant(businessId, question) {
+  return invokeFunction('feedback-worker', {
+    action: 'ask',
+    businessId,
+    question,
+  });
+}
+
+export async function draftBusinessNewsletter(businessId, weekStart) {
+  return invokeFunction('feedback-worker', {
+    action: 'draft-newsletter',
+    businessId,
+    weekStart,
+  });
+}
+
+export async function createHubTaskFromAssistant(businessId, task) {
+  return invokeFunction('feedback-worker', {
+    action: 'create-hub-task',
+    businessId,
+    category: task.category,
+    details: task.details,
+    dueDate: task.dueDate,
+    staffId: task.staffId,
+    title: task.title,
+  });
+}
+
 export async function syncBooksyGmail(businessUnitId, options = {}) {
   return invokeFunction('booksy-gmail-sync', {
     ...options,

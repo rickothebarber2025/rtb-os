@@ -193,6 +193,53 @@ const staffCoachingSchema = {
   type: "array",
 };
 
+const askAssistantSchema = {
+  additionalProperties: false,
+  properties: {
+    answer: { type: "string" },
+    confidence_score: { maximum: 1, minimum: 0, type: "number" },
+    suggested_tasks: {
+      items: {
+        additionalProperties: false,
+        properties: {
+          category: { type: "string" },
+          details: { type: "string" },
+          suggested_staff_name: { type: "string" },
+          title: { type: "string" },
+        },
+        required: ["title", "details", "category", "suggested_staff_name"],
+        type: "object",
+      },
+      type: "array",
+    },
+  },
+  required: ["answer", "suggested_tasks", "confidence_score"],
+  type: "object",
+};
+
+const newsletterDraftSchema = {
+  additionalProperties: false,
+  properties: {
+    client_feedback: { type: "string" },
+    improvements_needed: { type: "string" },
+    new_services_promos: { type: "string" },
+    reminders: { type: "string" },
+    top_performer_name: { type: "string" },
+    top_performer_note: { type: "string" },
+    weekly_goals: { type: "string" },
+  },
+  required: [
+    "top_performer_name",
+    "top_performer_note",
+    "weekly_goals",
+    "reminders",
+    "client_feedback",
+    "new_services_promos",
+    "improvements_needed",
+  ],
+  type: "object",
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -613,6 +660,164 @@ async function processQueuedFeedbackAnalysis(
   return { processed, skipped };
 }
 
+// Gathers the broader set of business data the RTB Business
+// Assistant needs to answer free-form questions or draft a
+// comprehensive weekly report -- staff roster, performance,
+// recent payroll, time off, booth rent, feedback, sources, and
+// past consultant reports. Kept as one shared function so the
+// "ask" action and the consultant report use the exact same real
+// data rather than two different narrower views of the business.
+async function gatherBusinessContext(admin: AdminClient, businessId: string) {
+  // payroll_entries has no direct business_unit_id column -- it only
+  // links via payroll_run_id, so staff must be fetched first and
+  // used to scope the payroll query. Without this, payroll from both
+  // businesses would leak into every report regardless of which one
+  // was asked about.
+  const { data: staffRows } = await admin
+    .from("staff")
+    .select("id,full_name,role,tier,active,fixed_rate")
+    .eq("business_unit_id", businessId);
+  const staffIds = (staffRows || []).map((row) => row.id);
+
+  const [
+    { data: business },
+    { data: performance },
+    { data: payrollEntries },
+    { data: timeOff },
+    { data: boothRent },
+    { data: feedback },
+    { data: projects },
+    { data: sources },
+    { data: pastReports },
+    { data: newsletters },
+  ] = await Promise.all([
+    admin.from("business_units").select("id,name,type").eq("id", businessId).maybeSingle(),
+    admin.from("staff_performance_summary").select("*").eq("business_unit_id", businessId),
+    admin
+      .from("payroll_entries")
+      .select("staff_name_snapshot,net_sales,tips,take_home,created_at")
+      .in("staff_id", staffIds.length ? staffIds : ["00000000-0000-0000-0000-000000000000"])
+      .order("created_at", { ascending: false })
+      .limit(60),
+    admin
+      .from("staff_time_off_requests")
+      .select("staff_id,start_date,end_date,reason,status")
+      .eq("business_unit_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    admin
+      .from("booth_rent")
+      .select("renter_name,week_label,rent_amount,paid")
+      .eq("business_unit_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    admin
+      .from("customer_feedback_enriched")
+      .select("*")
+      .eq("business_id", businessId)
+      .order("response_created_at", { ascending: false })
+      .limit(100),
+    admin
+      .from("business_improvement_projects")
+      .select("*")
+      .eq("business_id", businessId)
+      .order("updated_at", { ascending: false })
+      .limit(100),
+    admin
+      .from("business_intelligence_sources")
+      .select("*")
+      .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    admin
+      .from("ai_business_consultant_reports")
+      .select("summary,fix_first,highest_roi,lowest_cost,created_at")
+      .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    admin
+      .from("hub_newsletters")
+      .select("week_start,top_performer_note,weekly_goals,reminders,client_feedback,new_services_promos,improvements_needed")
+      .eq("business_id", businessId)
+      .order("week_start", { ascending: false })
+      .limit(4),
+  ]);
+
+  return {
+    booth_rent: boothRent || [],
+    business,
+    customer_feedback: (feedback || []).slice(0, 60),
+    improvement_projects: (projects || []).slice(0, 60),
+    intelligence_sources: (sources || []).slice(0, 60),
+    past_consultant_reports: pastReports || [],
+    past_newsletters: newsletters || [],
+    payroll_recent: payrollEntries || [],
+    staff: staffRows || [],
+    staff_performance: performance || [],
+    time_off_requests: timeOff || [],
+  };
+}
+
+async function askBusinessAssistant(question: string, context: Record<string, unknown>) {
+  const prompt =
+    "You are the RTB Business Assistant, an AI advisor for a salon and barbershop owner. " +
+    "Answer the owner's question directly and practically using only the real business data " +
+    "provided -- staff roster, performance, recent payroll, time off requests, booth rent, " +
+    "customer feedback, improvement projects, intelligence sources, and past reports. " +
+    "If the data doesn't support a confident answer, say so plainly rather than guessing. " +
+    "When the answer implies concrete follow-up work, suggest specific tasks (empty array if " +
+    "none are warranted) -- each with a title, details, a category, and your best guess at " +
+    "which staff member (by name, exactly as given in the roster) should own it, or " +
+    "'Owner' if it's the owner's own task. Return only the requested JSON.";
+
+  const ai = await structuredOpenAI(
+    prompt,
+    { business_context: context, question },
+    askAssistantSchema,
+    "rtb_business_assistant_answer",
+  );
+
+  if (!ai) {
+    throw new RequestError(
+      "The AI assistant is not configured yet. Add an OPENAI_API_KEY Supabase secret to enable it.",
+      500,
+    );
+  }
+
+  return {
+    answer: cleanText(ai.parsed.answer, "I could not generate an answer from the available data."),
+    confidence_score: clamp(numberValue(ai.parsed.confidence_score, 0.6), 0, 1),
+    model: ai.model,
+    suggested_tasks: Array.isArray(ai.parsed.suggested_tasks) ? ai.parsed.suggested_tasks.slice(0, 8) : [],
+  };
+}
+
+async function draftNewsletterContent(context: Record<string, unknown>) {
+  const prompt =
+    "You are the RTB Business Assistant drafting this week's internal staff newsletter for a " +
+    "salon and barbershop owner. Use the real business data provided -- staff performance, " +
+    "recent payroll, customer feedback, and improvement projects -- to write a short, specific, " +
+    "encouraging draft. Name a genuine top performer from the actual performance data if one " +
+    "stands out (highest net sales or a clear improvement), not a generic placeholder. Keep " +
+    "each field to a few sentences. Return only the requested JSON.";
+
+  const ai = await structuredOpenAI(
+    prompt,
+    { business_context: context },
+    newsletterDraftSchema,
+    "rtb_newsletter_draft",
+  );
+
+  if (!ai) {
+    throw new RequestError(
+      "The AI assistant is not configured yet. Add an OPENAI_API_KEY Supabase secret to enable it.",
+      500,
+    );
+  }
+
+  return ai.parsed;
+}
+
 function buildConsultantFallback(input: {
   feedback: Record<string, any>[];
   projects: Record<string, any>[];
@@ -667,28 +872,11 @@ async function createBusinessConsultantReport(
   businessId: string,
   userId: string | null,
 ) {
-  const [{ data: feedback }, { data: projects }, { data: sources }, { data: business }] =
-    await Promise.all([
-      admin
-        .from("customer_feedback_enriched")
-        .select("*")
-        .eq("business_id", businessId)
-        .order("response_created_at", { ascending: false })
-        .limit(100),
-      admin
-        .from("business_improvement_projects")
-        .select("*")
-        .eq("business_id", businessId)
-        .order("updated_at", { ascending: false })
-        .limit(100),
-      admin
-        .from("business_intelligence_sources")
-        .select("*")
-        .eq("business_id", businessId)
-        .order("created_at", { ascending: false })
-        .limit(100),
-      admin.from("business_units").select("id,name,type").eq("id", businessId).maybeSingle(),
-    ]);
+  const context = await gatherBusinessContext(admin, businessId);
+  const feedback = context.customer_feedback;
+  const projects = context.improvement_projects;
+  const sources = context.intelligence_sources;
+  const business = context.business;
 
   const fallback = buildConsultantFallback({
     feedback: feedback || [],
@@ -700,13 +888,11 @@ async function createBusinessConsultantReport(
 
   try {
     const ai = await structuredOpenAI(
-      "You are RTB OS, an AI business consultant for a salon/barbershop operator. Analyze all provided intelligence and answer with practical priorities. Return only JSON.",
-      {
-        business,
-        customer_feedback: (feedback || []).slice(0, 50),
-        intelligence_sources: (sources || []).slice(0, 50),
-        improvement_projects: (projects || []).slice(0, 50),
-      },
+      "You are RTB OS, an AI business consultant for a salon/barbershop operator. Analyze all " +
+        "provided intelligence -- including staff performance, recent payroll, time off, and " +
+        "booth rent, not just customer feedback -- and answer with practical priorities. " +
+        "Return only JSON.",
+      { business_context: context },
       consultantSchema,
       "rtb_business_consultant_report",
     );
@@ -797,6 +983,88 @@ Deno.serve(async (req) => {
         coaching: coaching || [],
         ai_available: Boolean(coaching?.length),
       });
+    }
+
+    if (action === "ask") {
+      if (!businessId) throw new RequestError("Choose one business before asking the assistant.");
+      const question = cleanText(body.question);
+      if (!question) throw new RequestError("Ask a question first.");
+
+      const context = await gatherBusinessContext(admin, businessId);
+      const result = await askBusinessAssistant(question, context);
+
+      return jsonResponse(result);
+    }
+
+    if (action === "draft-newsletter") {
+      if (!businessId) throw new RequestError("Choose one business before drafting a newsletter.");
+
+      const context = await gatherBusinessContext(admin, businessId);
+      const draft = await draftNewsletterContent(context);
+      const staffList = (context.staff as Array<Record<string, unknown>>) || [];
+      const matchedPerformer = staffList.find(
+        (member) =>
+          cleanText(member.full_name as string).toLowerCase() ===
+          cleanText(draft.top_performer_name).toLowerCase(),
+      );
+      const weekStart = cleanText(body.weekStart || body.week_start) ||
+        new Date().toISOString().slice(0, 10);
+
+      const { data: saved, error } = await admin
+        .from("hub_newsletters")
+        .insert({
+          business_id: businessId,
+          client_feedback: cleanText(draft.client_feedback),
+          improvements_needed: cleanText(draft.improvements_needed),
+          new_services_promos: cleanText(draft.new_services_promos),
+          published: false,
+          reminders: cleanText(draft.reminders),
+          top_performer_id: matchedPerformer?.id || null,
+          top_performer_note: cleanText(draft.top_performer_note),
+          week_start: weekStart,
+          weekly_goals: cleanText(draft.weekly_goals),
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      return jsonResponse({
+        newsletter: saved,
+        unmatched_top_performer: matchedPerformer ? null : draft.top_performer_name,
+      });
+    }
+
+    if (action === "create-hub-task") {
+      if (!businessId) throw new RequestError("Choose one business before creating a task.");
+      const staffId = cleanText(body.staffId || body.staff_id);
+      const title = cleanText(body.title);
+      if (!staffId) throw new RequestError("Choose which staff member this task belongs to.");
+      if (!title) throw new RequestError("A task title is required.");
+
+      const { data: staffRow, error: staffLookupError } = await admin
+        .from("staff")
+        .select("id")
+        .eq("id", staffId)
+        .eq("business_unit_id", businessId)
+        .maybeSingle();
+      if (staffLookupError) throw staffLookupError;
+      if (!staffRow) throw new RequestError("That staff member was not found on this business.", 404);
+
+      const { data: task, error } = await admin
+        .from("hub_tasks")
+        .insert({
+          category: cleanText(body.category, "general"),
+          created_by: auth.user?.id || null,
+          details: cleanText(body.details) || null,
+          due_date: cleanText(body.dueDate || body.due_date) || null,
+          staff_id: staffId,
+          title,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      return jsonResponse({ task });
     }
 
     throw new RequestError("Unknown feedback worker action.", 400);
