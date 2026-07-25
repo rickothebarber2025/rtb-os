@@ -38,7 +38,7 @@ const SQUARE_NAME_ALIASES = {
   'rsean mathurin': 'roshi',
   'sara leguizamon': 'sara',
   'steph bell': 'steph',
-  'wavyboy gatoni': 'gatoni',
+  'wavyboy gatoni': 'josh',
 };
 
 function isProductLabel(label) {
