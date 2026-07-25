@@ -9,6 +9,7 @@ import {
   Save,
   Sparkles,
   Trash2,
+  Upload,
   UserPlus,
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -37,6 +38,7 @@ import {
   splitPayrollRunsByVoidStatus,
   toMoneyNumber,
 } from '../utils/payroll';
+import { matchSquareNameToStaff, parseSquarePayrollCsv } from '../utils/squarePayrollImport';
 
 function createInitialRun(businessUnitId) {
   const week = getDefaultPayrollWeek();
@@ -109,6 +111,9 @@ export default function PayrollPage({
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState('');
   const [showVoidedRuns, setShowVoidedRuns] = useState(false);
+  const [squareImportReview, setSquareImportReview] = useState([]);
+  const [squareImportSummary, setSquareImportSummary] = useState(null);
+  const squareCsvInputRef = useRef(null);
   const previousBusinessUnitId = useRef(null);
 
   useEffect(() => {
@@ -183,6 +188,8 @@ export default function PayrollPage({
     if (allBusinessesView || !payrollEditable) return;
     setCurrentRun(createInitialRun(businessUnit?.id));
     setEntries(activeStaff.map(createDraftEntry));
+    setSquareImportReview([]);
+    setSquareImportSummary(null);
     setError('');
     setNotice('');
   }
@@ -233,6 +240,86 @@ export default function PayrollPage({
     setEntries((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
     setError('');
     setNotice('Payroll row removed. Save the draft to keep the change.');
+  }
+
+  function applySquareAmountsToEntry(entry, squareData) {
+    return recalculateEntry({
+      ...entry,
+      net_sales: toMoneyNumber(squareData.netSales),
+      tips: toMoneyNumber(squareData.tips),
+    });
+  }
+
+  async function handleSquareCsvUpload(file) {
+    if (readOnly || !file) return;
+    setError('');
+    setNotice('');
+
+    try {
+      const csvText = await file.text();
+      const { bySquareName, meta } = parseSquarePayrollCsv(csvText);
+
+      let matchedCount = 0;
+      const unmatched = [];
+      const usedStaffIds = new Set();
+
+      setEntries((rows) => {
+        const updated = [...rows];
+
+        Object.entries(bySquareName).forEach(([squareName, squareData]) => {
+          const matchedStaff = matchSquareNameToStaff(squareName, activeStaff);
+
+          if (!matchedStaff || usedStaffIds.has(matchedStaff.id)) {
+            unmatched.push({ squareData, squareName });
+            return;
+          }
+
+          usedStaffIds.add(matchedStaff.id);
+          matchedCount += 1;
+          const entryIndex = updated.findIndex((entry) => entryBelongsToStaff(entry, matchedStaff));
+
+          if (entryIndex >= 0) {
+            updated[entryIndex] = applySquareAmountsToEntry(updated[entryIndex], squareData);
+          } else {
+            updated.push(applySquareAmountsToEntry(createDraftEntry(matchedStaff), squareData));
+          }
+        });
+
+        return updated;
+      });
+
+      setSquareImportReview(unmatched);
+      setSquareImportSummary({ ...meta, matchedCount, unmatchedCount: unmatched.length });
+      setNotice(
+        `Imported ${meta.transactionCount} transactions -- matched ${matchedCount} staff` +
+          (unmatched.length ? `, ${unmatched.length} name${unmatched.length === 1 ? '' : 's'} need review below.` : '.'),
+      );
+    } catch (err) {
+      setError(err.message || 'Unable to read that CSV file.');
+    }
+  }
+
+  function assignUnmatchedImport(reviewIndex, staffId) {
+    const review = squareImportReview[reviewIndex];
+    if (!review) return;
+    const matchedStaff = activeStaff.find((member) => member.id === staffId);
+    if (!matchedStaff) return;
+
+    setEntries((rows) => {
+      const entryIndex = rows.findIndex((entry) => entryBelongsToStaff(entry, matchedStaff));
+      if (entryIndex >= 0) {
+        return rows.map((entry, index) =>
+          index === entryIndex ? applySquareAmountsToEntry(entry, review.squareData) : entry,
+        );
+      }
+      return [...rows, applySquareAmountsToEntry(createDraftEntry(matchedStaff), review.squareData)];
+    });
+    setSquareImportReview((rows) => rows.filter((_, index) => index !== reviewIndex));
+    setNotice(`${review.squareName} assigned to ${matchedStaff.full_name}.`);
+  }
+
+  function dismissUnmatchedImport(reviewIndex) {
+    setSquareImportReview((rows) => rows.filter((_, index) => index !== reviewIndex));
   }
 
   function loadRun(run) {
@@ -635,6 +722,75 @@ export default function PayrollPage({
             <strong>{formatCurrency(totals.rtbNet)}</strong>
           </div>
         </div>
+
+        {!readOnly ? (
+          <section className="payroll-fix-panel" aria-label="Import Square sales">
+            <div>
+              <span>Square import</span>
+              <strong>Upload this week's Square transaction export</strong>
+              <p>
+                Parses the raw Square CSV, splits out retail products from commissionable
+                revenue, and fills in each staff member's net sales and tips automatically.
+              </p>
+            </div>
+            <div className="payroll-fix-panel__actions">
+              <input
+                accept=".csv"
+                hidden
+                ref={squareCsvInputRef}
+                type="file"
+                onChange={(event) => {
+                  handleSquareCsvUpload(event.target.files?.[0]);
+                  event.target.value = '';
+                }}
+              />
+              <button
+                className="secondary-button small"
+                disabled={saving}
+                type="button"
+                onClick={() => squareCsvInputRef.current?.click()}
+              >
+                <Upload size={15} />
+                Upload Square CSV
+              </button>
+            </div>
+            {squareImportSummary ? (
+              <p className="subtle-text">
+                {squareImportSummary.transactionCount} transactions -- {formatCurrency(squareImportSummary.totalRevenueNet)}{' '}
+                commissionable revenue, {formatCurrency(squareImportSummary.totalProductRevenue)} retail product revenue excluded,{' '}
+                {formatCurrency(squareImportSummary.totalTips)} in tips.
+              </p>
+            ) : null}
+            {squareImportReview.length ? (
+              <div className="payroll-fix-panel__actions" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <p className="subtle-text">
+                  These Square names didn't match an active staff member -- assign each one or dismiss it:
+                </p>
+                {squareImportReview.map((review, index) => (
+                  <div className="action-row" key={`${review.squareName}-${index}`}>
+                    <span style={{ minWidth: '160px' }}>{review.squareName}</span>
+                    <span className="subtle-text">
+                      {formatCurrency(review.squareData.netSales)} net sales, {formatCurrency(review.squareData.tips)} tips
+                    </span>
+                    <select onChange={(event) => event.target.value && assignUnmatchedImport(index, event.target.value)} defaultValue="">
+                      <option value="" disabled>
+                        Assign to...
+                      </option>
+                      {activeStaff.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.full_name}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="ghost-button small" type="button" onClick={() => dismissUnmatchedImport(index)}>
+                      Dismiss
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         {!readOnly ? (
           <section className="payroll-fix-panel" aria-label="Payroll draft fix-ups">
