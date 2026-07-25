@@ -8,7 +8,16 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
+// Number(null) === 0 in JavaScript -- a real, confirmed bug: every
+// non-review activity_event correctly gets rating: null from the
+// parser, but this helper silently turned that into 0, which fails
+// the activity_events_rating_check constraint (0 is neither NULL
+// nor >= 1). This was the actual root cause of "activity_events_
+// rating_check" failures on every single non-review Booksy email,
+// not a parser bug at all -- confirmed by reproducing
+// numericOrNull(null) directly and getting 0 back instead of null.
 function numericOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
