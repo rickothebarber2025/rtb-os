@@ -17,7 +17,7 @@ import {
   persistParsedEvent,
 } from "../_shared/source-sync.js";
 
-const DEFAULT_LABEL = "RTB-OS/Google Reviews";
+const DEFAULT_LABEL = "RTB-OS/GoogleReviews";
 
 function assertBusinessId(value: unknown) {
   const businessUnitId = String(value || "").trim();
