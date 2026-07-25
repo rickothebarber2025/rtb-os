@@ -15,6 +15,8 @@ begin;
 -- her own row, and only her own row -- confirmed for a second person
 -- (Flow) as well.
 
+drop policy if exists "staff_read_own_row" on public.staff;
+
 create policy "staff_read_own_row" on public.staff
 for select
 using (

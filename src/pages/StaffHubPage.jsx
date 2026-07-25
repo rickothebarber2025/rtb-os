@@ -30,6 +30,7 @@ import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
 import {
+  acknowledgePolicyDocument,
   decideContentSubmission,
   decideTimeOffRequest,
   markStaffAnnouncementRead,
@@ -39,13 +40,18 @@ import {
   saveStaffAnnouncement,
   saveStaffAvailability,
   saveStaffNewsletter,
+  saveStaffOperationsRequest,
+  saveStaffShiftRecord,
   saveStaffTask,
+  saveShiftNote,
+  saveShopStatusEvent,
   saveTimeOffRequest,
   updateStaffTaskStatus,
 } from '../services/rtbService';
 import { canManageOperations } from '../utils/access';
 import { normalizeActionCenterState } from '../utils/actionCenter';
 import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
+import { buildDailyOperationsSummary, getTodayKey as getOperationsTodayKey } from '../utils/dailyOperations';
 import { formatCurrency, formatDate, formatDateTime, formatNumber } from '../utils/formatters';
 import {
   STAFF_HUB_COMMISSION_TIERS,
@@ -58,6 +64,7 @@ import {
 } from '../utils/staffHubInsights';
 
 const TABS = [
+  { id: 'daily', label: 'Daily Ops' },
   { id: 'home', label: 'Today' },
   { id: 'money', label: 'Earnings' },
   { id: 'stats', label: 'Performance' },
@@ -68,15 +75,26 @@ const TABS = [
 const EMPTY_STAFF_HUB = {
   announcementReads: [],
   announcements: [],
+  auditLogs: [],
   availability: [],
+  checklistRuns: [],
+  checklistTemplates: [],
   contentSubmissions: [],
   newsletters: [],
+  operationsRequests: [],
+  policyAcknowledgements: [],
+  policyDocuments: [],
+  shiftNotes: [],
+  shiftRecords: [],
+  shopStatusEvents: [],
   tasks: [],
   timeOffRequests: [],
 };
 
 const ANNOUNCEMENT_CATEGORIES = ['policy', 'schedule', 'promotion', 'training', 'event', 'reminder'];
 const TASK_CATEGORIES = ['cleaning', 'opening', 'closing', 'content', 'restocking', 'client_followup', 'general'];
+const OPERATIONS_REQUEST_TYPES = ['maintenance', 'inventory', 'incident'];
+const SHOP_STATUSES = ['closed', 'opening', 'open', 'busy', 'closing', 'after_hours'];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const PROFILE_THEME_OPTIONS = [
   { id: 'business', label: 'Business', description: 'Use the selected business style.' },
@@ -390,7 +408,7 @@ export default function StaffHubPage({
   staffPortalSummary,
   user,
 }) {
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState('daily');
   const [hubMessage, setHubMessage] = useState('');
   const [hubError, setHubError] = useState('');
   const [savingHubAction, setSavingHubAction] = useState('');
@@ -418,6 +436,17 @@ export default function StaffHubPage({
     due_date: '',
     staff_id: '',
     title: '',
+  });
+  const [operationsRequestForm, setOperationsRequestForm] = useState({
+    category: 'general',
+    details: '',
+    priority: 'normal',
+    request_type: 'maintenance',
+    title: '',
+  });
+  const [shiftNoteForm, setShiftNoteForm] = useState({
+    note: '',
+    visibility: 'team',
   });
   const [newsletterForm, setNewsletterForm] = useState({
     client_feedback: '',
@@ -516,6 +545,33 @@ export default function StaffHubPage({
     ...EMPTY_STAFF_HUB,
     ...(staffHub || {}),
   };
+  const operationsBusinessId = staffProfile?.business_unit_id || (!allBusinessesView ? businessUnit?.id : '');
+  const operationsTodayKey = getOperationsTodayKey();
+  const dailyOperations = useMemo(
+    () =>
+      buildDailyOperationsSummary({
+        checklistRuns: hubRecords.checklistRuns,
+        operationsRequests: hubRecords.operationsRequests,
+        policyAcknowledgements: hubRecords.policyAcknowledgements,
+        policyDocuments: hubRecords.policyDocuments,
+        shiftRecords: hubRecords.shiftRecords,
+        shopStatusEvents: hubRecords.shopStatusEvents,
+        staffId: staffProfile?.id,
+        tasks: hubRecords.tasks,
+        today: operationsTodayKey,
+      }),
+    [
+      hubRecords.checklistRuns,
+      hubRecords.operationsRequests,
+      hubRecords.policyAcknowledgements,
+      hubRecords.policyDocuments,
+      hubRecords.shiftRecords,
+      hubRecords.shopStatusEvents,
+      hubRecords.tasks,
+      operationsTodayKey,
+      staffProfile?.id,
+    ],
+  );
   const readAnnouncementIds = useMemo(
     () => new Set(hubRecords.announcementReads.map((read) => read.announcement_id)),
     [hubRecords.announcementReads],
@@ -1169,6 +1225,14 @@ export default function StaffHubPage({
     setTaskForm((current) => ({ ...current, [field]: value }));
   }
 
+  function updateOperationsRequestForm(field, value) {
+    setOperationsRequestForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateShiftNoteForm(field, value) {
+    setShiftNoteForm((current) => ({ ...current, [field]: value }));
+  }
+
   function updateNewsletterForm(field, value) {
     setNewsletterForm((current) => ({ ...current, [field]: value }));
   }
@@ -1278,6 +1342,127 @@ export default function StaffHubPage({
       `task-${task.id}`,
       () => updateStaffTaskStatus(task.id, task.status === 'completed' ? 'pending' : 'completed'),
       task.status === 'completed' ? 'Task reopened.' : 'Task completed.',
+    );
+  }
+
+  async function startShift() {
+    if (!staffProfile || !operationsBusinessId) {
+      setHubError('Select one business and match this login to a roster profile before starting a shift.');
+      return;
+    }
+
+    await runHubAction(
+      'start-shift',
+      () =>
+        saveStaffShiftRecord({
+          ...(dailyOperations.todayShift || {}),
+          business_unit_id: operationsBusinessId,
+          checked_in_at: new Date().toISOString(),
+          shift_date: operationsTodayKey,
+          staff_id: staffProfile.id,
+          status: 'active',
+        }),
+      'Shift started.',
+    );
+  }
+
+  async function endShift() {
+    if (!staffProfile || !operationsBusinessId) {
+      setHubError('Select one business and match this login to a roster profile before ending a shift.');
+      return;
+    }
+
+    await runHubAction(
+      'end-shift',
+      () =>
+        saveStaffShiftRecord({
+          ...(dailyOperations.todayShift || {}),
+          business_unit_id: operationsBusinessId,
+          checked_out_at: new Date().toISOString(),
+          missed_checkout: false,
+          shift_date: operationsTodayKey,
+          staff_id: staffProfile.id,
+          status: 'completed',
+        }),
+      'Shift ended.',
+    );
+  }
+
+  async function updateShopStatus(status) {
+    if (!operationsBusinessId) {
+      setHubError('Choose one business before changing shop status.');
+      return;
+    }
+
+    await runHubAction(
+      `shop-status-${status}`,
+      () =>
+        saveShopStatusEvent({
+          business_unit_id: operationsBusinessId,
+          staff_id: staffProfile?.id || null,
+          status,
+        }),
+      'Shop status updated.',
+    );
+  }
+
+  async function submitOperationsRequest(event) {
+    event.preventDefault();
+    if (!operationsBusinessId) {
+      setHubError('Choose one business before sending an operations request.');
+      return;
+    }
+
+    await runHubAction(
+      'operations-request',
+      () =>
+        saveStaffOperationsRequest({
+          ...operationsRequestForm,
+          business_unit_id: operationsBusinessId,
+          staff_id: staffProfile?.id || null,
+        }),
+      'Operations request submitted.',
+    );
+    setOperationsRequestForm({
+      category: 'general',
+      details: '',
+      priority: 'normal',
+      request_type: 'maintenance',
+      title: '',
+    });
+  }
+
+  async function submitShiftNote(event) {
+    event.preventDefault();
+    if (!operationsBusinessId) {
+      setHubError('Choose one business before saving a shift note.');
+      return;
+    }
+
+    await runHubAction(
+      'shift-note',
+      () =>
+        saveShiftNote({
+          ...shiftNoteForm,
+          business_unit_id: operationsBusinessId,
+          shift_date: operationsTodayKey,
+          staff_id: staffProfile?.id || null,
+        }),
+      'Shift note saved.',
+    );
+    setShiftNoteForm({ note: '', visibility: 'team' });
+  }
+
+  async function acknowledgePolicy(policyId) {
+    if (!staffProfile) {
+      setHubError('Your login must be matched to a roster profile before acknowledging policies.');
+      return;
+    }
+
+    await runHubAction(
+      `policy-${policyId}`,
+      () => acknowledgePolicyDocument(policyId, staffProfile.id),
+      'Policy acknowledged.',
     );
   }
 
@@ -1629,6 +1814,342 @@ export default function StaffHubPage({
           </button>
         ))}
       </nav>
+
+      {activeTab === 'daily' ? (
+        <>
+          <section className="panel full-span daily-ops-hero">
+            <div>
+              <span className="eyebrow">Daily Operations</span>
+              <h2>Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {firstName}</h2>
+              <p>
+                Start your shift, check the shop status, finish required tasks, and keep the team updated.
+              </p>
+            </div>
+            <div className="daily-ops-score">
+              <span>Operations Score</span>
+              <strong>{dailyOperations.operationsScore}</strong>
+              <small>Professionalism today</small>
+            </div>
+          </section>
+
+          {!operationsBusinessId ? (
+            <section className="panel full-span staff-hub-alert-panel">
+              <div className="alert warning">
+                <strong>Select one business to use Daily Ops.</strong>
+                <span>All Businesses can combine reports, but shifts, checklists, notes, and requests must belong to one shop.</span>
+              </div>
+            </section>
+          ) : null}
+
+          <section className="daily-ops-grid full-span">
+            <article className="panel daily-ops-card daily-ops-shift-card">
+              <div className="section-header">
+                <div>
+                  <span>Shift</span>
+                  <h2>{dailyOperations.todayShift?.status ? formatCategory(dailyOperations.todayShift.status) : 'Ready to work'}</h2>
+                </div>
+                <Clock3 size={20} />
+              </div>
+              <div className="daily-ops-shift-times">
+                <div>
+                  <span>Check in</span>
+                  <strong>{dailyOperations.todayShift?.checked_in_at ? safeTime(dailyOperations.todayShift.checked_in_at) : '--'}</strong>
+                </div>
+                <div>
+                  <span>Check out</span>
+                  <strong>{dailyOperations.todayShift?.checked_out_at ? safeTime(dailyOperations.todayShift.checked_out_at) : '--'}</strong>
+                </div>
+                <div>
+                  <span>Late</span>
+                  <strong>{formatNumber(dailyOperations.todayShift?.late_minutes || 0)} min</strong>
+                </div>
+              </div>
+              <div className="daily-ops-actions">
+                <button
+                  className="primary-button"
+                  disabled={!staffProfile || !operationsBusinessId || Boolean(dailyOperations.todayShift?.checked_in_at) || savingHubAction === 'start-shift'}
+                  onClick={startShift}
+                  type="button"
+                >
+                  Start Shift
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={!staffProfile || !operationsBusinessId || !dailyOperations.todayShift?.checked_in_at || Boolean(dailyOperations.todayShift?.checked_out_at) || savingHubAction === 'end-shift'}
+                  onClick={endShift}
+                  type="button"
+                >
+                  End Shift
+                </button>
+              </div>
+            </article>
+
+            <article className="panel daily-ops-card">
+              <div className="section-header">
+                <div>
+                  <span>Shop Status</span>
+                  <h2>{dailyOperations.shopStatus.label}</h2>
+                </div>
+                <StatusBadge tone={dailyOperations.shopStatus.status === 'open' ? 'success' : 'gold'}>
+                  {dailyOperations.shopStatus.status}
+                </StatusBadge>
+              </div>
+              <div className="daily-ops-status-grid">
+                {SHOP_STATUSES.map((status) => (
+                  <button
+                    className={dailyOperations.shopStatus.status === status ? 'active' : ''}
+                    disabled={!canManageHub || !operationsBusinessId || savingHubAction === `shop-status-${status}`}
+                    key={status}
+                    onClick={() => updateShopStatus(status)}
+                    type="button"
+                  >
+                    {formatCategory(status)}
+                  </button>
+                ))}
+              </div>
+              <small className="subtle-text">
+                {dailyOperations.shopStatus.updatedAt
+                  ? `Updated ${formatDateTime(dailyOperations.shopStatus.updatedAt)}`
+                  : 'No shop status has been recorded yet.'}
+              </small>
+            </article>
+
+            <article className="panel daily-ops-card">
+              <div className="section-header">
+                <div>
+                  <span>Opening / Closing</span>
+                  <h2>{dailyOperations.checklistCompletion}% complete</h2>
+                </div>
+                <ClipboardCheck size={20} />
+              </div>
+              <div className="staff-hub-progress-track">
+                <span style={{ width: `${dailyOperations.checklistCompletion}%` }} />
+              </div>
+              <div className="daily-ops-mini-list">
+                {dailyOperations.todayChecklistRuns.length ? (
+                  dailyOperations.todayChecklistRuns.slice(0, 4).map((run) => (
+                    <div key={run.id}>
+                      <strong>{formatCategory(run.checklist_type)}</strong>
+                      <span>{formatCategory(run.status)} · {formatNumber(run.items?.filter((item) => item.completed).length || 0)} done</span>
+                    </div>
+                  ))
+                ) : (
+                  <div>
+                    <strong>No checklist started</strong>
+                    <span>Opening and closing checklist runs will appear here.</span>
+                  </div>
+                )}
+              </div>
+            </article>
+          </section>
+
+          <section className="daily-ops-grid full-span">
+            <article className="panel daily-ops-card daily-ops-card--wide">
+              <div className="section-header">
+                <div>
+                  <span>Required Work</span>
+                  <h2>Tasks and reminders</h2>
+                </div>
+                <StatusBadge tone={dailyOperations.overdueTasks.length ? 'danger' : 'success'}>
+                  {dailyOperations.overdueTasks.length ? `${dailyOperations.overdueTasks.length} overdue` : 'On track'}
+                </StatusBadge>
+              </div>
+              <div className="daily-ops-task-list">
+                {pendingTasks.length ? (
+                  pendingTasks.slice(0, 6).map((task) => (
+                    <button
+                      className={isOverdueTask(task) ? 'overdue' : ''}
+                      key={task.id}
+                      onClick={() => completeTask(task)}
+                      type="button"
+                    >
+                      <ClipboardCheck size={17} />
+                      <span>
+                        <strong>{task.title}</strong>
+                        <small>{formatCategory(task.category)}{task.due_date ? ` · ${formatDate(task.due_date)}` : ''}</small>
+                      </span>
+                      <ChevronRight size={17} />
+                    </button>
+                  ))
+                ) : (
+                  <EmptyState
+                    icon={ClipboardCheck}
+                    title="No required tasks"
+                    message="Assigned cleaning, restocking, follow-up, content, and general tasks will show here."
+                  />
+                )}
+              </div>
+            </article>
+
+            <article className="panel daily-ops-card">
+              <div className="section-header">
+                <div>
+                  <span>Policy Center</span>
+                  <h2>{dailyOperations.unacknowledgedPolicies.length} need acknowledgement</h2>
+                </div>
+                <BookOpen size={20} />
+              </div>
+              <div className="daily-ops-mini-list">
+                {dailyOperations.unacknowledgedPolicies.slice(0, 4).map((policy) => (
+                  <div key={policy.id}>
+                    <strong>{policy.title}</strong>
+                    <span>{formatCategory(policy.category)} · v{policy.version}</span>
+                    <button
+                      className="secondary-button small"
+                      disabled={!staffProfile || savingHubAction === `policy-${policy.id}`}
+                      onClick={() => acknowledgePolicy(policy.id)}
+                      type="button"
+                    >
+                      Acknowledge
+                    </button>
+                  </div>
+                ))}
+                {!dailyOperations.unacknowledgedPolicies.length ? (
+                  <div>
+                    <strong>All caught up</strong>
+                    <span>New handbook and policy acknowledgements will show here.</span>
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          </section>
+
+          <section className="daily-ops-grid full-span">
+            <article className="panel daily-ops-card">
+              <div className="section-header">
+                <div>
+                  <span>Report Something</span>
+                  <h2>Maintenance, inventory, incident</h2>
+                </div>
+                <Megaphone size={20} />
+              </div>
+              <form className="daily-ops-form" onSubmit={submitOperationsRequest}>
+                <div className="form-grid compact">
+                  <label className="field">
+                    <span>Type</span>
+                    <select
+                      value={operationsRequestForm.request_type}
+                      onChange={(event) => updateOperationsRequestForm('request_type', event.target.value)}
+                    >
+                      {OPERATIONS_REQUEST_TYPES.map((type) => (
+                        <option key={type} value={type}>{formatCategory(type)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Priority</span>
+                    <select
+                      value={operationsRequestForm.priority}
+                      onChange={(event) => updateOperationsRequestForm('priority', event.target.value)}
+                    >
+                      {['low', 'normal', 'high', 'urgent'].map((priority) => (
+                        <option key={priority} value={priority}>{formatCategory(priority)}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="field">
+                  <span>Title</span>
+                  <input
+                    required
+                    value={operationsRequestForm.title}
+                    placeholder="Broken chair, need gloves, client issue..."
+                    onChange={(event) => updateOperationsRequestForm('title', event.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>Details</span>
+                  <textarea
+                    value={operationsRequestForm.details}
+                    placeholder="What happened? What is needed? Where is it?"
+                    onChange={(event) => updateOperationsRequestForm('details', event.target.value)}
+                  />
+                </label>
+                <button className="primary-button" disabled={!operationsBusinessId || savingHubAction === 'operations-request'} type="submit">
+                  Send Request
+                </button>
+              </form>
+            </article>
+
+            <article className="panel daily-ops-card">
+              <div className="section-header">
+                <div>
+                  <span>Shift Notes</span>
+                  <h2>Leave context for the team</h2>
+                </div>
+                <MessageSquare size={20} />
+              </div>
+              <form className="daily-ops-form" onSubmit={submitShiftNote}>
+                <label className="field">
+                  <span>Note</span>
+                  <textarea
+                    required
+                    value={shiftNoteForm.note}
+                    placeholder="Need towels, chair issue, cash note, reminder for opener..."
+                    onChange={(event) => updateShiftNoteForm('note', event.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>Visibility</span>
+                  <select
+                    value={shiftNoteForm.visibility}
+                    onChange={(event) => updateShiftNoteForm('visibility', event.target.value)}
+                  >
+                    <option value="team">Team</option>
+                    <option value="manager">Manager only</option>
+                  </select>
+                </label>
+                <button className="secondary-button" disabled={!operationsBusinessId || savingHubAction === 'shift-note'} type="submit">
+                  Save Note
+                </button>
+              </form>
+            </article>
+
+            <article className="panel daily-ops-card">
+              <div className="section-header">
+                <div>
+                  <span>Live Issues</span>
+                  <h2>{dailyOperations.openRequests.length} open</h2>
+                </div>
+                <Bell size={20} />
+              </div>
+              <div className="daily-ops-mini-list">
+                {dailyOperations.openRequests.slice(0, 5).map((request) => (
+                  <div key={request.id}>
+                    <strong>{request.title}</strong>
+                    <span>{formatCategory(request.request_type)} · {formatCategory(request.priority)} · {formatCategory(request.status)}</span>
+                  </div>
+                ))}
+                {!dailyOperations.openRequests.length ? (
+                  <div>
+                    <strong>No open issues</strong>
+                    <span>Maintenance, inventory, and incident requests will show here.</span>
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          </section>
+
+          <section className="panel full-span daily-ops-manager-strip">
+            <div>
+              <span>Manager Snapshot</span>
+              <strong>{formatNumber(hubRecords.shiftRecords.filter((shift) => shift.status === 'checked_in').length)} working</strong>
+            </div>
+            <div>
+              <span>Late staff</span>
+              <strong>{formatNumber(hubRecords.shiftRecords.filter((shift) => Number(shift.late_minutes || 0) > 0 && shift.shift_date === operationsTodayKey).length)}</strong>
+            </div>
+            <div>
+              <span>Missed checkout</span>
+              <strong>{formatNumber(hubRecords.shiftRecords.filter((shift) => shift.missed_checkout && shift.shift_date === operationsTodayKey).length)}</strong>
+            </div>
+            <div>
+              <span>Unread policies</span>
+              <strong>{formatNumber(dailyOperations.unacknowledgedPolicies.length)}</strong>
+            </div>
+          </section>
+        </>
+      ) : null}
 
       {activeTab === 'home' ? (
         <>
