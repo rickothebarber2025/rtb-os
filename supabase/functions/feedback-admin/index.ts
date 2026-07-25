@@ -125,28 +125,44 @@ async function sendEmail(request: Record<string, any>, businessName: string) {
   return { delivered: true, provider: "resend", providerId: body?.id || null };
 }
 
-async function sendSms(request: Record<string, any>, businessName: string) {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const from = Deno.env.get("TWILIO_FROM_NUMBER");
+// TextBee sends via a phone you own, not a rented virtual number, so
+// it needs a real E.164-formatted destination number rather than the
+// loosely-validated digits stored on the request (raw 10-digit North
+// American numbers, or ones with dashes/parens, are both currently
+// accepted by PHONE_DIGITS_PATTERN above). Assumes North America
+// (+1) for a bare 10-digit number, which matches this business.
+function toE164(rawPhone: string) {
+  const digits = String(rawPhone || "").replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return rawPhone.trim().startsWith("+") ? rawPhone.trim() : `+${digits}`;
+}
 
-  if (!accountSid || !authToken || !from) {
-    return { delivered: false, reason: "Twilio SMS secrets are not configured." };
+async function sendSms(request: Record<string, any>, businessName: string) {
+  const apiKey = Deno.env.get("TEXTBEE_API_KEY");
+  const deviceId = Deno.env.get("TEXTBEE_DEVICE_ID");
+
+  if (!apiKey || !deviceId) {
+    return { delivered: false, reason: "TextBee SMS secrets are not configured." };
+  }
+
+  const recipient = toE164(request.customer_phone);
+  if (!recipient) {
+    return { delivered: false, reason: "No valid phone number on this request." };
   }
 
   const content = messageText(request, businessName);
-  const body = new URLSearchParams({
-    Body: content.text,
-    From: from,
-    To: request.customer_phone,
-  });
   const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    `https://api.textbee.dev/api/v1/gateway/devices/${encodeURIComponent(deviceId)}/send-sms`,
     {
-      body,
+      body: JSON.stringify({
+        message: content.text,
+        recipients: [recipient],
+      }),
       headers: {
-        Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
       },
       method: "POST",
     },
@@ -154,10 +170,13 @@ async function sendSms(request: Record<string, any>, businessName: string) {
   const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    return { delivered: false, reason: result?.message || "Twilio SMS failed." };
+    return {
+      delivered: false,
+      reason: result?.error || result?.message || `TextBee SMS failed (HTTP ${response.status}).`,
+    };
   }
 
-  return { delivered: true, provider: "twilio", providerId: result?.sid || null };
+  return { delivered: true, provider: "textbee", providerId: result?.data?.[0]?._id || null };
 }
 
 async function dispatchOne(admin: ReturnType<typeof getAdminClient>, request: Record<string, any>) {
