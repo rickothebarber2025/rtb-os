@@ -15,8 +15,8 @@ import {
 
 type AdminClient = ReturnType<typeof createClient>;
 
-const DEFAULT_MODEL = "gpt-4.1-mini";
-const DEFAULT_STAFF_COACH_MODEL = "gpt-4o-mini";
+const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_STAFF_COACH_MODEL = "gemini-2.5-flash";
 const FEEDBACK_WORKER_REQUIREMENTS = [
   { module: "performance", minimum: "edit" },
   { module: "operations", minimum: "edit" },
@@ -264,12 +264,9 @@ function ratingAverage(response: Record<string, unknown>) {
 }
 
 function extractResponseText(body: Record<string, any>) {
-  if (body.output_text) return body.output_text;
-
-  for (const item of body.output || []) {
-    for (const content of item.content || []) {
-      if (content.type === "output_text" && content.text) return content.text;
-      if (content.type === "text" && content.text) return content.text;
+  for (const candidate of body.candidates || []) {
+    for (const part of candidate.content?.parts || []) {
+      if (part.text) return part.text;
     }
   }
 
@@ -354,37 +351,49 @@ function normalizeAnalysis(analysis: Record<string, any>, rawResult: Record<stri
   };
 }
 
-async function structuredOpenAI(prompt: string, payload: Record<string, unknown>, schema: Record<string, unknown>, name: string, modelOverride?: string) {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
+// Gemini's responseSchema is an OpenAPI 3.0 subset -- it doesn't
+// support "additionalProperties" (present in all the schemas above
+// since they were originally written for OpenAI's strict mode).
+// Stripped recursively rather than left in, since the docs note
+// unsupported keywords are rejected "silently-ish" rather than with
+// a clear error.
+function stripUnsupportedSchemaKeys(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(stripUnsupportedSchemaKeys);
+  if (!schema || typeof schema !== "object") return schema;
+
+  const { additionalProperties: _drop, ...rest } = schema as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(rest).map(([key, value]) => [key, stripUnsupportedSchemaKeys(value)]),
+  );
+}
+
+async function structuredGemini(prompt: string, payload: Record<string, unknown>, schema: Record<string, unknown>, _name: string, modelOverride?: string) {
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) return null;
 
-  const model = modelOverride || Deno.env.get("OPENAI_MODEL") || DEFAULT_MODEL;
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    body: JSON.stringify({
-      input: [
-        { content: prompt, role: "system" },
-        { content: JSON.stringify(payload), role: "user" },
-      ],
-      model,
-      text: {
-        format: {
-          name,
-          schema,
-          strict: true,
-          type: "json_schema",
+  const model = modelOverride || Deno.env.get("GEMINI_MODEL") || DEFAULT_MODEL;
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: JSON.stringify(payload) }], role: "user" }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: stripUnsupportedSchemaKeys(schema),
         },
+        systemInstruction: { parts: [{ text: prompt }] },
+      }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
-    }),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+      method: "POST",
     },
-    method: "POST",
-  });
+  );
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(body?.error?.message || "OpenAI request failed.");
+    throw new Error(body?.error?.message || "Gemini request failed.");
   }
 
   return { body, model, parsed: JSON.parse(extractResponseText(body)) };
@@ -395,8 +404,8 @@ async function analyzeStaffCoaching(payload: Record<string, unknown>) {
     "You are RTB OS, an AI coach for salon and barbershop operations. Analyze each staff member separately using their role, total net sales, total tips, tip rate, average week, best week, under-minimum weeks, adjusted weeks, fixed-rate status, tier, and weeks recorded. Return only valid JSON. Give different, specific coaching for each staff member. Focus on revenue growth, better tip earning behavior, customer experience, and a clear next conversation Ricko can bring up. Avoid generic repeated wording. For barbers, hairstylists, nail techs, and lash techs, tailor the advice to the actual service role. If data is limited, state the missing signal and give one baseline action.";
 
   try {
-    const model = Deno.env.get("OPENAI_STAFF_COACH_MODEL") || DEFAULT_STAFF_COACH_MODEL;
-    const ai = await structuredOpenAI(
+    const model = Deno.env.get("GEMINI_STAFF_COACH_MODEL") || DEFAULT_STAFF_COACH_MODEL;
+    const ai = await structuredGemini(
       prompt,
       payload,
       staffCoachingSchema,
@@ -438,7 +447,7 @@ async function getFeedbackContext(admin: AdminClient, responseId: string) {
 
 async function analyzeFeedback(context: Record<string, any>) {
   try {
-    const ai = await structuredOpenAI(
+    const ai = await structuredGemini(
       "You are RTB OS, an AI business consultant for salon and barbershop operations. Analyze one customer survey and return only the requested JSON. Be specific, practical, and cost-aware.",
       {
         business: context.business,
@@ -770,7 +779,7 @@ async function askBusinessAssistant(question: string, context: Record<string, un
     "which staff member (by name, exactly as given in the roster) should own it, or " +
     "'Owner' if it's the owner's own task. Return only the requested JSON.";
 
-  const ai = await structuredOpenAI(
+  const ai = await structuredGemini(
     prompt,
     { business_context: context, question },
     askAssistantSchema,
@@ -779,7 +788,7 @@ async function askBusinessAssistant(question: string, context: Record<string, un
 
   if (!ai) {
     throw new RequestError(
-      "The AI assistant is not configured yet. Add an OPENAI_API_KEY Supabase secret to enable it.",
+      "The AI assistant is not configured yet. Add a GEMINI_API_KEY Supabase secret to enable it.",
       500,
     );
   }
@@ -801,7 +810,7 @@ async function draftNewsletterContent(context: Record<string, unknown>) {
     "stands out (highest net sales or a clear improvement), not a generic placeholder. Keep " +
     "each field to a few sentences. Return only the requested JSON.";
 
-  const ai = await structuredOpenAI(
+  const ai = await structuredGemini(
     prompt,
     { business_context: context },
     newsletterDraftSchema,
@@ -810,7 +819,7 @@ async function draftNewsletterContent(context: Record<string, unknown>) {
 
   if (!ai) {
     throw new RequestError(
-      "The AI assistant is not configured yet. Add an OPENAI_API_KEY Supabase secret to enable it.",
+      "The AI assistant is not configured yet. Add a GEMINI_API_KEY Supabase secret to enable it.",
       500,
     );
   }
@@ -887,7 +896,7 @@ async function createBusinessConsultantReport(
   let model: string | null = null;
 
   try {
-    const ai = await structuredOpenAI(
+    const ai = await structuredGemini(
       "You are RTB OS, an AI business consultant for a salon/barbershop operator. Analyze all " +
         "provided intelligence -- including staff performance, recent payroll, time off, and " +
         "booth rent, not just customer feedback -- and answer with practical priorities. " +

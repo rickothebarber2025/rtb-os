@@ -167,8 +167,8 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
       const result = await runStaffPerformanceCoaching(scopedBusinessId);
       setStaffCoaching(result.coaching || []);
     } catch (err) {
-      if (err?.message?.includes('OPENAI_API_KEY')) {
-        setError('AI coaching is unavailable until the OpenAI API key is configured.');
+      if (err?.message?.includes('GEMINI_API_KEY')) {
+        setError('AI coaching is unavailable until the Gemini API key is configured.');
       } else {
         setError(err.message || 'Unable to load staff coaching.');
       }
