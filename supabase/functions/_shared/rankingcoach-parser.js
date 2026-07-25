@@ -57,7 +57,12 @@ function safeIsoMillis(value) {
 // structural line is consumed at most once, in order; everything
 // else is left completely untouched as the verbatim review text.
 function parseReviewBlock(body) {
-  const headerPattern = /you'?ve just scored a star review on google/i;
+  // Two real phrasings confirmed: positive reviews say "you've just
+  // scored a star review", negative ones say "you've got a 1 star
+  // review" -- without matching both, negative reviews (arguably the
+  // most important feedback to actually catch) were silently
+  // dropped entirely, never even reaching the "unknown" bucket.
+  const headerPattern = /you'?ve (?:just scored|got) a\s*(?:\d\s*)?star review on google/i;
   const headerMatch = body.match(headerPattern);
   if (!headerMatch) return null;
 

@@ -14,7 +14,12 @@ const EVENT_TEMPLATES = [
   {
     eventType: "appointment_updated",
     name: "appointment-updated",
-    patterns: [/appointment.+updated/i, /booking.+updated/i, /appointment.+changed/i],
+    patterns: [
+      /appointment.+updated/i,
+      /booking.+updated/i,
+      /appointment.+changed/i,
+      /confirmed the new appointment time/i,
+    ],
   },
   {
     eventType: "appointment_created",
@@ -85,12 +90,30 @@ function safeIsoMillis(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+// A regex match here is a candidate, not a certainty -- reject
+// anything that rounds outside the real 1-5 star range rather than
+// clamping it into range. Clamping a stray "5.9" (almost certainly a
+// coincidental match on unrelated numeric text near the word "rated"
+// or "stars", not a genuine rating) down to 5 would record a rating
+// that was never actually there. This was a real, confirmed bug:
+// activity_events_rating_check failed on every affected message
+// because Math.round(5.9) = 6, outside the column's 1-5 constraint.
+//
+// Allows a short run of words between the keyword and the number
+// (up to 30 characters, non-greedy) rather than requiring the digit
+// immediately after -- confirmed against a real Booksy review email:
+// "The client has rated this appointment as: 5 on a 1-to-5 scale."
+// would not match a keyword-then-digit pattern with nothing allowed
+// in between.
 function parseRating(text) {
-  const starMatch = text.match(/(?:rating|rated|stars?)\s*[:\-]?\s*([1-5](?:\.\d)?)/i);
-  if (starMatch) return Math.round(Number(starMatch[1]));
+  const starMatch = text.match(/(?:rating|rated|stars?)\b[\s\S]{0,30}?([1-5](?:\.\d)?)\b/i);
+  if (starMatch) {
+    const rounded = Math.round(Number(starMatch[1]));
+    return rounded >= 1 && rounded <= 5 ? rounded : null;
+  }
 
   const unicodeStars = text.match(/(★+)/);
-  if (unicodeStars) return Math.min(5, unicodeStars[1].length);
+  if (unicodeStars) return Math.max(1, Math.min(5, unicodeStars[1].length));
 
   const wordStars = text.match(/\b(five|four|three|two|one)\s+stars?\b/i);
   if (!wordStars) return null;
@@ -138,7 +161,15 @@ function extractLabelFields(text) {
     ["bookingIdentifier", /(?:booking id|booking identifier|appointment id|reservation id|booksy id)\s*[:#\-]\s*([A-Za-z0-9_-]+)/i],
     ["price", /(?:price|amount|total)\s*[:\-]\s*(\$?\d[\d,]*(?:\.\d{2})?)/i],
     ["location", /(?:location|business|salon)\s*[:\-]\s*([^\n]+)/i],
-    ["reviewText", /(?:review|comment|feedback)\s*[:\-]\s*([\s\S]{5,800})/i],
+    // Allows an optional word (e.g. "content") between the keyword
+    // and the colon -- confirmed against a real Booksy review email:
+    // "Review content: Amazing service super fast". Captures up to
+    // the first newline rather than [\s\S], since clean() collapses
+    // all whitespace (including newlines) before any later
+    // truncation step would run, so stopping the capture itself
+    // before it reaches the next paragraph of boilerplate is the
+    // only place this can actually be bounded correctly.
+    ["reviewText", /(?:review|comment|feedback)\s*(?:content)?\s*[:\-]\s*([^\n]{5,800})/i],
   ];
 
   labels.forEach(([key, pattern]) => {
@@ -239,7 +270,11 @@ export function parseBooksyCsvRows(rows = []) {
       parserTemplate: "booksy-csv-row",
       parserVersion: "booksy-csv-v1",
       price: parseMoney(row.price || row.amount),
-      rating: row.rating ? Math.round(Number(row.rating)) : null,
+      rating: (() => {
+        if (!row.rating) return null;
+        const rounded = Math.round(Number(row.rating));
+        return rounded >= 1 && rounded <= 5 ? rounded : null;
+      })(),
       reviewText: row.review_text || row.review || row.comment || "",
       serviceName: row.service || row.service_name || "",
       sourceEventId:
