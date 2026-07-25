@@ -19,6 +19,9 @@ import StatusBadge from '../components/StatusBadge';
 import {
   createPayrollCorrection,
   deletePayrollDraft,
+  getBusinessUnits,
+  getPayrollRuns,
+  getStaff,
   lockPayrollRun,
   savePayrollDraft,
 } from '../services/rtbService';
@@ -38,7 +41,7 @@ import {
   splitPayrollRunsByVoidStatus,
   toMoneyNumber,
 } from '../utils/payroll';
-import { matchSquareNameToStaff, parseSquarePayrollCsv } from '../utils/squarePayrollImport';
+import { matchSquareNameToStaff, parseSquarePayrollCsv, parseSquarePayrollCsvByLocation } from '../utils/squarePayrollImport';
 
 function createInitialRun(businessUnitId) {
   const week = getDefaultPayrollWeek();
@@ -114,6 +117,8 @@ export default function PayrollPage({
   const [squareImportReview, setSquareImportReview] = useState([]);
   const [squareImportSummary, setSquareImportSummary] = useState(null);
   const squareCsvInputRef = useRef(null);
+  const bothBusinessCsvInputRef = useRef(null);
+  const [bothBusinessImporting, setBothBusinessImporting] = useState(false);
   const previousBusinessUnitId = useRef(null);
 
   useEffect(() => {
@@ -320,6 +325,106 @@ export default function PayrollPage({
 
   function dismissUnmatchedImport(reviewIndex) {
     setSquareImportReview((rows) => rows.filter((_, index) => index !== reviewIndex));
+  }
+
+  // Square's own export tags each transaction with a Location, so one CSV
+  // covering both businesses can populate both businesses' drafts in one
+  // action -- without needing the current business's in-memory currentRun
+  // and entries state, since this saves each run directly. Both are saved
+  // as drafts, never locked automatically, so Ricko still reviews and
+  // finalizes each one deliberately.
+  async function handleSquareCsvUploadBothBusinesses(file) {
+    if (!payrollEditable || !file) return;
+    setError('');
+    setNotice('');
+    setBothBusinessImporting(true);
+
+    try {
+      const csvText = await file.text();
+      const byLocation = parseSquarePayrollCsvByLocation(csvText);
+      const businesses = await getBusinessUnits();
+      const weekFields = {
+        week_end: currentRun.week_end,
+        week_label: currentRun.week_label,
+        week_start: currentRun.week_start,
+      };
+
+      const summaries = [];
+      const skippedBusinesses = [];
+
+      for (const business of businesses) {
+        const locationData = byLocation[business.name];
+        if (!locationData) {
+          skippedBusinesses.push(business.name);
+          continue;
+        }
+
+        const businessStaff = await getStaff(business.id, false);
+        const existingRuns = await getPayrollRuns(business.id);
+        const existingDraft = existingRuns.find(
+          (run) => run.status === 'draft' && run.week_start === weekFields.week_start,
+        );
+
+        const entries = businessStaff.map(createDraftEntry);
+        const usedStaffIds = new Set();
+        const unmatchedNames = [];
+
+        Object.entries(locationData.bySquareName).forEach(([squareName, squareData]) => {
+          const matchedStaff = matchSquareNameToStaff(squareName, businessStaff);
+          if (!matchedStaff || usedStaffIds.has(matchedStaff.id)) {
+            unmatchedNames.push(squareName);
+            return;
+          }
+
+          usedStaffIds.add(matchedStaff.id);
+          const entryIndex = entries.findIndex((entry) => entryBelongsToStaff(entry, matchedStaff));
+          const updatedEntry = recalculateEntry({
+            ...(entryIndex >= 0 ? entries[entryIndex] : createDraftEntry(matchedStaff)),
+            net_sales: toMoneyNumber(squareData.netSales),
+            tips: toMoneyNumber(squareData.tips),
+          });
+
+          if (entryIndex >= 0) entries[entryIndex] = updatedEntry;
+          else entries.push(updatedEntry);
+        });
+
+        const runPayload = {
+          ...weekFields,
+          business_unit_id: business.id,
+          id: existingDraft?.id || null,
+          notes: existingDraft?.notes || '',
+          owner_net_sales: existingDraft?.owner_net_sales || 0,
+          owner_tips: existingDraft?.owner_tips || 0,
+          status: 'draft',
+        };
+
+        await savePayrollDraft(runPayload, entries);
+        summaries.push({ business: business.name, matched: usedStaffIds.size, unmatchedNames });
+      }
+
+      await onRefresh();
+
+      const summaryText = summaries
+        .map(
+          (summary) =>
+            `${summary.business}: ${summary.matched} matched` +
+            (summary.unmatchedNames.length
+              ? ` (review needed: ${summary.unmatchedNames.join(', ')})`
+              : ''),
+        )
+        .join(' | ');
+      setNotice(
+        `Saved drafts for both businesses -- ${summaryText}` +
+          (skippedBusinesses.length
+            ? `. No transactions found for: ${skippedBusinesses.join(', ')}.`
+            : '.') +
+          ' Open each business to review before finalizing.',
+      );
+    } catch (err) {
+      setError(err.message || 'Unable to import that CSV for both businesses.');
+    } finally {
+      setBothBusinessImporting(false);
+    }
   }
 
   function loadRun(run) {
@@ -789,6 +894,41 @@ export default function PayrollPage({
                 ))}
               </div>
             ) : null}
+          </section>
+        ) : null}
+
+        {payrollEditable ? (
+          <section className="payroll-fix-panel" aria-label="Import Square sales for both businesses">
+            <div>
+              <span>Square import -- both businesses</span>
+              <strong>Upload one export, populate both businesses' drafts</strong>
+              <p>
+                Square tags every transaction with which location it happened at, so one CSV covering
+                both RTB Lounge and RTB Beauty Lounge saves a draft for each -- using the week currently
+                loaded above. Nothing is finalized automatically; open each business to review first.
+              </p>
+            </div>
+            <div className="payroll-fix-panel__actions">
+              <input
+                accept=".csv"
+                hidden
+                ref={bothBusinessCsvInputRef}
+                type="file"
+                onChange={(event) => {
+                  handleSquareCsvUploadBothBusinesses(event.target.files?.[0]);
+                  event.target.value = '';
+                }}
+              />
+              <button
+                className="secondary-button small"
+                disabled={bothBusinessImporting}
+                type="button"
+                onClick={() => bothBusinessCsvInputRef.current?.click()}
+              >
+                <Upload size={15} />
+                {bothBusinessImporting ? 'Importing...' : 'Upload Square CSV (both businesses)'}
+              </button>
+            </div>
           </section>
         ) : null}
 

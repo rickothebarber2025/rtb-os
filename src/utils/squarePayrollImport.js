@@ -107,20 +107,11 @@ function findColumnKey(fields, candidates) {
   return null;
 }
 
-// Parses a raw Square transaction export (one row per payment, not a
-// pre-aggregated payroll sheet) into per-Square-staff-name totals, with
-// retail product revenue split out separately so it never counts toward
-// commission. This is genuinely new: the existing google-sheets-payroll-sync
-// function expects already-computed payroll numbers, not raw transactions.
-export function parseSquarePayrollCsv(csvText) {
-  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-  const fields = parsed.meta.fields || [];
-  const staffKey = findColumnKey(fields, ['staff name', 'staff']);
-  const revenueKey = findColumnKey(fields, ['net sales', 'revenue']);
-  const tipKey = findColumnKey(fields, ['tip']);
-  const dateKey = findColumnKey(fields, ['date']);
-  const descriptionKey = findColumnKey(fields, ['description']);
-
+// Shared aggregation core used by both parseSquarePayrollCsv (all rows in
+// one bucket) and parseSquarePayrollCsvByLocation (one bucket per Location
+// value) -- extracted so both paths run the exact same tested logic rather
+// than risk two copies drifting apart.
+function aggregateRows(rows, { staffKey, revenueKey, tipKey, dateKey, descriptionKey }) {
   const bySquareName = {};
   let transactionCount = 0;
   let totalRevenueGross = 0;
@@ -129,7 +120,7 @@ export function parseSquarePayrollCsv(csvText) {
   let weekMin = null;
   let weekMax = null;
 
-  (parsed.data || []).forEach((row) => {
+  rows.forEach((row) => {
     const name = (staffKey ? row[staffKey] : '').trim();
     if (!name) return;
 
@@ -184,6 +175,55 @@ export function parseSquarePayrollCsv(csvText) {
       weekMin,
     },
   };
+}
+
+function findCsvKeys(fields) {
+  return {
+    dateKey: findColumnKey(fields, ['date']),
+    descriptionKey: findColumnKey(fields, ['description']),
+    locationKey: findColumnKey(fields, ['location']),
+    revenueKey: findColumnKey(fields, ['net sales', 'revenue']),
+    staffKey: findColumnKey(fields, ['staff name', 'staff']),
+    tipKey: findColumnKey(fields, ['tip']),
+  };
+}
+
+// Parses a raw Square transaction export (one row per payment, not a
+// pre-aggregated payroll sheet) into per-Square-staff-name totals, with
+// retail product revenue split out separately so it never counts toward
+// commission. This is genuinely new: the existing google-sheets-payroll-sync
+// function expects already-computed payroll numbers, not raw transactions.
+export function parseSquarePayrollCsv(csvText) {
+  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+  const keys = findCsvKeys(parsed.meta.fields || []);
+  return aggregateRows(parsed.data || [], keys);
+}
+
+// Square's own export already tags every transaction with a "Location"
+// column (confirmed real values: "RTB Lounge", "RTB Beauty Lounge", exact
+// matches to the business_units.name of each real business) -- so one CSV
+// covering both businesses' sales can be split into two independent
+// aggregations without needing two separate exports. Rows with a location
+// value that doesn't match a known business go under the empty-string key
+// so callers can flag them rather than silently drop the revenue.
+export function parseSquarePayrollCsvByLocation(csvText) {
+  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+  const fields = parsed.meta.fields || [];
+  const keys = findCsvKeys(fields);
+  const rowsByLocation = {};
+
+  (parsed.data || []).forEach((row) => {
+    const location = (keys.locationKey ? row[keys.locationKey] : '').trim();
+    if (!rowsByLocation[location]) rowsByLocation[location] = [];
+    rowsByLocation[location].push(row);
+  });
+
+  const byLocation = {};
+  Object.entries(rowsByLocation).forEach(([location, rows]) => {
+    byLocation[location] = aggregateRows(rows, keys);
+  });
+
+  return byLocation;
 }
 
 function normalizeName(value) {
