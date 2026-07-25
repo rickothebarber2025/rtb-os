@@ -15,8 +15,16 @@ import {
 
 type AdminClient = ReturnType<typeof createClient>;
 
-const DEFAULT_MODEL = "gemini-2.5-flash";
-const DEFAULT_STAFF_COACH_MODEL = "gemini-2.5-flash";
+// Real, confirmed error hit in production: "This model
+// models/gemini-2.5-flash is no longer available to new users."
+// Google restricts some model IDs to accounts that already used
+// them before a cutoff (the same pattern as the 2025 Gemini 1.5
+// restriction) -- a brand-new API key hits this immediately.
+// gemini-flash-latest is a stable alias that always resolves to
+// whatever current Flash model is actually available, avoiding this
+// exact class of breakage going forward.
+const DEFAULT_MODEL = "gemini-flash-latest";
+const DEFAULT_STAFF_COACH_MODEL = "gemini-flash-latest";
 const FEEDBACK_WORKER_REQUIREMENTS = [
   { module: "performance", minimum: "edit" },
   { module: "operations", minimum: "edit" },
