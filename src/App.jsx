@@ -80,6 +80,17 @@ export default function App() {
     () => getBusinessSelectionOptions(data.businessUnits, auth.profile),
     [auth.profile, data.businessUnits],
   );
+  const unreadAnnouncementCount = useMemo(() => {
+    const announcements = data.staffHub?.announcements || [];
+    const readIds = new Set(
+      (data.staffHub?.announcementReads || []).map((read) => read.announcement_id),
+    );
+    return announcements.filter((item) => !readIds.has(item.id)).length;
+  }, [data.staffHub]);
+  const navBadges = useMemo(
+    () => ({ 'staff-hub': unreadAnnouncementCount }),
+    [unreadAnnouncementCount],
+  );
 
   useEffect(() => {
     const selectedExists = businessOptions.some((unit) => unit.id === selectedBusinessUnitId);
@@ -299,19 +310,6 @@ export default function App() {
       />
     );
   }
-
-  const unreadAnnouncementCount = useMemo(() => {
-    const announcements = data.staffHub?.announcements || [];
-    const readIds = new Set(
-      (data.staffHub?.announcementReads || []).map((read) => read.announcement_id),
-    );
-    return announcements.filter((item) => !readIds.has(item.id)).length;
-  }, [data.staffHub]);
-
-  const navBadges = useMemo(
-    () => ({ 'staff-hub': unreadAnnouncementCount }),
-    [unreadAnnouncementCount],
-  );
 
   return (
     <AppShell
