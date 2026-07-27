@@ -8,6 +8,7 @@ import {
   CircleDollarSign,
   Clock3,
   ReceiptText,
+  Store,
   TrendingUp,
   Users,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import StatusBadge from '../components/StatusBadge';
 import { buildActionCenterItems, getActionCenterSummary, getPriorityIcon } from '../utils/actionCenter';
 import { canManagePayroll, canUsePayroll } from '../utils/access';
 import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
+import { getLatestShopStatus } from '../utils/dailyOperations';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -103,6 +105,7 @@ export default function DashboardPage({
   actionCenter,
   boothRent,
   businessUnit,
+  businessUnits,
   instagramInsights,
   masterDashboard,
   masterDashboardUpdatedAt,
@@ -112,10 +115,18 @@ export default function DashboardPage({
   setActivePage,
   squareStatus,
   staff,
+  staffHub,
 }) {
   const payrollAllowed = canUsePayroll(accessProfile);
   const payrollEditable = canManagePayroll(accessProfile);
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
+  const shopStatusByBusiness = (businessUnits || []).map((unit) => ({
+    id: unit.id,
+    name: unit.name,
+    status: getLatestShopStatus(
+      (staffHub?.shopStatusEvents || []).filter((event) => event.business_unit_id === unit.id),
+    ),
+  }));
   const canStartPayroll = payrollEditable && !allBusinessesView;
   const businessProfile = getBusinessProfile(businessUnit);
   const activeStaff = staff.filter((member) => member.active);
@@ -195,6 +206,23 @@ export default function DashboardPage({
           </button>
         ) : null}
       </section>
+
+      {shopStatusByBusiness.length ? (
+        <section className="panel full-span dashboard-shop-status-strip">
+          {shopStatusByBusiness.map((business) => (
+            <div className="dashboard-shop-status-item" key={business.id}>
+              <Store size={18} />
+              <div>
+                <span>{business.name}</span>
+                <strong>{business.status.label}</strong>
+              </div>
+              <StatusBadge tone={business.status.status === 'open' ? 'success' : 'gold'}>
+                {business.status.status}
+              </StatusBadge>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       <nav className="dashboard-mobile-tabs" aria-label="Dashboard sections">
         {mobileTabs.map((tab) => (
