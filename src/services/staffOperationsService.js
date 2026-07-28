@@ -30,18 +30,26 @@ export function endMyShift(businessUnitId, afterHoursReason = '') {
   });
 }
 
-export function claimMyOperationChecklist(businessUnitId, checklistType) {
+export function claimMyOperationChecklist(businessUnitId, checklistType, scope = 'shared') {
   return call('claim_my_operation_checklist', {
     p_business_unit_id: businessUnitId || null,
     p_checklist_type: checklistType,
+    p_scope: scope,
   });
 }
 
-export function setMyOperationItem(itemId, completed, { note = '', photoUrl = '' } = {}) {
+export function setMyOperationItem(itemId, status, { note = '', photoUrl = '' } = {}) {
   return call('set_my_operation_item', {
     p_item_id: itemId,
-    p_completed: Boolean(completed),
+    p_status: status,
     p_note: note || null,
     p_photo_url: photoUrl || null,
+  });
+}
+
+export function confirmMyOperationShift(businessUnitId, checklistType) {
+  return call('confirm_operation_shift', {
+    p_business_unit_id: businessUnitId || null,
+    p_checklist_type: checklistType,
   });
 }
