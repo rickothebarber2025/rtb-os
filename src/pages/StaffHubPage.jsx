@@ -1132,12 +1132,6 @@ export default function StaffHubPage({
           id: 'performance',
           label: 'Performance',
         },
-        {
-          description: 'Imported appointments and schedule data',
-          icon: CalendarDays,
-          id: 'insights',
-          label: 'Schedule',
-        },
       ];
   const moreOptions = staffOnlyPortal ? [] : [
     {

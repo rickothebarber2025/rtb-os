@@ -128,7 +128,6 @@ export default function SystemPage({
   const quickActions = [
     ['staff', 'Fix roster mistake', 'Edit, deactivate, restore, delete, or move staff to probation.'],
     ['payroll', 'Correct payroll', 'Delete drafts or create a correction draft from finalized payroll.'],
-    ['insights', 'Refresh appointments', 'Import Booksy PDF/HTML or sync Square appointment data.'],
     ['booth-rent', 'Fix booth rent', 'Edit, reopen, mark paid, or remove rent records.'],
     ['operations', 'Update SOPs/forms', 'Adjust workflows, checklists, templates, and change log.'],
     ['access', 'Manage access', 'Invite, revoke, restore, or change admin and manager roles.'],

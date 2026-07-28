@@ -126,8 +126,6 @@ export function buildSystemChecks({
     const age = daysSince(start, now);
     return age !== null && age > 90;
   });
-  const appointmentAge = daysSince(masterDashboardUpdatedAt || masterDashboard?.updatedAt, now);
-  const isBeauty = businessUnit?.name === 'RTB Beauty Lounge';
 
   addCheck(checks, {
     action: 'dashboard',
@@ -165,34 +163,6 @@ export function buildSystemChecks({
         : 'No payroll runs saved yet',
       label: 'Payroll',
       tone: latestRun ? 'success' : 'warning',
-    });
-  }
-
-  addCheck(checks, {
-    action: 'insights',
-    detail: masterDashboard
-      ? appointmentAge === null
-        ? 'Appointment data saved'
-        : `Updated ${appointmentAge} day${appointmentAge === 1 ? '' : 's'} ago`
-      : isBeauty
-        ? 'Square appointment data not imported yet'
-        : 'Booksy report not imported yet',
-    label: isBeauty ? 'Square appointments' : 'Booksy report',
-    tone: masterDashboard ? (appointmentAge !== null && appointmentAge > 14 ? 'warning' : 'success') : 'warning',
-  });
-
-  if (isBeauty) {
-    const squareConnectionDetail = squareStatus?.connected
-      ? squareStatus.connection?.status === 'direct_token'
-        ? 'Square production token sync is ready'
-        : 'Square connection is active'
-      : squareStatus?.setup?.message || 'Square production token setup is needed';
-
-    addCheck(checks, {
-      action: 'insights',
-      detail: squareConnectionDetail,
-      label: 'Square connection',
-      tone: squareStatus?.connected ? 'success' : 'danger',
     });
   }
 

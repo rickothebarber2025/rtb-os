@@ -173,12 +173,10 @@ export default function DashboardPage({
   const actionSummary = getActionCenterSummary(actionItems);
   const topActions = actionItems.slice(0, 3);
   const workspace = buildRoleWorkspace(accessProfile, navItems, businessUnit);
-  const hasAppointmentSnapshot = Boolean(booksySummary || squareSummary);
   const [mobileTab, setMobileTab] = useState('overview');
   const mobileTabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'actions', label: 'Actions' },
-    ...(hasAppointmentSnapshot ? [{ id: 'appointments', label: 'Appointments' }] : []),
     { id: 'payroll', label: 'Payroll' },
   ];
   const mobileGroupClass = (id) => (mobileTab === id ? 'is-active-mobile-tab' : '');
@@ -522,87 +520,6 @@ export default function DashboardPage({
         </div>
       </section>
 
-      {booksySummary ? (
-        <section className={`panel full-span ${mobileGroupClass('appointments')}`} data-mobile-group="appointments">
-          <div className="section-header">
-            <div>
-              <span>Booksy import</span>
-              <h2>Master dashboard snapshot</h2>
-            </div>
-            <button className="ghost-button" type="button" onClick={() => setActivePage('insights')}>
-              Open insights
-            </button>
-          </div>
-
-          <div className="snapshot-grid">
-            <div>
-              <CalendarDays size={18} />
-              <span>YTD revenue</span>
-              <strong>{formatCurrency(booksySummary.ytdRevenue)}</strong>
-            </div>
-            <div>
-              <Users size={18} />
-              <span>All-time clients</span>
-              <strong>{formatNumber(booksySummary.allTimeClients)}</strong>
-            </div>
-            <div>
-              <AlertTriangle size={18} />
-              <span>Slipping away</span>
-              <strong>{formatNumber(booksySummary.slippingAwayClients)}</strong>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {isBeautyLounge && squareSummary ? (
-        <section className={`panel full-span ${mobileGroupClass('appointments')}`} data-mobile-group="appointments">
-          <div className="section-header">
-            <div>
-              <span>Square Appointments</span>
-              <h2>Beauty Lounge appointment snapshot</h2>
-            </div>
-            <button className="ghost-button" type="button" onClick={() => setActivePage('insights')}>
-              Open insights
-            </button>
-          </div>
-
-          <div className="snapshot-grid">
-            <div>
-              <CalendarDays size={18} />
-              <span>Estimated sales</span>
-              <strong>{formatCurrency(squareSummary.ytdRevenue)}</strong>
-            </div>
-            <div>
-              <Users size={18} />
-              <span>Clients</span>
-              <strong>{formatNumber(squareSummary.allTimeClients)}</strong>
-            </div>
-            <div>
-              <AlertTriangle size={18} />
-              <span>Synced appts</span>
-              <strong>{formatNumber(squareSummary.completedAppointments)}</strong>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {isBeautyLounge && !squareSummary ? (
-        <section className={`panel full-span ${mobileGroupClass('appointments')}`} data-mobile-group="appointments">
-          <div className="section-header">
-            <div>
-              <span>Square Appointments</span>
-              <h2>Beauty Lounge appointment source</h2>
-            </div>
-            <button className="ghost-button" type="button" onClick={() => setActivePage('insights')}>
-              Open insights
-            </button>
-          </div>
-          <p className="subtle-text">
-            RTB Beauty Lounge uses Square Appointments. Import Square Appointments data to
-            fill this snapshot.
-          </p>
-        </section>
-      ) : null}
 
       {payrollAllowed ? (
       <section className={`panel two-thirds ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">

@@ -27,7 +27,6 @@ import { shouldAutoGraduate, toGraduationPayload } from './utils/probation';
 const AccessPage = lazy(() => import('./pages/AccessPage'));
 const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
 const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
-const BooksyInsightsPage = lazy(() => import('./pages/BooksyInsightsPage'));
 const BoothRentPage = lazy(() => import('./pages/BoothRentPage'));
 const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -231,12 +230,6 @@ export default function App() {
         return (
           <ModuleGate module="performance">
             <PerformancePage {...pageProps} />
-          </ModuleGate>
-        );
-      case 'insights':
-        return (
-          <ModuleGate module="appointments">
-            <BooksyInsightsPage {...pageProps} />
           </ModuleGate>
         );
       case 'customer-intelligence':

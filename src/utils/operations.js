@@ -12,13 +12,6 @@ export function daysSince(value, now = new Date()) {
   return Math.max(0, Math.floor((startOfUtcDay(now) - startOfUtcDay(parsed)) / DAY_MS));
 }
 
-function ageLabel(days) {
-  if (days === null) return 'No data saved';
-  if (days === 0) return 'Updated today';
-  if (days === 1) return 'Updated yesterday';
-  return `Updated ${days} days ago`;
-}
-
 export function buildOperationalChecks({
   activeStaffCount,
   appointmentUpdatedAt,
@@ -49,30 +42,6 @@ export function buildOperationalChecks({
       tone: payrollAge === null ? 'danger' : payrollAge > 10 ? 'warning' : 'success',
     });
   }
-
-  const sourceAge = daysSince(appointmentUpdatedAt, now);
-  const isBeauty = businessUnitName === 'RTB Beauty Lounge';
-  const isAllBusinesses = businessUnitName === 'All Businesses';
-  let appointmentDetail = ageLabel(sourceAge);
-  let appointmentTone = sourceAge === null ? 'danger' : sourceAge > 14 ? 'warning' : 'success';
-
-  if (isAllBusinesses) {
-    appointmentDetail = 'Select one business to import appointment data';
-    appointmentTone = 'muted';
-  } else if (isBeauty && squareStatus?.connected === false) {
-    appointmentDetail = squareStatus?.setup?.message || 'Square production token setup is needed';
-    appointmentTone = 'danger';
-  } else if (isBeauty && squareStatus === null) {
-    appointmentDetail = 'Square status could not be verified';
-    appointmentTone = 'warning';
-  }
-
-  checks.push({
-    action: 'insights',
-    detail: appointmentDetail,
-    label: isAllBusinesses ? 'Appointment imports' : isBeauty ? 'Square Appointments' : 'Booksy report',
-    tone: appointmentTone,
-  });
 
   checks.push({
     action: 'booth-rent',
