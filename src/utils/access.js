@@ -93,6 +93,10 @@ export function canManageAppointments(profile) {
   return hasModulePermission(profile, 'appointments', 'edit');
 }
 
+export function canDeleteBoothRent(profile) {
+  return hasModulePermission(profile, 'booth_rent', 'admin');
+}
+
 export function canManageOperations(profile) {
   return hasModulePermission(profile, 'operations', 'edit');
 }
