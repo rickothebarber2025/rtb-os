@@ -278,7 +278,6 @@ export const FORM_TEMPLATES = [
           'Performance Review - staff keeps 55% - if standards drop',
           'Growth - staff keeps 65% - by management approval',
           'Elite - staff keeps 70% - top performers, limited spots',
-          'Booth Rent - weekly rent model',
         ],
       ],
       [

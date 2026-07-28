@@ -635,29 +635,6 @@ export default function DashboardPage({
           </div>
         </div>
       </section>
-
-      <section className={`panel ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
-        <div className="section-header">
-          <div>
-            <span>Booth rent</span>
-            <h2>Open balances</h2>
-          </div>
-        </div>
-        <div className="stat-list">
-          {openBoothRent.slice(0, 4).map((record) => (
-            <div key={record.id}>
-              <span>{record.renter_name}</span>
-              <strong>{formatCurrency(record.rent_amount)}</strong>
-            </div>
-          ))}
-          {!openBoothRent.length ? (
-            <div>
-              <span>No open records</span>
-              <strong>{formatCurrency(0)}</strong>
-            </div>
-          ) : null}
-        </div>
-      </section>
     </div>
   );
 }

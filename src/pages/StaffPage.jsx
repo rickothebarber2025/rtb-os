@@ -870,7 +870,6 @@ export default function StaffPage({
                 >
                   <option value="Commission">Commission</option>
                   <option value="Fixed rate">Fixed rate</option>
-                  <option value="Booth rent">Booth rent</option>
                   <option value="Probation">Probation</option>
                 </select>
               </label>
