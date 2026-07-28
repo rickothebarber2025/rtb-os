@@ -40,7 +40,6 @@ function tableButtonLabel(label, count) {
 
 export default function SystemPage({
   accessProfile,
-  boothRent,
   businessUnit,
   businessUnits,
   masterDashboard,
@@ -64,7 +63,6 @@ export default function SystemPage({
     () =>
       createBackupSnapshot({
         accessProfile,
-        boothRent,
         businessUnit,
         businessUnits,
         masterDashboard,
@@ -79,7 +77,6 @@ export default function SystemPage({
       }),
     [
       accessProfile,
-      boothRent,
       businessUnit,
       businessUnits,
       masterDashboard,
@@ -98,7 +95,6 @@ export default function SystemPage({
     () =>
       buildSystemChecks({
         accessProfile,
-        boothRent,
         businessUnit,
         masterDashboard,
         masterDashboardUpdatedAt,
@@ -109,7 +105,6 @@ export default function SystemPage({
       }),
     [
       accessProfile,
-      boothRent,
       businessUnit,
       masterDashboard,
       masterDashboardUpdatedAt,
@@ -128,7 +123,6 @@ export default function SystemPage({
   const quickActions = [
     ['staff', 'Fix roster mistake', 'Edit, deactivate, restore, delete, or move staff to probation.'],
     ['payroll', 'Correct payroll', 'Delete drafts or create a correction draft from finalized payroll.'],
-    ['booth-rent', 'Fix booth rent', 'Edit, reopen, mark paid, or remove rent records.'],
     ['operations', 'Update SOPs/forms', 'Adjust workflows, checklists, templates, and change log.'],
     ['access', 'Manage access', 'Invite, revoke, restore, or change admin and manager roles.'],
   ].filter(([page]) => canAccessPage(accessProfile, page));
@@ -168,18 +162,6 @@ export default function SystemPage({
       filename: `${businessSlug}-payroll-entries.csv`,
       label: 'Payroll entries',
       rows: payrollEntries,
-    },
-    {
-      filename: `${businessSlug}-booth-rent.csv`,
-      label: 'Booth rent',
-      rows: boothRent.map((record) => ({
-        amount: record.rent_amount,
-        notes: record.notes,
-        paid: record.paid,
-        paid_at: record.paid_at,
-        renter: record.renter_name,
-        week: record.week_label,
-      })),
     },
     {
       filename: `${businessSlug}-performance.csv`,
@@ -304,7 +286,7 @@ export default function SystemPage({
         </div>
         <p className="subtle-text">
           Use the full backup before big cleanup work. Use CSV exports when you want a spreadsheet
-          copy for payroll, staff, booth rent, or performance records.
+          copy for payroll, staff, or performance records.
         </p>
         <div className="system-export-grid">
           <button className="primary-button" type="button" onClick={downloadBackup}>

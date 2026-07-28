@@ -29,7 +29,6 @@ const FILTERS = [
   { id: 'urgent', label: 'Urgent' },
   { id: 'probation', label: 'Probation' },
   { id: 'payroll', label: 'Payroll' },
-  { id: 'booth', label: 'Booth rent' },
   { id: 'warning', label: 'Warnings' },
   { id: 'docs', label: 'Documents' },
 ];
@@ -93,7 +92,6 @@ function matchesCurrentStaff(record, staffIds, businessUnitId) {
 export default function ActionCenterPage({
   accessProfile,
   actionCenter,
-  boothRent,
   businessUnit,
   onRefresh,
   payrollRuns,
@@ -134,11 +132,10 @@ export default function ActionCenterPage({
         accessProfile,
         actionCenter: localState,
         businessUnitId: scopedBusinessUnitId,
-        boothRent,
         payrollRuns,
         staff,
       }),
-    [accessProfile, boothRent, localState, payrollRuns, scopedBusinessUnitId, staff],
+    [accessProfile, localState, payrollRuns, scopedBusinessUnitId, staff],
   );
   const summary = getActionCenterSummary(items);
   const filteredItems = items.filter((item) => {
@@ -266,7 +263,7 @@ export default function ActionCenterPage({
           <h2>Action Center</h2>
           <p>
             The issues that need attention come to you: probation deadlines, payroll drafts,
-            overdue booth rent, staff warnings, and missing onboarding documents.
+            staff warnings, and missing onboarding documents.
           </p>
         </div>
         <button className="secondary-button" type="button" onClick={onRefresh}>

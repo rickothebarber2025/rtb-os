@@ -14,11 +14,9 @@ export const STAFF_HUB_COMMISSION_TIERS = [
   { label: 'Performance Review', rule: '55/45', note: 'If standards drop' },
   { label: 'Growth Performer', rule: '65/35', note: 'Management approval' },
   { label: 'Elite RTB', rule: '70/30 max', note: 'Top performers' },
-  { label: 'Booth Rent', rule: 'Keep 100%', note: 'Rent model' },
 ];
 
 const TIER_LABELS = {
-  booth: 'Booth Rent Tier',
   elite: 'Elite RTB Tier',
   growth: 'Growth Performer Tier',
   performance: 'Performance Review Tier',

@@ -412,7 +412,7 @@ export default function AiConsultantPage({ businessUnit, staff, performanceSumma
           </div>
         </div>
         <p className="subtle-text">
-          Ask about staff, payroll, performance, time off, booth rent, or customer feedback --
+          Ask about staff, payroll, performance, time off, or customer feedback --
           "Who needs attention this week?" or "What's hurting profit?"
         </p>
         <form className="form-grid" onSubmit={askAssistant}>

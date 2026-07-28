@@ -15,7 +15,6 @@ export function daysSince(value, now = new Date()) {
 export function buildOperationalChecks({
   activeStaffCount,
   appointmentUpdatedAt,
-  boothRentCount,
   businessUnitName,
   latestRun,
   payrollAllowed,
@@ -42,13 +41,6 @@ export function buildOperationalChecks({
       tone: payrollAge === null ? 'danger' : payrollAge > 10 ? 'warning' : 'success',
     });
   }
-
-  checks.push({
-    action: 'booth-rent',
-    detail: boothRentCount ? `${boothRentCount} saved rent records` : 'No rent records saved',
-    label: 'Booth rent',
-    tone: boothRentCount ? 'success' : 'muted',
-  });
 
   checks.push({
     action: 'operations',

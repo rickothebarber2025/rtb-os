@@ -66,18 +66,6 @@ export const COMMISSION_TIERS = [
     split: '70 / 30',
     tone: 'gold',
   },
-  {
-    duration: 'Long-term option',
-    expectations: [
-      'Independent operation under RTB',
-      'Manage own clientele and schedule',
-      'Maintain RTB standards and reputation',
-    ],
-    name: 'Booth Rent Tier',
-    notes: ['Pay weekly booth rent', 'Keep 100% of services'],
-    split: 'Keep 100%',
-    tone: 'neutral',
-  },
 ];
 
 export const HIRE_STEPS = [

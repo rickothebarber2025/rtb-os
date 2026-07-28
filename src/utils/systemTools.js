@@ -44,7 +44,6 @@ export function flattenPayrollEntries(payrollRuns = []) {
 
 export function createBackupSnapshot({
   accessProfile,
-  boothRent = [],
   businessUnit,
   businessUnits = [],
   masterDashboard,
@@ -67,7 +66,6 @@ export function createBackupSnapshot({
     selectedBusiness: businessUnit?.name || null,
     summary: {
       activeStaff: staff.filter((member) => member.active).length,
-      boothRentRecords: boothRent.length,
       businessUnits: businessUnits.length,
       monthlyPerformanceRows: monthlyPerformanceSummary.length,
       payrollRuns: payrollRuns.length,
@@ -77,7 +75,6 @@ export function createBackupSnapshot({
     tables: {
       appointmentDashboard: masterDashboard || null,
       appointmentDashboardUpdatedAt: masterDashboardUpdatedAt || null,
-      boothRent,
       businessUnits,
       monthlyPerformanceSummary,
       payrollEntries: flattenPayrollEntries(payrollRuns),
@@ -107,7 +104,6 @@ function addCheck(checks, check) {
 
 export function buildSystemChecks({
   accessProfile,
-  boothRent = [],
   businessUnit,
   masterDashboard,
   masterDashboardUpdatedAt,
@@ -119,7 +115,6 @@ export function buildSystemChecks({
 }) {
   const checks = [];
   const activeStaff = staff.filter((member) => member.active);
-  const openBoothRent = boothRent.filter((record) => !record.paid);
   const probationStaff = activeStaff.filter((member) => member.tier === 'probation');
   const overdueProbation = probationStaff.filter((member) => {
     const start = member.probation_start_date || member.start_date;
@@ -167,15 +162,6 @@ export function buildSystemChecks({
   }
 
   addCheck(checks, {
-    action: 'booth-rent',
-    detail: openBoothRent.length
-      ? `${openBoothRent.length} open rent record${openBoothRent.length === 1 ? '' : 's'}`
-      : 'No open rent records',
-    label: 'Booth rent',
-    tone: openBoothRent.length ? 'warning' : 'success',
-  });
-
-  addCheck(checks, {
     action: 'operations',
     detail: 'SOPs, forms, training, and change log available',
     label: 'Operations',
@@ -200,7 +186,6 @@ export function buildSupportSummary(snapshot, checks) {
     `User role: ${snapshot.exportedBy.role || 'unknown'}`,
     `Active staff: ${snapshot.summary.activeStaff}`,
     `Payroll runs: ${snapshot.summary.payrollRuns}`,
-    `Booth rent records: ${snapshot.summary.boothRentRecords}`,
     `Performance rows: ${snapshot.summary.performanceRows}`,
     `Warnings: ${snapshot.summary.warnings}`,
     '',

@@ -27,7 +27,6 @@ import { shouldAutoGraduate, toGraduationPayload } from './utils/probation';
 const AccessPage = lazy(() => import('./pages/AccessPage'));
 const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
 const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
-const BoothRentPage = lazy(() => import('./pages/BoothRentPage'));
 const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const OperationsPage = lazy(() => import('./pages/OperationsPage'));
@@ -140,7 +139,6 @@ export default function App() {
   const pageProps = useMemo(
     () => ({
       actionCenter: data.actionCenter,
-      boothRent: data.boothRent,
       instagramInsights: data.instagramInsights,
       businessUnit: data.selectedBusinessUnit,
       businessUnits: data.businessUnits,
@@ -236,12 +234,6 @@ export default function App() {
         return (
           <ModuleGate module="performance">
             <CustomerIntelligencePage {...pageProps} />
-          </ModuleGate>
-        );
-      case 'booth-rent':
-        return (
-          <ModuleGate module="booth_rent">
-            <BoothRentPage {...pageProps} />
           </ModuleGate>
         );
       case 'operations':

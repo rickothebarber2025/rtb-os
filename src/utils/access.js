@@ -89,14 +89,6 @@ export function canAdminPayroll(profile) {
   return hasModulePermission(profile, 'payroll', 'admin');
 }
 
-export function canManageBoothRent(profile) {
-  return hasModulePermission(profile, 'booth_rent', 'edit');
-}
-
-export function canDeleteBoothRent(profile) {
-  return hasModulePermission(profile, 'booth_rent', 'admin');
-}
-
 export function canManageAppointments(profile) {
   return hasModulePermission(profile, 'appointments', 'edit');
 }

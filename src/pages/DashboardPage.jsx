@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
-  ReceiptText,
   Store,
   TrendingUp,
   Users,
@@ -103,7 +102,6 @@ function formatBestPostingWindows(hourMap) {
 export default function DashboardPage({
   accessProfile,
   actionCenter,
-  boothRent,
   businessUnit,
   businessUnits,
   instagramInsights,
@@ -135,11 +133,6 @@ export default function DashboardPage({
     (member) => !member.fixed_rate && member.tier !== 'probation',
   );
   const latestRun = payrollRuns[0];
-  const openBoothRent = boothRent.filter((record) => !record.paid);
-  const boothBalance = openBoothRent.reduce(
-    (total, record) => total + Number(record.rent_amount || 0),
-    0,
-  );
   const performanceTotal = performanceSummary.reduce(
     (total, row) => total + Number(row.total_net_sales || 0),
     0,
@@ -156,7 +149,6 @@ export default function DashboardPage({
     appointmentUpdatedAt: masterDashboard
       ? masterDashboardUpdatedAt || masterDashboard.updatedAt
       : null,
-    boothRentCount: boothRent.length,
     businessUnitName: businessUnit?.name,
     latestRun,
     payrollAllowed,
@@ -166,7 +158,6 @@ export default function DashboardPage({
     accessProfile,
     actionCenter,
     businessUnitId: allBusinessesView ? null : businessUnit?.id,
-    boothRent,
     payrollRuns,
     staff,
   });
@@ -373,12 +364,6 @@ export default function DashboardPage({
                 : '$0'
               : formatCompactCurrency(appointmentSummary?.ytdRevenue)
           }
-        />
-        <MetricCard
-          icon={ReceiptText}
-          label="Open booth rent"
-          trend={`${openBoothRent.length} open records`}
-          value={formatCompactCurrency(boothBalance)}
         />
         <MetricCard
           icon={TrendingUp}

@@ -794,7 +794,6 @@ export default function StaffPage({
                   <option value="standard">standard</option>
                   <option value="growth">growth</option>
                   <option value="elite">elite</option>
-                  <option value="booth">booth</option>
                 </select>
               </label>
               <label className="field">
@@ -1049,7 +1048,7 @@ export default function StaffPage({
           }
           description={
             confirmAction.type === 'delete'
-              ? `Delete ${confirmAction.member.full_name}? Profiles linked to payroll, performance, or booth rent cannot be deleted and should be deactivated instead.`
+              ? `Delete ${confirmAction.member.full_name}? Profiles linked to payroll or performance records cannot be deleted and should be deactivated instead.`
               : confirmAction.type === 'graduate'
                 ? `Graduate ${confirmAction.member.full_name} early to Standard RTB at 60%?`
                 : `Deactivate ${confirmAction.member.full_name}? Their history stays intact and you can restore them later.`

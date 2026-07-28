@@ -73,7 +73,7 @@ export function enrichStaffWithBusinessMetadata(staff, metadata, businessUnits) 
       booking_platform_profile: record.booking_platform_profile || member.full_name || '',
       commission_type:
         record.commission_type ||
-        (member.fixed_rate ? 'Fixed rate' : member.tier === 'booth' ? 'Booth rent' : 'Commission'),
+        (member.fixed_rate ? 'Fixed rate' : 'Commission'),
       instagram_handle: instagramHandle,
       instagram_manual_override: record.instagram_manual_override,
       instagram_rule: record.instagram_rule || profile.instagram_format,

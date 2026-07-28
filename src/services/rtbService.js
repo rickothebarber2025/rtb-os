@@ -418,11 +418,10 @@ export async function deleteStaff(staffId) {
   const linkedCounts = await Promise.all([
     getLinkedRecordCount('payroll_entries', staffId),
     getLinkedRecordCount('performance_history', staffId),
-    getLinkedRecordCount('booth_rent', staffId),
   ]);
 
   if (linkedCounts.some((count) => count > 0)) {
-    throw new Error('This staff profile is tied to payroll, performance, or booth rent records. Deactivate it to keep history safe.');
+    throw new Error('This staff profile is tied to payroll or performance records. Deactivate it to keep history safe.');
   }
 
   return requireData(await client.from('staff').delete().eq('id', staffId));
@@ -650,17 +649,6 @@ export async function getInstagramInsights(businessUnitId) {
     .maybeSingle();
   if (error) throw error;
   return data;
-}
-
-export async function getBoothRent(businessUnitId) {
-  const client = requireClient();
-  return requireData(
-    await client
-      .from('booth_rent')
-      .select('*')
-      .eq('business_unit_id', businessUnitId)
-      .order('created_at', { ascending: false }),
-  );
 }
 
 export async function getAppSetting(key) {
@@ -1401,46 +1389,6 @@ export async function syncSquareAppointments(businessUnitId, options = {}) {
     endDate: options.endDate,
     startDate: options.startDate,
   });
-}
-
-export async function saveBoothRent(record) {
-  const client = requireClient();
-  const payload = cleanObject({
-    business_unit_id: record.business_unit_id,
-    notes: record.notes || null,
-    paid: Boolean(record.paid),
-    paid_at: record.paid ? record.paid_at || new Date().toISOString() : null,
-    rent_amount: Number(record.rent_amount || 0),
-    renter_name: record.renter_name,
-    staff_id: record.staff_id || null,
-    week_label: record.week_label || null,
-  });
-
-  if (record.id) {
-    return requireData(
-      await client.from('booth_rent').update(payload).eq('id', record.id).select().single(),
-    );
-  }
-
-  return requireData(await client.from('booth_rent').insert(payload).select().single());
-}
-
-export async function toggleBoothRentPaid(record) {
-  const client = requireClient();
-  const paid = !record.paid;
-  return requireData(
-    await client
-      .from('booth_rent')
-      .update({ paid, paid_at: paid ? new Date().toISOString() : null })
-      .eq('id', record.id)
-      .select()
-      .single(),
-  );
-}
-
-export async function deleteBoothRent(recordId) {
-  const client = requireClient();
-  return requireData(await client.from('booth_rent').delete().eq('id', recordId));
 }
 
 export async function getPublicFeedbackSurvey(token) {

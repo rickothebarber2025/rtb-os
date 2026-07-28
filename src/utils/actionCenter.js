@@ -4,10 +4,8 @@ import {
   CalendarClock,
   ClipboardList,
   FileWarning,
-  ReceiptText,
 } from 'lucide-react';
 import { canUsePayroll } from './access.js';
-import { formatCurrency } from './formatters.js';
 import { getProbationInfo, toDateKey as toLocalDateKey } from './probation.js';
 
 export const ACTION_CENTER_SETTING_KEY = 'rtb_action_center';
@@ -20,7 +18,6 @@ const PRIORITY_RANK = {
 };
 
 const CATEGORY_LABELS = {
-  booth: 'Booth rent',
   docs: 'Documents',
   payroll: 'Payroll',
   probation: 'Probation',
@@ -28,7 +25,6 @@ const CATEGORY_LABELS = {
 };
 
 export const ACTION_CENTER_ICONS = {
-  booth: ReceiptText,
   docs: ClipboardList,
   payroll: BadgeDollarSign,
   probation: CalendarClock,
@@ -87,10 +83,6 @@ function priorityForDaysLeft(daysLeft) {
   if (daysLeft < 0) return 'urgent';
   if (daysLeft <= 5) return 'high';
   return 'medium';
-}
-
-function createdDaysAgo(record, now) {
-  return daysBetween(record.created_at || record.inserted_at || record.updated_at || now, now);
 }
 
 function buildItem({
@@ -167,34 +159,6 @@ function buildPayrollItems(payrollRuns, accessProfile) {
   ];
 }
 
-function buildBoothRentItems(boothRent, now) {
-  const overdueRecords = boothRent.filter((record) => {
-    if (record.paid) return false;
-    const age = createdDaysAgo(record, now);
-    return age === null || age >= 7;
-  });
-
-  if (!overdueRecords.length) return [];
-
-  const total = overdueRecords.reduce(
-    (sum, record) => sum + Number(record.rent_amount || 0),
-    0,
-  );
-
-  return [
-    buildItem({
-      actionLabel: 'Open booth rent',
-      category: 'booth',
-      detail: `${overdueRecords.map((record) => record.renter_name).join(', ')} - ${formatCurrency(total)} open.`,
-      id: 'booth-rent-overdue',
-      page: 'booth-rent',
-      priority: overdueRecords.length > 2 ? 'high' : 'medium',
-      source: 'Booth rent',
-      title: `${plural(overdueRecords.length, 'booth rent payment')} overdue`,
-    }),
-  ];
-}
-
 function buildWarningItems(warnings, now) {
   const month = thisMonthKey(now);
   const activeWarnings = warnings.filter((warning) => !warning.resolved_at);
@@ -266,7 +230,6 @@ export function buildActionCenterItems({
   accessProfile,
   actionCenter,
   businessUnitId = null,
-  boothRent = [],
   payrollRuns = [],
   staff = [],
   now = new Date(),
@@ -282,7 +245,6 @@ export function buildActionCenterItems({
   const items = [
     ...buildProbationItems(staff, now),
     ...buildPayrollItems(payrollRuns, accessProfile),
-    ...buildBoothRentItems(boothRent, now),
     ...buildWarningItems(scopedWarnings, now),
     ...buildDocumentItems(scopedDocuments, now),
   ];
