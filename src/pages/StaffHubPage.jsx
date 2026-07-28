@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
+import OpeningClosingChecklist from '../components/OpeningClosingChecklist';
 import StatusBadge from '../components/StatusBadge';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
 import {
@@ -1833,23 +1834,11 @@ export default function StaffHubPage({
               <div className="staff-hub-progress-track">
                 <span style={{ width: `${dailyOperations.checklistCompletion}%` }} />
               </div>
-              <div className="daily-ops-mini-list">
-                {dailyOperations.todayChecklistRuns.length ? (
-                  dailyOperations.todayChecklistRuns.slice(0, 4).map((run) => (
-                    <div key={run.id}>
-                      <strong>{formatCategory(run.checklist_type)}</strong>
-                      <span>{formatCategory(run.status)} · {formatNumber(run.items?.filter((item) => item.completed).length || 0)} done</span>
-                    </div>
-                  ))
-                ) : (
-                  <div>
-                    <strong>No checklist started</strong>
-                    <span>Opening and closing checklist runs will appear here.</span>
-                  </div>
-                )}
-              </div>
+              <p className="subtle-text">Full station and shared checklists are below.</p>
             </article>
           </section>
+
+          <OpeningClosingChecklist businessUnitId={operationsBusinessId} />
 
           <section className="daily-ops-grid full-span">
             <article className="panel daily-ops-card daily-ops-card--wide">

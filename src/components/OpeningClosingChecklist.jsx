@@ -1,0 +1,323 @@
+import { useEffect, useState } from 'react';
+import { Camera, CheckCircle2, Lock, MessageSquareText, RotateCcw, XCircle } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import {
+  claimMyOperationChecklist,
+  confirmMyOperationShift,
+  getMyDailyOperations,
+  setMyOperationItem,
+} from '../services/staffOperationsService';
+
+const CHECKLIST_TYPES = [
+  { id: 'opening', label: 'Opening' },
+  { id: 'closing', label: 'Closing' },
+];
+
+const STATUS_LABEL = {
+  completed: 'Done',
+  could_not_complete: 'Could not complete',
+  skipped: 'Skipped',
+};
+
+function defaultChecklistType() {
+  // Reasonable default so staff land on the right list without thinking
+  // about it -- afternoon/evening defaults to closing, everything else
+  // defaults to opening. They can still switch manually either way.
+  return new Date().getHours() >= 15 ? 'closing' : 'opening';
+}
+
+async function uploadChecklistPhoto(itemId, file) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const extension = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `checklist-photos/${itemId}-${Date.now()}.${extension}`;
+  const { error } = await supabase.storage.from('hub-content').upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from('hub-content').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export default function OpeningClosingChecklist({ businessUnitId, readOnly }) {
+  const [checklistType, setChecklistType] = useState(defaultChecklistType);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [working, setWorking] = useState('');
+  const [drafts, setDrafts] = useState({});
+
+  async function load() {
+    if (!businessUnitId) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const result = await getMyDailyOperations(businessUnitId);
+      setData(result);
+    } catch (err) {
+      setError(err.message || 'Unable to load checklists.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessUnitId]);
+
+  if (!businessUnitId) return null;
+
+  const stationRun = data?.checklists?.find((run) => run.type === checklistType && run.scope === 'station') || null;
+  const sharedRun = data?.checklists?.find((run) => run.type === checklistType && run.scope === 'shared') || null;
+
+  async function handleClaim(scope) {
+    setWorking(`claim-${scope}`);
+    setError('');
+    try {
+      await claimMyOperationChecklist(businessUnitId, checklistType, scope);
+      await load();
+    } catch (err) {
+      setError(err.message || 'Unable to start this checklist.');
+    } finally {
+      setWorking('');
+    }
+  }
+
+  async function handleSetStatus(item, status) {
+    const note = drafts[item.id]?.note ?? item.note ?? '';
+    if (status !== 'completed' && item.required && !note.trim()) {
+      setError(`Add a note explaining why "${item.label}" wasn't completed.`);
+      return;
+    }
+    setWorking(item.id);
+    setError('');
+    try {
+      await setMyOperationItem(item.id, status, { note, photoUrl: item.photo_url || '' });
+      await load();
+    } catch (err) {
+      setError(err.message || 'Unable to update this task.');
+    } finally {
+      setWorking('');
+    }
+  }
+
+  async function handlePhoto(item, file) {
+    if (!file) return;
+    setWorking(`${item.id}-photo`);
+    setError('');
+    try {
+      const photoUrl = await uploadChecklistPhoto(item.id, file);
+      const note = drafts[item.id]?.note ?? item.note ?? '';
+      const nextStatus = item.status === 'pending' ? 'completed' : item.status;
+      await setMyOperationItem(item.id, nextStatus, { note, photoUrl });
+      await load();
+    } catch (err) {
+      setError(err.message || 'Unable to upload that photo.');
+    } finally {
+      setWorking('');
+    }
+  }
+
+  async function handleConfirm() {
+    setWorking('confirm');
+    setError('');
+    try {
+      const result = await confirmMyOperationShift(businessUnitId, checklistType);
+      if (!result?.confirmed) {
+        setError(result?.message || 'Some required tasks still need to be completed or explained.');
+      } else {
+        await load();
+      }
+    } catch (err) {
+      setError(err.message || 'Unable to confirm this shift.');
+    } finally {
+      setWorking('');
+    }
+  }
+
+  function renderItem(item) {
+    const isPending = item.status === 'pending';
+    const busy = working === item.id || working === `${item.id}-photo`;
+
+    return (
+      <div className={`occ-item occ-item--${item.status}`} key={item.id}>
+        <div className="occ-item__main">
+          <span className="occ-item__label">
+            {item.label}
+            {!item.required ? <em> (optional)</em> : null}
+          </span>
+          {!isPending ? (
+            <small className="occ-item__meta">
+              {STATUS_LABEL[item.status] || item.status}
+              {item.completed_by_name ? ` by ${item.completed_by_name}` : ''}
+            </small>
+          ) : null}
+          {item.note ? (
+            <small className="occ-item__note">
+              <MessageSquareText size={12} /> {item.note}
+            </small>
+          ) : null}
+          {item.photo_url ? (
+            <a className="occ-item__photo-link" href={item.photo_url} rel="noreferrer" target="_blank">
+              <Camera size={12} /> View photo
+            </a>
+          ) : null}
+        </div>
+
+        {isPending ? (
+          <div className="occ-item__actions">
+            <input
+              className="occ-item__note-input"
+              disabled={readOnly || busy}
+              onChange={(event) =>
+                setDrafts((current) => ({ ...current, [item.id]: { note: event.target.value } }))
+              }
+              placeholder="Optional note"
+              value={drafts[item.id]?.note ?? ''}
+            />
+            <div className="occ-item__buttons">
+              <button
+                className="ghost-button small success-action"
+                disabled={readOnly || busy}
+                onClick={() => handleSetStatus(item, 'completed')}
+                type="button"
+              >
+                <CheckCircle2 size={14} /> Done
+              </button>
+              <button
+                className="ghost-button small"
+                disabled={readOnly || busy}
+                onClick={() => handleSetStatus(item, 'skipped')}
+                type="button"
+              >
+                Skip
+              </button>
+              <button
+                className="ghost-button small danger-action"
+                disabled={readOnly || busy}
+                onClick={() => handleSetStatus(item, 'could_not_complete')}
+                type="button"
+              >
+                <XCircle size={14} /> Can't complete
+              </button>
+              <label className="ghost-button small occ-photo-button">
+                <Camera size={14} />
+                <input
+                  accept="image/*"
+                  disabled={readOnly || busy}
+                  hidden
+                  onChange={(event) => handlePhoto(item, event.target.files?.[0])}
+                  type="file"
+                />
+              </label>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="ghost-button small"
+            disabled={readOnly || busy}
+            onClick={() => handleSetStatus(item, 'pending')}
+            type="button"
+          >
+            <RotateCcw size={14} /> Reopen
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  function renderChecklist(run, scope, title, description) {
+    if (!run) {
+      return (
+        <div className="occ-claim-card">
+          <div>
+            <strong>{title}</strong>
+            <p>{description}</p>
+          </div>
+          <button
+            className="secondary-button small"
+            disabled={readOnly || working === `claim-${scope}`}
+            onClick={() => handleClaim(scope)}
+            type="button"
+          >
+            {working === `claim-${scope}` ? 'Starting...' : 'Start checklist'}
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="occ-checklist">
+        <div className="occ-checklist__header">
+          <strong>{run.completion_percent}% complete</strong>
+          {run.final_confirmed_at ? (
+            <span className="occ-confirmed-badge">
+              <Lock size={12} /> Confirmed by {run.final_confirmed_by_name}
+            </span>
+          ) : null}
+        </div>
+        <div className="occ-item-list">{run.items.map(renderItem)}</div>
+      </div>
+    );
+  }
+
+  return (
+    <section className="panel full-span occ-panel">
+      <div className="section-header">
+        <div>
+          <span>Opening / Closing</span>
+          <h2>Station and shared responsibilities</h2>
+        </div>
+        <div className="occ-type-toggle">
+          {CHECKLIST_TYPES.map((type) => (
+            <button
+              className={checklistType === type.id ? 'active' : ''}
+              key={type.id}
+              onClick={() => setChecklistType(type.id)}
+              type="button"
+            >
+              {type.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error ? <div className="alert danger">{error}</div> : null}
+
+      {loading ? (
+        <p className="subtle-text">Loading checklists...</p>
+      ) : (
+        <div className="occ-grid">
+          <div className="occ-column">
+            <h3>My Station / Work Area</h3>
+            {renderChecklist(stationRun, 'station', 'My Station', 'Your own station -- only you can complete these.')}
+          </div>
+          <div className="occ-column">
+            <h3>Shared Shop Responsibilities</h3>
+            {renderChecklist(
+              sharedRun,
+              'shared',
+              'Shared Shop',
+              'Claim any task you personally complete -- everyone can see who did what.',
+            )}
+            {sharedRun ? (
+              <button
+                className="primary-button occ-confirm-button"
+                disabled={readOnly || working === 'confirm' || Boolean(sharedRun.final_confirmed_at)}
+                onClick={handleConfirm}
+                type="button"
+              >
+                <Lock size={16} />
+                {sharedRun.final_confirmed_at
+                  ? `Confirmed by ${sharedRun.final_confirmed_by_name}`
+                  : `Confirm shop ${checklistType === 'opening' ? 'opened' : 'closed'}`}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
