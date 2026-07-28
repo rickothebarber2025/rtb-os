@@ -23,10 +23,10 @@ bundle a snapshot of the site into the app. This means:
 
 - Capacitor installed and initialized (`capacitor.config.ts`)
 - iOS platform scaffolded (`ios/App/App.xcodeproj`)
-- Bundle ID: `com.rtbheadquarters.os`
+- Bundle ID: `com.rtbheadquaters.os`
 - Display name: RTB OS
 - Native auth callback registered:
-  `com.rtbheadquarters.os://auth/callback`
+  `com.rtbheadquaters.os://auth/callback`
 
 ## What's left — needs a Mac with Xcode
 
@@ -38,7 +38,7 @@ bundle a snapshot of the site into the app. This means:
 3. **Signing**: in Xcode, under Signing & Capabilities, select your
    Apple Developer team and let Xcode manage signing automatically.
 4. **App Store Connect**: create the app record there (bundle ID
-   `com.rtbheadquarters.os`, matching what's already configured
+   `com.rtbheadquaters.os`, matching what's already configured
    here), fill in the required metadata (screenshots, description,
    support URL, privacy policy URL, age rating, etc. — same as any
    public app, since unlisted apps go through the identical
@@ -80,5 +80,5 @@ Supabase Auth must allow this native callback URL in addition to the
 live website URLs:
 
 ```
-com.rtbheadquarters.os://auth/callback
+com.rtbheadquaters.os://auth/callback
 ```
