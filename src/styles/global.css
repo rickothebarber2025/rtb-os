@@ -13634,3 +13634,110 @@ tbody tr:hover,
   margin-top: var(--space-3);
   width: 100%;
 }
+
+.chp-panel .section-header {
+  margin-top: var(--space-4);
+}
+
+.chp-range-toggle {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.chp-range-toggle button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.9rem;
+}
+
+.chp-range-toggle button.active {
+  background: var(--shell-accent-strong);
+  border-color: var(--shell-accent-strong);
+  color: var(--shell-bg, #0b0e14);
+}
+
+.chp-participation-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.chp-participation-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.2rem;
+  padding: var(--space-3);
+}
+
+.chp-participation-completed {
+  color: var(--success, #4ade80);
+  font-size: 0.75rem;
+}
+
+.chp-participation-missed {
+  color: var(--warning, #facc15);
+  font-size: 0.72rem;
+}
+
+.chp-missed-list,
+.chp-runs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.chp-missed-item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.chp-missed-item > div {
+  flex: 1;
+}
+
+.chp-missed-item p {
+  color: var(--faint);
+  font-size: 0.8rem;
+  margin: 0.3rem 0;
+}
+
+.chp-missed-no-note {
+  font-style: italic;
+}
+
+.chp-missed-item a {
+  align-items: center;
+  color: var(--shell-accent-strong);
+  display: flex;
+  font-size: 0.75rem;
+  gap: 0.3rem;
+  width: fit-content;
+}
+
+.chp-run-row {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-3);
+}
+
+.chp-confirmed {
+  align-items: center;
+  color: var(--success, #4ade80);
+  display: flex;
+  font-size: 0.75rem;
+  gap: 0.3rem;
+}

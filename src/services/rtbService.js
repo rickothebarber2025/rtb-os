@@ -706,6 +706,29 @@ function applyBusinessScope(query, businessUnitId) {
   return query.eq('business_unit_id', businessUnitId);
 }
 
+// Manager-facing: full checklist history with per-item completer names,
+// for the Operations "Checklists" tab. Regular staff can call this too --
+// RLS still applies -- but they'll only get back runs they have access to
+// (their own station runs, or shared runs for a business they belong to),
+// not the full cross-staff history a manager sees.
+export async function getChecklistHistory(businessUnitId, days = 14) {
+  const client = requireClient();
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const query = client
+    .from('operation_checklist_runs')
+    .select(
+      '*,items:operation_checklist_run_items(*,completed_by:completed_by_staff_id(full_name)),owner:staff_id(full_name),confirmed_by:final_confirmed_by(full_name)',
+    )
+    .gte('run_date', since.toISOString().slice(0, 10))
+    .order('run_date', { ascending: false });
+
+  if (businessUnitId) query.eq('business_unit_id', businessUnitId);
+
+  return requireData(await query);
+}
+
 export async function getStaffHubRecords({ businessUnitId = null, staffId = null } = {}) {
   const client = requireClient();
   const [

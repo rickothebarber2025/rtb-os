@@ -7,17 +7,19 @@ import {
   Download,
   FileText,
   GraduationCap,
+  ListChecks,
   Plus,
   RefreshCw,
   SquarePen,
   Trash2,
 } from 'lucide-react';
+import ChecklistHistoryPanel from '../components/ChecklistHistoryPanel';
 import ConfirmDialog from '../components/ConfirmDialog';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
 import { getAppSetting, saveAppSetting } from '../services/rtbService';
 import { canAdminOperations, canManageOperations } from '../utils/access';
-import { getCombinedStaffRoles, getStaffRolesForBusinessName } from '../utils/businessProfiles';
+import { getCombinedStaffRoles, getStaffRolesForBusinessName, isAllBusinessesUnit } from '../utils/businessProfiles';
 import {
   COMMISSION_TIERS,
   FINANCE_CLOSE_STEPS,
@@ -36,6 +38,7 @@ import {
 
 const TAB_ITEMS = [
   { icon: ClipboardCheck, id: 'sops', label: 'SOPs' },
+  { icon: ListChecks, id: 'checklists', label: 'Checklists' },
   { icon: ClipboardList, id: 'hiring', label: 'Hiring' },
   { icon: FileText, id: 'forms', label: 'Forms' },
   { icon: GraduationCap, id: 'training', label: 'Training' },
@@ -933,7 +936,14 @@ export default function OperationsPage({ accessProfile, businessUnit, staff }) {
     );
   }
 
+  function renderChecklists() {
+    return (
+      <ChecklistHistoryPanel businessUnitId={isAllBusinessesUnit(businessUnit) ? null : businessUnit?.id} />
+    );
+  }
+
   function renderActiveTab() {
+    if (activeTab === 'checklists') return renderChecklists();
     if (activeTab === 'hiring') return renderHiring();
     if (activeTab === 'forms') return renderForms();
     if (activeTab === 'training') return renderTraining();
