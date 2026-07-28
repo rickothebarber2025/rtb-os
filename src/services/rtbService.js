@@ -602,6 +602,23 @@ export async function savePerformanceFromRun(runId) {
   if (result.error) throw result.error;
 }
 
+export async function getReviews(businessUnitId, days = 60) {
+  const client = requireClient();
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  let query = client
+    .from('reviews')
+    .select('id,business_unit_id,staff_id,source,reviewer_name,rating,review_text,source_timestamp,assignment_status,assignment_confidence')
+    .gte('created_at', since.toISOString())
+    .order('source_timestamp', { ascending: false, nullsFirst: false })
+    .limit(200);
+
+  if (businessUnitId) query = query.eq('business_unit_id', businessUnitId);
+
+  return requireData(await query);
+}
+
 export async function getPerformanceSummary(businessUnitId) {
   const client = requireClient();
   let query = client

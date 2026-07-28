@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Award, BarChart3, Download, TrendingDown, TrendingUp, WalletCards } from 'lucide-react';
+import { Award, BarChart3, Download, RefreshCw, Star, TrendingDown, TrendingUp, WalletCards } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import ProbationProgressCard from '../components/ProbationProgressCard';
 import StatusBadge from '../components/StatusBadge';
+import {
+  getReviews,
+  syncRankingCoachReviews,
+} from '../services/rtbService';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -24,6 +28,7 @@ function monthLabel(value) {
 }
 
 export default function PerformancePage({
+  accessProfile,
   businessUnit,
   monthlyPerformanceSummary,
   performanceSummary,
@@ -32,12 +37,71 @@ export default function PerformancePage({
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const [certificateError, setCertificateError] = useState('');
   const [certificateLoading, setCertificateLoading] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsSyncing, setReviewsSyncing] = useState(false);
+  const [reviewsError, setReviewsError] = useState('');
+  const [reviewsNotice, setReviewsNotice] = useState('');
   const availableMonths = useMemo(
     () => [...new Set(monthlyPerformanceSummary.map((row) => row.month_start))],
     [monthlyPerformanceSummary],
   );
   const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || '');
   const staffById = useMemo(() => new Map(staff.map((member) => [member.id, member])), [staff]);
+  const scopedBusinessId = allBusinessesView ? null : businessUnit?.id;
+
+  async function loadReviews() {
+    setReviewsLoading(true);
+    setReviewsError('');
+    try {
+      const rows = await getReviews(scopedBusinessId);
+      setReviews(rows || []);
+    } catch (err) {
+      setReviewsError(err.message || 'Unable to load reviews.');
+    } finally {
+      setReviewsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedBusinessId]);
+
+  async function handleSyncReviews() {
+    if (allBusinessesView) {
+      setReviewsError('Choose one business before syncing reviews.');
+      return;
+    }
+    setReviewsSyncing(true);
+    setReviewsError('');
+    setReviewsNotice('');
+    try {
+      const result = await syncRankingCoachReviews(scopedBusinessId, { maxMessages: 25 });
+      setReviewsNotice(
+        `Synced: ${result.inserted ?? 0} new, ${result.updated ?? 0} updated, ${result.unresolved ?? 0} need review.`,
+      );
+      await loadReviews();
+    } catch (err) {
+      setReviewsError(err.message || 'Review sync failed.');
+    } finally {
+      setReviewsSyncing(false);
+    }
+  }
+
+  const reviewCountsByStaff = useMemo(() => {
+    const counts = new Map();
+    reviews.forEach((review) => {
+      if (!review.staff_id) return;
+      const current = counts.get(review.staff_id) || { count: 0, totalRating: 0 };
+      counts.set(review.staff_id, {
+        count: current.count + 1,
+        totalRating: current.totalRating + Number(review.rating || 0),
+      });
+    });
+    return counts;
+  }, [reviews]);
+
   const performanceFeedback = useMemo(
     () => buildStaffPerformanceFeedback(performanceSummary, staff),
     [performanceSummary, staff],
@@ -118,6 +182,57 @@ export default function PerformancePage({
           trend={`${totals.adjustedWeeks} adjusted weeks`}
           value={totals.underMinimumWeeks}
         />
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div>
+            <span>Reviews</span>
+            <h2>{reviews.length} in the last 60 days</h2>
+          </div>
+          <button
+            className="secondary-button"
+            disabled={reviewsSyncing || allBusinessesView}
+            onClick={handleSyncReviews}
+            title={allBusinessesView ? 'Choose one business to sync reviews.' : undefined}
+            type="button"
+          >
+            <RefreshCw size={16} />
+            {reviewsSyncing ? 'Syncing...' : 'Sync reviews'}
+          </button>
+        </div>
+        {reviewsError ? <div className="alert danger">{reviewsError}</div> : null}
+        {reviewsNotice ? <div className="alert success">{reviewsNotice}</div> : null}
+        {reviewsLoading ? (
+          <p className="subtle-text">Loading reviews...</p>
+        ) : reviews.length ? (
+          <div className="stat-list">
+            {staff
+              .filter((member) => reviewCountsByStaff.has(member.id))
+              .sort(
+                (a, b) =>
+                  (reviewCountsByStaff.get(b.id)?.count || 0) - (reviewCountsByStaff.get(a.id)?.count || 0),
+              )
+              .map((member) => {
+                const summary = reviewCountsByStaff.get(member.id);
+                const avgRating = summary.count ? (summary.totalRating / summary.count).toFixed(1) : '--';
+                return (
+                  <div key={member.id}>
+                    <span>{member.full_name}</span>
+                    <strong>
+                      <Star size={14} /> {summary.count} · {avgRating} avg
+                    </strong>
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Star}
+            title="No reviews synced yet"
+            message="Click Sync reviews to pull in new Google reviews from rankingCoach's forwarded emails."
+          />
+        )}
       </section>
 
       <section className="panel full-span certificate-panel">
