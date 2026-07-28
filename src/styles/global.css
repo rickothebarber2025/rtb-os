@@ -13680,6 +13680,539 @@ tbody tr:hover,
   font-size: 0.75rem;
 }
 
+/* ============================================================
+   Calm product UI pass
+   This final layer intentionally wins over older experimental
+   overrides. It keeps RTB OS dark and branded, but removes the
+   noisy stacked-dashboard feel so the app is easier to scan on
+   desktop, iPad, and phone.
+   ============================================================ */
+:root {
+  --rtb-bg: #0b1018;
+  --rtb-bg-2: #101824;
+  --rtb-surface: rgba(20, 28, 40, 0.84);
+  --rtb-surface-2: rgba(26, 36, 51, 0.72);
+  --rtb-border: rgba(231, 226, 214, 0.1);
+  --rtb-border-strong: rgba(231, 226, 214, 0.18);
+  --rtb-text: #f8f4ec;
+  --rtb-muted: #a9b3c0;
+  --rtb-faint: #788596;
+  --rtb-gold: #d6ad52;
+  --rtb-rose: #f3a8c8;
+  --rtb-teal: #7ed7d0;
+  --radius: 14px;
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at 18% -10%, color-mix(in srgb, var(--shell-accent) 22%, transparent), transparent 34rem),
+    radial-gradient(circle at 92% 8%, rgba(126, 215, 208, 0.1), transparent 28rem),
+    linear-gradient(135deg, var(--rtb-bg), #0d131d 48%, #080c12);
+  color: var(--rtb-text);
+}
+
+.app-shell.theme-lounge {
+  --shell-accent: var(--rtb-gold);
+  --shell-accent-strong: #f0cd72;
+  --shell-accent-soft: rgba(214, 173, 82, 0.13);
+}
+
+.app-shell.theme-beauty {
+  --shell-accent: var(--rtb-rose);
+  --shell-accent-strong: #ffd3e6;
+  --shell-accent-soft: rgba(243, 168, 200, 0.14);
+}
+
+.app-shell.theme-combined {
+  --shell-accent: var(--rtb-teal);
+  --shell-accent-strong: #b4fff7;
+  --shell-accent-soft: rgba(126, 215, 208, 0.12);
+}
+
+body {
+  background: var(--rtb-bg);
+}
+
+.app-ambient {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025), transparent 30%),
+    radial-gradient(circle at 78% 0%, color-mix(in srgb, var(--shell-accent) 18%, transparent), transparent 26rem);
+  opacity: 0.7;
+}
+
+.sidebar,
+.topbar,
+.mobile-tabbar {
+  background: rgba(8, 12, 18, 0.82);
+  border-color: var(--rtb-border);
+  box-shadow: none;
+}
+
+.sidebar {
+  backdrop-filter: blur(22px);
+  padding: 1rem 0.8rem;
+}
+
+.sidebar::before,
+.hero-panel::after,
+.metric-card::before {
+  display: none !important;
+}
+
+.sidebar__brand {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--rtb-border);
+  border-radius: 16px;
+  margin-bottom: 0.9rem;
+  padding: 0.65rem;
+}
+
+.sidebar__brand strong,
+.topbar__title h1,
+.hero-panel h2,
+.metric-card strong {
+  color: var(--rtb-text);
+  letter-spacing: 0;
+}
+
+.sidebar__brand span,
+.topbar__title span,
+.hero-panel p,
+.metric-card p,
+.metric-card span,
+.section-header span,
+.subtle-text {
+  color: var(--rtb-muted);
+}
+
+.sidebar .brand-mark,
+.staff-hub-logo,
+.hero-brand-logo {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--shell-accent) 32%, var(--rtb-border));
+  border-radius: 12px;
+}
+
+.sidebar__nav {
+  gap: 0.55rem;
+  margin-top: 0.4rem;
+}
+
+.nav-group {
+  display: grid;
+  gap: 0.26rem;
+}
+
+.nav-group__label {
+  color: var(--rtb-faint);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 0.7rem 0.18rem;
+}
+
+.nav-item {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #c8d0da;
+  gap: 0.68rem;
+  justify-content: flex-start;
+  min-height: 42px;
+  padding: 0 0.72rem;
+}
+
+.nav-item svg {
+  color: var(--rtb-faint);
+}
+
+.nav-item.active,
+.nav-item:hover {
+  background: color-mix(in srgb, var(--shell-accent) 13%, rgba(255, 255, 255, 0.035));
+  border-color: color-mix(in srgb, var(--shell-accent) 34%, transparent);
+  box-shadow: none;
+  color: var(--rtb-text);
+}
+
+.nav-item.active svg,
+.nav-item:hover svg {
+  color: var(--shell-accent-strong);
+}
+
+.sidebar__footer {
+  color: var(--rtb-faint);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.topbar {
+  min-height: 70px;
+  padding: 0.8rem 1.3rem;
+}
+
+.topbar__kicker {
+  color: var(--shell-accent-strong) !important;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.topbar__title h1 {
+  font-size: clamp(1.15rem, 2.2vw, 1.42rem);
+}
+
+.topbar__actions {
+  gap: 0.5rem;
+}
+
+.topbar__status {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--rtb-border);
+  border-radius: 999px;
+  color: var(--rtb-muted);
+  min-height: 38px;
+  padding: 0 0.75rem;
+}
+
+.business-selector,
+.role-pill,
+.user-chip,
+.icon-button,
+.secondary-button,
+.ghost-button,
+.segmented-control,
+.toolbar,
+input,
+select,
+textarea {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: var(--rtb-border);
+  box-shadow: none;
+}
+
+.business-selector {
+  border-radius: 12px;
+  color: var(--rtb-text);
+  min-width: min(250px, 34vw);
+}
+
+.role-pill.admin,
+.badge.gold,
+.segmented-control button.active,
+.toolbar button.active {
+  background: var(--shell-accent-soft);
+  border-color: color-mix(in srgb, var(--shell-accent) 35%, transparent);
+  color: var(--shell-accent-strong);
+}
+
+.primary-button {
+  background: linear-gradient(135deg, var(--shell-accent-strong), var(--shell-accent));
+  border: 0;
+  color: #07101a;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--shell-accent) 22%, transparent);
+}
+
+.content {
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.page-grid {
+  gap: 0.95rem;
+}
+
+.panel,
+.hero-panel,
+.metric-card,
+.stat-strip,
+.staff-hub-app-card,
+.staff-hub-pro-dashboard,
+.staff-hub-command-panel,
+.daily-ops-card,
+.access-gate,
+.auth-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.028));
+  border: 1px solid var(--rtb-border);
+  border-radius: 16px;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.2);
+}
+
+.panel {
+  padding: 0.95rem;
+}
+
+.hero-panel {
+  min-height: 136px;
+  padding: 1.15rem;
+}
+
+.hero-panel h2 {
+  font-size: clamp(1.7rem, 3.2vw, 2.9rem);
+  max-width: 720px;
+}
+
+.metric-card {
+  min-height: 108px;
+  padding: 0.9rem;
+}
+
+.metric-card:hover,
+.panel:hover,
+.staff-hub-app-card:hover {
+  border-color: color-mix(in srgb, var(--shell-accent) 24%, var(--rtb-border));
+  transform: none;
+}
+
+.metric-card__icon {
+  background: var(--shell-accent-soft);
+  border-color: color-mix(in srgb, var(--shell-accent) 26%, transparent);
+  border-radius: 12px;
+  color: var(--shell-accent-strong);
+}
+
+.alert {
+  border-radius: 12px;
+}
+
+.alert.warning {
+  background: color-mix(in srgb, var(--shell-accent) 11%, rgba(255, 255, 255, 0.04));
+  border-color: color-mix(in srgb, var(--shell-accent) 28%, transparent);
+}
+
+/* Staff Hub: show one clean header and one real tab strip. */
+.staff-hub-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.staff-hub-page .staff-hub-pro-dashboard,
+.staff-hub-page .staff-hub-command-panel,
+.staff-hub-page .staff-hub-tabs-panel {
+  display: none !important;
+}
+
+.staff-hub-hero {
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.06), transparent 62%),
+    color-mix(in srgb, var(--shell-accent) 10%, rgba(12, 18, 27, 0.86));
+}
+
+.staff-hub-brand-lockup {
+  gap: 0.9rem;
+}
+
+.staff-hub-logo-stack {
+  min-width: 84px;
+}
+
+.staff-hub-logo {
+  height: 64px;
+  width: 64px;
+}
+
+.staff-hub-avatar {
+  border: 2px solid var(--rtb-bg);
+  height: 34px;
+  width: 34px;
+}
+
+.staff-hub-hero h2 {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1.02;
+}
+
+.staff-hub-hero p {
+  max-width: 560px;
+}
+
+.staff-hub-account-card {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--rtb-border);
+  border-radius: 14px;
+  min-width: 190px;
+  padding: 0.85rem;
+}
+
+.staff-hub-sticky-tabs {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: var(--rtb-border);
+  border-radius: 14px;
+  margin-bottom: 0;
+  padding: 0.32rem;
+}
+
+.staff-hub-sticky-tabs button {
+  border-radius: 11px;
+  color: var(--rtb-muted);
+  min-height: 38px;
+}
+
+.staff-hub-sticky-tabs button.active {
+  background: var(--shell-accent-soft);
+  border-color: color-mix(in srgb, var(--shell-accent) 34%, transparent);
+  color: var(--shell-accent-strong);
+}
+
+.daily-ops-hero {
+  align-items: center;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--shell-accent) 18%, transparent), transparent 18rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025));
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.daily-ops-hero h2 {
+  font-size: clamp(1.35rem, 2.7vw, 2.1rem);
+}
+
+.daily-ops-hero p {
+  color: var(--rtb-muted);
+  max-width: 620px;
+}
+
+.daily-ops-score {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid color-mix(in srgb, var(--shell-accent) 28%, var(--rtb-border));
+  border-radius: 16px;
+}
+
+.daily-ops-status-grid button,
+.daily-ops-task-list button,
+.daily-ops-mini-list div,
+.daily-ops-shift-times div {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: var(--rtb-border);
+  border-radius: 12px;
+}
+
+.daily-ops-status-grid button.active,
+.daily-ops-status-grid button:hover:not(:disabled) {
+  background: var(--shell-accent-soft);
+  border-color: color-mix(in srgb, var(--shell-accent) 34%, transparent);
+}
+
+.mobile-app-nav {
+  pointer-events: none;
+}
+
+.mobile-tabbar {
+  pointer-events: auto;
+  background: rgba(9, 13, 20, 0.9);
+  border: 1px solid var(--rtb-border);
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+}
+
+.mobile-tabbar__item {
+  border-radius: 16px;
+  color: var(--rtb-muted);
+}
+
+.mobile-tabbar__item.active,
+.app-shell .mobile-tabbar__item.active {
+  background: var(--shell-accent-soft);
+  color: var(--shell-accent-strong);
+}
+
+@media (max-width: 1024px) {
+  .topbar {
+    gap: 0.65rem;
+    min-height: 64px;
+    padding: 0.65rem 0.9rem;
+  }
+
+  .topbar__status,
+  .topbar__user-controls .role-pill {
+    display: none;
+  }
+
+  .topbar__business {
+    min-width: 0;
+  }
+
+  .business-selector {
+    min-width: min(48vw, 260px);
+  }
+
+  .content {
+    padding: 0.85rem 0.85rem calc(6.6rem + env(safe-area-inset-bottom));
+  }
+
+  .staff-hub-page {
+    max-width: 100%;
+  }
+
+  .staff-hub-sticky-tabs {
+    margin-inline: -0.85rem;
+    padding-inline: 0.85rem;
+    top: 64px;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbar__title h1 {
+    font-size: 1.04rem;
+  }
+
+  .topbar__title span {
+    font-size: 0.64rem;
+  }
+
+  .topbar__user-controls .user-chip,
+  .topbar__user-controls .icon-button:first-of-type {
+    display: none;
+  }
+
+  .business-selector {
+    min-width: 42vw;
+  }
+
+  .hero-panel,
+  .daily-ops-hero {
+    border-radius: 18px;
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 0;
+  }
+
+  .staff-hub-brand-lockup {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-logo-stack {
+    display: none;
+  }
+
+  .staff-hub-account-card {
+    width: 100%;
+  }
+
+  .daily-ops-grid,
+  .metrics-grid,
+  .page-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel,
+  .metric-card,
+  .daily-ops-card {
+    border-radius: 16px;
+  }
+
+  .mobile-tabbar {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    padding: 0.26rem;
+  }
+
+  .mobile-tabbar__item {
+    min-height: 48px;
+  }
+}
+
 .chp-participation-missed {
   color: var(--warning, #facc15);
   font-size: 0.72rem;

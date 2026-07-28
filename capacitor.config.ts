@@ -1,5 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+const liveRtbOsUrl = 'https://rtbheadquaters.com';
+
 // Remote/hosted mode: the native shell loads the live site directly
 // (server.url) instead of bundling a snapshot of dist/ into the app
 // package. This matters a lot for RTB OS specifically -- the team
@@ -15,11 +17,14 @@ const config: CapacitorConfig = {
   appName: 'RTB OS',
   webDir: 'dist',
   server: {
-    url: 'https://rtbheadquaters.com',
+    url: liveRtbOsUrl,
     cleartext: false,
+    allowNavigation: ['rtbheadquaters.com', 'www.rtbheadquaters.com'],
   },
   ios: {
-    contentInset: 'automatic',
+    allowsLinkPreview: false,
+    contentInset: 'never',
+    preferredContentMode: 'mobile',
   },
 };
 

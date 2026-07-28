@@ -161,6 +161,26 @@ export function buildSystemChecks({
     });
   }
 
+  if (businessUnit?.name === 'RTB Beauty Lounge') {
+    addCheck(checks, {
+      action: 'operations',
+      detail: squareStatus?.connected
+        ? 'Square credentials are connected'
+        : 'Square credentials are missing or disconnected',
+      label: 'Square connection',
+      tone: squareStatus?.connected ? 'success' : 'danger',
+    });
+
+    addCheck(checks, {
+      action: 'operations',
+      detail: masterDashboard || masterDashboardUpdatedAt
+        ? `Square appointment data loaded${masterDashboardUpdatedAt ? ` ${masterDashboardUpdatedAt}` : ''}`
+        : 'No Square appointment data has been imported yet',
+      label: 'Square appointments',
+      tone: masterDashboard || masterDashboardUpdatedAt ? 'success' : 'warning',
+    });
+  }
+
   addCheck(checks, {
     action: 'operations',
     detail: 'SOPs, forms, training, and change log available',

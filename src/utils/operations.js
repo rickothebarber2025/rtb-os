@@ -49,6 +49,28 @@ export function buildOperationalChecks({
     tone: 'muted',
   });
 
+  if (businessUnitName === 'RTB Beauty Lounge') {
+    checks.push({
+      action: 'operations',
+      detail: squareStatus?.connected
+        ? 'Square connection is available'
+        : 'Square connection needs attention',
+      label: 'Square Appointments',
+      tone: squareStatus?.connected ? 'success' : 'danger',
+    });
+  } else if (appointmentUpdatedAt) {
+    const appointmentAge = daysSince(appointmentUpdatedAt, now);
+    checks.push({
+      action: 'operations',
+      detail:
+        appointmentAge === 0
+          ? 'Appointment import updated today'
+          : `${appointmentAge} days since appointment import`,
+      label: 'Appointment imports',
+      tone: appointmentAge !== null && appointmentAge <= 7 ? 'success' : 'warning',
+    });
+  }
+
   checks.push({
     action: 'system',
     detail: 'Health checks, backups, exports, and recovery shortcuts',

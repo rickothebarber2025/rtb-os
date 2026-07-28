@@ -25,12 +25,12 @@ bundle a snapshot of the site into the app. This means:
 - iOS platform scaffolded (`ios/App/App.xcodeproj`)
 - Bundle ID: `com.rtbheadquarters.os`
 - Display name: RTB OS
+- Native auth callback registered:
+  `com.rtbheadquarters.os://auth/callback`
 
 ## What's left — needs a Mac with Xcode
 
-1. **Open the project**: `ios/App/App.xcworkspace` (not `.xcodeproj`
-   — Capacitor uses CocoaPods/Swift Package Manager, so the
-   `.xcworkspace` is the one that actually builds).
+1. **Open the project**: `ios/App/App.xcodeproj`.
 2. **App icon and launch screen**: replace the placeholder assets in
    `ios/App/App/Assets.xcassets/AppIcon.appiconset` and
    `Splash.imageset` with real RTB branding. A 1024x1024 icon is the
@@ -72,4 +72,13 @@ live):
 ```
 npm run build
 npx cap sync ios
+```
+
+## Required Supabase Auth redirect URL
+
+Supabase Auth must allow this native callback URL in addition to the
+live website URLs:
+
+```
+com.rtbheadquarters.os://auth/callback
 ```

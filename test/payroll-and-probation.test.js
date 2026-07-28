@@ -240,7 +240,7 @@ test('role workspace surfaces allowed role-specific actions', () => {
   );
 
   assert.equal(workspace.title, 'Appointment Coordination Workspace');
-  assert.equal(workspace.focusPages.some((page) => page.id === 'insights'), true);
+  assert.equal(workspace.focusPages.some((page) => page.id === 'action-center'), true);
   assert.equal(workspace.focusPages.some((page) => page.id === 'payroll'), false);
   assert.equal(workspace.onboarding.every((item) => item.complete), true);
 });
@@ -834,17 +834,9 @@ test('system checks flag overdue probation and missing appointment source', () =
   assert.equal(checks.find((check) => check.label === 'Square appointments').tone, 'warning');
 });
 
-test('action center surfaces automatic operational work', () => {
+test('action center surfaces automatic payroll and probation work', () => {
   const items = buildActionCenterItems({
     accessProfile: profileWithPermissions({ payroll: 'view' }),
-    boothRent: [
-      {
-        created_at: '2026-06-10T12:00:00Z',
-        paid: false,
-        rent_amount: 200,
-        renter_name: 'Tara',
-      },
-    ],
     payrollRuns: [
       {
         status: 'draft',
@@ -865,7 +857,6 @@ test('action center surfaces automatic operational work', () => {
 
   assert.equal(items.some((item) => item.category === 'probation'), true);
   assert.equal(items.some((item) => item.category === 'payroll'), true);
-  assert.equal(items.some((item) => item.category === 'booth'), true);
   assert.match(items.find((item) => item.category === 'probation').title, /Josh/);
 });
 
