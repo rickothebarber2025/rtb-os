@@ -61,7 +61,7 @@ function attachArrowNavigation(container, buttons, selectTab) {
 function enhanceDashboard() {
   const page = document.querySelector('.dashboard-page');
   const originalNav = page?.querySelector('.dashboard-mobile-tabs');
-  if (!page || !originalNav || originalNav.dataset.enhanced === 'true') return () => {};
+  if (!page || !originalNav || originalNav.dataset.enhanced === 'true') return null;
 
   originalNav.dataset.enhanced = 'true';
   originalNav.setAttribute('role', 'tablist');
@@ -83,7 +83,7 @@ function enhanceDashboard() {
     .map((group) => group.id)
     .filter((id) => groupedSections.some((section) => section.dataset.mobileGroup === id));
 
-  if (!availableIds.length) return () => {};
+  if (!availableIds.length) return null;
 
   originalNav.replaceChildren();
   const buttons = availableIds.map((id) => {
@@ -110,16 +110,20 @@ function enhanceDashboard() {
     return button;
   });
 
+  const firstPanelByGroup = new Set();
   groupedSections.forEach((section, index) => {
     const group = section.dataset.mobileGroup;
     section.setAttribute('role', 'tabpanel');
-    section.id ||= `dashboard-panel-${group}-${index}`;
-    if (!page.querySelector(`#dashboard-panel-${group}`)) {
+    if (!firstPanelByGroup.has(group)) {
       section.id = `dashboard-panel-${group}`;
+      firstPanelByGroup.add(group);
+    } else {
+      section.id ||= `dashboard-panel-${group}-${index}`;
     }
   });
 
-  let activeId = availableIds.includes(readSection()) ? readSection() : availableIds[0];
+  const requestedSection = readSection();
+  let activeId = availableIds.includes(requestedSection) ? requestedSection : availableIds[0];
 
   const selectTab = (id, shouldScroll = true) => {
     if (!availableIds.includes(id)) return;
@@ -151,7 +155,7 @@ function enhanceStaffHub() {
   const page = document.querySelector('.staff-hub-page');
   const stickyNav = page?.querySelector('.staff-hub-sticky-tabs');
   const legacyPanel = page?.querySelector('.staff-hub-tabs-panel');
-  if (!page || !stickyNav || stickyNav.dataset.enhanced === 'true') return () => {};
+  if (!page || !stickyNav || stickyNav.dataset.enhanced === 'true') return null;
 
   stickyNav.dataset.enhanced = 'true';
   stickyNav.setAttribute('role', 'tablist');
@@ -181,8 +185,10 @@ function enhanceStaffHub() {
     validIds.push(mappedId);
   });
 
-  const originalClick = new Map();
-  let activeId = validIds.includes(readSection()) ? readSection() : buttons.find((button) => button.classList.contains('active'))?.dataset.tabId || validIds[0];
+  const requestedSection = readSection();
+  let activeId = validIds.includes(requestedSection)
+    ? requestedSection
+    : buttons.find((button) => button.classList.contains('active'))?.dataset.tabId || validIds[0];
 
   const markPanels = () => {
     Array.from(page.querySelectorAll('[data-tab], [data-tab-panel], .staff-hub-tab-content')).forEach((panel, index) => {
@@ -208,7 +214,6 @@ function enhanceStaffHub() {
       window.requestAnimationFrame(() => selectTab(button.dataset.tabId));
     };
     button.addEventListener('click', onClick);
-    originalClick.set(button, onClick);
     return () => button.removeEventListener('click', onClick);
   });
 
@@ -230,13 +235,15 @@ function enhanceStaffHub() {
 
 export default function MobileNavigationEnhancer() {
   useEffect(() => {
-    let cleanups = [];
+    const cleanups = [];
     let scheduled = false;
 
     const applyEnhancements = () => {
       scheduled = false;
-      cleanups.forEach((cleanup) => cleanup());
-      cleanups = [enhanceDashboard(), enhanceStaffHub()];
+      const dashboardCleanup = enhanceDashboard();
+      const staffHubCleanup = enhanceStaffHub();
+      if (dashboardCleanup) cleanups.push(dashboardCleanup);
+      if (staffHubCleanup) cleanups.push(staffHubCleanup);
     };
 
     const scheduleEnhancements = () => {
@@ -247,7 +254,8 @@ export default function MobileNavigationEnhancer() {
 
     scheduleEnhancements();
     const observer = new MutationObserver(scheduleEnhancements);
-    observer.observe(document.getElementById('root'), { childList: true, subtree: true });
+    const root = document.getElementById('root');
+    if (root) observer.observe(root, { childList: true, subtree: true });
 
     return () => {
       observer.disconnect();
