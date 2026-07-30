@@ -62,11 +62,14 @@ export default function StaffDailyOperationsCard({ businessUnitId }) {
     setError('');
     setNotice('');
     try {
-      await action();
-      setNotice(successMessage);
+      const result = await action();
+      if (result === null || result === undefined) {
+        throw new Error('The database did not confirm this action.');
+      }
       await load();
+      setNotice(successMessage);
     } catch (err) {
-      setError(err.message || 'The operation could not be completed.');
+      setError(err.message || 'The operation could not be completed. Nothing was marked complete.');
     } finally {
       setWorking('');
     }
@@ -76,7 +79,7 @@ export default function StaffDailyOperationsCard({ businessUnitId }) {
     await runAction(
       `item-${item.id}`,
       () => setMyOperationItem(item.id, !item.completed),
-      item.completed ? 'Checklist item reopened.' : 'Checklist item completed.',
+      item.completed ? 'Checklist item reopened.' : 'Checklist item saved and attributed to your account.',
     );
   }
 
@@ -219,7 +222,7 @@ export default function StaffDailyOperationsCard({ businessUnitId }) {
                         onClick={() => toggleItem(item)}
                       >
                         <span>{item.completed ? <Check size={15} /> : null}</span>
-                        {item.label}
+                        {working === `item-${item.id}` ? 'Saving…' : item.label}
                       </button>
                     ))}
                   </div>
