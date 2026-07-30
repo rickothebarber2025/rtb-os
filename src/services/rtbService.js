@@ -1193,3 +1193,528 @@ export async function saveTimeOffRequest(record) {
 
   return requireData(await client.from('staff_time_off_requests').insert(payload).select().single());
 }
+
+export async function decideTimeOffRequest(recordId, status, adminNote = '') {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('staff_time_off_requests')
+      .update({
+        admin_note: adminNote || null,
+        decided_at: new Date().toISOString(),
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', recordId)
+      .select()
+      .single(),
+  );
+}
+
+export async function saveStaffTask(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    business_unit_id: record.business_unit_id || null,
+    category: record.category || 'general',
+    details: record.details || null,
+    due_date: record.due_date || null,
+    staff_id: record.staff_id,
+    status: record.status || 'pending',
+    title: record.title,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (record.id) {
+    return requireData(
+      await client.from('staff_tasks').update(payload).eq('id', record.id).select().single(),
+    );
+  }
+
+  return requireData(await client.from('staff_tasks').insert(payload).select().single());
+}
+
+export async function updateStaffTaskStatus(taskId, status) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('staff_tasks')
+      .update({
+        completed_at: status === 'completed' ? new Date().toISOString() : null,
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', taskId)
+      .select()
+      .single(),
+  );
+}
+
+export async function saveStaffNewsletter(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    business_unit_id: record.business_unit_id || null,
+    client_feedback: record.client_feedback || null,
+    improvements_needed: record.improvements_needed || null,
+    new_services_promos: record.new_services_promos || null,
+    published: Boolean(record.published),
+    reminders: record.reminders || null,
+    top_performer_id: record.top_performer_id || null,
+    top_performer_note: record.top_performer_note || null,
+    updated_at: new Date().toISOString(),
+    week_start: record.week_start,
+    weekly_goals: record.weekly_goals || null,
+  });
+
+  if (record.id) {
+    return requireData(
+      await client
+        .from('staff_newsletters')
+        .update(payload)
+        .eq('id', record.id)
+        .select()
+        .single(),
+    );
+  }
+
+  return requireData(
+    await client
+      .from('staff_newsletters')
+      .upsert(payload, { onConflict: 'business_unit_id,week_start' })
+      .select()
+      .single(),
+  );
+}
+
+export async function saveContentSubmission(record) {
+  const client = requireClient();
+  const payload = cleanObject({
+    business_unit_id: record.business_unit_id || null,
+    caption: record.caption || null,
+    content_type: record.content_type || 'work',
+    media_type: record.media_type || 'idea',
+    media_url: record.media_url || null,
+    staff_id: record.staff_id,
+    status: record.status || 'pending',
+    updated_at: new Date().toISOString(),
+  });
+
+  if (record.id) {
+    return requireData(
+      await client
+        .from('staff_content_submissions')
+        .update(payload)
+        .eq('id', record.id)
+        .select()
+        .single(),
+    );
+  }
+
+  return requireData(
+    await client.from('staff_content_submissions').insert(payload).select().single(),
+  );
+}
+
+export async function decideContentSubmission(recordId, status, adminNote = '') {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('staff_content_submissions')
+      .update({
+        admin_note: adminNote || null,
+        reviewed_at: new Date().toISOString(),
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', recordId)
+      .select()
+      .single(),
+  );
+}
+
+export async function startSquareConnection(businessUnitId) {
+  return invokeFunction('square-appointments', {
+    action: 'start',
+    businessUnitId,
+  });
+}
+
+export async function getSquareStatus(businessUnitId) {
+  return invokeFunction('square-appointments', {
+    action: 'status',
+    businessUnitId,
+  });
+}
+
+export async function syncSquareAppointments(businessUnitId, options = {}) {
+  return invokeFunction('square-appointments', {
+    action: 'sync',
+    businessUnitId,
+    endDate: options.endDate,
+    startDate: options.startDate,
+  });
+}
+
+export async function getPublicFeedbackSurvey(token) {
+  const response = await fetch(getPublicFunctionUrl('feedback-public', { token }), {
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+    },
+  });
+
+  return parseFunctionResponse(response);
+}
+
+export async function submitPublicFeedbackSurvey(token, surveyResponse) {
+  const response = await fetch(getPublicFunctionUrl('feedback-public'), {
+    body: JSON.stringify({ response: surveyResponse, token }),
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+      'Content-Type': 'application/json',
+    },
+    method: 'POST',
+  });
+
+  return parseFunctionResponse(response);
+}
+
+export async function createFeedbackRequest(request) {
+  return invokeFunction('feedback-admin', {
+    action: 'create-request',
+    request,
+  });
+}
+
+export async function dispatchDueFeedbackRequests(businessId = null) {
+  return invokeFunction('feedback-admin', {
+    action: 'dispatch-due',
+    businessId,
+  });
+}
+
+export async function expireOldFeedbackRequests(businessId = null) {
+  return invokeFunction('feedback-admin', {
+    action: 'expire-old',
+    businessId,
+  });
+}
+
+export async function processFeedbackQueue(businessId = null, maxJobs = 5) {
+  return invokeFunction('feedback-worker', {
+    action: 'process',
+    businessId,
+    maxJobs,
+  });
+}
+
+export async function runBusinessConsultantAnalysis(businessId) {
+  return invokeFunction('feedback-worker', {
+    action: 'consultant-report',
+    businessId,
+  });
+}
+
+export async function runStaffPerformanceCoaching(businessId) {
+  return invokeFunction('feedback-worker', {
+    action: 'staff-coaching',
+    businessId,
+  });
+}
+
+export async function askBusinessAssistant(businessId, question) {
+  return invokeFunction('feedback-worker', {
+    action: 'ask',
+    businessId,
+    question,
+  });
+}
+
+export async function draftBusinessNewsletter(businessId, weekStart) {
+  return invokeFunction('feedback-worker', {
+    action: 'draft-newsletter',
+    businessId,
+    weekStart,
+  });
+}
+
+export async function createHubTaskFromAssistant(businessId, task) {
+  return invokeFunction('feedback-worker', {
+    action: 'create-hub-task',
+    businessId,
+    category: task.category,
+    details: task.details,
+    dueDate: task.dueDate,
+    staffId: task.staffId,
+    title: task.title,
+  });
+}
+
+export async function syncBooksyGmail(businessUnitId, options = {}) {
+  return invokeFunction('booksy-gmail-sync', {
+    ...options,
+    businessUnitId,
+  });
+}
+
+export async function reconcileBooksyCsvRows(businessUnitId, rows, options = {}) {
+  return invokeFunction('booksy-csv-reconcile', {
+    ...options,
+    businessUnitId,
+    rows,
+  });
+}
+
+export async function syncGoogleBusinessReviews(businessUnitId, options = {}) {
+  return invokeFunction('google-reviews-sync', {
+    ...options,
+    businessUnitId,
+  });
+}
+
+export async function syncRankingCoachReviews(businessUnitId, options = {}) {
+  return invokeFunction('rankingcoach-review-sync', {
+    ...options,
+    businessUnitId,
+  });
+}
+
+export async function resolveAttributionItem(itemId, action, staffId = null, note = '') {
+  const client = requireClient();
+  return requireData(
+    await client.rpc('resolve_assignment_item', {
+      p_action: action,
+      p_note: note || null,
+      p_staff_id: staffId || null,
+      p_unresolved_item_id: itemId,
+    }),
+  );
+}
+
+export async function getStaffActivityReviewSummary(businessUnitId = null) {
+  const client = requireClient();
+  const query = scopedByBusiness(
+    client.from('staff_activity_review_summary').select('*'),
+    'business_unit_id',
+    businessUnitId,
+  );
+  return requireData(await query);
+}
+
+function scopedByBusiness(query, field, businessUnitId) {
+  return businessUnitId ? query.eq(field, businessUnitId) : query;
+}
+
+export async function getFeedbackDashboard(businessUnitId = null) {
+  const client = requireClient();
+  const summaryQuery = scopedByBusiness(
+    client.from('customer_feedback_summary').select('*'),
+    'business_id',
+    businessUnitId,
+  );
+  const feedbackQuery = scopedByBusiness(
+    client
+      .from('customer_feedback_enriched')
+      .select('*')
+      .order('request_created_at', { ascending: false })
+      .limit(150),
+    'business_id',
+    businessUnitId,
+  );
+  const requestsQuery = scopedByBusiness(
+    client
+      .from('feedback_requests')
+      .select('id,business_id,staff_id,service_name,customer_name,customer_email,customer_phone,status,send_after,sent_at,completed_at,expires_at,created_at')
+      .order('created_at', { ascending: false })
+      .limit(150),
+    'business_id',
+    businessUnitId,
+  );
+  const projectsQuery = scopedByBusiness(
+    client
+      .from('business_improvement_projects')
+      .select('*,tasks:business_improvement_tasks(*)')
+      .order('updated_at', { ascending: false })
+      .limit(100),
+    'business_id',
+    businessUnitId,
+  );
+  const recurringQuery = scopedByBusiness(
+    client
+      .from('feedback_recurring_issues')
+      .select('*')
+      .order('mention_count', { ascending: false }),
+    'business_id',
+    businessUnitId,
+  );
+  const attributionQueueQuery = scopedByBusiness(
+    client
+      .from('attribution_review_queue')
+      .select('*')
+      .eq('status', 'unresolved')
+      .order('created_at', { ascending: false })
+      .limit(100),
+    'business_unit_id',
+    businessUnitId,
+  );
+  const sourceReviewsQuery = scopedByBusiness(
+    client
+      .from('reviews')
+      .select('id,business_unit_id,staff_id,source,reviewer_name,customer_name,rating,review_text,source_timestamp,published_at,location,service_name,assignment_status,assignment_confidence,assignment_reason')
+      .order('source_timestamp', { ascending: false, nullsFirst: false })
+      .limit(100),
+    'business_unit_id',
+    businessUnitId,
+  );
+  const staffActivitySummaryQuery = scopedByBusiness(
+    client.from('staff_activity_review_summary').select('*'),
+    'business_unit_id',
+    businessUnitId,
+  );
+  const syncRunsQuery = scopedByBusiness(
+    client
+      .from('sync_runs')
+      .select('*')
+      .in('source', ['booksy_gmail', 'booksy_csv', 'google_business_profile'])
+      .order('started_at', { ascending: false })
+      .limit(25),
+    'business_unit_id',
+    businessUnitId,
+  );
+
+  const [
+    summary,
+    feedback,
+    requests,
+    projects,
+    recurringIssues,
+    attributionQueue,
+    sourceReviews,
+    staffActivitySummary,
+    syncRuns,
+  ] = await Promise.all([
+    requireData(await summaryQuery),
+    requireData(await feedbackQuery),
+    requireData(await requestsQuery),
+    requireData(await projectsQuery),
+    requireData(await recurringQuery),
+    optionalData(attributionQueueQuery, []),
+    optionalData(sourceReviewsQuery, []),
+    optionalData(staffActivitySummaryQuery, []),
+    optionalData(syncRunsQuery, []),
+  ]);
+
+  return {
+    attributionQueue,
+    feedback,
+    projects,
+    recurringIssues,
+    requests,
+    sourceReviews,
+    staffActivitySummary,
+    summary: businessUnitId ? summary[0] || null : null,
+    summaries: summary,
+    syncRuns,
+  };
+}
+
+export async function getBusinessConsultantData(businessUnitId = null) {
+  const client = requireClient();
+  const sourcesQuery = scopedByBusiness(
+    client
+      .from('business_intelligence_sources')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(150),
+    'business_id',
+    businessUnitId,
+  );
+  const reportsQuery = scopedByBusiness(
+    client
+      .from('ai_business_consultant_reports')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20),
+    'business_id',
+    businessUnitId,
+  );
+  const dashboard = await getFeedbackDashboard(businessUnitId);
+  const [sources, reports] = await Promise.all([
+    requireData(await sourcesQuery),
+    requireData(await reportsQuery),
+  ]);
+
+  return {
+    ...dashboard,
+    latestReport: reports[0] || null,
+    reports,
+    sources,
+  };
+}
+
+export async function saveBusinessIntelligenceSource(source) {
+  const client = requireClient();
+  const payload = cleanObject({
+    body: source.body,
+    business_id: source.business_id,
+    metadata: source.metadata || {},
+    source_date: source.source_date || null,
+    source_type: source.source_type || 'other',
+    title: source.title,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (source.id) {
+    return requireData(
+      await client
+        .from('business_intelligence_sources')
+        .update(payload)
+        .eq('id', source.id)
+        .select()
+        .single(),
+    );
+  }
+
+  return requireData(
+    await client
+      .from('business_intelligence_sources')
+      .insert(payload)
+      .select()
+      .single(),
+  );
+}
+
+export async function deleteBusinessIntelligenceSource(sourceId) {
+  const client = requireClient();
+  return requireData(
+    await client.from('business_intelligence_sources').delete().eq('id', sourceId),
+  );
+}
+
+export async function updateImprovementProject(projectId, updates) {
+  const client = requireClient();
+  return requireData(
+    await client
+      .from('business_improvement_projects')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', projectId)
+      .select('*,tasks:business_improvement_tasks(*)')
+      .single(),
+  );
+}
+
+export async function updateImprovementTask(taskId, updates) {
+  const client = requireClient();
+  const payload = {
+    ...updates,
+    completed_at: updates.status === 'done' ? new Date().toISOString() : null,
+    updated_at: new Date().toISOString(),
+  };
+
+  return requireData(
+    await client
+      .from('business_improvement_tasks')
+      .update(payload)
+      .eq('id', taskId)
+      .select()
+      .single(),
+  );
+}
