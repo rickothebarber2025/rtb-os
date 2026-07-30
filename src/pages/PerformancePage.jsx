@@ -90,16 +90,50 @@ export default function PerformancePage({
     }
   }
 
+  // Real opening hours confirmed directly from Square's /v2/locations for
+  // both businesses (identical schedule for each): 11:00 Sunday, 10:00
+  // every other day, America/Toronto time. Used as the "expected start"
+  // to flag late clock-ins -- not a live lookup, since store hours rarely
+  // change and this avoids an extra Square call just for a display flag.
+  const EXPECTED_OPENING_HOUR = { 0: 11, 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10 };
+  const LATE_GRACE_MINUTES = 15;
+
+  function localHourMinute(dateValue) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      hour12: false,
+      minute: 'numeric',
+      timeZone: 'America/Toronto',
+    }).formatToParts(new Date(dateValue));
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value || 0);
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value || 0);
+    return { hour, minute };
+  }
+
+  function isLateClockIn(clockIn) {
+    const date = new Date(clockIn);
+    const expectedHour = EXPECTED_OPENING_HOUR[date.getDay()];
+    const { hour, minute } = localHourMinute(clockIn);
+    const minutesAfterOpening = (hour - expectedHour) * 60 + minute;
+    return minutesAfterOpening > LATE_GRACE_MINUTES;
+  }
+
   const attendanceByStaff = useMemo(() => {
     const summary = new Map();
     attendance.forEach((record) => {
       if (!record.staff_id) return;
-      const current = summary.get(record.staff_id) || { hours: 0, shifts: 0 };
+      const current = summary.get(record.staff_id) || { breakMinutes: 0, hours: 0, lateShifts: 0, shifts: 0 };
       const hours = record.clock_out
         ? (new Date(record.clock_out) - new Date(record.clock_in)) / (1000 * 60 * 60)
         : 0;
+      const breakMinutes = (record.breaks || []).reduce((sum, brk) => {
+        if (!brk.start_at || !brk.end_at) return sum;
+        return sum + (new Date(brk.end_at) - new Date(brk.start_at)) / (1000 * 60);
+      }, 0);
       summary.set(record.staff_id, {
+        breakMinutes: current.breakMinutes + breakMinutes,
         hours: current.hours + hours,
+        lateShifts: current.lateShifts + (isLateClockIn(record.clock_in) ? 1 : 0),
         shifts: current.shifts + 1,
       });
     });
@@ -221,7 +255,13 @@ export default function PerformancePage({
                 return (
                   <div key={member.id}>
                     <span>{member.full_name}</span>
-                    <strong>{summary.shifts} shifts &middot; {summary.hours.toFixed(1)}h</strong>
+                    <strong>
+                      {summary.shifts} shifts &middot; {summary.hours.toFixed(1)}h
+                      {summary.breakMinutes > 0 ? ` \u00b7 ${Math.round(summary.breakMinutes)}min breaks` : ''}
+                      {summary.lateShifts > 0 ? (
+                        <span className="attendance-late-flag"> &middot; {summary.lateShifts} late</span>
+                      ) : null}
+                    </strong>
                   </div>
                 );
               })}

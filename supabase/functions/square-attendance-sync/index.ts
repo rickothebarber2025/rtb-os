@@ -165,6 +165,14 @@ async function syncAttendance(admin: AdminClient, accessToken: string, days: num
       .maybeSingle();
 
     const record = {
+      breaks: Array.isArray(shift.breaks)
+        ? shift.breaks.map((brk: Record<string, unknown>) => ({
+          end_at: brk.end_at || null,
+          name: brk.name || null,
+          paid: Boolean(brk.is_paid),
+          start_at: brk.start_at || null,
+        }))
+        : [],
       business_unit_id: business.id,
       clock_in: shift.start_at,
       clock_out: shift.end_at || null,

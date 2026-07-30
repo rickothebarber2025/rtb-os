@@ -613,7 +613,7 @@ export async function getStaffAttendance(businessUnitId, days = 30) {
 
   let query = client
     .from('staff_attendance')
-    .select('id,staff_id,business_unit_id,clock_in,clock_out,status')
+    .select('id,staff_id,business_unit_id,clock_in,clock_out,status,breaks')
     .gte('clock_in', since.toISOString())
     .order('clock_in', { ascending: false })
     .limit(500);

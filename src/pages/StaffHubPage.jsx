@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
+import MyHoursWidget from '../components/MyHoursWidget';
 import OpeningClosingChecklist from '../components/OpeningClosingChecklist';
 import StatusBadge from '../components/StatusBadge';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
@@ -1822,6 +1823,8 @@ export default function StaffHubPage({
                   : 'No shop status has been recorded yet.'}
               </small>
             </article>
+
+            <MyHoursWidget businessUnitId={operationsBusinessId} staffId={staffProfile?.id} />
 
             <article className="panel daily-ops-card">
               <div className="section-header">
