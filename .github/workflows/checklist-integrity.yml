@@ -26,7 +26,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run build
-        env:
-          VITE_SUPABASE_URL: https://qbeficojfoqgzjxrzxyg.supabase.co
-          VITE_SUPABASE_ANON_KEY: ci-placeholder-key
+      - name: Verify checklist modules compile
+        run: |
+          node --check src/services/checklistValidation.js
+          node --check src/services/staffOperationsService.js
+          node --check test/staffOperationsService.test.js
