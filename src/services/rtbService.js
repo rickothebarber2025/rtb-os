@@ -602,6 +602,27 @@ export async function savePerformanceFromRun(runId) {
   if (result.error) throw result.error;
 }
 
+export async function syncSquareAttendance(businessId, days = 30) {
+  return invokeFunction('square-attendance-sync', { businessId, days });
+}
+
+export async function getStaffAttendance(businessUnitId, days = 30) {
+  const client = requireClient();
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  let query = client
+    .from('staff_attendance')
+    .select('id,staff_id,business_unit_id,clock_in,clock_out,status')
+    .gte('clock_in', since.toISOString())
+    .order('clock_in', { ascending: false })
+    .limit(500);
+
+  if (businessUnitId) query = query.eq('business_unit_id', businessUnitId);
+
+  return requireData(await query);
+}
+
 export async function getPerformanceSummary(businessUnitId) {
   const client = requireClient();
   let query = client

@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Award, BarChart3, Download, TrendingDown, TrendingUp, WalletCards } from 'lucide-react';
+import { Award, BarChart3, Clock3, Download, TrendingDown, TrendingUp, WalletCards } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
 import ProbationProgressCard from '../components/ProbationProgressCard';
 import StatusBadge from '../components/StatusBadge';
+import {
+  getStaffAttendance,
+  syncSquareAttendance,
+} from '../services/rtbService';
 import {
   formatCompactCurrency,
   formatCurrency,
@@ -33,12 +37,74 @@ export default function PerformancePage({
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const [certificateError, setCertificateError] = useState('');
   const [certificateLoading, setCertificateLoading] = useState(false);
+  const [attendance, setAttendance] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(true);
+  const [attendanceSyncing, setAttendanceSyncing] = useState(false);
+  const [attendanceError, setAttendanceError] = useState('');
+  const [attendanceNotice, setAttendanceNotice] = useState('');
   const availableMonths = useMemo(
     () => [...new Set(monthlyPerformanceSummary.map((row) => row.month_start))],
     [monthlyPerformanceSummary],
   );
   const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || '');
   const staffById = useMemo(() => new Map(staff.map((member) => [member.id, member])), [staff]);
+  const scopedBusinessId = allBusinessesView ? null : businessUnit?.id;
+
+  async function loadAttendance() {
+    setAttendanceLoading(true);
+    setAttendanceError('');
+    try {
+      const rows = await getStaffAttendance(scopedBusinessId, 30);
+      setAttendance(rows || []);
+    } catch (err) {
+      setAttendanceError(err.message || 'Unable to load attendance.');
+    } finally {
+      setAttendanceLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAttendance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedBusinessId]);
+
+  async function handleSyncAttendance() {
+    setAttendanceSyncing(true);
+    setAttendanceError('');
+    setAttendanceNotice('');
+    try {
+      const result = await syncSquareAttendance(scopedBusinessId, 30);
+      setAttendanceNotice(
+        `Synced: ${result.shiftsInserted} new, ${result.shiftsUpdated} updated` +
+          (result.shiftsWithUnmatchedStaff
+            ? `, ${result.shiftsWithUnmatchedStaff} shift(s) need a staff match`
+            : '') +
+          (result.unmatchedNames?.length ? ` (unmatched: ${result.unmatchedNames.join(', ')})` : '') +
+          '.',
+      );
+      await loadAttendance();
+    } catch (err) {
+      setAttendanceError(err.message || 'Attendance sync failed.');
+    } finally {
+      setAttendanceSyncing(false);
+    }
+  }
+
+  const attendanceByStaff = useMemo(() => {
+    const summary = new Map();
+    attendance.forEach((record) => {
+      if (!record.staff_id) return;
+      const current = summary.get(record.staff_id) || { hours: 0, shifts: 0 };
+      const hours = record.clock_out
+        ? (new Date(record.clock_out) - new Date(record.clock_in)) / (1000 * 60 * 60)
+        : 0;
+      summary.set(record.staff_id, {
+        hours: current.hours + hours,
+        shifts: current.shifts + 1,
+      });
+    });
+    return summary;
+  }, [attendance]);
 
   const performanceFeedback = useMemo(
     () => buildStaffPerformanceFeedback(performanceSummary, staff),
@@ -120,6 +186,53 @@ export default function PerformancePage({
           trend={`${totals.adjustedWeeks} adjusted weeks`}
           value={totals.underMinimumWeeks}
         />
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div>
+            <span>Attendance</span>
+            <h2>{attendance.length} shifts in the last 30 days</h2>
+          </div>
+          <button
+            className="secondary-button"
+            disabled={attendanceSyncing}
+            onClick={handleSyncAttendance}
+            type="button"
+          >
+            <Clock3 size={16} />
+            {attendanceSyncing ? 'Syncing...' : 'Sync Square attendance'}
+          </button>
+        </div>
+        <p className="subtle-text">
+          Pulls real clock-in/clock-out data from Square for both locations and matches it to your roster.
+        </p>
+        {attendanceError ? <div className="alert danger">{attendanceError}</div> : null}
+        {attendanceNotice ? <div className="alert success">{attendanceNotice}</div> : null}
+        {attendanceLoading ? (
+          <p className="subtle-text">Loading attendance...</p>
+        ) : attendanceByStaff.size ? (
+          <div className="stat-list">
+            {staff
+              .filter((member) => attendanceByStaff.has(member.id))
+              .sort((a, b) => (attendanceByStaff.get(b.id)?.hours || 0) - (attendanceByStaff.get(a.id)?.hours || 0))
+              .map((member) => {
+                const summary = attendanceByStaff.get(member.id);
+                return (
+                  <div key={member.id}>
+                    <span>{member.full_name}</span>
+                    <strong>{summary.shifts} shifts &middot; {summary.hours.toFixed(1)}h</strong>
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Clock3}
+            title="No attendance synced yet"
+            message="Click Sync Square attendance to pull in real clock-in/clock-out records."
+          />
+        )}
       </section>
 
       <section className="panel full-span certificate-panel">
