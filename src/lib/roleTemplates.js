@@ -164,6 +164,33 @@ export const ROLE_TEMPLATES = [
     title: 'Operations Assistant',
   },
   {
+    description: 'Cleaning and opening support role with access only to Staff Hub and operational checklists.',
+    expectations: 'Work the assigned 8:00 AM–10:00 AM cleaning shift, complete every required checklist item, upload the final walkthrough photo, and report supply or maintenance issues before opening.',
+    id: 'operations_cleaning',
+    permissions: permissions({
+      operations: 'edit',
+      staff_hub: 'view',
+    }),
+    responsibilities: [
+      'Clock in and out for the assigned cleaning shift',
+      'Complete the reception, washroom, barbershop, and Beauty Lounge opening checklist',
+      'Restock shared cleaning and paper supplies',
+      'Upload a final walkthrough photo before the shop opens',
+      'Inspect shared areas and report failed station conditions with a photo and note',
+      'Report low inventory, damaged equipment, and maintenance issues',
+    ],
+    restrictions: [
+      'No payroll or earnings access.',
+      'No appointment or client access.',
+      'No staff, user, or permission management.',
+      'No business settings changes.',
+      'No financial, booth-rent, or performance reports.',
+      'Cannot edit checklist templates or operations configuration.',
+    ],
+    roleValue: 'staff',
+    title: 'Operations Cleaning',
+  },
+  {
     description: 'Handles appointment imports, no-shows, and schedule issues.',
     expectations: 'Check appointment data regularly and report import, no-show, or schedule issues quickly.',
     id: 'appointment_coordinator',
