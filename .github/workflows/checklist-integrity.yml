@@ -14,6 +14,10 @@ concurrency:
   group: checklist-integrity-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  VITE_SUPABASE_URL: https://example.supabase.co
+  VITE_SUPABASE_ANON_KEY: ci-placeholder-key
+
 jobs:
   verify:
     runs-on: ubuntu-latest
