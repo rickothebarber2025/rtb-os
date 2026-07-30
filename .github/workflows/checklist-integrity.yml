@@ -1,27 +1,23 @@
 name: Checklist Integrity
 
 on:
+  workflow_dispatch:
   pull_request:
-    paths:
-      - 'src/services/staffOperationsService.js'
-      - 'src/services/rtbService.js'
-      - 'src/components/OpeningClosingChecklist.jsx'
-      - 'src/components/StaffDailyOperationsCard.jsx'
-      - 'test/staffOperationsService.test.js'
-      - '.github/workflows/checklist-integrity.yml'
+    branches: [main]
   push:
     branches: [main]
-    paths:
-      - 'src/services/staffOperationsService.js'
-      - 'src/services/rtbService.js'
-      - 'src/components/OpeningClosingChecklist.jsx'
-      - 'src/components/StaffDailyOperationsCard.jsx'
-      - 'test/staffOperationsService.test.js'
-      - '.github/workflows/checklist-integrity.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checklist-integrity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
