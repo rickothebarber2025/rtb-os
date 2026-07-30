@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSavedOperationItem } from '../src/services/staffOperationsService.js';
+import { validateSavedOperationItem } from '../src/services/checklistValidation.js';
 
 test('accepts a fully attributed completed checklist item', () => {
   const result = {
