@@ -14383,3 +14383,62 @@ textarea {
 .attendance-late-flag {
   color: var(--warning, #facc15);
 }
+
+.tips-week-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tips-week-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.tips-week-card__header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.tips-week-card__totals {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-bottom: var(--space-2);
+}
+
+.tips-week-card__totals div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.tips-week-card__totals span {
+  color: var(--faint);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.tips-shift-list {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-top: var(--space-2);
+}
+
+.tips-shift-row {
+  display: flex;
+  font-size: 0.78rem;
+  gap: 0.7rem;
+}
+
+.tips-shift-row__break {
+  align-items: center;
+  color: var(--faint);
+  display: flex;
+  gap: 0.2rem;
+}

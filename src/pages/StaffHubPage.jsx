@@ -30,6 +30,7 @@ import EmptyState from '../components/EmptyState';
 import MyHoursWidget from '../components/MyHoursWidget';
 import OpeningClosingChecklist from '../components/OpeningClosingChecklist';
 import StatusBadge from '../components/StatusBadge';
+import TipsBreakdown from '../components/TipsBreakdown';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
 import {
   acknowledgePolicyDocument,
@@ -67,7 +68,9 @@ import {
 const TABS = [
   { id: 'daily', label: 'Daily Ops' },
   { id: 'home', label: 'Today' },
+  { id: 'updates', label: 'Updates' },
   { id: 'money', label: 'Earnings' },
+  { id: 'tips', label: 'Tips' },
   { id: 'stats', label: 'Performance' },
   { id: 'schedule', label: 'Schedule' },
   { id: 'more', label: 'More' },
@@ -2343,108 +2346,6 @@ export default function StaffHubPage({
             </section>
             ) : null}
 
-          <section className="panel two-thirds staff-hub-feed-panel">
-            <div className="staff-hub-section-stack">
-              <div className="staff-hub-preview-list__header">
-                <strong>Updates</strong>
-                <span>{formatNumber(visibleAnnouncements.length)} updates</span>
-              </div>
-              {canManageHub ? (
-                <details className="staff-hub-composer">
-                  <summary>
-                    <span>
-                      <strong>Post staff update</strong>
-                      <small>Share a reminder, policy note, event, or training update.</small>
-                    </span>
-                    <ChevronRight size={16} />
-                  </summary>
-                  <form className="staff-hub-form" onSubmit={submitAnnouncement}>
-                    <div className="form-grid compact">
-                      <label className="field">
-                        <span>Title</span>
-                        <input
-                          required
-                          value={announcementForm.title}
-                          onChange={(event) => updateAnnouncementForm('title', event.target.value)}
-                          placeholder="Staff reminder"
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Category</span>
-                        <select
-                          value={announcementForm.category}
-                          onChange={(event) => updateAnnouncementForm('category', event.target.value)}
-                        >
-                          {ANNOUNCEMENT_CATEGORIES.map((category) => (
-                            <option key={category} value={category}>
-                              {formatCategory(category)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <label className="field">
-                      <span>Message</span>
-                      <textarea
-                        required
-                        rows={3}
-                        value={announcementForm.body}
-                        onChange={(event) => updateAnnouncementForm('body', event.target.value)}
-                        placeholder="Write the update staff should see."
-                      />
-                    </label>
-                    <label className="checkbox-line">
-                      <input
-                        checked={announcementForm.pinned}
-                        onChange={(event) => updateAnnouncementForm('pinned', event.target.checked)}
-                        type="checkbox"
-                      />
-                      Pin this update
-                    </label>
-                    <button className="primary-button" disabled={savingHubAction === 'announcement'} type="submit">
-                      Post update
-                    </button>
-                  </form>
-                </details>
-              ) : null}
-              {visibleAnnouncements.length ? (
-                <div className="staff-hub-feed">
-                  {visibleAnnouncements.slice(0, 5).map((announcement) => {
-                    const isRead = readAnnouncementIds.has(announcement.id);
-                    return (
-                      <article className={isRead ? 'staff-hub-feed-card read' : 'staff-hub-feed-card'} key={announcement.id}>
-                        <div>
-                          <StatusBadge tone={announcement.pinned ? 'gold' : 'muted'}>
-                            {formatCategory(announcement.category)}
-                          </StatusBadge>
-                          <small>{formatDate(announcement.created_at)}</small>
-                        </div>
-                        <h3>{announcement.title}</h3>
-                        <p>{announcement.body}</p>
-                        {staffProfile ? (
-                          <button
-                            className="ghost-button small"
-                            disabled={isRead || savingHubAction === `read-${announcement.id}`}
-                            onClick={() => markAnnouncementRead(announcement.id)}
-                            type="button"
-                          >
-                            {isRead ? 'Read' : 'Mark read'}
-                          </button>
-                        ) : null}
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <EmptyState
-                  icon={Megaphone}
-                  title="No staff updates yet"
-                  message="Admin announcements, policy updates, training reminders, and events will show here."
-                />
-              )}
-            </div>
-          </section>
-
           <section className="panel staff-hub-resource-panel">
             <div className="section-header">
               <div>
@@ -2483,6 +2384,114 @@ export default function StaffHubPage({
             )}
           </section>
         </>
+      ) : null}
+
+      {activeTab === 'updates' ? (
+        <section className="panel full-span staff-hub-feed-panel">
+          <div className="staff-hub-section-stack">
+            <div className="staff-hub-preview-list__header">
+              <strong>Updates</strong>
+              <span>{formatNumber(visibleAnnouncements.length)} updates</span>
+            </div>
+            {canManageHub ? (
+              <details className="staff-hub-composer">
+                <summary>
+                  <span>
+                    <strong>Post staff update</strong>
+                    <small>Share a reminder, policy note, event, or training update.</small>
+                  </span>
+                  <ChevronRight size={16} />
+                </summary>
+                <form className="staff-hub-form" onSubmit={submitAnnouncement}>
+                  <div className="form-grid compact">
+                    <label className="field">
+                      <span>Title</span>
+                      <input
+                        required
+                        value={announcementForm.title}
+                        onChange={(event) => updateAnnouncementForm('title', event.target.value)}
+                        placeholder="Staff reminder"
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Category</span>
+                      <select
+                        value={announcementForm.category}
+                        onChange={(event) => updateAnnouncementForm('category', event.target.value)}
+                      >
+                        {ANNOUNCEMENT_CATEGORIES.map((category) => (
+                          <option key={category} value={category}>
+                            {formatCategory(category)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <label className="field">
+                    <span>Message</span>
+                    <textarea
+                      required
+                      rows={3}
+                      value={announcementForm.body}
+                      onChange={(event) => updateAnnouncementForm('body', event.target.value)}
+                      placeholder="Write the update staff should see."
+                    />
+                  </label>
+                  <label className="checkbox-line">
+                    <input
+                      checked={announcementForm.pinned}
+                      onChange={(event) => updateAnnouncementForm('pinned', event.target.checked)}
+                      type="checkbox"
+                    />
+                    Pin this update
+                  </label>
+                  <button className="primary-button" disabled={savingHubAction === 'announcement'} type="submit">
+                    Post update
+                  </button>
+                </form>
+              </details>
+            ) : null}
+            {visibleAnnouncements.length ? (
+              <div className="staff-hub-feed">
+                {visibleAnnouncements.map((announcement) => {
+                  const isRead = readAnnouncementIds.has(announcement.id);
+                  return (
+                    <article className={isRead ? 'staff-hub-feed-card read' : 'staff-hub-feed-card'} key={announcement.id}>
+                      <div>
+                        <StatusBadge tone={announcement.pinned ? 'gold' : 'muted'}>
+                          {formatCategory(announcement.category)}
+                        </StatusBadge>
+                        <small>{formatDate(announcement.created_at)}</small>
+                      </div>
+                      <h3>{announcement.title}</h3>
+                      <p>{announcement.body}</p>
+                      {staffProfile ? (
+                        <button
+                          className="ghost-button small"
+                          disabled={isRead || savingHubAction === `read-${announcement.id}`}
+                          onClick={() => markAnnouncementRead(announcement.id)}
+                          type="button"
+                        >
+                          {isRead ? 'Read' : 'Mark read'}
+                        </button>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState
+                icon={Megaphone}
+                title="No staff updates yet"
+                message="Admin announcements, policy updates, training reminders, and events will show here."
+              />
+            )}
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === 'tips' ? (
+        <TipsBreakdown businessUnitId={operationsBusinessId} ownEntries={ownEntries} staffId={staffProfile?.id} />
       ) : null}
 
       {activeTab === 'money' ? (

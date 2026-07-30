@@ -164,6 +164,7 @@ async function syncAttendance(admin: AdminClient, accessToken: string, days: num
       .eq("square_shift_id", String(shift.id))
       .maybeSingle();
 
+    const declaredTipMoney = (shift.declared_cash_tip_money as Record<string, unknown>) || {};
     const record = {
       breaks: Array.isArray(shift.breaks)
         ? shift.breaks.map((brk: Record<string, unknown>) => ({
@@ -176,6 +177,7 @@ async function syncAttendance(admin: AdminClient, accessToken: string, days: num
       business_unit_id: business.id,
       clock_in: shift.start_at,
       clock_out: shift.end_at || null,
+      declared_tips: Number(declaredTipMoney.amount || 0) / 100,
       square_shift_id: String(shift.id),
       square_team_member_id: teamMemberId,
       staff_id: staffId,
