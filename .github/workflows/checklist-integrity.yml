@@ -1,0 +1,33 @@
+name: Checklist Integrity
+
+on:
+  pull_request:
+    paths:
+      - 'src/services/staffOperationsService.js'
+      - 'src/services/rtbService.js'
+      - 'src/components/OpeningClosingChecklist.jsx'
+      - 'src/components/StaffDailyOperationsCard.jsx'
+      - 'test/staffOperationsService.test.js'
+      - '.github/workflows/checklist-integrity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/services/staffOperationsService.js'
+      - 'src/services/rtbService.js'
+      - 'src/components/OpeningClosingChecklist.jsx'
+      - 'src/components/StaffDailyOperationsCard.jsx'
+      - 'test/staffOperationsService.test.js'
+      - '.github/workflows/checklist-integrity.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
