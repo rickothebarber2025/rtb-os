@@ -72,6 +72,39 @@ Deno.serve(async (req) => {
   const teamBody = await teamRes.json().catch(() => ({}));
   results.teamMembers = { body: teamBody, ok: teamRes.ok, status: teamRes.status };
 
+  // 4. Check whether RTB Lounge (barbershop, not using Square Appointments)
+  // has real per-order team member attribution via Square's Orders API --
+  // this determines whether daily per-staff sales are buildable there too,
+  // or only at Beauty Lounge via its existing bookings data.
+  const ordersRes = await fetch(`${SQUARE_API_BASE}/v2/orders/search`, {
+    body: JSON.stringify({
+      location_ids: ["BYYR1W9SMFWS6"],
+      query: {
+        filter: {
+          date_time_filter: {
+            created_at: {
+              start_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            },
+          },
+        },
+        sort: { sort_field: "CREATED_AT", sort_order: "DESC" },
+      },
+    }),
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "Square-Version": SQUARE_VERSION,
+    },
+    method: "POST",
+  });
+  const ordersBody = await ordersRes.json().catch(() => ({}));
+  results.rtbLoungeOrders = {
+    firstOrderLineItems: ordersBody.orders?.[0]?.line_items || null,
+    ok: ordersRes.ok,
+    orderCount: ordersBody.orders?.length || 0,
+    status: ordersRes.status,
+  };
+
   return new Response(JSON.stringify(results, null, 2), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
     status: 200,

@@ -266,6 +266,12 @@ async function authorizeRequest(
   admin: ReturnType<typeof createClient>,
   businessUnitId: string,
 ) {
+  const expectedWorkerToken = Deno.env.get("RTB_SYNC_WORKER_TOKEN") || "";
+  const providedWorkerToken = req.headers.get("x-rtb-worker-token") || "";
+  if (expectedWorkerToken && providedWorkerToken && providedWorkerToken === expectedWorkerToken) {
+    return;
+  }
+
   const authorization = req.headers.get("Authorization") || "";
   const token = authorization.replace(/^Bearer\s+/i, "");
 
@@ -756,7 +762,7 @@ async function recordSyncUsage(
     key: SYNC_USAGE_KEY,
     updated_at: now,
     value,
-  });
+  }, { onConflict: "key" });
 
   return value;
 }
@@ -778,7 +784,7 @@ async function upsertSourceStatus(admin: ReturnType<typeof createClient>, status
         status: "loaded",
       },
     },
-  });
+  }, { onConflict: "key" });
 }
 
 Deno.serve(async (req) => {
@@ -914,7 +920,7 @@ Deno.serve(async (req) => {
         key: "rtb_beauty_square_appointments",
         updated_at: new Date().toISOString(),
         value: dashboard,
-      });
+      }, { onConflict: "key" });
 
       if (error) throw error;
       await upsertSourceStatus(admin, "loaded");

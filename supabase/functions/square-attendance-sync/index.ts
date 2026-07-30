@@ -204,6 +204,18 @@ async function syncAttendance(admin: AdminClient, accessToken: string, days: num
   };
 }
 
+async function authorizeSync(req: Request, admin: AdminClient, businessId: string | null) {
+  const expectedWorkerToken = Deno.env.get("RTB_SYNC_WORKER_TOKEN") || "";
+  const providedWorkerToken = req.headers.get("x-rtb-worker-token") || "";
+
+  if (expectedWorkerToken && providedWorkerToken && providedWorkerToken === expectedWorkerToken) {
+    return { worker: true };
+  }
+
+  await authorizeManager(req, admin, businessId, ATTENDANCE_REQUIREMENTS);
+  return { worker: false };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -212,7 +224,7 @@ Deno.serve(async (req) => {
 
     const admin = getAdminClient();
     const body = await readJson(req);
-    await authorizeManager(req, admin, body.businessId || null, ATTENDANCE_REQUIREMENTS);
+    await authorizeSync(req, admin, body.businessId || null);
 
     const accessToken = Deno.env.get("SQUARE_ACCESS_TOKEN");
     if (!accessToken) {

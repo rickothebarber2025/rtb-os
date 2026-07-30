@@ -2062,6 +2062,26 @@ export default function StaffHubPage({
                   Money
                 </button>
               </div>
+              {latestEntry ? (
+                <div className="staff-hub-weekly-floor">
+                  <div className="staff-hub-weekly-floor__header">
+                    <span>This week's sales vs. $500 minimum</span>
+                    <strong>{formatCurrency(latestEntry.net_sales)}</strong>
+                  </div>
+                  <div className={`staff-hub-progress-track ${incomeOpportunity.achievedFloor ? 'is-achieved' : ''}`}>
+                    <span
+                      style={{
+                        width: `${Math.min(100, Math.round((Number(latestEntry.net_sales || 0) / incomeOpportunity.floor) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <small>
+                    {incomeOpportunity.achievedFloor
+                      ? 'Above the minimum -- full commission rate protected.'
+                      : `${formatCurrency(incomeOpportunity.needToFloor)} more this week keeps your full commission rate.`}
+                  </small>
+                </div>
+              ) : null}
               {weeklyTrend.length ? (
                 <div className="staff-hub-mini-chart" role="img" aria-label="Weekly take-home trend">
                   {weeklyTrend.map((point) => (

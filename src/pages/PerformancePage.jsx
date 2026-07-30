@@ -16,6 +16,7 @@ import {
   formatPercent,
 } from '../utils/formatters';
 import { isAllBusinessesUnit } from '../utils/businessProfiles';
+import { LOW_SALES_THRESHOLD } from '../utils/constants';
 import { isProbationStaff } from '../utils/probation';
 import { buildStaffPerformanceFeedback } from '../utils/customerIntelligence';
 
@@ -31,6 +32,7 @@ export default function PerformancePage({
   accessProfile,
   businessUnit,
   monthlyPerformanceSummary,
+  payrollRuns = [],
   performanceSummary,
   staff,
 }) {
@@ -48,6 +50,25 @@ export default function PerformancePage({
   );
   const [selectedMonth, setSelectedMonth] = useState(availableMonths[0] || '');
   const staffById = useMemo(() => new Map(staff.map((member) => [member.id, member])), [staff]);
+  const latestEntryByStaff = useMemo(() => {
+    const entries = payrollRuns.flatMap((run) =>
+      (run.payroll_entries || []).map((entry) => ({
+        ...entry,
+        week_end: run.week_end,
+        week_label: run.week_label,
+        week_start: run.week_start,
+      })),
+    );
+    const byStaff = new Map();
+    entries.forEach((entry) => {
+      if (!entry.staff_id) return;
+      const current = byStaff.get(entry.staff_id);
+      if (!current || new Date(entry.week_start) > new Date(current.week_start)) {
+        byStaff.set(entry.staff_id, entry);
+      }
+    });
+    return byStaff;
+  }, [payrollRuns]);
   const scopedBusinessId = allBusinessesView ? null : businessUnit?.id;
 
   async function loadAttendance() {
@@ -220,6 +241,53 @@ export default function PerformancePage({
           trend={`${totals.adjustedWeeks} adjusted weeks`}
           value={totals.underMinimumWeeks}
         />
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div>
+            <span>Weekly Goal</span>
+            <h2>Progress toward the ${LOW_SALES_THRESHOLD} minimum</h2>
+          </div>
+        </div>
+        <p className="subtle-text">
+          Each staff member's most recent recorded week, compared against the ${LOW_SALES_THRESHOLD} commission floor.
+        </p>
+        {staff.filter((member) => member.active && latestEntryByStaff.has(member.id)).length ? (
+          <div className="team-goal-grid">
+            {staff
+              .filter((member) => member.active && latestEntryByStaff.has(member.id))
+              .sort((a, b) => {
+                const aNet = Number(latestEntryByStaff.get(a.id)?.net_sales || 0);
+                const bNet = Number(latestEntryByStaff.get(b.id)?.net_sales || 0);
+                return bNet - aNet;
+              })
+              .map((member) => {
+                const entry = latestEntryByStaff.get(member.id);
+                const netSales = Number(entry?.net_sales || 0);
+                const achieved = netSales >= LOW_SALES_THRESHOLD;
+                const percent = Math.min(100, Math.round((netSales / LOW_SALES_THRESHOLD) * 100));
+                return (
+                  <div className="team-goal-card" key={member.id}>
+                    <div className="team-goal-card__header">
+                      <strong>{member.full_name}</strong>
+                      <span>{formatCurrency(netSales)}</span>
+                    </div>
+                    <div className={`staff-hub-progress-track ${achieved ? 'is-achieved' : ''}`}>
+                      <span style={{ width: `${percent}%` }} />
+                    </div>
+                    <small>{entry?.week_label || 'Latest week'}</small>
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={WalletCards}
+            title="No payroll history yet"
+            message="This fills in once staff have at least one saved payroll entry."
+          />
+        )}
       </section>
 
       <section className="panel full-span">
