@@ -1838,7 +1838,7 @@ export default function StaffHubPage({
             </article>
           </section>
 
-          <OpeningClosingChecklist businessUnitId={operationsBusinessId} />
+          <OpeningClosingChecklist businessUnitId={operationsBusinessId} isAdmin={canManageHub} />
 
           <section className="daily-ops-grid full-span">
             <article className="panel daily-ops-card daily-ops-card--wide">

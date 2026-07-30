@@ -623,6 +623,29 @@ export async function getStaffAttendance(businessUnitId, days = 30) {
   return requireData(await query);
 }
 
+// Admin-facing: every staff member's checklist status for today, both
+// scopes, at one business -- not scoped to "my own" runs like
+// getMyDailyOperations is. Relies on the same RLS path managers already
+// use elsewhere (staff_hub_business_admin), so a regular staff member
+// calling this only gets back what they're allowed to see anyway.
+export async function getTodayChecklistStatus(businessUnitId, checklistType) {
+  const client = requireClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  let query = client
+    .from('operation_checklist_runs')
+    .select(
+      '*,owner:staff_id(full_name),confirmed_by:final_confirmed_by(full_name),items:operation_checklist_run_items(*,completed_by:completed_by_staff_id(full_name))',
+    )
+    .eq('run_date', today)
+    .order('scope', { ascending: true });
+
+  if (businessUnitId) query = query.eq('business_unit_id', businessUnitId);
+  if (checklistType) query = query.eq('checklist_type', checklistType);
+
+  return requireData(await query);
+}
+
 export async function getPerformanceSummary(businessUnitId) {
   const client = requireClient();
   let query = client

@@ -14274,3 +14274,84 @@ textarea {
   font-size: 0.75rem;
   gap: 0.3rem;
 }
+
+.occ-team-today {
+  border-top: 1px solid var(--line);
+  margin: var(--space-3) 0;
+  padding-top: var(--space-3);
+}
+
+.occ-team-today__header span {
+  color: var(--faint);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.occ-team-today__grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin-top: var(--space-2);
+}
+
+.occ-team-today__card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.occ-team-today__card-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.occ-team-today__card ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.occ-team-today__item {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.78rem;
+  gap: 0.1rem;
+}
+
+.occ-team-today__item span {
+  font-weight: 500;
+}
+
+.occ-team-today__item small {
+  color: var(--faint);
+}
+
+.occ-team-today__item--completed small {
+  color: var(--success, #4ade80);
+}
+
+.occ-team-today__item--skipped small,
+.occ-team-today__item--could_not_complete small {
+  color: var(--warning, #facc15);
+}
+
+.occ-team-today__item em {
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+
+.occ-team-today__confirm {
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 0.75rem;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+}

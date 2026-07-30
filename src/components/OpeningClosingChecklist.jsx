@@ -7,6 +7,7 @@ import {
   getMyDailyOperations,
   setMyOperationItem,
 } from '../services/staffOperationsService';
+import { getTodayChecklistStatus } from '../services/rtbService';
 
 const CHECKLIST_TYPES = [
   { id: 'opening', label: 'Opening' },
@@ -36,13 +37,38 @@ async function uploadChecklistPhoto(itemId, file) {
   return data.publicUrl;
 }
 
-export default function OpeningClosingChecklist({ businessUnitId, readOnly }) {
+export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readOnly }) {
   const [checklistType, setChecklistType] = useState(defaultChecklistType);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [working, setWorking] = useState('');
   const [drafts, setDrafts] = useState({});
+  const [teamStatus, setTeamStatus] = useState([]);
+  const [teamStatusLoading, setTeamStatusLoading] = useState(true);
+  const [teamStatusError, setTeamStatusError] = useState('');
+
+  async function loadTeamStatus() {
+    if (!isAdmin || !businessUnitId) {
+      setTeamStatusLoading(false);
+      return;
+    }
+    setTeamStatusLoading(true);
+    setTeamStatusError('');
+    try {
+      const runs = await getTodayChecklistStatus(businessUnitId, checklistType);
+      setTeamStatus(runs || []);
+    } catch (err) {
+      setTeamStatusError(err.message || 'Unable to load today\u2019s team status.');
+    } finally {
+      setTeamStatusLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadTeamStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessUnitId, checklistType, isAdmin]);
 
   async function load() {
     if (!businessUnitId) {
@@ -60,6 +86,7 @@ export default function OpeningClosingChecklist({ businessUnitId, readOnly }) {
     } finally {
       setLoading(false);
     }
+    if (isAdmin) await loadTeamStatus();
   }
 
   useEffect(() => {
@@ -283,6 +310,51 @@ export default function OpeningClosingChecklist({ businessUnitId, readOnly }) {
           ))}
         </div>
       </div>
+
+      {isAdmin ? (
+        <div className="occ-team-today">
+          <div className="occ-team-today__header">
+            <span>Team today &middot; {checklistType}</span>
+          </div>
+          {teamStatusError ? <div className="alert danger">{teamStatusError}</div> : null}
+          {teamStatusLoading ? (
+            <p className="subtle-text">Loading team status...</p>
+          ) : teamStatus.length ? (
+            <div className="occ-team-today__grid">
+              {teamStatus.map((run) => (
+                <div className="occ-team-today__card" key={run.id}>
+                  <div className="occ-team-today__card-header">
+                    <strong>{run.scope === 'station' ? run.owner?.full_name || 'Unknown staff' : 'Shared shop'}</strong>
+                    <span>{run.completion_percent}%</span>
+                  </div>
+                  <ul>
+                    {(run.items || []).map((item) => (
+                      <li key={item.id} className={`occ-team-today__item occ-team-today__item--${item.status}`}>
+                        <span>{item.label}</span>
+                        <small>
+                          {item.status === 'pending'
+                            ? 'Not done'
+                            : `${STATUS_LABEL[item.status] || item.status}${item.completed_by?.full_name ? ` by ${item.completed_by.full_name}` : ''}`}
+                        </small>
+                        {item.note ? <em>{item.note}</em> : null}
+                      </li>
+                    ))}
+                  </ul>
+                  {run.scope === 'shared' ? (
+                    <div className="occ-team-today__confirm">
+                      {run.final_confirmed_at
+                        ? `Confirmed by ${run.confirmed_by?.full_name || 'someone'}`
+                        : 'Not confirmed yet'}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="subtle-text">Nobody has started {checklistType} checklists yet today.</p>
+          )}
+        </div>
+      ) : null}
 
       {error ? <div className="alert danger">{error}</div> : null}
 
