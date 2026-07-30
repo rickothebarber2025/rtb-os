@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useState } from 'react';
+import AdminChecklistDashboard from '../components/AdminChecklistDashboard';
 import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MetricCard from '../components/MetricCard';
@@ -37,10 +38,6 @@ const OPERATION_ICONS = {
   warning: AlertTriangle,
 };
 
-// Turns Instagram's hour-by-hour follower-online data into a short,
-// readable "best time to post" summary -- e.g. "6-8 PM" -- by
-// finding the top consecutive block of high-activity hours rather
-// than just listing the single busiest hour.
 function formatBestPostingWindows(hourMap) {
   const entries = Object.entries(hourMap || {}).map(([hour, count]) => [Number(hour), Number(count) || 0]);
   if (!entries.length) return 'Not enough data yet';
@@ -60,10 +57,6 @@ function formatBestPostingWindows(hourMap) {
   if (topHours.length === 1) return formatHour(topHours[0]);
   if (topHours.length === 24) return 'All day';
 
-  // Real follower activity is often bimodal (a lunch peak and an
-  // evening peak), so this finds every separate contiguous block --
-  // a gap of more than 1 hour between consecutive top hours marks a
-  // real break -- rather than assuming there's only ever one window.
   const n = topHours.length;
   const gaps = topHours.map((hour, i) => {
     const next = topHours[(i + 1) % n];
@@ -74,8 +67,6 @@ function formatBestPostingWindows(hourMap) {
     .map((gap, i) => (gap > 1 ? i : -1))
     .filter((i) => i !== -1);
 
-  // No real gaps at all (topHours is one solid run, possibly
-  // wrapping midnight) -- treat the largest gap as the seam.
   const seams = breakIndices.length ? breakIndices : [gaps.indexOf(Math.max(...gaps))];
 
   const blocks = seams.map((seamIndex, i) => {
@@ -90,8 +81,6 @@ function formatBestPostingWindows(hourMap) {
       ? formatHour(block.start)
       : `${formatHour(block.start)}-${formatHour((block.end + 1) % 24)}`;
 
-  // Cap at 2 windows so this stays a quick read, not a data dump.
-  // Sort chronologically (by start hour) for a natural reading order.
   return blocks
     .slice(0, 2)
     .sort((a, b) => a.start - b.start)
@@ -168,6 +157,7 @@ export default function DashboardPage({
   const mobileTabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'actions', label: 'Actions' },
+    { id: 'operations', label: 'Operations' },
     { id: 'payroll', label: 'Payroll' },
   ];
   const mobileGroupClass = (id) => (mobileTab === id ? 'is-active-mobile-tab' : '');
@@ -343,296 +333,95 @@ export default function DashboardPage({
       </section>
 
       <section className={`metrics-grid stat-strip ${mobileGroupClass('overview')}`} data-mobile-group="overview">
-        <MetricCard
-          icon={Users}
-          label="Active staff"
-          trend={`${fixedRateStaff.length} fixed-rate`}
-          value={activeStaff.length}
-        />
+        <MetricCard icon={Users} label="Active staff" trend={`${fixedRateStaff.length} fixed-rate`} value={activeStaff.length} />
         <MetricCard
           icon={CircleDollarSign}
           label={payrollAllowed ? 'Latest payroll' : 'Appointment revenue'}
-          trend={
-            payrollAllowed
-              ? latestRun?.week_label || 'No runs yet'
-              : appointmentSummary?.periodLabel || 'Import appointment data'
-          }
-          value={
-            payrollAllowed
-              ? latestRun
-                ? formatCompactCurrency(latestRun.total_net_sales)
-                : '$0'
-              : formatCompactCurrency(appointmentSummary?.ytdRevenue)
-          }
+          trend={payrollAllowed ? latestRun?.week_label || 'No runs yet' : appointmentSummary?.periodLabel || 'Import appointment data'}
+          value={payrollAllowed ? (latestRun ? formatCompactCurrency(latestRun.total_net_sales) : '$0') : formatCompactCurrency(appointmentSummary?.ytdRevenue)}
         />
-        <MetricCard
-          icon={TrendingUp}
-          label="Recorded sales"
-          trend={`${performanceSummary.length} staff profiles`}
-          value={formatCompactCurrency(performanceTotal)}
-        />
+        <MetricCard icon={TrendingUp} label="Recorded sales" trend={`${performanceSummary.length} staff profiles`} value={formatCompactCurrency(performanceTotal)} />
       </section>
 
       {instagramInsights ? (
         <section className={`panel full-span ${mobileGroupClass('overview')}`} data-mobile-group="overview">
           <div className="section-header">
-            <div>
-              <span>Marketing</span>
-              <h2>Instagram performance</h2>
-            </div>
-            <StatusBadge tone="muted">
-              Synced {new Date(instagramInsights.synced_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
-            </StatusBadge>
+            <div><span>Marketing</span><h2>Instagram performance</h2></div>
+            <StatusBadge tone="muted">Synced {new Date(instagramInsights.synced_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}</StatusBadge>
           </div>
           <div className="workspace-grid">
-            <div className="workspace-card">
-              <span>Best times to post</span>
-              <strong>{formatBestPostingWindows(instagramInsights.online_followers_by_hour)}</strong>
-              <small>Based on when your followers are actually online</small>
-            </div>
-            <div className="workspace-card">
-              <span>Followers</span>
-              <strong>{instagramInsights.followers_count ?? '—'}</strong>
-            </div>
-            <div className="workspace-card">
-              <span>Reach, last 7 days</span>
-              <strong>{instagramInsights.reach_7d ?? '—'}</strong>
-            </div>
-            <div className="workspace-card">
-              <span>Avg. engagement rate</span>
-              <strong>{instagramInsights.avg_engagement_rate != null ? `${instagramInsights.avg_engagement_rate}%` : '—'}</strong>
-            </div>
+            <div className="workspace-card"><span>Best times to post</span><strong>{formatBestPostingWindows(instagramInsights.online_followers_by_hour)}</strong><small>Based on when your followers are actually online</small></div>
+            <div className="workspace-card"><span>Followers</span><strong>{instagramInsights.followers_count ?? '—'}</strong></div>
+            <div className="workspace-card"><span>Reach, last 7 days</span><strong>{instagramInsights.reach_7d ?? '—'}</strong></div>
+            <div className="workspace-card"><span>Avg. engagement rate</span><strong>{instagramInsights.avg_engagement_rate != null ? `${instagramInsights.avg_engagement_rate}%` : '—'}</strong></div>
           </div>
         </section>
       ) : null}
 
       <section className={`panel full-span ${mobileGroupClass('overview')}`} data-mobile-group="overview">
-        <div className="section-header">
-          <div>
-            <span>Setup</span>
-            <h2>Business profile</h2>
-          </div>
-        </div>
+        <div className="section-header"><div><span>Setup</span><h2>Business profile</h2></div></div>
         <div className="snapshot-grid">
-          <div>
-            <CalendarDays size={18} />
-            <span>Booking</span>
-            <strong>{businessProfile.booking_platform || 'Manual'}</strong>
-          </div>
-          <div>
-            <CircleDollarSign size={18} />
-            <span>POS</span>
-            <strong>{businessProfile.pos_platform || 'Square'}</strong>
-          </div>
-          <div>
-            <Users size={18} />
-            <span>Instagram</span>
-            <strong>{businessProfile.instagram_format || 'Manual'}</strong>
-          </div>
+          <div><CalendarDays size={18} /><span>Booking</span><strong>{businessProfile.booking_platform || 'Manual'}</strong></div>
+          <div><CircleDollarSign size={18} /><span>POS</span><strong>{businessProfile.pos_platform || 'Square'}</strong></div>
+          <div><Users size={18} /><span>Instagram</span><strong>{businessProfile.instagram_format || 'Manual'}</strong></div>
         </div>
       </section>
 
       <section className={`panel full-span ${mobileGroupClass('overview')}`} data-mobile-group="overview">
-        <div className="section-header">
-          <div>
-            <span>Operations</span>
-            <h2>Checks</h2>
-          </div>
-        </div>
+        <div className="section-header"><div><span>Operations</span><h2>Checks</h2></div></div>
         <div className="operations-grid">
           {operationalChecks.map((check) => {
             const Icon = OPERATION_ICONS[check.tone] || Clock3;
-            return (
-              <button
-                className={`operation-check ${check.tone}`}
-                key={check.label}
-                onClick={() => setActivePage(check.action)}
-                type="button"
-              >
-                <Icon size={18} />
-                <span>
-                  <strong>{check.label}</strong>
-                  <small>{check.detail}</small>
-                </span>
-              </button>
-            );
+            return <button className={`operation-check ${check.tone}`} key={check.label} onClick={() => setActivePage(check.action)} type="button"><Icon size={18} /><span><strong>{check.label}</strong><small>{check.detail}</small></span></button>;
           })}
         </div>
       </section>
 
+      <div className={mobileGroupClass('operations')} data-mobile-group="operations">
+        <AdminChecklistDashboard businessUnitId={allBusinessesView ? null : businessUnit?.id} />
+      </div>
+
       <section className={`panel full-span action-center-snapshot ${mobileGroupClass('actions')}`} data-mobile-group="actions">
         <div className="section-header">
-          <div>
-            <span>Action Center</span>
-            <h2>Attention</h2>
-          </div>
-          <button className="ghost-button" type="button" onClick={() => setActivePage('action-center')}>
-            <BellRing size={16} />
-            Open Action Center
-          </button>
+          <div><span>Action Center</span><h2>Attention</h2></div>
+          <button className="ghost-button" type="button" onClick={() => setActivePage('action-center')}><BellRing size={16} />Open Action Center</button>
         </div>
         {topActions.length ? (
           <div className="dashboard-action-list">
             {topActions.map((item) => {
               const Icon = getPriorityIcon(item.category);
-              return (
-                <button
-                  className={`dashboard-action-item ${item.priority}`}
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActivePage(item.page)}
-                >
-                  <Icon size={18} />
-                  <span>
-                    <strong>{item.title}</strong>
-                    <small>{item.detail}</small>
-                  </span>
-                </button>
-              );
+              return <button className={`dashboard-action-item ${item.priority}`} key={item.id} type="button" onClick={() => setActivePage(item.page)}><Icon size={18} /><span><strong>{item.title}</strong><small>{item.detail}</small></span></button>;
             })}
           </div>
-        ) : (
-          <div className="empty-state compact">
-            <h3>No open actions</h3>
-            <p>Action Center is clear for this view.</p>
-          </div>
-        )}
+        ) : <div className="empty-state compact"><h3>No open actions</h3><p>Action Center is clear for this view.</p></div>}
         <div className="action-center-snapshot__footer">
-          <StatusBadge tone={actionSummary.urgent ? 'warning' : actionSummary.total ? 'gold' : 'success'}>
-            {actionSummary.total ? `${actionSummary.total} open actions` : 'Clear'}
-          </StatusBadge>
+          <StatusBadge tone={actionSummary.urgent ? 'warning' : actionSummary.total ? 'gold' : 'success'}>{actionSummary.total ? `${actionSummary.total} open actions` : 'Clear'}</StatusBadge>
           <span>{actionSummary.automatic} automatic / {actionSummary.manual} manual</span>
         </div>
       </section>
 
-
       {payrollAllowed ? (
-      <section className={`panel two-thirds ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
-        <div className="section-header">
-          <div>
-            <span>Payroll</span>
-            <h2>Recent runs</h2>
-          </div>
-          <button className="ghost-button" type="button" onClick={() => setActivePage('payroll')}>
-            Open payroll
-          </button>
-        </div>
-
-        {payrollRuns.length ? (
-          <DataTable>
-            <table>
-              <thead>
-                <tr>
-                  <th>Week</th>
-                  <th>Status</th>
-                  <th>Net sales</th>
-                  <th>Staff payout</th>
-                  <th>RTB net</th>
-                  <th>Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payrollRuns.slice(0, 6).map((run) => (
-                  <tr key={run.id}>
-                    <td>{run.week_label}</td>
-                    <td>
-                      <StatusBadge tone={run.status === 'locked' ? 'success' : 'warning'}>
-                        {run.status}
-                      </StatusBadge>
-                    </td>
-                    <td>{formatCurrency(run.total_net_sales)}</td>
-                    <td>{formatCurrency(run.total_staff_payout)}</td>
-                    <td>{formatCurrency(run.rtb_net)}</td>
-                    <td>{formatDate(run.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </DataTable>
-        ) : (
-          <EmptyState
-            icon={BadgeDollarSign}
-            title="No payroll runs"
-            message="Draft the first run for this business unit."
-            action={
-              <button className="ghost-button" type="button" onClick={() => setActivePage('payroll')}>
-                Start payroll
-              </button>
-            }
-          />
-        )}
-      </section>
+        <section className={`panel two-thirds ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
+          <div className="section-header"><div><span>Payroll</span><h2>Recent runs</h2></div><button className="ghost-button" type="button" onClick={() => setActivePage('payroll')}>Open payroll</button></div>
+          {payrollRuns.length ? (
+            <DataTable><table><thead><tr><th>Week</th><th>Status</th><th>Net sales</th><th>Staff payout</th><th>RTB net</th><th>Created</th></tr></thead><tbody>{payrollRuns.slice(0, 6).map((run) => <tr key={run.id}><td>{run.week_label}</td><td><StatusBadge tone={run.status === 'locked' ? 'success' : 'warning'}>{run.status}</StatusBadge></td><td>{formatCurrency(run.total_net_sales)}</td><td>{formatCurrency(run.total_staff_payout)}</td><td>{formatCurrency(run.rtb_net)}</td><td>{formatDate(run.created_at)}</td></tr>)}</tbody></table></DataTable>
+          ) : <EmptyState icon={BadgeDollarSign} title="No payroll runs" message="Draft the first run for this business unit." action={<button className="ghost-button" type="button" onClick={() => setActivePage('payroll')}>Start payroll</button>} />}
+        </section>
       ) : null}
 
       <section className={`panel ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
-        <div className="section-header">
-          <div>
-            <span>Performance</span>
-            <h2>Leaderboard</h2>
-          </div>
-        </div>
-
+        <div className="section-header"><div><span>Performance</span><h2>Leaderboard</h2></div></div>
         {topPerformers.length ? (
-          <DataTable>
-            <table className="leaderboard-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Staff</th>
-                  <th>Role</th>
-                  <th>Net sales</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topPerformers.map((row, index) => (
-                  <tr key={row.staff_id || row.full_name}>
-                    <td>{index + 1}</td>
-                    <td>{row.full_name}</td>
-                    <td>{row.role || 'Staff'}</td>
-                    <td>{formatCompactCurrency(row.total_net_sales)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </DataTable>
-        ) : (
-          <EmptyState
-            icon={TrendingUp}
-            title="No performance history"
-            message="Locked payroll runs can populate staff performance."
-          />
-        )}
+          <DataTable><table className="leaderboard-table"><thead><tr><th>#</th><th>Staff</th><th>Role</th><th>Net sales</th></tr></thead><tbody>{topPerformers.map((row, index) => <tr key={row.staff_id || row.full_name}><td>{index + 1}</td><td>{row.full_name}</td><td>{row.role || 'Staff'}</td><td>{formatCompactCurrency(row.total_net_sales)}</td></tr>)}</tbody></table></DataTable>
+        ) : <EmptyState icon={TrendingUp} title="No performance history" message="Locked payroll runs can populate staff performance." />}
       </section>
 
       <section className={`panel ${mobileGroupClass('payroll')}`} data-mobile-group="payroll">
-        <div className="section-header">
-          <div>
-            <span>Roster</span>
-            <h2>Commission profile</h2>
-          </div>
-        </div>
+        <div className="section-header"><div><span>Roster</span><h2>Commission profile</h2></div></div>
         <div className="stat-list">
-          <div>
-            <span>Average commission</span>
-            <strong>
-              {activeStaff.length
-                ? formatPercent(
-                    activeStaff.reduce(
-                      (total, member) => total + Number(member.commission_rate || 0),
-                      0,
-                    ) / activeStaff.length,
-                  )
-                : '0%'}
-            </strong>
-          </div>
-          <div>
-            <span>Auto-adjust eligible</span>
-            <strong>{autoAdjustEligible.length}</strong>
-          </div>
-          <div>
-            <span>Inactive profiles</span>
-            <strong>{staff.filter((member) => !member.active).length}</strong>
-          </div>
+          <div><span>Average commission</span><strong>{activeStaff.length ? formatPercent(activeStaff.reduce((total, member) => total + Number(member.commission_rate || 0), 0) / activeStaff.length) : '0%'}</strong></div>
+          <div><span>Auto-adjust eligible</span><strong>{autoAdjustEligible.length}</strong></div>
+          <div><span>Inactive profiles</span><strong>{staff.filter((member) => !member.active).length}</strong></div>
         </div>
       </section>
     </div>
