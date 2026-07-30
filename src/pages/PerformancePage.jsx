@@ -329,7 +329,7 @@ export default function PerformancePage({
                 <tbody>
                   {performanceSummary.map((row) => {
                     const rosterMember = staffById.get(row.staff_id);
-                    const probation = isProbationStaff(rosterMember);
+                    const probation = Boolean(rosterMember?.active) && isProbationStaff(rosterMember);
 
                     return (
                       <tr key={row.staff_id || row.full_name}>
