@@ -1,23 +1,24 @@
 .owner-activity-notifications {
-  position: fixed;
-  right: 1rem;
-  top: 5.1rem;
-  z-index: 90;
+  position: relative;
+  z-index: 120;
 }
 
 .owner-activity-button {
   align-items: center;
-  background: var(--panel, #111827);
+  background: transparent;
   border: 1px solid var(--line, rgba(255,255,255,.14));
   border-radius: 999px;
   color: var(--text, #fff);
   cursor: pointer;
   display: inline-flex;
-  height: 42px;
+  height: 38px;
   justify-content: center;
   position: relative;
-  width: 42px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.24);
+  width: 38px;
+}
+
+.owner-activity-button:hover {
+  background: rgba(255,255,255,.06);
 }
 
 .owner-activity-badge {
@@ -27,15 +28,15 @@
   border-radius: 999px;
   color: #fff;
   display: inline-flex;
-  font-size: .65rem;
+  font-size: .62rem;
   font-weight: 800;
-  height: 20px;
+  height: 19px;
   justify-content: center;
-  min-width: 20px;
+  min-width: 19px;
   padding: 0 4px;
   position: absolute;
   right: -6px;
-  top: -6px;
+  top: -7px;
 }
 
 .owner-activity-popover {
@@ -43,8 +44,10 @@
   border: 1px solid var(--line, rgba(255,255,255,.14));
   border-radius: 18px;
   box-shadow: 0 24px 70px rgba(0,0,0,.45);
-  margin-top: .65rem;
   overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: calc(100% + .7rem);
   width: min(420px, calc(100vw - 2rem));
 }
 
@@ -76,14 +79,21 @@
   align-items: center;
   background: transparent;
   border: 0;
+  border-radius: 8px;
   color: var(--faint, #94a3b8);
   cursor: pointer;
   display: inline-flex;
   gap: .3rem;
+  padding: .4rem .5rem;
+}
+
+.owner-activity-header-actions button:hover {
+  background: rgba(255,255,255,.06);
+  color: var(--text, #fff);
 }
 
 .owner-activity-list {
-  max-height: min(66vh, 620px);
+  max-height: min(62vh, 560px);
   overflow-y: auto;
 }
 
@@ -95,8 +105,12 @@
   padding: .9rem 1rem;
 }
 
+.owner-activity-list article:last-child {
+  border-bottom: 0;
+}
+
 .owner-activity-list article.unread {
-  background: color-mix(in srgb, var(--shell-accent-strong, #d4af37) 8%, transparent);
+  background: rgba(212,175,55,.08);
 }
 
 .owner-activity-list article p {
@@ -124,12 +138,10 @@
 }
 
 @media (max-width: 760px) {
-  .owner-activity-notifications {
+  .owner-activity-popover {
+    position: fixed;
     right: .8rem;
     top: 4.7rem;
-  }
-
-  .owner-activity-popover {
     width: calc(100vw - 1.6rem);
   }
 }
