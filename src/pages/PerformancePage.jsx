@@ -7,6 +7,7 @@ import ProbationProgressCard from '../components/ProbationProgressCard';
 import StatusBadge from '../components/StatusBadge';
 import {
   getStaffAttendance,
+  getStaffDailySales,
   syncSquareAttendance,
 } from '../services/rtbService';
 import {
@@ -44,6 +45,9 @@ export default function PerformancePage({
   const [attendanceSyncing, setAttendanceSyncing] = useState(false);
   const [attendanceError, setAttendanceError] = useState('');
   const [attendanceNotice, setAttendanceNotice] = useState('');
+  const [dailySales, setDailySales] = useState([]);
+  const [dailySalesLoading, setDailySalesLoading] = useState(true);
+  const [dailySalesError, setDailySalesError] = useState('');
   const availableMonths = useMemo(
     () => [...new Set(monthlyPerformanceSummary.map((row) => row.month_start))],
     [monthlyPerformanceSummary],
@@ -86,6 +90,24 @@ export default function PerformancePage({
 
   useEffect(() => {
     loadAttendance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedBusinessId]);
+
+  async function loadDailySales() {
+    setDailySalesLoading(true);
+    setDailySalesError('');
+    try {
+      const rows = await getStaffDailySales(scopedBusinessId, 14);
+      setDailySales(rows || []);
+    } catch (err) {
+      setDailySalesError(err.message || 'Unable to load daily sales.');
+    } finally {
+      setDailySalesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadDailySales();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedBusinessId]);
 
@@ -160,6 +182,33 @@ export default function PerformancePage({
     });
     return summary;
   }, [attendance]);
+
+  const WEEKLY_MINIMUM = 500;
+
+  function currentWeekDates() {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    const start = new Date(now);
+    start.setDate(start.getDate() + diff);
+    start.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(date.getDate() + index);
+      return date.toISOString().slice(0, 10);
+    });
+  }
+
+  const weeklyProgressByStaff = useMemo(() => {
+    const weekDates = new Set(currentWeekDates());
+    const summary = new Map();
+    dailySales.forEach((row) => {
+      if (!row.staff_id || !weekDates.has(row.sale_date)) return;
+      const current = summary.get(row.staff_id) || 0;
+      summary.set(row.staff_id, current + Number(row.net_sales || 0));
+    });
+    return summary;
+  }, [dailySales]);
 
   const performanceFeedback = useMemo(
     () => buildStaffPerformanceFeedback(performanceSummary, staff),
@@ -286,6 +335,51 @@ export default function PerformancePage({
             icon={WalletCards}
             title="No payroll history yet"
             message="This fills in once staff have at least one saved payroll entry."
+          />
+        )}
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div>
+            <span>Weekly $500 Goal</span>
+            <h2>Progress this week &middot; real Square sales data</h2>
+          </div>
+        </div>
+        <p className="subtle-text">
+          Attributed to whoever rang up the sale in Square, not necessarily who performed the
+          service &mdash; useful day to day, but the finalized payroll numbers are still the
+          source of truth for commission.
+        </p>
+        {dailySalesError ? <div className="alert danger">{dailySalesError}</div> : null}
+        {dailySalesLoading ? (
+          <p className="subtle-text">Loading...</p>
+        ) : weeklyProgressByStaff.size ? (
+          <div className="stat-list">
+            {staff
+              .filter((member) => weeklyProgressByStaff.has(member.id))
+              .sort((a, b) => (weeklyProgressByStaff.get(b.id) || 0) - (weeklyProgressByStaff.get(a.id) || 0))
+              .map((member) => {
+                const total = weeklyProgressByStaff.get(member.id) || 0;
+                const percent = Math.min(100, (total / WEEKLY_MINIMUM) * 100);
+                return (
+                  <div key={member.id}>
+                    <span>{member.full_name}</span>
+                    <strong>
+                      {formatCurrency(total)} / {formatCurrency(WEEKLY_MINIMUM)}
+                      <span className="weekly-goal-mini-track">
+                        <span style={{ width: `${percent}%` }} />
+                      </span>
+                    </strong>
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={TrendingUp}
+            title="No sales synced yet this week"
+            message="Real daily sales sync automatically every morning."
           />
         )}
       </section>

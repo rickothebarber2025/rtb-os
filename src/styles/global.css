@@ -14492,3 +14492,66 @@ textarea {
   color: var(--faint);
   font-size: 0.7rem;
 }
+
+.weekly-goal-mini-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  display: block;
+  height: 4px;
+  margin-top: 0.3rem;
+  overflow: hidden;
+  width: 100%;
+}
+
+.weekly-goal-mini-track span {
+  background: var(--shell-accent-strong);
+  display: block;
+  height: 100%;
+}
+
+.wgp-progress-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  height: 8px;
+  margin: 0.5rem 0;
+  overflow: hidden;
+}
+
+.wgp-progress-track span {
+  background: var(--success, #4ade80);
+  display: block;
+  height: 100%;
+}
+
+.wgp-bar-row {
+  align-items: flex-end;
+  display: flex;
+  gap: 0.4rem;
+  height: 70px;
+  justify-content: space-between;
+  margin: var(--space-2) 0;
+}
+
+.wgp-bar {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+.wgp-bar__fill {
+  background: var(--shell-accent-strong);
+  border-radius: 3px 3px 0 0;
+  width: 100%;
+}
+
+.wgp-bar--today .wgp-bar__fill {
+  background: var(--success, #4ade80);
+}
+
+.wgp-bar small {
+  color: var(--faint);
+  font-size: 0.65rem;
+}

@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
   });
   const ordersBody = await ordersRes.json().catch(() => ({}));
   results.rtbLoungeOrders = {
-    firstOrderLineItems: ordersBody.orders?.[0]?.line_items || null,
+    firstOrderFull: ordersBody.orders?.[0] || null,
     ok: ordersRes.ok,
     orderCount: ordersBody.orders?.length || 0,
     status: ordersRes.status,

@@ -31,6 +31,7 @@ import MyHoursWidget from '../components/MyHoursWidget';
 import OpeningClosingChecklist from '../components/OpeningClosingChecklist';
 import StatusBadge from '../components/StatusBadge';
 import TipsBreakdown from '../components/TipsBreakdown';
+import WeeklyGoalProgress from '../components/WeeklyGoalProgress';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
 import {
   acknowledgePolicyDocument,
@@ -1828,6 +1829,8 @@ export default function StaffHubPage({
             </article>
 
             <MyHoursWidget businessUnitId={operationsBusinessId} staffId={staffProfile?.id} />
+
+            <WeeklyGoalProgress businessUnitId={operationsBusinessId} staffId={staffProfile?.id} />
 
             <article className="panel daily-ops-card">
               <div className="section-header">
