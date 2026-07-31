@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, CheckCheck, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import '../styles/ownerActivityNotifications.css';
 
 function formatWhen(value) {
   if (!value) return '';
