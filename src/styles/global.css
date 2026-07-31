@@ -14443,29 +14443,8 @@ textarea {
   gap: 0.2rem;
 }
 
-.staff-hub-weekly-floor {
-  margin-top: var(--space-3);
-}
-
-.staff-hub-weekly-floor__header {
-  align-items: center;
-  display: flex;
-  font-size: 0.78rem;
-  justify-content: space-between;
-}
-
-.staff-hub-weekly-floor__header span {
-  color: var(--faint);
-}
-
 .staff-hub-progress-track.is-achieved span {
   background: linear-gradient(90deg, #4ade80, #22c55e);
-}
-
-.staff-hub-weekly-floor small {
-  color: var(--faint);
-  display: block;
-  font-size: 0.72rem;
 }
 
 .team-goal-grid {
