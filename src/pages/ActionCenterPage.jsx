@@ -29,6 +29,9 @@ const FILTERS = [
   { id: 'urgent', label: 'Urgent' },
   { id: 'probation', label: 'Probation' },
   { id: 'payroll', label: 'Payroll' },
+  { id: 'task', label: 'Tasks' },
+  { id: 'time_off', label: 'Time Off' },
+  { id: 'content', label: 'Content' },
   { id: 'warning', label: 'Warnings' },
   { id: 'docs', label: 'Documents' },
 ];
@@ -97,6 +100,7 @@ export default function ActionCenterPage({
   payrollRuns,
   setActivePage,
   staff,
+  staffHub,
 }) {
   const canEditOperations = canManageOperations(accessProfile);
   const canAdminOps = canAdminOperations(accessProfile);
@@ -132,10 +136,13 @@ export default function ActionCenterPage({
         accessProfile,
         actionCenter: localState,
         businessUnitId: scopedBusinessUnitId,
+        contentSubmissions: staffHub?.contentSubmissions || [],
         payrollRuns,
         staff,
+        tasks: staffHub?.tasks || [],
+        timeOffRequests: staffHub?.timeOffRequests || [],
       }),
-    [accessProfile, localState, payrollRuns, scopedBusinessUnitId, staff],
+    [accessProfile, localState, payrollRuns, scopedBusinessUnitId, staff, staffHub],
   );
   const summary = getActionCenterSummary(items);
   const filteredItems = items.filter((item) => {

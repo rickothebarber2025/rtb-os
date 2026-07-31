@@ -11,6 +11,10 @@ const CORE_REFRESH_TABLES = [
   'payroll_runs',
   'performance_history',
   'staff',
+  'staff_announcements',
+  'staff_content_submissions',
+  'staff_tasks',
+  'staff_time_off_requests',
   'user_profiles',
 ];
 

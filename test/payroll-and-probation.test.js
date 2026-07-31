@@ -907,6 +907,80 @@ test('action center tracks warnings and missing documents for the selected roste
   assert.equal(summary.manual, 2);
 });
 
+test('action center includes staff hub tasks time off and content by business scope', () => {
+  const items = buildActionCenterItems({
+    businessUnitId: 'business-rtb',
+    contentSubmissions: [
+      {
+        business_unit_id: 'business-rtb',
+        content_type: 'before_after',
+        created_at: '2026-06-15T12:00:00Z',
+        id: 'content-1',
+        staff_id: 'staff-steph',
+        status: 'pending',
+      },
+      {
+        business_unit_id: 'business-other',
+        content_type: 'work',
+        id: 'content-other',
+        staff_id: 'staff-other',
+        status: 'pending',
+      },
+    ],
+    staff: [
+      {
+        active: true,
+        business_unit_id: 'business-rtb',
+        full_name: 'Steph',
+        id: 'staff-steph',
+      },
+    ],
+    tasks: [
+      {
+        business_unit_id: 'business-rtb',
+        due_date: '2026-06-25',
+        id: 'task-1',
+        staff_id: 'staff-steph',
+        status: 'pending',
+        title: 'Post aftercare reminder',
+      },
+      {
+        business_unit_id: 'business-rtb',
+        due_date: '2026-06-20',
+        id: 'task-done',
+        staff_id: 'staff-steph',
+        status: 'completed',
+        title: 'Completed task',
+      },
+    ],
+    timeOffRequests: [
+      {
+        business_unit_id: 'business-rtb',
+        end_date: '2026-07-03',
+        id: 'timeoff-1',
+        staff_id: 'staff-steph',
+        start_date: '2026-07-01',
+        status: 'pending',
+      },
+      {
+        business_unit_id: 'business-rtb',
+        end_date: '2026-07-05',
+        id: 'timeoff-approved',
+        staff_id: 'staff-steph',
+        start_date: '2026-07-04',
+        status: 'approved',
+      },
+    ],
+    now: new Date('2026-06-28T12:00:00Z'),
+  });
+
+  assert.equal(items.filter((item) => item.category === 'task').length, 1);
+  assert.equal(items.filter((item) => item.category === 'time_off').length, 1);
+  assert.equal(items.filter((item) => item.category === 'content').length, 1);
+  assert.equal(items.some((item) => item.id === 'content-content-other'), false);
+  assert.equal(items.some((item) => item.title.includes('Steph')), true);
+});
+
 test('booksy import matching ignores case spaces and punctuation', () => {
   assert.equal(normalizeImportName('Ricko Joseph'), 'rickojoseph');
   assert.equal(normalizeImportName(' RICKO-JOSEPH '), 'rickojoseph');

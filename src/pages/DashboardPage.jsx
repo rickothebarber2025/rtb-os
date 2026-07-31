@@ -147,8 +147,11 @@ export default function DashboardPage({
     accessProfile,
     actionCenter,
     businessUnitId: allBusinessesView ? null : businessUnit?.id,
+    contentSubmissions: staffHub?.contentSubmissions || [],
     payrollRuns,
     staff,
+    tasks: staffHub?.tasks || [],
+    timeOffRequests: staffHub?.timeOffRequests || [],
   });
   const actionSummary = getActionCenterSummary(actionItems);
   const topActions = actionItems.slice(0, 3);
