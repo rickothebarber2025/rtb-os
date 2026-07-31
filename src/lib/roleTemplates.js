@@ -187,7 +187,7 @@ export const ROLE_TEMPLATES = [
       'No financial, booth-rent, or performance reports.',
       'Cannot edit checklist templates or operations configuration.',
     ],
-    roleValue: 'staff',
+    roleValue: 'contractor',
     title: 'Operations Cleaning',
   },
   {

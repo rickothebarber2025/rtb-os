@@ -12,7 +12,7 @@ test('Operations Cleaning appears in the Access role template list', () => {
   const template = ROLE_TEMPLATES.find((item) => item.id === 'operations_cleaning');
   assert.ok(template);
   assert.equal(template.title, 'Operations Cleaning');
-  assert.equal(getTemplateRoleValue(template.id), 'staff');
+  assert.equal(getTemplateRoleValue(template.id), 'contractor');
 });
 
 test('Operations Cleaning only exposes Staff Hub and Operations', () => {

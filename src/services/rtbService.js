@@ -48,6 +48,7 @@ const USER_PROFILE_SELECT = [
   'email',
   'full_name',
   'role',
+  'user_type',
   'active',
   'business_unit_id',
   'permissions',
