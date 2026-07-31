@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import MobileTabBar from './MobileTabBar';
-import OwnerActivityNotifications from './OwnerActivityNotifications';
 import Sidebar from './Sidebar';
 import StaffDailyOperationsCard from './StaffDailyOperationsCard';
 import Topbar from './Topbar';
@@ -75,7 +74,6 @@ export default function AppShell({
           user={user}
           userPreferences={userPreferences}
         />
-        <OwnerActivityNotifications selectedBusinessUnitId={selectedBusinessUnitId} />
         <main className={`content ${pageClass}`}>
           {showDailyOperations ? (
             <StaffDailyOperationsCard businessUnitId={selectedBusinessUnitId} />
