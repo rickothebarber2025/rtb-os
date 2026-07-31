@@ -20,9 +20,19 @@ export const ROLE_OPTIONS = [
     value: 'manager',
   },
   {
-    description: 'Label only. Actual access comes from module permissions.',
+    description: 'Employee or commission team member. Actual access comes from module permissions.',
     label: 'Staff',
     value: 'staff',
+  },
+  {
+    description: 'Independent contractor with only the assigned modules, duties, and business locations.',
+    label: 'Contractor',
+    value: 'contractor',
+  },
+  {
+    description: 'External vendor with limited task, checklist, or service access.',
+    label: 'Vendor',
+    value: 'vendor',
   },
   {
     description: 'Waiting for access setup.',
