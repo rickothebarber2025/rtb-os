@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
 };
 
-const ROLE_VALUES = new Set(["admin", "manager", "staff", "pending"]);
+const ROLE_VALUES = new Set(["admin", "manager", "staff", "contractor", "vendor", "pending"]);
 const OWNER_EMAIL = "rickothebarber@gmail.com";
 const ALL_BUSINESSES_ACCESS = "all-businesses";
 const MODULE_IDS = [
@@ -175,6 +175,13 @@ function hasAssignedBusiness(permissions: ReturnType<typeof normalizePermissions
   );
 }
 
+function getUserTypeForRole(role: string) {
+  if (role === "contractor") return "contractor";
+  if (role === "vendor") return "vendor";
+  if (role === "admin") return "admin";
+  return "employee";
+}
+
 function cleanRedirectTo(value: unknown, origin: string | null) {
   const configuredAppUrl =
     Deno.env.get("RTB_OS_PUBLIC_URL") ||
@@ -313,6 +320,7 @@ Deno.serve(async (req) => {
           role_description: permissions.role_description,
           role_title: permissions.role_title,
           role,
+          user_type: getUserTypeForRole(role),
           updated_at: new Date().toISOString(),
         },
         { onConflict: "id" },

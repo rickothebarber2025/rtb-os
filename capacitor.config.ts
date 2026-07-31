@@ -13,7 +13,7 @@ const liveRtbOsUrl = 'https://rtbheadquaters.com';
 // submission -- everything else updates the instant it's deployed,
 // exactly like it does in a browser today.
 const config: CapacitorConfig = {
-  appId: 'com.rtbheadquarters.os',
+  appId: 'com.rtbheadquaters.os',
   appName: 'RTB OS',
   webDir: 'dist',
   server: {

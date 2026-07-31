@@ -21,13 +21,19 @@ const CATEGORY_LABELS = {
   docs: 'Documents',
   payroll: 'Payroll',
   probation: 'Probation',
+  content: 'Content',
+  task: 'Task',
+  time_off: 'Time off',
   warning: 'Staff warning',
 };
 
 export const ACTION_CENTER_ICONS = {
+  content: FileWarning,
   docs: ClipboardList,
   payroll: BadgeDollarSign,
   probation: CalendarClock,
+  task: ClipboardList,
+  time_off: CalendarClock,
   warning: FileWarning,
 };
 
@@ -83,6 +89,19 @@ function priorityForDaysLeft(daysLeft) {
   if (daysLeft < 0) return 'urgent';
   if (daysLeft <= 5) return 'high';
   return 'medium';
+}
+
+function priorityForDueDate(dueDate, now, soonDays = 3) {
+  if (!dueDate) return 'low';
+  const daysLeft = daysBetween(now, dueDate);
+  if (daysLeft === null) return 'low';
+  if (daysLeft < 0) return 'urgent';
+  if (daysLeft <= soonDays) return 'high';
+  return 'medium';
+}
+
+function staffNameFor(record, staffById) {
+  return staffById.get(record.staff_id)?.full_name || record.staff_name || 'Staff member';
 }
 
 function buildItem({
@@ -214,6 +233,84 @@ function buildDocumentItems(documents, now) {
     });
 }
 
+export function buildStaffTaskItems(tasks, staffById, now) {
+  return tasks
+    .filter((task) => task.status !== 'completed')
+    .map((task) => {
+      const staffName = staffNameFor(task, staffById);
+      const priority = priorityForDueDate(task.due_date, now);
+      const daysLeft = task.due_date ? daysBetween(now, task.due_date) : null;
+      const dueText = task.due_date
+        ? daysLeft < 0
+          ? `overdue since ${task.due_date}`
+          : `due ${task.due_date}`
+        : 'no due date set';
+
+      return buildItem({
+        actionLabel: 'Open Staff Hub',
+        category: 'task',
+        detail: `${staffName} has "${task.title || 'an assigned task'}" ${dueText}.`,
+        id: `task-${task.id}`,
+        page: 'staff-hub',
+        priority,
+        source: 'Staff Hub',
+        title:
+          priority === 'urgent'
+            ? `Overdue task for ${staffName}`
+            : `Task needs attention for ${staffName}`,
+      });
+    });
+}
+
+export function buildTimeOffItems(timeOffRequests, staffById, now) {
+  return timeOffRequests
+    .filter((request) => request.status === 'pending')
+    .map((request) => {
+      const staffName = staffNameFor(request, staffById);
+      const priority = priorityForDueDate(request.start_date, now, 7);
+      const dateRange = request.end_date && request.end_date !== request.start_date
+        ? `${request.start_date} to ${request.end_date}`
+        : request.start_date;
+
+      return buildItem({
+        actionLabel: 'Review request',
+        category: 'time_off',
+        detail: `${staffName} requested time off for ${dateRange || 'an upcoming date'}.`,
+        id: `time-off-${request.id}`,
+        page: 'staff-hub',
+        priority,
+        source: 'Staff Hub',
+        title: `Time off request from ${staffName}`,
+      });
+    });
+}
+
+export function buildContentSubmissionItems(contentSubmissions, staffById, now) {
+  return contentSubmissions
+    .filter((submission) => submission.status === 'pending')
+    .map((submission) => {
+      const staffName = staffNameFor(submission, staffById);
+      const daysOpen = daysBetween(submission.created_at || now, now);
+      const priority = daysOpen !== null && daysOpen > 14
+        ? 'urgent'
+        : daysOpen !== null && daysOpen > 7
+          ? 'high'
+          : 'medium';
+      const contentType = submission.content_type || submission.media_type || 'content';
+
+      return buildItem({
+        actionLabel: 'Review content',
+        category: 'content',
+        detail: `${staffName} submitted ${contentType.replace(/_/g, ' ')} content for review.`,
+        id: `content-${submission.id}`,
+        page: 'staff-hub',
+        priority,
+        source: 'Staff Hub',
+        title: `Content submission from ${staffName}`,
+      });
+    });
+}
+
 function matchesStaffScope(record, staffIds, businessUnitId) {
   if (businessUnitId && record.business_unit_id) {
     return record.business_unit_id === businessUnitId;
@@ -230,21 +327,35 @@ export function buildActionCenterItems({
   accessProfile,
   actionCenter,
   businessUnitId = null,
+  contentSubmissions = [],
   payrollRuns = [],
   staff = [],
+  tasks = [],
+  timeOffRequests = [],
   now = new Date(),
 }) {
   const state = normalizeActionCenterState(actionCenter);
   const staffIds = new Set(staff.map((member) => member.id).filter(Boolean));
+  const staffById = new Map(staff.map((member) => [member.id, member]).filter(([id]) => Boolean(id)));
   const scopedWarnings = state.warnings.filter((warning) =>
     matchesStaffScope(warning, staffIds, businessUnitId),
   );
   const scopedDocuments = state.documents.filter((document) =>
     matchesStaffScope(document, staffIds, businessUnitId),
   );
+  const scopedTasks = tasks.filter((task) => matchesStaffScope(task, staffIds, businessUnitId));
+  const scopedTimeOffRequests = timeOffRequests.filter((request) =>
+    matchesStaffScope(request, staffIds, businessUnitId),
+  );
+  const scopedContentSubmissions = contentSubmissions.filter((submission) =>
+    matchesStaffScope(submission, staffIds, businessUnitId),
+  );
   const items = [
     ...buildProbationItems(staff, now),
     ...buildPayrollItems(payrollRuns, accessProfile),
+    ...buildStaffTaskItems(scopedTasks, staffById, now),
+    ...buildTimeOffItems(scopedTimeOffRequests, staffById, now),
+    ...buildContentSubmissionItems(scopedContentSubmissions, staffById, now),
     ...buildWarningItems(scopedWarnings, now),
     ...buildDocumentItems(scopedDocuments, now),
   ];

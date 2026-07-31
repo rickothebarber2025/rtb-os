@@ -9,7 +9,7 @@ import {
 } from '../services/rtbService';
 
 const EMAIL_AUTH_TYPES = new Set(['email', 'email_change', 'invite', 'magiclink', 'recovery', 'signup']);
-const NATIVE_AUTH_CALLBACK_URL = 'com.rtbheadquarters.os://auth/callback';
+const NATIVE_AUTH_CALLBACK_URL = 'com.rtbheadquaters.os://auth/callback';
 
 function isNativeApp() {
   return Capacitor.isNativePlatform();

@@ -1,20 +1,21 @@
-name: Deploy RTB OS
+name: Validate RTB OS
 
 on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: production-build
-  cancel-in-progress: false
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-package:
+  test-and-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,43 +31,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run tests
+        run: npm test
+
       - name: Build production site
+        env:
+          VITE_BUILD_SHA: ${{ github.sha }}
         run: npm run build
 
-      - name: Upload production build artifact
+      - name: Verify Operations Cleaning template is bundled
+        run: grep -R "Operations Cleaning" dist >/dev/null
+
+      - name: Upload validated build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rtb-os-dist
+          name: rtb-os-dist-${{ github.sha }}
           path: dist
           if-no-files-found: error
-
-  deploy-hostinger:
-    runs-on: ubuntu-latest
-    needs: build-and-package
-    env:
-      HOSTINGER_FTP_PASSWORD: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-      HOSTINGER_FTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}
-      HOSTINGER_FTP_SERVER_DIR: ${{ secrets.HOSTINGER_FTP_SERVER_DIR }}
-      HOSTINGER_FTP_USERNAME: ${{ secrets.HOSTINGER_FTP_USERNAME }}
-
-    steps:
-      - name: Check Hostinger deployment credentials
-        if: ${{ env.HOSTINGER_FTP_SERVER == '' || env.HOSTINGER_FTP_USERNAME == '' || env.HOSTINGER_FTP_PASSWORD == '' }}
-        run: echo "Hostinger FTP secrets are not configured. Build artifact was created, but live deployment was skipped."
-
-      - name: Download production build artifact
-        if: ${{ env.HOSTINGER_FTP_SERVER != '' && env.HOSTINGER_FTP_USERNAME != '' && env.HOSTINGER_FTP_PASSWORD != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: rtb-os-dist
-          path: dist
-
-      - name: Deploy production build to Hostinger
-        if: ${{ env.HOSTINGER_FTP_SERVER != '' && env.HOSTINGER_FTP_USERNAME != '' && env.HOSTINGER_FTP_PASSWORD != '' }}
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          local-dir: dist/
-          password: ${{ env.HOSTINGER_FTP_PASSWORD }}
-          server: ${{ env.HOSTINGER_FTP_SERVER }}
-          server-dir: ${{ env.HOSTINGER_FTP_SERVER_DIR || '/public_html/' }}
-          username: ${{ env.HOSTINGER_FTP_USERNAME }}
+          retention-days: 14

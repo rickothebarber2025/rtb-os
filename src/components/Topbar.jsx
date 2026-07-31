@@ -1,5 +1,6 @@
 import { CalendarDays, LogOut, Menu, RefreshCw } from 'lucide-react';
 import BusinessUnitSelector from './BusinessUnitSelector';
+import OwnerActivityNotifications from './OwnerActivityNotifications';
 import { getProfileRoleTitle, isOwnerProfile } from '../lib/permissions.js';
 
 export default function Topbar({
@@ -53,6 +54,9 @@ export default function Topbar({
             <span className={`role-pill ${isOwnerProfile(profile) ? 'admin' : profile.role}`}>
               {getProfileRoleTitle(profile)}
             </span>
+          ) : null}
+          {isOwnerProfile(profile) ? (
+            <OwnerActivityNotifications selectedBusinessUnitId={selectedBusinessUnitId} />
           ) : null}
           <button className="icon-button" type="button" onClick={onRefresh} aria-label="Refresh data">
             <RefreshCw size={18} />
