@@ -11,6 +11,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import MetricCard from '../components/MetricCard';
+import ClientErrorLog from '../components/ClientErrorLog';
 import StatusBadge from '../components/StatusBadge';
 import { isSupabaseConfigured } from '../lib/supabaseClient';
 import { getProfileRoleTitle } from '../lib/permissions.js';
@@ -276,6 +277,8 @@ export default function SystemPage({
           ))}
         </div>
       </section>
+
+      <ClientErrorLog />
 
       <section className="panel two-thirds">
         <div className="section-header">
