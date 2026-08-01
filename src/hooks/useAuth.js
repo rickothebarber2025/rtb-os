@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
@@ -107,6 +107,7 @@ async function completeAuthRedirect(sourceUrl = window.location.href) {
 export function useAuth() {
   const [session, setSession] = useState(null);
   const [authError, setAuthError] = useState('');
+  const intentionalSignOutRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [profileError, setProfileError] = useState('');
@@ -143,8 +144,22 @@ export function useAuth() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (nextSession) setAuthError('');
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (nextSession) {
+        setAuthError('');
+      } else if (event === 'SIGNED_OUT') {
+        // A session can end two ways: the user deliberately signed out (no
+        // message needed -- they know why), or the refresh token failed/
+        // expired and Supabase signed them out automatically, which
+        // previously left staff silently booted to the login screen with
+        // zero explanation, looking like the app had just broken. Only
+        // show this message for the latter.
+        if (intentionalSignOutRef.current) {
+          intentionalSignOutRef.current = false;
+        } else {
+          setAuthError((current) => current || 'Your session ended. Please sign in again to continue.');
+        }
+      }
       setSession(nextSession);
       setLoading(false);
     });
@@ -318,6 +333,7 @@ export function useAuth() {
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
+    intentionalSignOutRef.current = true;
     setProfile(null);
     setProfileError('');
     await supabase.auth.signOut();
