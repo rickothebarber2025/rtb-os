@@ -1740,11 +1740,14 @@ select {
 }
 
 .staff-hub-tabs button {
+  align-items: center;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 9px;
   color: var(--muted);
+  display: flex;
   font-weight: 800;
+  gap: 0.4rem;
   min-height: 34px;
   padding: 0 0.78rem;
 }
@@ -13100,11 +13103,14 @@ tbody tr:hover,
 }
 
 .staff-hub-sticky-tabs button {
+  align-items: center;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 9px;
   color: var(--muted);
+  display: flex;
   font-weight: 800;
+  gap: 0.4rem;
   min-height: 34px;
   padding: 0 0.78rem;
   cursor: pointer;

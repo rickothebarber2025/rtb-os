@@ -425,13 +425,13 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
         <>
           {checklistView === 'station' ? (
             <div className="occ-single-column">
-              {renderChecklist(stationRun, 'station', 'My Station', 'Your own station — only you can complete these.')}
+              {renderChecklist(stationRun, 'station', 'My Station', 'Just your own tasks.')}
             </div>
           ) : null}
 
           {checklistView === 'shared' ? (
             <div className="occ-single-column">
-              {renderChecklist(sharedRun, 'shared', 'Shared Shop', 'Any staff member can complete shared responsibilities.')}
+              {renderChecklist(sharedRun, 'shared', 'Shared Shop', 'Anyone can pitch in.')}
               {sharedRun && !sharedRun.final_confirmed_at ? (
                 <button
                   className="primary-button full-width occ-confirm-button"

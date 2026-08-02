@@ -12,9 +12,12 @@ import {
   CircleDollarSign,
   ClipboardCheck,
   Clock3,
+  Coffee,
   FileText,
+  Home,
   Megaphone,
   MessageSquare,
+  MoreHorizontal,
   Palette,
   ShieldCheck,
   Star,
@@ -67,14 +70,14 @@ import {
 } from '../utils/staffHubInsights';
 
 const TABS = [
-  { id: 'daily', label: 'Daily Ops' },
-  { id: 'home', label: 'Today' },
-  { id: 'updates', label: 'Updates' },
-  { id: 'money', label: 'Earnings' },
-  { id: 'tips', label: 'Tips' },
-  { id: 'stats', label: 'Performance' },
-  { id: 'schedule', label: 'Schedule' },
-  { id: 'more', label: 'More' },
+  { icon: ClipboardCheck, id: 'daily', label: 'Daily Ops' },
+  { icon: Home, id: 'home', label: 'Today' },
+  { icon: Megaphone, id: 'updates', label: 'Updates' },
+  { icon: CircleDollarSign, id: 'money', label: 'Earnings' },
+  { icon: Coffee, id: 'tips', label: 'Tips' },
+  { icon: TrendingUp, id: 'stats', label: 'Performance' },
+  { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
+  { icon: MoreHorizontal, id: 'more', label: 'More' },
 ];
 
 const EMPTY_STAFF_HUB = {
@@ -1744,7 +1747,28 @@ export default function StaffHubPage({
 
       <section className="panel full-span staff-hub-tabs-panel">
         <div className="staff-hub-tabs" role="tablist" aria-label="Staff Hub sections">
-          {TABS.map((tab) => (
+          {TABS.map((tab) => {
+            const TabIcon = tab.icon;
+            return (
+              <button
+                aria-selected={activeTab === tab.id}
+                className={activeTab === tab.id ? 'active' : ''}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                type="button"
+              >
+                <TabIcon size={16} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <nav className="staff-hub-sticky-tabs" role="tablist" aria-label="Staff Hub sections">
+        {TABS.map((tab) => {
+          const TabIcon = tab.icon;
+          return (
             <button
               aria-selected={activeTab === tab.id}
               className={activeTab === tab.id ? 'active' : ''}
@@ -1752,24 +1776,11 @@ export default function StaffHubPage({
               onClick={() => setActiveTab(tab.id)}
               type="button"
             >
-              {tab.label}
+              <TabIcon size={18} />
+              <span>{tab.label}</span>
             </button>
-          ))}
-        </div>
-      </section>
-
-      <nav className="staff-hub-sticky-tabs" role="tablist" aria-label="Staff Hub sections">
-        {TABS.map((tab) => (
-          <button
-            aria-selected={activeTab === tab.id}
-            className={activeTab === tab.id ? 'active' : ''}
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            type="button"
-          >
-            {tab.label}
-          </button>
-        ))}
+          );
+        })}
       </nav>
 
       {activeTab === 'daily' ? (
