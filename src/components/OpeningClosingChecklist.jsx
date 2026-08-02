@@ -43,6 +43,7 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
   const [working, setWorking] = useState('');
   const [drafts, setDrafts] = useState({});
   const [expandedItemId, setExpandedItemId] = useState(null);
+  const [checklistView, setChecklistView] = useState('station');
   const [teamStatus, setTeamStatus] = useState([]);
   const [teamStatusLoading, setTeamStatusLoading] = useState(true);
   const [teamStatusError, setTeamStatusError] = useState('');
@@ -347,11 +348,34 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
         </div>
       </div>
 
-      {isAdmin ? (
+      <div className="occ-view-toggle">
+        <button
+          className={checklistView === 'station' ? 'active' : ''}
+          onClick={() => setChecklistView('station')}
+          type="button"
+        >
+          My Station
+        </button>
+        <button
+          className={checklistView === 'shared' ? 'active' : ''}
+          onClick={() => setChecklistView('shared')}
+          type="button"
+        >
+          Shared Shop
+        </button>
+        {isAdmin ? (
+          <button
+            className={checklistView === 'team' ? 'active' : ''}
+            onClick={() => setChecklistView('team')}
+            type="button"
+          >
+            Team Today
+          </button>
+        ) : null}
+      </div>
+
+      {isAdmin && checklistView === 'team' ? (
         <div className="occ-team-today">
-          <div className="occ-team-today__header">
-            <span>Team today · {checklistType}</span>
-          </div>
           {teamStatusError ? <div className="alert danger">{teamStatusError}</div> : null}
           {teamStatusLoading ? (
             <p className="subtle-text">Loading team status...</p>
@@ -398,26 +422,29 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
       {loading ? (
         <p className="subtle-text">Loading checklists...</p>
       ) : (
-        <div className="occ-grid">
-          <div className="occ-column">
-            <h3>My Station / Work Area</h3>
-            {renderChecklist(stationRun, 'station', 'My Station', 'Your own station — only you can complete these.')}
-          </div>
-          <div className="occ-column">
-            <h3>Shared Shop</h3>
-            {renderChecklist(sharedRun, 'shared', 'Shared Shop', 'Any staff member can complete shared responsibilities.')}
-            {sharedRun && !sharedRun.final_confirmed_at ? (
-              <button
-                className="primary-button full-width occ-confirm-button"
-                disabled={readOnly || working === 'confirm'}
-                onClick={handleConfirm}
-                type="button"
-              >
-                <Lock size={15} /> {working === 'confirm' ? 'Confirming...' : `Confirm ${checklistType}`}
-              </button>
-            ) : null}
-          </div>
-        </div>
+        <>
+          {checklistView === 'station' ? (
+            <div className="occ-single-column">
+              {renderChecklist(stationRun, 'station', 'My Station', 'Your own station — only you can complete these.')}
+            </div>
+          ) : null}
+
+          {checklistView === 'shared' ? (
+            <div className="occ-single-column">
+              {renderChecklist(sharedRun, 'shared', 'Shared Shop', 'Any staff member can complete shared responsibilities.')}
+              {sharedRun && !sharedRun.final_confirmed_at ? (
+                <button
+                  className="primary-button full-width occ-confirm-button"
+                  disabled={readOnly || working === 'confirm'}
+                  onClick={handleConfirm}
+                  type="button"
+                >
+                  <Lock size={15} /> {working === 'confirm' ? 'Confirming...' : `Confirm ${checklistType}`}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </>
       )}
     </section>
   );

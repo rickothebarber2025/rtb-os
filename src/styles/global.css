@@ -13494,6 +13494,34 @@ tbody tr:hover,
   color: var(--shell-bg, #0b0e14);
 }
 
+.occ-view-toggle {
+  display: flex;
+  gap: 0.4rem;
+  margin: var(--space-3) 0;
+}
+
+.occ-view-toggle button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--faint);
+  cursor: pointer;
+  flex: 1;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.5rem 0.7rem;
+}
+
+.occ-view-toggle button.active {
+  background: var(--shell-accent-strong);
+  border-color: var(--shell-accent-strong);
+  color: var(--shell-bg, #0b0e14);
+}
+
+.occ-single-column {
+  margin-top: var(--space-2);
+}
+
 .occ-grid {
   display: grid;
   gap: var(--space-4);
@@ -13542,7 +13570,7 @@ tbody tr:hover,
 .occ-item-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0.4rem;
 }
 
 .occ-item {
@@ -13551,8 +13579,8 @@ tbody tr:hover,
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: var(--space-3);
+  gap: 0.3rem;
+  padding: 0.6rem 0.75rem;
 }
 
 .occ-item--completed {
@@ -14349,7 +14377,7 @@ textarea {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: var(--space-3);
+  padding: 0.6rem 0.75rem;
 }
 
 .occ-team-today__card-header {
