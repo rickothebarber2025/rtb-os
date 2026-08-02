@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Camera, CheckCircle2, Lock, MessageSquareText, RotateCcw, XCircle } from 'lucide-react';
+import { Camera, CheckCircle2, Lock, MessageSquareText, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import {
   claimMyOperationChecklist,
@@ -42,6 +42,7 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
   const [notice, setNotice] = useState('');
   const [working, setWorking] = useState('');
   const [drafts, setDrafts] = useState({});
+  const [expandedItemId, setExpandedItemId] = useState(null);
   const [teamStatus, setTeamStatus] = useState([]);
   const [teamStatusLoading, setTeamStatusLoading] = useState(true);
   const [teamStatusError, setTeamStatusError] = useState('');
@@ -178,33 +179,74 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
   function renderItem(item) {
     const isPending = item.status === 'pending';
     const busy = working === item.id || working === `${item.id}-photo`;
+    const isExpanded = expandedItemId === item.id;
 
     return (
       <div className={`occ-item occ-item--${item.status}`} key={item.id}>
-        <div className="occ-item__main">
-          <span className="occ-item__label">
-            {item.label}
-            {!item.required ? <em> (optional)</em> : null}
-          </span>
-          {!isPending ? (
-            <small className="occ-item__meta">
-              {STATUS_LABEL[item.status] || item.status}
-              {item.completed_by_name ? ` by ${item.completed_by_name}` : ''}
-            </small>
-          ) : null}
-          {item.note ? (
-            <small className="occ-item__note">
-              <MessageSquareText size={12} /> {item.note}
-            </small>
-          ) : null}
-          {item.photo_url ? (
-            <a className="occ-item__photo-link" href={item.photo_url} rel="noreferrer" target="_blank">
-              <Camera size={12} /> View photo
-            </a>
+        <div className="occ-item__row">
+          {isPending ? (
+            <button
+              aria-label={`Mark "${item.label}" done`}
+              className="occ-item__check"
+              disabled={readOnly || busy}
+              onClick={() => handleSetStatus(item, 'completed')}
+              type="button"
+            />
+          ) : (
+            <button
+              aria-label={`Reopen "${item.label}"`}
+              className={`occ-item__check occ-item__check--${item.status}`}
+              disabled={readOnly || busy}
+              onClick={() => handleSetStatus(item, 'pending')}
+              type="button"
+            >
+              {item.status === 'completed' ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+            </button>
+          )}
+
+          <div className="occ-item__main" onClick={() => isPending && setExpandedItemId(isExpanded ? null : item.id)}>
+            <span className="occ-item__label">
+              {item.label}
+              {!item.required ? <em> (optional)</em> : null}
+            </span>
+            {!isPending ? (
+              <small className="occ-item__meta">
+                {STATUS_LABEL[item.status] || item.status}
+                {item.completed_by_name ? ` by ${item.completed_by_name}` : ''}
+              </small>
+            ) : null}
+            {item.note ? (
+              <small className="occ-item__note">
+                <MessageSquareText size={12} /> {item.note}
+              </small>
+            ) : null}
+            {item.photo_url ? (
+              <a
+                className="occ-item__photo-link"
+                href={item.photo_url}
+                onClick={(event) => event.stopPropagation()}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <Camera size={12} /> View photo
+              </a>
+            ) : null}
+          </div>
+
+          {isPending ? (
+            <button
+              aria-label="More options"
+              className="occ-item__more"
+              disabled={readOnly || busy}
+              onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
+              type="button"
+            >
+              {busy ? '...' : '\u22ef'}
+            </button>
           ) : null}
         </div>
 
-        {isPending ? (
+        {isPending && isExpanded ? (
           <div className="occ-item__actions">
             <input
               className="occ-item__note-input"
@@ -216,14 +258,6 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
               value={drafts[item.id]?.note ?? ''}
             />
             <div className="occ-item__buttons">
-              <button
-                className="ghost-button small success-action"
-                disabled={readOnly || busy}
-                onClick={() => handleSetStatus(item, 'completed')}
-                type="button"
-              >
-                <CheckCircle2 size={14} /> {busy ? 'Saving...' : 'Done'}
-              </button>
               <button
                 className="ghost-button small"
                 disabled={readOnly || busy}
@@ -241,7 +275,7 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
                 <XCircle size={14} /> Can't complete
               </button>
               <label className="ghost-button small occ-photo-button">
-                <Camera size={14} />
+                <Camera size={14} /> Add photo
                 <input
                   accept="image/*"
                   disabled={readOnly || busy}
@@ -252,16 +286,7 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
               </label>
             </div>
           </div>
-        ) : (
-          <button
-            className="ghost-button small"
-            disabled={readOnly || busy}
-            onClick={() => handleSetStatus(item, 'pending')}
-            type="button"
-          >
-            <RotateCcw size={14} /> Reopen
-          </button>
-        )}
+        ) : null}
       </div>
     );
   }

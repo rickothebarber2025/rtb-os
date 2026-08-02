@@ -13564,8 +13564,55 @@ tbody tr:hover,
   border-color: rgba(250, 204, 21, 0.35);
 }
 
-.occ-item__main {
+.occ-item__row {
+  align-items: flex-start;
   display: flex;
+  gap: 0.6rem;
+}
+
+.occ-item__check {
+  align-items: center;
+  background: transparent;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  flex-shrink: 0;
+  height: 28px;
+  justify-content: center;
+  margin-top: 0.1rem;
+  padding: 0;
+  width: 28px;
+}
+
+.occ-item__check--completed {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.6);
+  color: #4ade80;
+}
+
+.occ-item__check--skipped,
+.occ-item__check--could_not_complete {
+  background: rgba(250, 204, 21, 0.15);
+  border-color: rgba(250, 204, 21, 0.6);
+  color: #facc15;
+}
+
+.occ-item__more {
+  background: transparent;
+  border: none;
+  color: var(--faint);
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+}
+
+.occ-item__main {
+  cursor: pointer;
+  display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 0.2rem;
 }
@@ -13604,9 +13651,12 @@ tbody tr:hover,
 }
 
 .occ-item__actions {
+  border-top: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
 }
 
 .occ-item__note-input {
@@ -14589,4 +14639,28 @@ textarea {
 .client-error-row small {
   color: var(--faint);
   font-size: 0.72rem;
+}
+
+.daily-ops-view-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin: var(--space-3) 0;
+}
+
+.daily-ops-view-toggle button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--faint);
+  cursor: pointer;
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.6rem 1rem;
+}
+
+.daily-ops-view-toggle button.active {
+  background: var(--shell-accent-strong);
+  border-color: var(--shell-accent-strong);
+  color: var(--shell-bg, #0b0e14);
 }

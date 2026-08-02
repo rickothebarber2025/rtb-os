@@ -414,6 +414,7 @@ export default function StaffHubPage({
   user,
 }) {
   const [activeTab, setActiveTab] = useState('daily');
+  const [dailyOpsView, setDailyOpsView] = useState('checklist');
   const [hubMessage, setHubMessage] = useState('');
   const [hubError, setHubError] = useState('');
   const [savingHubAction, setSavingHubAction] = useState('');
@@ -1797,6 +1798,28 @@ export default function StaffHubPage({
             </section>
           ) : null}
 
+          <div className="daily-ops-view-toggle">
+            <button
+              className={dailyOpsView === 'checklist' ? 'active' : ''}
+              onClick={() => setDailyOpsView('checklist')}
+              type="button"
+            >
+              Opening / Closing
+            </button>
+            <button
+              className={dailyOpsView === 'overview' ? 'active' : ''}
+              onClick={() => setDailyOpsView('overview')}
+              type="button"
+            >
+              Overview
+            </button>
+          </div>
+
+          {dailyOpsView === 'checklist' ? (
+            <OpeningClosingChecklist businessUnitId={operationsBusinessId} isAdmin={canManageHub} />
+          ) : null}
+
+          {dailyOpsView === 'overview' ? (
           <section className="daily-ops-grid full-span">
             <article className="panel daily-ops-card">
               <div className="section-header">
@@ -1831,24 +1854,11 @@ export default function StaffHubPage({
             <MyHoursWidget businessUnitId={operationsBusinessId} staffId={staffProfile?.id} />
 
             <WeeklyGoalProgress businessUnitId={operationsBusinessId} staffId={staffProfile?.id} />
-
-            <article className="panel daily-ops-card">
-              <div className="section-header">
-                <div>
-                  <span>Opening / Closing</span>
-                  <h2>{dailyOperations.checklistCompletion}% complete</h2>
-                </div>
-                <ClipboardCheck size={20} />
-              </div>
-              <div className="staff-hub-progress-track">
-                <span style={{ width: `${dailyOperations.checklistCompletion}%` }} />
-              </div>
-              <p className="subtle-text">Full station and shared checklists are below.</p>
-            </article>
           </section>
+          ) : null}
 
-          <OpeningClosingChecklist businessUnitId={operationsBusinessId} isAdmin={canManageHub} />
-
+          {dailyOpsView === 'overview' ? (
+          <>
           <section className="daily-ops-grid full-span">
             <article className="panel daily-ops-card daily-ops-card--wide">
               <div className="section-header">
@@ -2021,6 +2031,8 @@ export default function StaffHubPage({
               </div>
             </article>
           </section>
+          </>
+          ) : null}
         </>
       ) : null}
 
