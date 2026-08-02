@@ -95,6 +95,7 @@ import {
   buildStaffCandidates,
   matchStaffAssignment,
 } from '../supabase/functions/_shared/source-attribution.js';
+import { matchSquareNameToStaff } from '../src/utils/squarePayrollImport.js';
 
 function profileWithPermissions(modules, extra = {}) {
   return {
@@ -483,6 +484,38 @@ test('general Google-style reviews stay business-level when no staff signal exis
   assert.equal(generalReview.staffId, null);
   assert.equal(mentionedReview.status, 'flagged_for_audit');
   assert.equal(mentionedReview.staffId, 'ricko');
+});
+
+test('Square payroll import matches staff by preferred name and profile aliases safely', () => {
+  const staff = [
+    {
+      active: true,
+      booking_platform_profile: 'Haleigh Beauty',
+      email: 'haleigh@example.com',
+      full_name: 'Haleigh Thompson',
+      id: 'haleigh',
+      pos_profile: 'Haleigh Lash Tech',
+      preferred_name: 'Haleigh',
+      social_handle: 'haleigh.rtb_lounge',
+    },
+    {
+      active: true,
+      full_name: 'Hailey Smith',
+      id: 'hailey',
+      preferred_name: 'Hailey',
+    },
+    {
+      active: true,
+      full_name: 'Ricko Joseph',
+      id: 'ricko',
+      preferred_name: 'Ricko',
+    },
+  ];
+
+  assert.equal(matchSquareNameToStaff('Haleigh Lash Tech', staff).id, 'haleigh');
+  assert.equal(matchSquareNameToStaff('haleigh@example.com', staff).id, 'haleigh');
+  assert.equal(matchSquareNameToStaff('Ricardo Joseph', staff).id, 'ricko');
+  assert.equal(matchSquareNameToStaff('H', staff), null);
 });
 
 test('business access can be one business, many businesses, or all businesses', () => {

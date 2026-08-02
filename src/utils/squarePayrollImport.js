@@ -227,35 +227,130 @@ export function parseSquarePayrollCsvByLocation(csvText) {
 }
 
 function normalizeName(value) {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[._|/-]+/g, ' ')
+    .replace(/[^a-z0-9\s@]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchKey(value) {
+  return normalizeName(value).replace(/[^a-z0-9]+/g, '');
 }
 
 function firstWord(value) {
   return normalizeName(value).split(/\s+/)[0] || '';
 }
 
-// Tries, in order: the known alias table, an exact full-name match, then a
-// first-word match in either direction. Anything left over is genuinely
-// ambiguous and should go to manual review rather than guess -- silently
-// misattributing one staff member's revenue to another would be a real
-// payroll error, not just a cosmetic one.
+function addStaffKeys(keys, member) {
+  [
+    member.full_name,
+    member.preferred_name,
+    member.social_handle,
+    member.instagram_handle,
+    member.pos_profile,
+    member.booking_platform_profile,
+    member.square_team_member_id,
+    member.source_staff_id,
+  ].forEach((value) => {
+    const key = matchKey(value);
+    if (key) keys.add(key);
+  });
+
+  if (member.email) {
+    const email = normalizeName(member.email);
+    const emailName = email.split('@')[0];
+    [email, emailName].forEach((value) => {
+      const key = matchKey(value);
+      if (key) keys.add(key);
+    });
+  }
+
+  [
+    member.alias,
+    member.aliases,
+    member.staff_aliases,
+    member.source_identities,
+    member.identities,
+  ].forEach((value) => {
+    if (!value) return;
+    const values = Array.isArray(value) ? value : [value];
+    values.forEach((item) => {
+      if (!item) return;
+      if (typeof item === 'string') {
+        const key = matchKey(item);
+        if (key) keys.add(key);
+        return;
+      }
+
+      [
+        item.alias,
+        item.alias_key,
+        item.source_display_name,
+        item.preferred_name,
+        item.source_email,
+        item.source_staff_id,
+      ].forEach((nested) => {
+        const key = matchKey(nested);
+        if (key) keys.add(key);
+      });
+    });
+  });
+}
+
+function uniqueMatch(matches) {
+  const byId = new Map();
+  matches.filter(Boolean).forEach((member) => {
+    if (member?.id) byId.set(member.id, member);
+  });
+  return byId.size === 1 ? [...byId.values()][0] : null;
+}
+
+function findByMatchKey(staffList, key) {
+  if (!key) return null;
+  return uniqueMatch(
+    (staffList || []).filter((member) => {
+      const keys = new Set();
+      addStaffKeys(keys, member);
+      return keys.has(key);
+    }),
+  );
+}
+
+// Tries, in order: known Square aliases, exact normalized staff identifiers
+// (full/preferred name, POS profile, email, social handle, saved aliases),
+// then a cautious first-word fallback. Ambiguous matches stay in review
+// instead of being silently assigned to the wrong staff member.
 export function matchSquareNameToStaff(squareName, staffList) {
   const normalized = normalizeName(squareName);
-  const aliasTarget = SQUARE_NAME_ALIASES[normalized];
+  const squareKey = matchKey(squareName);
+  const aliasTarget = SQUARE_NAME_ALIASES[normalized] || SQUARE_NAME_ALIASES[squareKey];
 
   if (aliasTarget) {
-    const aliasMatch = (staffList || []).find((member) => normalizeName(member.full_name) === aliasTarget);
+    const aliasMatch = findByMatchKey(staffList, matchKey(aliasTarget));
     if (aliasMatch) return aliasMatch;
   }
 
-  const exactMatch = (staffList || []).find((member) => normalizeName(member.full_name) === normalized);
+  const exactMatch = findByMatchKey(staffList, squareKey);
   if (exactMatch) return exactMatch;
 
   const squareFirst = firstWord(squareName);
-  const firstWordMatch = (staffList || []).find((member) => {
-    const staffFirst = firstWord(member.full_name);
-    return staffFirst && squareFirst && (staffFirst === squareFirst || squareFirst.startsWith(staffFirst) || staffFirst.startsWith(squareFirst));
-  });
+  const firstWordMatch = uniqueMatch(
+    (staffList || []).filter((member) => {
+      const candidateNames = [
+        member.full_name,
+        member.preferred_name,
+        member.pos_profile,
+        member.booking_platform_profile,
+      ];
+      return candidateNames.some((name) => {
+        const staffFirst = firstWord(name);
+        return staffFirst && squareFirst && (staffFirst === squareFirst || squareFirst.startsWith(staffFirst) || staffFirst.startsWith(squareFirst));
+      });
+    }),
+  );
 
   return firstWordMatch || null;
 }
