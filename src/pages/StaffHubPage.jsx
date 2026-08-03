@@ -407,6 +407,7 @@ export default function StaffHubPage({
   masterDashboardUpdatedAt,
   navItems,
   onRefresh,
+  pageTarget,
   payrollRuns,
   performanceSummary,
   setActivePage,
@@ -421,6 +422,16 @@ export default function StaffHubPage({
   const [hubMessage, setHubMessage] = useState('');
   const [hubError, setHubError] = useState('');
   const [savingHubAction, setSavingHubAction] = useState('');
+
+  // When something elsewhere in the app links here with a specific tab in
+  // mind (e.g. the Priority Board's "Time off request from X"), open that
+  // tab instead of the default Daily Ops -- otherwise the approve/decline
+  // buttons are two tabs away with no indication of where to look.
+  useEffect(() => {
+    if (pageTarget && TABS.some((tab) => tab.id === pageTarget)) {
+      setActiveTab(pageTarget);
+    }
+  }, [pageTarget]);
   const [announcementForm, setAnnouncementForm] = useState({
     body: '',
     category: 'reminder',

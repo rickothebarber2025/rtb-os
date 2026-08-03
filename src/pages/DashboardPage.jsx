@@ -99,6 +99,7 @@ export default function DashboardPage({
   navItems,
   payrollRuns,
   performanceSummary,
+  navigateTo,
   setActivePage,
   squareStatus,
   staff,
@@ -312,7 +313,7 @@ export default function DashboardPage({
                   <button
                     className={`priority-board__item ${item.priority}`}
                     key={item.id}
-                    onClick={() => setActivePage(item.page)}
+                    onClick={() => (navigateTo ? navigateTo(item.page, item.pageTarget) : setActivePage(item.page))}
                     type="button"
                   >
                     <div className="priority-board__item-icon">

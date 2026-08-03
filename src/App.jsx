@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppShell from './components/AppShell';
 import LoadingState from './components/LoadingState';
 import ModuleGate from './components/ModuleGate.jsx';
@@ -54,6 +54,17 @@ export default function App() {
   const [userPreferences, setUserPreferences] = useUserPreferences(auth.user?.id);
   const surveyToken = getSurveyTokenFromLocation();
   const [activePage, setActivePage] = useState('dashboard');
+  const [pageTarget, setPageTarget] = useState(null);
+
+  // Lets a link elsewhere in the app (e.g. a Priority Board item) open a
+  // specific tab inside a page, not just the page's default tab. Without
+  // this, clicking "Time off request from X" landed on Staff Hub's Daily
+  // Ops tab with no indication the approve/decline buttons were two tabs
+  // away under Schedule.
+  const navigateTo = useCallback((page, target = null) => {
+    setActivePage(page);
+    setPageTarget(target);
+  }, []);
   const [selectedBusinessUnitId, setSelectedBusinessUnitId] = useState(() =>
     window.localStorage.getItem(STORAGE_KEY),
   );
@@ -150,6 +161,8 @@ export default function App() {
       payrollRuns: data.payrollRuns,
       monthlyPerformanceSummary: data.monthlyPerformanceSummary,
       navItems,
+      navigateTo,
+      pageTarget,
       performanceSummary: data.performanceSummary,
       setActivePage,
       squareStatus: data.squareStatus,
@@ -164,7 +177,7 @@ export default function App() {
       userPreferences,
       warnings: data.warnings,
     }),
-    [auth.profile, auth.user, businessOptions, data, navItems, setUserPreferences, userPreferences],
+    [auth.profile, auth.user, businessOptions, data, navItems, navigateTo, pageTarget, setUserPreferences, userPreferences],
   );
 
   function renderPage() {

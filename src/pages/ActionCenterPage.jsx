@@ -98,6 +98,7 @@ export default function ActionCenterPage({
   businessUnit,
   onRefresh,
   payrollRuns,
+  navigateTo,
   setActivePage,
   staff,
   staffHub,
@@ -339,7 +340,7 @@ export default function ActionCenterPage({
                       <button
                         className="primary-button small"
                         type="button"
-                        onClick={() => setActivePage(item.page)}
+                        onClick={() => (navigateTo ? navigateTo(item.page, item.pageTarget) : setActivePage(item.page))}
                       >
                         {item.actionLabel}
                       </button>
