@@ -459,7 +459,7 @@ export default function PayrollPage({
       week_label: run.week_label,
       week_start: run.week_start || '',
     });
-    setEntries((run.payroll_entries || []).map((entry) => {
+    setEntries((run.entries || run.payroll_entries || []).map((entry) => {
       const normalized = {
         ...entry,
         applied_commission_rate: Number(entry.applied_commission_rate || 0),
