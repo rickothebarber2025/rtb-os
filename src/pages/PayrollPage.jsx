@@ -25,7 +25,7 @@ import {
   lockPayrollRun,
   savePayrollDraft,
 } from '../services/rtbService';
-import { getDefaultPayrollWeek } from '../utils/dates';
+import { addDays, buildWeekLabel, getDefaultPayrollWeek, getWeekStart } from '../utils/dates';
 import { isAllBusinessesUnit } from '../utils/businessProfiles';
 import { canAdminPayroll, canManagePayroll } from '../utils/access';
 import { formatCurrency, formatDate, formatPercent } from '../utils/formatters';
@@ -343,11 +343,6 @@ export default function PayrollPage({
       const csvText = await file.text();
       const byLocation = parseSquarePayrollCsvByLocation(csvText);
       const businesses = await getBusinessUnits();
-      const weekFields = {
-        week_end: currentRun.week_end,
-        week_label: currentRun.week_label,
-        week_start: currentRun.week_start,
-      };
 
       const summaries = [];
       const skippedBusinesses = [];
@@ -358,6 +353,22 @@ export default function PayrollPage({
           skippedBusinesses.push(business.name);
           continue;
         }
+
+        // The uploaded CSV's own transaction dates decide which week this
+        // is, not whatever run happens to be open on screen -- previously
+        // this hardcoded currentRun's week for every upload, so a CSV for
+        // any other week silently overwrote whichever week was currently
+        // selected instead of landing on its own week (confirmed live: a
+        // real "Jul 20-26" run existed with the "Jul 13-19" week's exact
+        // totals duplicated into it, and had to be voided).
+        const weekMinValue = locationData.meta.weekMin;
+        const weekStartDate = weekMinValue ? getWeekStart(new Date(weekMinValue)) : getWeekStart(new Date());
+        const weekEndDate = addDays(weekStartDate, 6);
+        const weekFields = {
+          week_end: weekEndDate.toISOString().slice(0, 10),
+          week_label: buildWeekLabel(weekStartDate, weekEndDate),
+          week_start: weekStartDate.toISOString().slice(0, 10),
+        };
 
         const businessStaff = await getStaff(business.id, false);
         const existingRuns = await getPayrollRuns(business.id);
@@ -399,7 +410,12 @@ export default function PayrollPage({
         };
 
         await savePayrollDraft(runPayload, entries);
-        summaries.push({ business: business.name, matched: usedStaffIds.size, unmatchedNames });
+        summaries.push({
+          business: business.name,
+          matched: usedStaffIds.size,
+          unmatchedNames,
+          weekLabel: weekFields.week_label,
+        });
       }
 
       await onRefresh();
@@ -407,7 +423,7 @@ export default function PayrollPage({
       const summaryText = summaries
         .map(
           (summary) =>
-            `${summary.business}: ${summary.matched} matched` +
+            `${summary.business} (${summary.weekLabel}): ${summary.matched} matched` +
             (summary.unmatchedNames.length
               ? ` (review needed: ${summary.unmatchedNames.join(', ')})`
               : ''),
