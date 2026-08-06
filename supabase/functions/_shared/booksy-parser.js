@@ -7,8 +7,20 @@ const EVENT_TEMPLATES = [
     patterns: [/cancel(l)?ed/i, /appointment.+cancel/i],
   },
   {
+    eventType: "appointment_created",
+    name: "appointment-created",
+    patterns: [/new appointment/i, /appointment.+created/i, /new booking/i, /booked.+appointment/i],
+  },
+  {
     eventType: "appointment_rescheduled",
     name: "appointment-rescheduled",
+    // Confirmed via real data: every Booksy email (including plain "new
+    // booking" ones) includes generic policy-footer text containing the
+    // word "rescheduled" ("...or rescheduled based on availability"),
+    // which was matching this template before appointment_created ever
+    // got a chance to -- misclassifying 20 of 24 real events, all of
+    // which were actually new bookings. appointment_created is checked
+    // first above specifically to prevent that footer text from winning.
     patterns: [/rescheduled/i, /appointment.+moved/i, /changed.+time/i],
   },
   {
@@ -20,11 +32,6 @@ const EVENT_TEMPLATES = [
       /appointment.+changed/i,
       /confirmed the new appointment time/i,
     ],
-  },
-  {
-    eventType: "appointment_created",
-    name: "appointment-created",
-    patterns: [/new appointment/i, /appointment.+created/i, /new booking/i, /booked.+appointment/i],
   },
   {
     eventType: "client_created",
