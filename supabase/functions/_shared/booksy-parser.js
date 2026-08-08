@@ -281,7 +281,6 @@ function extractLabelFields(text) {
     ["appointmentTime", /(?:appointment time|time)\s*[:\-]\s*([^\n]+)/i],
     ["bookingIdentifier", /(?:booking id|booking identifier|appointment id|reservation id|booksy id)\s*[:#\-]\s*([A-Za-z0-9_-]+)/i],
     ["price", /(?:price|amount|total)\s*[:\-]\s*(\$?\d[\d,]*(?:\.\d{2})?)/i],
-<<<<<<< Updated upstream
     ["location", /(?:location|business|salon)\s*[:\-]\s*([^\n]+)/i],
     // Allows an optional word (e.g. "content") between the keyword
     // and the colon -- confirmed against a real Booksy review email:
@@ -292,9 +291,6 @@ function extractLabelFields(text) {
     // before it reaches the next paragraph of boilerplate is the
     // only place this can actually be bounded correctly.
     ["reviewText", /(?:review|comment|feedback)\s*(?:content)?\s*[:\-]\s*([^\n]{5,800})/i],
-=======
-    ["reviewText", /(?:review|comment|feedback)\s*[:\-]\s*([\s\S]{5,800})/i],
->>>>>>> Stashed changes
   ];
 
   labels.forEach(([key, pattern]) => {
