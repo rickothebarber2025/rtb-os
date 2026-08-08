@@ -4,6 +4,7 @@ import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import MobileNavigationEnhancer from './components/MobileNavigationEnhancer.jsx';
 import { AuthProfileProvider } from './contexts/AuthProfileContext.jsx';
+import { initializePushNotifications } from './lib/pushNotifications.js';
 import './styles/global.css';
 import './styles/mobileNavigation.css';
 
@@ -36,6 +37,9 @@ function clearLegacyServiceWorkerCache() {
 }
 
 clearLegacyServiceWorkerCache();
+initializePushNotifications().catch((error) => {
+  console.error('RTB push initialization failed', error);
+});
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
