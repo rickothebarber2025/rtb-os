@@ -40,20 +40,34 @@ async function safe<T>(promise: PromiseLike<{ data: T | null; error: unknown }>,
   }
 }
 
-async function gatherContext(admin: ReturnType<typeof createClient>, businessId: string) {
-  const since = new Date(Date.now() - 30 * 86400000).toISOString();
-  const today = new Intl.DateTimeFormat("en-CA", {
+function torontoDate() {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Toronto",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+async function gatherContext(
+  admin: ReturnType<typeof createClient>,
+  businessId: string,
+  options: { audience: "admin" | "staff_hub"; currentStaffId?: string | null; allowFinancial: boolean },
+) {
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const today = torontoDate();
+  const adminAudience = options.audience === "admin";
 
   const [business, staff] = await Promise.all([
     safe(admin.from("business_units").select("id,name,type").eq("id", businessId).maybeSingle(), null),
     safe(admin.from("staff").select("id,full_name,role,tier,active,fixed_rate").eq("business_unit_id", businessId).order("full_name"), []),
   ]);
-  const staffIds = (staff as any[]).map((row) => row.id);
+
+  const staffRows = staff as any[];
+  const staffIds = staffRows.map((row) => row.id);
+  const ownStaffId = options.currentStaffId || null;
+  const staffFilter = <T extends any[]>(rows: T) =>
+    adminAudience || !ownStaffId ? rows : rows.filter((row: any) => row.staff_id === ownStaffId || row.actor_staff_id === ownStaffId);
 
   const [performance, attendance, shifts, checklistRuns, tasks, operationsRequests, activity, feedback, payroll] = await Promise.all([
     safe(admin.from("staff_performance_summary").select("*").eq("business_unit_id", businessId), []),
@@ -64,23 +78,43 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
     safe(admin.from("staff_operations_requests").select("staff_id,request_type,category,title,details,priority,status,manager_note,resolved_at,created_at").eq("business_unit_id", businessId).order("created_at", { ascending: false }).limit(100), []),
     safe(admin.from("owner_activity_events").select("actor_staff_id,category,action,title,body,metadata,created_at").eq("business_unit_id", businessId).gte("created_at", since).order("created_at", { ascending: false }).limit(150), []),
     safe(admin.from("customer_feedback_enriched").select("staff_id,rating,review_text,sentiment,main_category,priority,suggested_action,response_created_at").eq("business_id", businessId).order("response_created_at", { ascending: false }).limit(60), []),
-    staffIds.length ? safe(admin.from("payroll_entries").select("staff_id,staff_name_snapshot,net_sales,tips,take_home,created_at").in("staff_id", staffIds).order("created_at", { ascending: false }).limit(80), []) : Promise.resolve([]),
+    options.allowFinancial && staffIds.length
+      ? safe(admin.from("payroll_entries").select("staff_id,staff_name_snapshot,net_sales,tips,take_home,created_at").in("staff_id", staffIds).order("created_at", { ascending: false }).limit(80), [])
+      : Promise.resolve([]),
   ]);
+
+  const ownPerformance = adminAudience || !ownStaffId
+    ? performance
+    : (performance as any[]).filter((row) => row.staff_id === ownStaffId);
 
   return {
     business,
-    staff,
-    staff_performance: performance,
-    attendance_last_30_days: attendance,
-    shifts_today: shifts,
-    opening_closing_today: checklistRuns,
-    tasks,
-    operations_requests: operationsRequests,
-    owner_activity_last_30_days: activity,
-    customer_feedback: feedback,
-    payroll_recent: payroll,
+    roster: adminAudience ? staffRows : staffRows.filter((row) => row.id === ownStaffId),
+    staff_performance: ownPerformance,
+    attendance_last_30_days: staffFilter(attendance as any[]),
+    shifts_today: staffFilter(shifts as any[]),
+    opening_closing_today: adminAudience
+      ? checklistRuns
+      : (checklistRuns as any[]).map((run: any) => ({
+          checklist_type: run.checklist_type,
+          scope: run.scope,
+          status: run.status,
+          completion_percent: run.completion_percent,
+          run_date: run.run_date,
+          my_items: Array.isArray(run.items)
+            ? run.items.filter((item: any) => item.completed_by_staff_id === ownStaffId)
+            : [],
+        })),
+    tasks: staffFilter(tasks as any[]),
+    operations_requests: staffFilter(operationsRequests as any[]),
+    owner_activity_last_30_days: adminAudience ? activity : staffFilter(activity as any[]),
+    customer_feedback: adminAudience
+      ? feedback
+      : (feedback as any[]).filter((row) => row.staff_id === ownStaffId),
+    payroll_recent: options.allowFinancial ? payroll : [],
     generated_at: new Date().toISOString(),
     timezone: "America/Toronto",
+    audience: options.audience,
   };
 }
 
@@ -109,6 +143,28 @@ const responseSchema = {
   required: ["answer", "summary", "confidence_score", "evidence", "priorities", "suggested_tasks"],
 };
 
+async function askGemini(apiKey: string, model: string, prompt: string, payload: unknown) {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: prompt }] },
+      contents: [{ role: "user", parts: [{ text: JSON.stringify(payload) }] }],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: "application/json",
+        responseSchema,
+      },
+    }),
+  });
+
+  const raw = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(raw?.error?.message || "Gemini request failed.");
+  const text = raw?.candidates?.[0]?.content?.parts?.find((part: any) => part.text)?.text || "";
+  if (!text) throw new Error("Gemini returned an empty response.");
+  return JSON.parse(text);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed." }, 405);
@@ -126,51 +182,98 @@ Deno.serve(async (req) => {
     if (authError || !authData.user) return json({ error: "Your session is invalid or expired." }, 401);
 
     const body = await req.json().catch(() => ({}));
+    const action = clean(body.action || "ask").toLowerCase();
     const businessId = clean(body.businessId || body.business_id);
     const question = clean(body.question);
     if (!businessId) return json({ error: "Choose one business first." }, 400);
-    if (!question) return json({ error: "Ask a question first." }, 400);
 
     const profile = await safe(admin.from("user_profiles").select("email,active,business_unit_id,permissions,role").eq("id", authData.user.id).maybeSingle(), null as any);
     const owner = clean(profile?.email).toLowerCase() === "rickothebarber@gmail.com";
     const permissions = profile?.permissions || {};
     const modules = permissions.modules || permissions;
     const operationsLevel = ["none", "view", "edit", "admin"].indexOf(clean(modules.operations).toLowerCase());
+    const dashboardLevel = ["none", "view", "edit", "admin"].indexOf(clean(modules.dashboard).toLowerCase());
+    const payrollLevel = ["none", "view", "edit", "admin"].indexOf(clean(modules.payroll).toLowerCase());
     const businessIds = Array.isArray(permissions.business_unit_ids) ? permissions.business_unit_ids.map(String) : [];
     const businessAllowed = owner || permissions.business_scope === "all" || businessIds.includes("all-businesses") || businessIds.includes(businessId) || profile?.business_unit_id === businessId;
-    if (!profile?.active || (!owner && (operationsLevel < 1 || !businessAllowed))) {
-      return json({ error: "You do not have permission to use RTB Gemini for this business." }, 403);
+    if (!profile?.active || !businessAllowed) return json({ error: "You do not have access to this business." }, 403);
+
+    const manager = owner || operationsLevel >= 2 || dashboardLevel >= 1 || ["admin", "manager", "owner"].includes(clean(profile?.role).toLowerCase());
+    const audience: "admin" | "staff_hub" = manager ? "admin" : "staff_hub";
+    const currentStaff = await safe(
+      admin.from("staff").select("id,full_name,email").eq("business_unit_id", businessId).ilike("email", clean(profile?.email)).maybeSingle(),
+      null as any,
+    );
+
+    if (action === "automation") {
+      if (!manager) return json({ error: "Manager access is required to run automations." }, 403);
+      const { data, error } = await admin.rpc("run_rtb_safe_automations");
+      if (error) throw error;
+      return json({ automation: data });
     }
 
-    const context = await gatherContext(admin, businessId);
-    const model = Deno.env.get("GEMINI_MODEL") || "gemini-flash-latest";
-    const system = [
-      "You are RTB Gemini, the private operating copilot for RTB Lounge and RTB Beauty Lounge.",
-      "Use ONLY the supplied RTB OS business context as factual evidence. Never invent staff actions, sales, attendance, checklist completion, or customer feedback.",
-      "The owner wants direct, critical, decision-oriented answers. Identify operational risk, accountability gaps, revenue opportunities, and the next best actions.",
-      "For questions about today, prioritize shifts_today, opening_closing_today, tasks, operations_requests, and owner_activity_last_30_days.",
-      "For staff questions, name staff only when the supplied data supports it. If records are missing or incomplete, explicitly say what is missing.",
-      "Suggested tasks must be actionable and use a real roster name when possible; otherwise suggested_staff_name should be Owner.",
-      "Do not alter payroll, permissions, or financial data. Return JSON only matching the schema.",
-    ].join(" ");
+    if (action === "ask" && !question) return json({ error: "Ask a question first." }, 400);
 
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: JSON.stringify({ question, business_context: context }) }] }],
-        generationConfig: { temperature: 0.25, responseMimeType: "application/json", responseSchema },
-      }),
+    if (manager) {
+      await admin.rpc("run_rtb_safe_automations").catch(() => null);
+    }
+
+    const context = await gatherContext(admin, businessId, {
+      audience,
+      currentStaffId: currentStaff?.id || null,
+      allowFinancial: owner || payrollLevel >= 1,
+    });
+    const model = Deno.env.get("GEMINI_MODEL") || "gemini-flash-latest";
+
+    const system = audience === "admin"
+      ? [
+          "You are RTB Gemini, the private operating copilot for the owner and managers of RTB Lounge and RTB Beauty Lounge.",
+          "Use only supplied RTB OS data as factual evidence. Never invent staff actions, sales, attendance, checklist completion, or customer feedback.",
+          "Summarize what matters, identify operational risk, accountability gaps, revenue opportunities, and the next best actions.",
+          "Prioritize today's shifts, opening/closing, overdue tasks, unresolved operations issues, staff activity, and performance.",
+          "Do not alter payroll, permissions, compensation, terminations, or financial records. Return JSON only.",
+        ].join(" ")
+      : [
+          "You are RTB Gemini inside Staff Hub. You are coaching one staff member using only their own permitted RTB OS data.",
+          "Do not reveal other staff payroll, private performance, attendance, or management-only information.",
+          "Summarize today's responsibilities, checklist participation, assigned tasks, attendance signals, client feedback tied to this staff member, and the clearest next action.",
+          "Be constructive, specific, concise, and operational. Return JSON only.",
+        ].join(" ");
+
+    const effectiveQuestion = action === "summary"
+      ? audience === "admin"
+        ? "Give me the current RTB owner operations brief. What needs attention now, what is going well, and what should management do next?"
+        : "Give me my Staff Hub brief for today: what I need to finish, anything I missed, and the most useful next action."
+      : question;
+
+    const parsed = await askGemini(geminiKey, model, system, {
+      question: effectiveQuestion,
+      business_context: context,
     });
 
-    const raw = await geminiResponse.json().catch(() => ({}));
-    if (!geminiResponse.ok) return json({ error: raw?.error?.message || "Gemini request failed." }, 502);
-    const text = raw?.candidates?.[0]?.content?.parts?.find((part: any) => part.text)?.text || "";
-    if (!text) return json({ error: "Gemini returned an empty response." }, 502);
-    const parsed = JSON.parse(text);
+    if (action === "summary") {
+      const { error: saveError } = await admin.from("ai_operations_summaries").upsert({
+        business_unit_id: businessId,
+        audience,
+        summary_date: torontoDate(),
+        headline: parsed.priorities?.[0] || (audience === "admin" ? "RTB operations brief" : "My RTB brief"),
+        summary: parsed.summary || parsed.answer,
+        priorities: parsed.priorities || [],
+        evidence: parsed.evidence || [],
+        suggested_tasks: parsed.suggested_tasks || [],
+        model,
+        generated_at: new Date().toISOString(),
+      }, { onConflict: "business_unit_id,audience,summary_date" });
+      if (saveError) throw saveError;
+    }
 
-    return json({ ...parsed, model, data_scope: "rtb_os_live", generated_at: new Date().toISOString() });
+    return json({
+      ...parsed,
+      model,
+      audience,
+      data_scope: audience === "admin" ? "rtb_os_admin_live" : "rtb_os_staff_live",
+      generated_at: new Date().toISOString(),
+    });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "RTB Gemini failed." }, 500);
   }
