@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import GeminiOpsBrief from './GeminiOpsBrief';
 import MobileTabBar from './MobileTabBar';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
@@ -73,6 +74,7 @@ export default function AppShell({
           userPreferences={userPreferences}
         />
         <main className={`content ${pageClass}`}>
+          <GeminiOpsBrief activePage={activePage} businessUnitId={selectedBusinessUnitId} />
           {children}
         </main>
         <MobileTabBar
