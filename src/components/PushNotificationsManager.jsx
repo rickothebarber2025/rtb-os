@@ -1,68 +1,51 @@
 import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
-import { supabase } from '../lib/supabaseClient';
-
-const IOS_BUNDLE_ID = 'com.rtbheadquaters.os';
-
-function getPushTarget(notification) {
-  const data = notification?.notification?.data || notification?.data || {};
-  const rtb = data?.rtb || data || {};
-  return rtb?.page || null;
-}
+import {
+  initializePushNotifications,
+  syncStoredPushToken,
+} from '../lib/pushNotifications';
 
 export default function PushNotificationsManager({ enabled, setActivePage }) {
   useEffect(() => {
-    if (!enabled || !supabase || !Capacitor.isNativePlatform()) return undefined;
+    if (!enabled || !Capacitor.isNativePlatform()) return undefined;
 
     let cancelled = false;
-    const listenerHandles = [];
+    let retryTimer = null;
 
-    async function registerToken(tokenValue) {
-      if (!tokenValue || cancelled) return;
-      const { error } = await supabase.rpc('register_my_push_token', {
-        p_token: tokenValue,
-        p_platform: Capacitor.getPlatform(),
-        p_bundle_id: IOS_BUNDLE_ID,
-      });
-      if (error) console.error('Unable to register RTB push token', error);
-    }
-
-    async function setupPush() {
+    async function syncAuthenticatedDevice() {
       try {
-        listenerHandles.push(
-          await PushNotifications.addListener('registration', (token) => registerToken(token.value)),
-        );
-        listenerHandles.push(
-          await PushNotifications.addListener('registrationError', (error) => {
-            console.error('RTB push registration failed', error);
-          }),
-        );
-        listenerHandles.push(
-          await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-            const target = getPushTarget(action);
-            if (target && typeof setActivePage === 'function') setActivePage(target);
-          }),
-        );
-
-        const current = await PushNotifications.checkPermissions();
-        let permission = current.receive;
-        if (permission === 'prompt' || permission === 'prompt-with-rationale') {
-          const requested = await PushNotifications.requestPermissions();
-          permission = requested.receive;
+        // initializePushNotifications is idempotent. If APNs already delivered a
+        // token before login, this immediately retries that stored token now that
+        // AppShell knows the authenticated profile is active.
+        await initializePushNotifications();
+        const registered = await syncStoredPushToken();
+        if (!registered && !cancelled) {
+          retryTimer = window.setTimeout(syncAuthenticatedDevice, 2000);
         }
-        if (permission !== 'granted') return;
-        await PushNotifications.register();
       } catch (error) {
-        console.error('RTB push setup failed', error);
+        console.error('[RTB Push] authenticated token sync failed', error);
+        if (!cancelled) retryTimer = window.setTimeout(syncAuthenticatedDevice, 2000);
       }
     }
 
-    setupPush();
+    function handlePushNavigation(event) {
+      const target = event?.detail?.route;
+      if (target && typeof setActivePage === 'function') setActivePage(target);
+    }
+
+    function handleAuthReady() {
+      syncAuthenticatedDevice();
+    }
+
+    window.addEventListener('rtb:push-navigation', handlePushNavigation);
+    window.addEventListener('rtb:auth-session-ready', handleAuthReady);
+    syncAuthenticatedDevice();
 
     return () => {
       cancelled = true;
-      listenerHandles.forEach((handle) => handle?.remove?.());
+      if (retryTimer) window.clearTimeout(retryTimer);
+      window.removeEventListener('rtb:push-navigation', handlePushNavigation);
+      window.removeEventListener('rtb:auth-session-ready', handleAuthReady);
     };
   }, [enabled, setActivePage]);
 
