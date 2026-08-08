@@ -3,11 +3,22 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { supabase } from './supabaseClient';
 
 const PUSH_TOKEN_KEY = 'rtb-os-ios-push-token';
+const PUSH_STATUS_KEY = 'rtb-os-push-status';
 let initialized = false;
 let pendingToken = '';
 
+function setStatus(status, details = '') {
+  const payload = { status, details, at: new Date().toISOString() };
+  try {
+    window.localStorage.setItem(PUSH_STATUS_KEY, JSON.stringify(payload));
+  } catch {
+    // Diagnostics are best-effort only.
+  }
+  console.info('[RTB Push]', status, details || '');
+}
+
 async function saveToken(token) {
-  if (!token || !supabase) return;
+  if (!token || !supabase) return false;
   pendingToken = token;
   try {
     window.localStorage.setItem(PUSH_TOKEN_KEY, token);
@@ -15,8 +26,15 @@ async function saveToken(token) {
     // Local storage is only a convenience; Supabase is the source of truth.
   }
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData?.session?.user) return;
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    setStatus('session_error', sessionError.message);
+    return false;
+  }
+  if (!sessionData?.session?.user) {
+    setStatus('token_waiting_for_login');
+    return false;
+  }
 
   const { error } = await supabase.rpc('register_my_push_token', {
     p_token: token,
@@ -26,31 +44,46 @@ async function saveToken(token) {
   });
 
   if (error) {
-    console.error('RTB push token registration failed', error);
+    setStatus('supabase_registration_error', error.message || String(error));
+    return false;
   }
+
+  setStatus('registered_with_supabase');
+  return true;
 }
 
 async function syncStoredToken() {
-  if (!supabase) return;
+  if (!supabase) return false;
   let token = pendingToken;
   try {
     token ||= window.localStorage.getItem(PUSH_TOKEN_KEY) || '';
   } catch {
     // Ignore storage errors.
   }
-  if (token) await saveToken(token);
+  if (!token) return false;
+  return saveToken(token);
 }
 
 export async function initializePushNotifications() {
-  if (initialized || !Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return;
+  if (initialized) return;
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
+    setStatus('not_native_ios');
+    return;
+  }
   initialized = true;
+  setStatus('initializing');
 
-  await PushNotifications.addListener('registration', ({ value }) => {
-    saveToken(value);
+  await PushNotifications.addListener('registration', async ({ value }) => {
+    setStatus('apns_token_received');
+    await saveToken(value);
   });
 
   await PushNotifications.addListener('registrationError', (error) => {
-    console.error('RTB push registration error', error);
+    setStatus('apns_registration_error', error?.error || error?.message || JSON.stringify(error));
+  });
+
+  await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    setStatus('push_received', notification?.title || 'notification');
   });
 
   await PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
@@ -68,16 +101,33 @@ export async function initializePushNotifications() {
   if (supabase) {
     supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-        syncStoredToken();
+        window.setTimeout(() => {
+          syncStoredToken().catch((error) => {
+            setStatus('token_resync_error', error?.message || String(error));
+          });
+        }, 250);
       }
     });
   }
 
   let permission = await PushNotifications.checkPermissions();
-  if (permission.receive === 'prompt') {
+  setStatus('permission_checked', permission.receive);
+  if (permission.receive === 'prompt' || permission.receive === 'prompt-with-rationale') {
     permission = await PushNotifications.requestPermissions();
+    setStatus('permission_requested', permission.receive);
   }
-  if (permission.receive !== 'granted') return;
+  if (permission.receive !== 'granted') {
+    setStatus('permission_not_granted', permission.receive);
+    return;
+  }
 
+  setStatus('registering_with_apns');
   await PushNotifications.register();
+
+  // If APNs produced a token before the auth session was ready, this catches it.
+  window.setTimeout(() => {
+    syncStoredToken().catch((error) => {
+      setStatus('delayed_token_sync_error', error?.message || String(error));
+    });
+  }, 3000);
 }
