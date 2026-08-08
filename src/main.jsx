@@ -4,7 +4,6 @@ import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import MobileNavigationEnhancer from './components/MobileNavigationEnhancer.jsx';
 import { AuthProfileProvider } from './contexts/AuthProfileContext.jsx';
-import { initializePushNotifications } from './lib/pushNotifications.js';
 import './styles/global.css';
 import './styles/mobileNavigation.css';
 
@@ -24,7 +23,9 @@ function clearLegacyServiceWorkerCache() {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map((registration) => registration.unregister()));
 
-    if (!window.localStorage.getItem(CACHE_CLEANUP_KEY)) {
+    // Do not install a service worker inside the Capacitor native WebView.
+    const isNative = Boolean(window.Capacitor?.isNativePlatform?.());
+    if (!isNative && !window.localStorage.getItem(CACHE_CLEANUP_KEY)) {
       const registration = await navigator.serviceWorker.register('/sw.js');
       await registration.update();
       window.localStorage.setItem(CACHE_CLEANUP_KEY, 'done');
@@ -37,9 +38,6 @@ function clearLegacyServiceWorkerCache() {
 }
 
 clearLegacyServiceWorkerCache();
-initializePushNotifications().catch((error) => {
-  console.error('RTB push initialization failed', error);
-});
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -51,3 +49,13 @@ createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </React.StrictMode>,
 );
+
+// Native services start only after the UI has mounted. A push failure must never
+// prevent RTB OS from rendering or leave the iOS WebView on a black screen.
+window.setTimeout(() => {
+  import('./lib/pushNotifications.js')
+    .then(({ initializePushNotifications }) => initializePushNotifications())
+    .catch((error) => {
+      console.error('RTB push initialization failed', error);
+    });
+}, 750);
