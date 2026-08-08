@@ -34,6 +34,13 @@ function sourceTypeFor(source) {
   return "booksy_email";
 }
 
+// assignment_matches.status has a stricter allowed set than unresolved_items.status
+// (no "unresolved" value there - it uses "unassigned" instead). Map at the boundary
+// so the shared assignment.status vocabulary used elsewhere doesn't have to change.
+function assignmentMatchesStatus(status) {
+  return status === "unresolved" ? "unassigned" : status;
+}
+
 export async function loadAttributionContext(admin, businessUnitId) {
   const [staffResult, identitiesResult, aliasesResult, eventResult] = await Promise.all([
     admin
@@ -159,7 +166,7 @@ async function recordAssignment(admin, {
     source_table: sourceTable,
     source_type: sourceTypeFor(source),
     staff_id: assignment.staffId,
-    status: assignment.status,
+    status: assignmentMatchesStatus(assignment.status),
     updated_at: new Date().toISOString(),
   };
 
