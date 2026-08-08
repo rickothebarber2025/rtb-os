@@ -18,32 +18,17 @@ const PRIORITY_RANK = {
 };
 
 const CATEGORY_LABELS = {
-<<<<<<< Updated upstream
   docs: 'Documents',
   payroll: 'Payroll',
   probation: 'Probation',
   content: 'Content',
   task: 'Task',
   time_off: 'Time off',
-=======
-  booth: 'Booth rent',
-  content: 'Content review',
-  docs: 'Documents',
-  payroll: 'Payroll',
-  probation: 'Probation',
-  task: 'Staff Hub task',
-  time_off: 'Time off request',
->>>>>>> Stashed changes
   warning: 'Staff warning',
 };
 
 export const ACTION_CENTER_ICONS = {
-<<<<<<< Updated upstream
   content: FileWarning,
-=======
-  booth: ReceiptText,
-  content: ClipboardList,
->>>>>>> Stashed changes
   docs: ClipboardList,
   payroll: BadgeDollarSign,
   probation: CalendarClock,
@@ -341,84 +326,10 @@ function matchesStaffScope(record, staffIds, businessUnitId) {
   return true;
 }
 
-function staffNameFor(staffId, staffById) {
-  return staffById.get(staffId)?.full_name || 'Staff member';
-}
-
-// Staff Hub's own task board (staff_tasks) never surfaced anywhere outside
-// Staff Hub itself. This pulls open/overdue tasks into the same feed the
-// Dashboard and Action Center already render, so a task created in Staff
-// Hub is actually visible to managers without opening that page directly.
-function buildStaffTaskItems(tasks, staffById, now) {
-  return tasks
-    .filter((task) => task.status && task.status !== 'completed')
-    .map((task) => {
-      const daysLeft = task.due_date ? daysBetween(now, task.due_date) : null;
-      const overdue = daysLeft !== null && daysLeft < 0;
-      const staffName = staffNameFor(task.staff_id, staffById);
-
-      return buildItem({
-        actionLabel: 'Open Staff Hub',
-        category: 'task',
-        detail: `${staffName}${task.due_date ? ` - due ${task.due_date}` : ''}${task.details ? ` - ${task.details}` : ''}`,
-        id: `task-${task.id}`,
-        page: 'staff-hub',
-        priority: overdue ? 'urgent' : daysLeft !== null && daysLeft <= 2 ? 'high' : 'medium',
-        source: 'Staff Hub',
-        title: task.title || 'Untitled task',
-      });
-    });
-}
-
-function buildTimeOffItems(timeOffRequests, staffById, now) {
-  return timeOffRequests
-    .filter((request) => request.status === 'pending')
-    .map((request) => {
-      const daysUntil = request.start_date ? daysBetween(now, request.start_date) : null;
-      const staffName = staffNameFor(request.staff_id, staffById);
-
-      return buildItem({
-        actionLabel: 'Review request',
-        category: 'time_off',
-        detail: `${staffName} requested ${request.start_date || '?'} to ${request.end_date || '?'}${request.reason ? ` - ${request.reason}` : ''}`,
-        id: `time-off-${request.id}`,
-        kind: 'manual',
-        page: 'staff-hub',
-        priority: daysUntil !== null && daysUntil <= 3 ? 'high' : 'medium',
-        source: 'Staff Hub',
-        title: `${staffName} requested time off`,
-      });
-    });
-}
-
-function buildContentSubmissionItems(contentSubmissions, staffById, now) {
-  return contentSubmissions
-    .filter((item) => item.status === 'pending')
-    .map((item) => {
-      const staffName = staffNameFor(item.staff_id, staffById);
-
-      return buildItem({
-        actionLabel: 'Review content',
-        category: 'content',
-        detail: `${staffName} submitted ${item.content_type || 'content'} for review${createdDaysAgo(item, now) ? ` - ${createdDaysAgo(item, now)}d ago` : ''}`,
-        id: `content-${item.id}`,
-        kind: 'manual',
-        page: 'staff-hub',
-        priority: 'medium',
-        source: 'Staff Hub',
-        title: `${staffName} submitted content for review`,
-      });
-    });
-}
-
 export function buildActionCenterItems({
   accessProfile,
   actionCenter,
   businessUnitId = null,
-<<<<<<< Updated upstream
-=======
-  boothRent = [],
->>>>>>> Stashed changes
   contentSubmissions = [],
   payrollRuns = [],
   staff = [],
@@ -428,11 +339,7 @@ export function buildActionCenterItems({
 }) {
   const state = normalizeActionCenterState(actionCenter);
   const staffIds = new Set(staff.map((member) => member.id).filter(Boolean));
-<<<<<<< Updated upstream
   const staffById = new Map(staff.map((member) => [member.id, member]).filter(([id]) => Boolean(id)));
-=======
-  const staffById = new Map(staff.map((member) => [member.id, member]));
->>>>>>> Stashed changes
   const scopedWarnings = state.warnings.filter((warning) =>
     matchesStaffScope(warning, staffIds, businessUnitId),
   );
@@ -440,19 +347,11 @@ export function buildActionCenterItems({
     matchesStaffScope(document, staffIds, businessUnitId),
   );
   const scopedTasks = tasks.filter((task) => matchesStaffScope(task, staffIds, businessUnitId));
-<<<<<<< Updated upstream
   const scopedTimeOffRequests = timeOffRequests.filter((request) =>
     matchesStaffScope(request, staffIds, businessUnitId),
   );
   const scopedContentSubmissions = contentSubmissions.filter((submission) =>
     matchesStaffScope(submission, staffIds, businessUnitId),
-=======
-  const scopedTimeOff = timeOffRequests.filter((request) =>
-    matchesStaffScope(request, staffIds, businessUnitId),
-  );
-  const scopedContent = contentSubmissions.filter((item) =>
-    matchesStaffScope(item, staffIds, businessUnitId),
->>>>>>> Stashed changes
   );
   const items = [
     ...buildProbationItems(staff, now),
@@ -462,9 +361,6 @@ export function buildActionCenterItems({
     ...buildContentSubmissionItems(scopedContentSubmissions, staffById, now),
     ...buildWarningItems(scopedWarnings, now),
     ...buildDocumentItems(scopedDocuments, now),
-    ...buildStaffTaskItems(scopedTasks, staffById, now),
-    ...buildTimeOffItems(scopedTimeOff, staffById, now),
-    ...buildContentSubmissionItems(scopedContent, staffById, now),
   ];
 
   return [...items].sort((a, b) => {

@@ -27,9 +27,6 @@ import {
 const FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'urgent', label: 'Urgent' },
-  { id: 'task', label: 'Staff Hub tasks' },
-  { id: 'time_off', label: 'Time off' },
-  { id: 'content', label: 'Content review' },
   { id: 'probation', label: 'Probation' },
   { id: 'payroll', label: 'Payroll' },
   { id: 'task', label: 'Tasks' },
@@ -140,21 +137,13 @@ export default function ActionCenterPage({
         accessProfile,
         actionCenter: localState,
         businessUnitId: scopedBusinessUnitId,
-<<<<<<< Updated upstream
-=======
-        boothRent,
->>>>>>> Stashed changes
         contentSubmissions: staffHub?.contentSubmissions || [],
         payrollRuns,
         staff,
         tasks: staffHub?.tasks || [],
         timeOffRequests: staffHub?.timeOffRequests || [],
       }),
-<<<<<<< Updated upstream
     [accessProfile, localState, payrollRuns, scopedBusinessUnitId, staff, staffHub],
-=======
-    [accessProfile, boothRent, localState, payrollRuns, scopedBusinessUnitId, staff, staffHub],
->>>>>>> Stashed changes
   );
   const summary = getActionCenterSummary(items);
   const filteredItems = items.filter((item) => {
