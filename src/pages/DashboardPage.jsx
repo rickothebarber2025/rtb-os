@@ -148,10 +148,6 @@ export default function DashboardPage({
     accessProfile,
     actionCenter,
     businessUnitId: allBusinessesView ? null : businessUnit?.id,
-<<<<<<< Updated upstream
-=======
-    boothRent,
->>>>>>> Stashed changes
     contentSubmissions: staffHub?.contentSubmissions || [],
     payrollRuns,
     staff,
