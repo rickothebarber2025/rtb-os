@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import GeminiOpsBrief from './GeminiOpsBrief';
 import MobileTabBar from './MobileTabBar';
+import PushNotificationsManager from './PushNotificationsManager';
 import Sidebar from './Sidebar';
 import StaffCareerCoach from './StaffCareerCoach';
 import Topbar from './Topbar';
@@ -46,6 +47,7 @@ export default function AppShell({
     <div
       className={`app-shell ${preferredTheme} ${densityClass} ${navigationClass} ${motionClass} ${sidebarClass}`}
     >
+      <PushNotificationsManager enabled={Boolean(profile?.active && user?.id)} setActivePage={setActivePage} />
       <div className="app-ambient" aria-hidden="true" />
       <Sidebar
         activePage={activePage}
