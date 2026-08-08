@@ -212,6 +212,14 @@ export async function updateUserProfile(profile) {
   return hydrateUserProfile(updated);
 }
 
+export async function linkUserProfile(signInProfileId, keepProfileId) {
+  const result = await invokeFunction('link-user-profile', {
+    keepProfileId,
+    signInProfileId,
+  });
+  return hydrateUserProfile(result.profile);
+}
+
 export async function inviteUserProfile(invite) {
   const rolePayload = profileRolePayload(invite);
   return invokeFunction('invite-user', {
