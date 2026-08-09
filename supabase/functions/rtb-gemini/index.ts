@@ -111,7 +111,9 @@ async function gatherContext(
     customer_feedback: adminAudience
       ? feedback
       : (feedback as any[]).filter((row) => row.staff_id === ownStaffId),
-    payroll_recent: options.allowFinancial ? payroll : [],
+    payroll_recent: options.allowFinancial
+      ? (adminAudience || !ownStaffId ? payroll : (payroll as any[]).filter((row: any) => row.staff_id === ownStaffId))
+      : [],
     generated_at: new Date().toISOString(),
     timezone: "America/Toronto",
     audience: options.audience,
