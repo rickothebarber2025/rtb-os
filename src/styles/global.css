@@ -14698,3 +14698,28 @@ textarea {
   border-color: var(--shell-accent-strong);
   color: var(--shell-bg, #0b0e14);
 }
+
+.payroll-balance-check__row {
+  display: flex;
+  gap: var(--space-5);
+  margin-top: var(--space-2);
+}
+
+.payroll-balance-check__row div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.payroll-balance-check__row span {
+  color: var(--faint);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.payroll-balance-check__ok {
+  color: #4ade80;
+}
+
+.payroll-balance-check__gap {
+  color: #facc15;
+}

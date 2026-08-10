@@ -22,6 +22,7 @@ import {
   getBusinessUnits,
   getPayrollRuns,
   getStaff,
+  getStaffDailySales,
   lockPayrollRun,
   savePayrollDraft,
 } from '../services/rtbService';
@@ -113,6 +114,7 @@ export default function PayrollPage({
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState('');
+  const [squareSalesTotal, setSquareSalesTotal] = useState(null);
   const [showVoidedRuns, setShowVoidedRuns] = useState(false);
   const [squareImportReview, setSquareImportReview] = useState([]);
   const [squareImportSummary, setSquareImportSummary] = useState(null);
@@ -120,6 +122,30 @@ export default function PayrollPage({
   const bothBusinessCsvInputRef = useRef(null);
   const [bothBusinessImporting, setBothBusinessImporting] = useState(false);
   const previousBusinessUnitId = useRef(null);
+
+  useEffect(() => {
+    if (allBusinessesView || !businessUnit?.id || !currentRun.week_start || !currentRun.week_end) {
+      setSquareSalesTotal(null);
+      return;
+    }
+    let cancelled = false;
+
+    getStaffDailySales(businessUnit.id, 60)
+      .then((rows) => {
+        if (cancelled) return;
+        const total = (rows || [])
+          .filter((row) => row.sale_date >= currentRun.week_start && row.sale_date <= currentRun.week_end)
+          .reduce((sum, row) => sum + Number(row.net_sales || 0), 0);
+        setSquareSalesTotal(total);
+      })
+      .catch(() => {
+        if (!cancelled) setSquareSalesTotal(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [allBusinessesView, businessUnit?.id, currentRun.week_start, currentRun.week_end]);
 
   useEffect(() => {
     if (allBusinessesView) {
@@ -988,6 +1014,39 @@ export default function PayrollPage({
                 ))}
               </div>
             ) : null}
+          </section>
+        ) : null}
+
+        {entries.length && squareSalesTotal !== null ? (
+          <section className="panel full-span payroll-balance-check">
+            <div className="section-header">
+              <div>
+                <span>Square sync check</span>
+                <h2>{formatCurrency(squareSalesTotal)} synced this week</h2>
+              </div>
+            </div>
+            <p className="subtle-text">
+              Pulled automatically from Square, no file needed. Square doesn't say who did each sale, so
+              you still enter each person's number below -- this just tells you when it adds up.
+            </p>
+            <div className="payroll-balance-check__row">
+              <div>
+                <span>Entered so far</span>
+                <strong>{formatCurrency(totals.totalNetSales)}</strong>
+              </div>
+              <div>
+                <span>Remaining to assign</span>
+                <strong
+                  className={
+                    Math.abs(squareSalesTotal - totals.totalNetSales) < 0.01
+                      ? 'payroll-balance-check__ok'
+                      : 'payroll-balance-check__gap'
+                  }
+                >
+                  {formatCurrency(squareSalesTotal - totals.totalNetSales)}
+                </strong>
+              </div>
+            </div>
           </section>
         ) : null}
 
