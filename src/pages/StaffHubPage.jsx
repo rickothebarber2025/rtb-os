@@ -73,14 +73,23 @@ import {
 const TABS = [
   { icon: ClipboardCheck, id: 'daily', label: 'Daily Ops' },
   { icon: Home, id: 'home', label: 'Today' },
-  { icon: Megaphone, id: 'updates', label: 'Updates' },
-  { icon: Trophy, id: 'spotlight', label: 'Spotlight' },
   { icon: CircleDollarSign, id: 'money', label: 'Earnings' },
-  { icon: Coffee, id: 'tips', label: 'Tips' },
   { icon: TrendingUp, id: 'stats', label: 'Performance' },
   { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
   { icon: MoreHorizontal, id: 'more', label: 'More' },
 ];
+
+// Updates, Spotlight, and Tips are still real destinations (activeTab can
+// still be set to any of them, and their content blocks are unchanged) --
+// they're just reached via a sub-nav inside their related primary tab now
+// instead of taking up their own slot in the main tab bar, which is what
+// was actually crowded. This map is only for which primary tab should
+// show as "active" while on one of these secondary pages.
+const TAB_PARENT = {
+  spotlight: 'home',
+  tips: 'money',
+  updates: 'home',
+};
 
 const EMPTY_STAFF_HUB = {
   announcementReads: [],
@@ -430,7 +439,7 @@ export default function StaffHubPage({
   // tab instead of the default Daily Ops -- otherwise the approve/decline
   // buttons are two tabs away with no indication of where to look.
   useEffect(() => {
-    if (pageTarget && TABS.some((tab) => tab.id === pageTarget)) {
+    if (pageTarget && (TABS.some((tab) => tab.id === pageTarget) || TAB_PARENT[pageTarget])) {
       setActiveTab(pageTarget);
     }
   }, [pageTarget]);
@@ -1762,10 +1771,11 @@ export default function StaffHubPage({
         <div className="staff-hub-tabs" role="tablist" aria-label="Staff Hub sections">
           {TABS.map((tab) => {
             const TabIcon = tab.icon;
+            const isActive = (TAB_PARENT[activeTab] || activeTab) === tab.id;
             return (
               <button
-                aria-selected={activeTab === tab.id}
-                className={activeTab === tab.id ? 'active' : ''}
+                aria-selected={isActive}
+                className={isActive ? 'active' : ''}
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 type="button"
@@ -1781,10 +1791,11 @@ export default function StaffHubPage({
       <nav className="staff-hub-sticky-tabs" role="tablist" aria-label="Staff Hub sections">
         {TABS.map((tab) => {
           const TabIcon = tab.icon;
+          const isActive = (TAB_PARENT[activeTab] || activeTab) === tab.id;
           return (
             <button
-              aria-selected={activeTab === tab.id}
-              className={activeTab === tab.id ? 'active' : ''}
+              aria-selected={isActive}
+              className={isActive ? 'active' : ''}
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               type="button"
@@ -2062,6 +2073,15 @@ export default function StaffHubPage({
 
       {activeTab === 'home' ? (
         <>
+          <div className="staff-hub-subnav">
+            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('updates')} type="button">
+              <Megaphone size={14} /> Updates
+            </button>
+            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('spotlight')} type="button">
+              <Trophy size={14} /> Staff of the Month
+            </button>
+          </div>
+
           <section className="panel full-span staff-hub-focus-band">
             <article className={`staff-hub-focus-card ${focusCard.value === 'Overdue' ? 'urgent' : ''}`}>
               <div className="staff-hub-priority-icon">
@@ -2426,7 +2446,13 @@ export default function StaffHubPage({
       ) : null}
 
       {activeTab === 'updates' ? (
-        <section className="panel full-span staff-hub-feed-panel">
+        <>
+          <div className="staff-hub-subnav">
+            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('home')} type="button">
+              <Home size={14} /> Back to Today
+            </button>
+          </div>
+          <section className="panel full-span staff-hub-feed-panel">
           <div className="staff-hub-section-stack">
             <div className="staff-hub-preview-list__header">
               <strong>Updates</strong>
@@ -2527,18 +2553,40 @@ export default function StaffHubPage({
             )}
           </div>
         </section>
+        </>
       ) : null}
 
       {activeTab === 'spotlight' ? (
-        <StaffSpotlightBoard businessUnitId={operationsBusinessId} />
+        <>
+          <div className="staff-hub-subnav">
+            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('home')} type="button">
+              <Home size={14} /> Back to Today
+            </button>
+          </div>
+          <StaffSpotlightBoard businessUnitId={operationsBusinessId} />
+        </>
       ) : null}
 
       {activeTab === 'tips' ? (
-        <TipsBreakdown businessUnitId={operationsBusinessId} ownEntries={ownEntries} staffId={staffProfile?.id} />
+        <>
+          <div className="staff-hub-subnav">
+            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('money')} type="button">
+              <CircleDollarSign size={14} /> Back to Earnings
+            </button>
+          </div>
+          <TipsBreakdown businessUnitId={operationsBusinessId} ownEntries={ownEntries} staffId={staffProfile?.id} />
+        </>
       ) : null}
 
       {activeTab === 'money' ? (
-        <section className="panel full-span">
+        <>
+          <div className="staff-hub-subnav">
+            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('tips')} type="button">
+              <Coffee size={14} /> Tips by shift
+            </button>
+          </div>
+
+          <section className="panel full-span">
           <div className="section-header">
             <div>
               <span>Weekly earnings</span>
@@ -2731,6 +2779,7 @@ export default function StaffHubPage({
             </div>
           ) : null}
         </section>
+        </>
       ) : null}
 
       {activeTab === 'stats' ? (
