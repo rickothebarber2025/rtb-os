@@ -14723,3 +14723,106 @@ textarea {
 .payroll-balance-check__gap {
   color: #facc15;
 }
+
+.spotlight-form {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+}
+
+.spotlight-current {
+  align-items: center;
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+}
+
+.spotlight-current__avatar {
+  align-items: center;
+  background: linear-gradient(135deg, var(--rtb-gold), var(--rtb-gold-strong));
+  border-radius: 999px;
+  color: var(--shell-bg, #0b0e14);
+  display: flex;
+  flex-shrink: 0;
+  height: 88px;
+  justify-content: center;
+  overflow: hidden;
+  width: 88px;
+}
+
+.spotlight-current__avatar img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.spotlight-current__month {
+  color: var(--rtb-gold);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.spotlight-current h3 {
+  font-size: 1.4rem;
+  margin: 0.2rem 0;
+}
+
+.spotlight-current small {
+  color: var(--faint);
+}
+
+.spotlight-current p {
+  margin-top: 0.5rem;
+  max-width: 60ch;
+}
+
+.spotlight-history {
+  margin-top: var(--space-4);
+}
+
+.spotlight-history h4 {
+  color: var(--faint);
+  font-size: 0.78rem;
+  margin-bottom: var(--space-2);
+  text-transform: uppercase;
+}
+
+.spotlight-history__grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.spotlight-history__card {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.spotlight-history__card img {
+  border-radius: 999px;
+  height: 34px;
+  object-fit: cover;
+  width: 34px;
+}
+
+.spotlight-history__card strong {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.spotlight-history__card small {
+  color: var(--faint);
+  font-size: 0.7rem;
+}

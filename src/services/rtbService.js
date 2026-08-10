@@ -621,6 +621,44 @@ export async function getStaffAttendance(businessUnitId, days = 30) {
   return requireData(await query);
 }
 
+export async function getStaffSpotlight(businessUnitId, months = 6) {
+  const client = requireClient();
+  const since = new Date();
+  since.setMonth(since.getMonth() - months);
+  const sinceMonth = new Date(since.getFullYear(), since.getMonth(), 1).toISOString().slice(0, 10);
+
+  const { data, error } = await client
+    .from('staff_spotlight')
+    .select('id,month,reason,photo_url,staff:staff_id(id,full_name,role,photo_url)')
+    .eq('business_unit_id', businessUnitId)
+    .gte('month', sinceMonth)
+    .order('month', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function saveStaffSpotlight({ businessUnitId, month, staffId, reason, photoUrl }) {
+  const client = requireClient();
+  const payload = {
+    business_unit_id: businessUnitId,
+    month,
+    staff_id: staffId,
+    reason,
+    photo_url: photoUrl || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await client
+    .from('staff_spotlight')
+    .upsert(payload, { onConflict: 'business_unit_id,month' })
+    .select('id')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function getTodayChecklistStatus(businessUnitId, checklistType) {
   const client = requireClient();
   const today = new Intl.DateTimeFormat('en-CA', {

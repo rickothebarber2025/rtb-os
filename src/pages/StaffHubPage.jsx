@@ -32,6 +32,7 @@ import DataTable from '../components/DataTable';
 import EmptyState from '../components/EmptyState';
 import MyHoursWidget from '../components/MyHoursWidget';
 import OpeningClosingChecklist from '../components/OpeningClosingChecklist';
+import StaffSpotlightBoard from '../components/StaffSpotlightBoard';
 import StatusBadge from '../components/StatusBadge';
 import TipsBreakdown from '../components/TipsBreakdown';
 import WeeklyGoalProgress from '../components/WeeklyGoalProgress';
@@ -73,6 +74,7 @@ const TABS = [
   { icon: ClipboardCheck, id: 'daily', label: 'Daily Ops' },
   { icon: Home, id: 'home', label: 'Today' },
   { icon: Megaphone, id: 'updates', label: 'Updates' },
+  { icon: Trophy, id: 'spotlight', label: 'Spotlight' },
   { icon: CircleDollarSign, id: 'money', label: 'Earnings' },
   { icon: Coffee, id: 'tips', label: 'Tips' },
   { icon: TrendingUp, id: 'stats', label: 'Performance' },
@@ -2525,6 +2527,10 @@ export default function StaffHubPage({
             )}
           </div>
         </section>
+      ) : null}
+
+      {activeTab === 'spotlight' ? (
+        <StaffSpotlightBoard businessUnitId={operationsBusinessId} isAdmin={canManageHub} />
       ) : null}
 
       {activeTab === 'tips' ? (
