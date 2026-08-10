@@ -217,7 +217,18 @@ Deno.serve(async (req) => {
     if (action === "ask" && !question) return json({ error: "Ask a question first." }, 400);
 
     if (manager) {
-      await admin.rpc("run_rtb_safe_automations").catch(() => null);
+      // Best-effort: this runs on every summary/ask request just to keep
+      // automations fresh, so a failure here must never break the actual
+      // brief. Previously chained .catch() directly on admin.rpc(...),
+      // which threw "admin.rpc(...).catch is not a function" in
+      // production (confirmed via a live screenshot) instead of being
+      // swallowed -- try/catch works regardless of the exact shape the
+      // query builder returns.
+      try {
+        await admin.rpc("run_rtb_safe_automations");
+      } catch (_automationError) {
+        // Ignore -- this is a background nicety, not the actual request.
+      }
     }
 
     const context = await gatherContext(admin, businessId, {
