@@ -55,6 +55,7 @@ export default function App() {
   const surveyToken = getSurveyTokenFromLocation();
   const [activePage, setActivePage] = useState('dashboard');
   const [pageTarget, setPageTarget] = useState(null);
+  const [staffHubTab, setStaffHubTab] = useState('daily');
 
   // Lets a link elsewhere in the app (e.g. a Priority Board item) open a
   // specific tab inside a page, not just the page's default tab. Without
@@ -169,6 +170,8 @@ export default function App() {
       staff: data.staff,
       staffActivityReviewSummary: data.staffActivityReviewSummary,
       staffHub: data.staffHub,
+      staffHubTab,
+      setStaffHubTab,
       staffPortalSummary: data.staffPortalSummary,
       staffBusinessMetadata: data.staffBusinessMetadata,
       accessProfile: auth.profile,
@@ -177,7 +180,7 @@ export default function App() {
       userPreferences,
       warnings: data.warnings,
     }),
-    [auth.profile, auth.user, businessOptions, data, navItems, navigateTo, pageTarget, setUserPreferences, userPreferences],
+    [auth.profile, auth.user, businessOptions, data, navItems, navigateTo, pageTarget, staffHubTab, setUserPreferences, userPreferences],
   );
 
   function renderPage() {
@@ -321,7 +324,9 @@ export default function App() {
       selectedBusinessUnitId={selectedBusinessUnitId}
       setActivePage={setActivePage}
       setSelectedBusinessUnitId={setSelectedBusinessUnitId}
+      setStaffHubTab={setStaffHubTab}
       signOut={auth.signOut}
+      staffHubTab={staffHubTab}
       user={auth.user}
       userPreferences={userPreferences}
     >

@@ -18,7 +18,9 @@ export default function AppShell({
   selectedBusinessUnitId,
   setActivePage,
   setSelectedBusinessUnitId,
+  setStaffHubTab,
   signOut,
+  staffHubTab,
   user,
   userPreferences,
 }) {
@@ -85,6 +87,8 @@ export default function AppShell({
           navItems={navItems}
           onMoreClick={() => setSidebarOpen(true)}
           setActivePage={setActivePage}
+          setStaffHubTab={setStaffHubTab}
+          staffHubTab={staffHubTab}
         />
       </div>
     </div>

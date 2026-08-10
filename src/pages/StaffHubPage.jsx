@@ -422,13 +422,22 @@ export default function StaffHubPage({
   payrollRuns,
   performanceSummary,
   setActivePage,
+  setStaffHubTab,
   staff,
   staffActivityReviewSummary = [],
   staffHub = EMPTY_STAFF_HUB,
+  staffHubTab,
   staffPortalSummary,
   user,
 }) {
-  const [activeTab, setActiveTab] = useState('daily');
+  // Lifted to App.jsx so the mobile bottom nav can show/control Staff
+  // Hub's own tabs directly, instead of the mostly-empty global nav most
+  // staff see (they don't have access to Dashboard/Payroll/Roster as
+  // top-level pages). Falls back to local state if this page is ever
+  // rendered without the lifted props (e.g. in isolation/tests).
+  const [localActiveTab, setLocalActiveTab] = useState('daily');
+  const activeTab = staffHubTab ?? localActiveTab;
+  const setActiveTab = setStaffHubTab ?? setLocalActiveTab;
   const [dailyOpsView, setDailyOpsView] = useState('checklist');
   const [hubMessage, setHubMessage] = useState('');
   const [hubError, setHubError] = useState('');
