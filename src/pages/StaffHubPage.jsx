@@ -2530,7 +2530,7 @@ export default function StaffHubPage({
       ) : null}
 
       {activeTab === 'spotlight' ? (
-        <StaffSpotlightBoard businessUnitId={operationsBusinessId} isAdmin={canManageHub} />
+        <StaffSpotlightBoard businessUnitId={operationsBusinessId} />
       ) : null}
 
       {activeTab === 'tips' ? (

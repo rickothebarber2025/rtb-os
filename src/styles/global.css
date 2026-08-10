@@ -14724,17 +14724,6 @@ textarea {
   color: #facc15;
 }
 
-.spotlight-form {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin: var(--space-3) 0;
-  padding: var(--space-3);
-}
-
 .spotlight-current {
   align-items: center;
   display: flex;
