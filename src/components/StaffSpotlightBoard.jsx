@@ -55,7 +55,7 @@ export default function StaffSpotlightBoard() {
         </div>
       </div>
       <p className="subtle-text">
-        Top 3 per business, based on the same checklist completion tracking as the Operations tab
+        Top 3 per business, based on the same performance and earnings ranking as the Performance tab
         {month ? ` -- ${monthLabel(month)}` : ''}.
       </p>
 
@@ -85,7 +85,6 @@ export default function StaffSpotlightBoard() {
                           <strong>{entry.full_name}</strong>
                           {entry.role ? <small>{entry.role}</small> : null}
                         </div>
-                        <div className="spotlight-podium__rate">{entry.rate}%</div>
                       </div>
                     );
                   })}
@@ -93,8 +92,8 @@ export default function StaffSpotlightBoard() {
               ) : (
                 <EmptyState
                   icon={Trophy}
-                  title="Not enough data yet"
-                  message="This fills in automatically as checklists get completed this month."
+                  title="No completed month yet"
+                  message="This fills in automatically once a full week's payroll has been locked for this business."
                 />
               )}
             </div>

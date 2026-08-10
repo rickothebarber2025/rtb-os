@@ -621,19 +621,18 @@ export async function getStaffAttendance(businessUnitId, days = 30) {
   return requireData(await query);
 }
 
-export async function getOperationsLeaderboards(month = null) {
+export async function getOperationsLeaderboards() {
   const client = requireClient();
   const businesses = await getBusinessUnits();
-  const monthValue = month || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
   const results = await Promise.all(
     businesses.map(async (business) => {
       const { data, error } = await client.rpc('get_monthly_operations_leaderboard', {
         p_business_unit_id: business.id,
-        p_month: monthValue,
+        p_month: null,
       });
       if (error) throw error;
-      return { business, month: monthValue, top: data || [] };
+      return { business, month: data?.month || null, top: data?.top || [] };
     }),
   );
 
