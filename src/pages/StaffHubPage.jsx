@@ -2578,7 +2578,7 @@ export default function StaffHubPage({
               <Home size={14} /> Back to Today
             </button>
           </div>
-          <StaffSpotlightBoard businessUnitId={operationsBusinessId} />
+          <StaffSpotlightBoard />
         </>
       ) : null}
 

@@ -621,28 +621,23 @@ export async function getStaffAttendance(businessUnitId, days = 30) {
   return requireData(await query);
 }
 
-export async function getMonthlySpotlight(businessUnitId, monthsBack = 6) {
+export async function getOperationsLeaderboards(month = null) {
   const client = requireClient();
-  const months = [];
-  const cursor = new Date();
-  cursor.setDate(1);
-
-  for (let i = 0; i < monthsBack; i += 1) {
-    months.push(new Date(cursor.getFullYear(), cursor.getMonth() - i, 1).toISOString().slice(0, 10));
-  }
+  const businesses = await getBusinessUnits();
+  const monthValue = month || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
   const results = await Promise.all(
-    months.map(async (month) => {
-      const { data, error } = await client.rpc('get_monthly_spotlight', {
-        p_business_unit_id: businessUnitId,
-        p_month: month,
+    businesses.map(async (business) => {
+      const { data, error } = await client.rpc('get_monthly_operations_leaderboard', {
+        p_business_unit_id: business.id,
+        p_month: monthValue,
       });
       if (error) throw error;
-      return data;
+      return { business, month: monthValue, top: data || [] };
     }),
   );
 
-  return results.filter((row) => row?.winner);
+  return results;
 }
 
 export async function getTodayChecklistStatus(businessUnitId, checklistType) {
