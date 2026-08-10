@@ -1568,6 +1568,17 @@ export default function StaffHubPage({
         </div>
       </section>
 
+      <section className="panel full-span staff-hub-ops-score-strip" aria-label="Daily Operations Score">
+        <div className="staff-hub-ops-score-strip__icon">
+          <ClipboardCheck size={20} />
+        </div>
+        <div className="staff-hub-ops-score-strip__body">
+          <span>Daily Operations Score</span>
+          <strong>{dailyOperations.operationsScore}</strong>
+        </div>
+        <small>Professionalism today -- checklist, tasks, and shift standards</small>
+      </section>
+
       {!staffProfile && !ownerView ? (
         <section className="panel full-span staff-hub-alert-panel">
           <div className="alert warning">
@@ -1816,11 +1827,6 @@ export default function StaffHubPage({
               <p>
                 Start your shift, check the shop status, finish required tasks, and keep the team updated.
               </p>
-            </div>
-            <div className="daily-ops-score">
-              <span>Operations Score</span>
-              <strong>{dailyOperations.operationsScore}</strong>
-              <small>Professionalism today</small>
             </div>
           </section>
 

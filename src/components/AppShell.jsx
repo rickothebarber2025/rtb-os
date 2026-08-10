@@ -3,7 +3,6 @@ import GeminiOpsBrief from './GeminiOpsBrief';
 import MobileTabBar from './MobileTabBar';
 import PushNotificationsManager from './PushNotificationsManager';
 import Sidebar from './Sidebar';
-import StaffCareerCoach from './StaffCareerCoach';
 import Topbar from './Topbar';
 import { getBusinessProfile } from '../utils/businessProfiles';
 
@@ -77,7 +76,6 @@ export default function AppShell({
           userPreferences={userPreferences}
         />
         <main className={`content ${pageClass}`}>
-          {activePage === 'staff-hub' ? <StaffCareerCoach /> : null}
           <GeminiOpsBrief activePage={activePage} businessUnitId={selectedBusinessUnitId} />
           {children}
         </main>
