@@ -20,7 +20,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
   const [error, setError] = useState('');
 
   const enabled = useMemo(
-    () => Boolean(businessUnitId && businessUnitId !== 'all-businesses' && ['dashboard', 'operations', 'staff-hub'].includes(activePage)),
+    () => Boolean(businessUnitId && businessUnitId !== 'all-businesses' && ['dashboard', 'operations'].includes(activePage)),
     [activePage, businessUnitId],
   );
 
