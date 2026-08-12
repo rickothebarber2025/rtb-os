@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import PromotionsManager from '../components/PromotionsManager';
 import {
   CheckCircle2,
   ClipboardCheck,
@@ -283,6 +284,8 @@ export default function CustomerIntelligencePage({
           </button>
         </div>
       </section>
+
+      <PromotionsManager />
 
       {notice ? <div className="alert success full-span">{notice}</div> : null}
       {error ? <div className="alert danger full-span">{error}</div> : null}

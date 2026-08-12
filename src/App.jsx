@@ -28,6 +28,7 @@ const AccessPage = lazy(() => import('./pages/AccessPage'));
 const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
 const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
 const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
+const PublicPromotionsPage = lazy(() => import('./pages/PublicPromotionsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const OperationsPage = lazy(() => import('./pages/OperationsPage'));
 const MyRolePage = lazy(() => import('./pages/MyRolePage'));
@@ -46,6 +47,10 @@ function getSurveyTokenFromLocation() {
 
   const params = new URLSearchParams(window.location.search);
   return params.get('survey') || params.get('survey_token') || '';
+}
+
+function isPublicPromotionsRoute() {
+  return /^\/(promotions|deals|specials)\/?$/.test(window.location.pathname);
 }
 
 export default function App() {
@@ -284,6 +289,14 @@ export default function App() {
     return (
       <Suspense fallback={<LoadingState label="Loading feedback survey" />}>
         <SurveyPage token={surveyToken} />
+      </Suspense>
+    );
+  }
+
+  if (isPublicPromotionsRoute()) {
+    return (
+      <Suspense fallback={<LoadingState label="Loading promotions" />}>
+        <PublicPromotionsPage />
       </Suspense>
     );
   }
