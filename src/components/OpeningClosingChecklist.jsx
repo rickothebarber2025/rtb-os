@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Camera, CheckCircle2, Lock, MessageSquareText, XCircle } from 'lucide-react';
+import { useAuthProfile } from '../contexts/AuthProfileContext.jsx';
 import { supabase } from '../lib/supabaseClient';
 import {
   claimMyOperationChecklist,
@@ -24,6 +25,12 @@ function defaultChecklistType() {
   return new Date().getHours() >= 15 ? 'closing' : 'opening';
 }
 
+function isOperationsCleaner(profile) {
+  const roleTemplate = profile?.permissions?.role_template;
+  const roleTitle = String(profile?.role_title || '').trim().toLowerCase();
+  return roleTemplate === 'operations_cleaning' || roleTitle === 'operations cleaning';
+}
+
 async function uploadChecklistPhoto(itemId, file) {
   if (!supabase) throw new Error('Supabase is not configured.');
   const extension = (file.name.split('.').pop() || 'jpg').toLowerCase();
@@ -35,7 +42,11 @@ async function uploadChecklistPhoto(itemId, file) {
 }
 
 export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readOnly }) {
-  const [checklistType, setChecklistType] = useState(defaultChecklistType);
+  const { profile: authProfile } = useAuthProfile();
+  const cleanerMode = isOperationsCleaner(authProfile);
+  const showAdminTeam = Boolean(isAdmin && !cleanerMode);
+
+  const [checklistType, setChecklistType] = useState(() => (cleanerMode ? 'opening' : defaultChecklistType()));
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -43,13 +54,19 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
   const [working, setWorking] = useState('');
   const [drafts, setDrafts] = useState({});
   const [expandedItemId, setExpandedItemId] = useState(null);
-  const [checklistView, setChecklistView] = useState('station');
+  const [checklistView, setChecklistView] = useState(() => (cleanerMode ? 'cleaning' : 'station'));
   const [teamStatus, setTeamStatus] = useState([]);
   const [teamStatusLoading, setTeamStatusLoading] = useState(true);
   const [teamStatusError, setTeamStatusError] = useState('');
 
+  useEffect(() => {
+    if (!cleanerMode) return;
+    setChecklistType('opening');
+    setChecklistView('cleaning');
+  }, [cleanerMode]);
+
   async function loadTeamStatus() {
-    if (!isAdmin || !businessUnitId) {
+    if (!showAdminTeam || !businessUnitId) {
       setTeamStatusLoading(false);
       return;
     }
@@ -68,7 +85,7 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
   useEffect(() => {
     loadTeamStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessUnitId, checklistType, isAdmin]);
+  }, [businessUnitId, checklistType, showAdminTeam]);
 
   async function load() {
     if (!businessUnitId) {
@@ -86,28 +103,33 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
     } finally {
       setLoading(false);
     }
-    if (isAdmin) await loadTeamStatus();
+    if (showAdminTeam) await loadTeamStatus();
   }
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessUnitId]);
+  }, [businessUnitId, cleanerMode]);
 
   if (!businessUnitId) return null;
 
   const stationRun = data?.checklists?.find((run) => run.type === checklistType && run.scope === 'station') || null;
   const sharedRun = data?.checklists?.find((run) => run.type === checklistType && run.scope === 'shared') || null;
+  const cleaningRun = data?.checklists?.find((run) => run.type === 'opening' && run.scope === 'cleaning') || null;
+  // Older same-day cleaner runs may have been created as shared before the cleaner
+  // scope was wired into the UI. Let them finish that run today, but every new
+  // Operations Cleaning checklist is claimed with scope="cleaning".
+  const activeCleanerRun = cleaningRun || (cleanerMode ? sharedRun : null);
 
   async function handleClaim(scope) {
     setWorking(`claim-${scope}`);
     setError('');
     setNotice('');
     try {
-      const runId = await claimMyOperationChecklist(businessUnitId, checklistType, scope);
+      const runId = await claimMyOperationChecklist(businessUnitId, cleanerMode ? 'opening' : checklistType, scope);
       if (!runId) throw new Error('Checklist start was not confirmed by the database.');
       await load();
-      setNotice(`${checklistType === 'opening' ? 'Opening' : 'Closing'} checklist started.`);
+      setNotice(cleanerMode ? 'Opening cleaning checklist started.' : `${checklistType === 'opening' ? 'Opening' : 'Closing'} checklist started.`);
     } catch (err) {
       setError(err.message || 'Unable to start this checklist.');
     } finally {
@@ -252,38 +274,20 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
             <input
               className="occ-item__note-input"
               disabled={readOnly || busy}
-              onChange={(event) =>
-                setDrafts((current) => ({ ...current, [item.id]: { note: event.target.value } }))
-              }
+              onChange={(event) => setDrafts((current) => ({ ...current, [item.id]: { note: event.target.value } }))}
               placeholder="Optional note"
               value={drafts[item.id]?.note ?? ''}
             />
             <div className="occ-item__buttons">
-              <button
-                className="ghost-button small"
-                disabled={readOnly || busy}
-                onClick={() => handleSetStatus(item, 'skipped')}
-                type="button"
-              >
+              <button className="ghost-button small" disabled={readOnly || busy} onClick={() => handleSetStatus(item, 'skipped')} type="button">
                 Skip
               </button>
-              <button
-                className="ghost-button small danger-action"
-                disabled={readOnly || busy}
-                onClick={() => handleSetStatus(item, 'could_not_complete')}
-                type="button"
-              >
+              <button className="ghost-button small danger-action" disabled={readOnly || busy} onClick={() => handleSetStatus(item, 'could_not_complete')} type="button">
                 <XCircle size={14} /> Can't complete
               </button>
               <label className="ghost-button small occ-photo-button">
                 <Camera size={14} /> Add photo
-                <input
-                  accept="image/*"
-                  disabled={readOnly || busy}
-                  hidden
-                  onChange={(event) => handlePhoto(item, event.target.files?.[0])}
-                  type="file"
-                />
+                <input accept="image/*" disabled={readOnly || busy} hidden onChange={(event) => handlePhoto(item, event.target.files?.[0])} type="file" />
               </label>
             </div>
           </div>
@@ -327,54 +331,46 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
     );
   }
 
+  const visibleChecklistTypes = cleanerMode ? CHECKLIST_TYPES.filter((type) => type.id === 'opening') : CHECKLIST_TYPES;
+
   return (
     <section className="panel full-span occ-panel">
       <div className="section-header">
         <div>
-          <span>Opening / Closing</span>
-          <h2>Station and shared responsibilities</h2>
+          <span>{cleanerMode ? 'Operations Cleaning' : 'Opening / Closing'}</span>
+          <h2>{cleanerMode ? 'Shared-area cleaning responsibilities' : 'Station and shared responsibilities'}</h2>
         </div>
         <div className="occ-type-toggle">
-          {CHECKLIST_TYPES.map((type) => (
-            <button
-              className={checklistType === type.id ? 'active' : ''}
-              key={type.id}
-              onClick={() => setChecklistType(type.id)}
-              type="button"
-            >
+          {visibleChecklistTypes.map((type) => (
+            <button className={checklistType === type.id ? 'active' : ''} key={type.id} onClick={() => setChecklistType(type.id)} type="button">
               {type.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="occ-view-toggle">
-        <button
-          className={checklistView === 'station' ? 'active' : ''}
-          onClick={() => setChecklistView('station')}
-          type="button"
-        >
-          My Station
-        </button>
-        <button
-          className={checklistView === 'shared' ? 'active' : ''}
-          onClick={() => setChecklistView('shared')}
-          type="button"
-        >
-          Shared Shop
-        </button>
-        {isAdmin ? (
-          <button
-            className={checklistView === 'team' ? 'active' : ''}
-            onClick={() => setChecklistView('team')}
-            type="button"
-          >
-            Team Today
+      {!cleanerMode ? (
+        <div className="occ-view-toggle">
+          <button className={checklistView === 'station' ? 'active' : ''} onClick={() => setChecklistView('station')} type="button">
+            My Station
           </button>
-        ) : null}
-      </div>
+          <button className={checklistView === 'shared' ? 'active' : ''} onClick={() => setChecklistView('shared')} type="button">
+            Shared Shop
+          </button>
+          {showAdminTeam ? (
+            <button className={checklistView === 'team' ? 'active' : ''} onClick={() => setChecklistView('team')} type="button">
+              Team Today
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="occ-cleaner-scope-note">
+          <strong>Shared areas only</strong>
+          <p>Reception, waiting areas, washroom, common floors, shared counters, supplies and final walkthrough. Staff are responsible for their own stations.</p>
+        </div>
+      )}
 
-      {isAdmin && checklistView === 'team' ? (
+      {showAdminTeam && checklistView === 'team' ? (
         <div className="occ-team-today">
           {teamStatusError ? <div className="alert danger">{teamStatusError}</div> : null}
           {teamStatusLoading ? (
@@ -384,7 +380,13 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
               {teamStatus.map((run) => (
                 <div className="occ-team-today__card" key={run.id}>
                   <div className="occ-team-today__card-header">
-                    <strong>{run.scope === 'station' ? run.owner?.full_name || 'Unknown staff' : 'Shared shop'}</strong>
+                    <strong>
+                      {run.scope === 'station'
+                        ? run.owner?.full_name || 'Unknown staff'
+                        : run.scope === 'cleaning'
+                          ? 'Operations cleaning'
+                          : 'Shared shop'}
+                    </strong>
                     <span>{run.completion_percent}%</span>
                   </div>
                   <ul>
@@ -400,11 +402,9 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
                       </li>
                     ))}
                   </ul>
-                  {run.scope === 'shared' ? (
+                  {run.scope === 'shared' || run.scope === 'cleaning' ? (
                     <div className="occ-team-today__confirm">
-                      {run.final_confirmed_at
-                        ? `Confirmed by ${run.confirmed_by?.full_name || 'someone'}`
-                        : 'Not confirmed yet'}
+                      {run.final_confirmed_at ? `Confirmed by ${run.confirmed_by?.full_name || 'someone'}` : 'Not confirmed yet'}
                     </div>
                   ) : null}
                 </div>
@@ -421,6 +421,15 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
 
       {loading ? (
         <p className="subtle-text">Loading checklists...</p>
+      ) : cleanerMode ? (
+        <div className="occ-single-column">
+          {renderChecklist(
+            activeCleanerRun,
+            'cleaning',
+            'Opening Cleaning',
+            'Complete the shared-area cleaning checklist before clients arrive. Staff stations are not part of this role.',
+          )}
+        </div>
       ) : (
         <>
           {checklistView === 'station' ? (
@@ -433,12 +442,7 @@ export default function OpeningClosingChecklist({ businessUnitId, isAdmin, readO
             <div className="occ-single-column">
               {renderChecklist(sharedRun, 'shared', 'Shared Shop', 'Anyone can pitch in.')}
               {sharedRun && !sharedRun.final_confirmed_at ? (
-                <button
-                  className="primary-button full-width occ-confirm-button"
-                  disabled={readOnly || working === 'confirm'}
-                  onClick={handleConfirm}
-                  type="button"
-                >
+                <button className="primary-button full-width occ-confirm-button" disabled={readOnly || working === 'confirm'} onClick={handleConfirm} type="button">
                   <Lock size={15} /> {working === 'confirm' ? 'Confirming...' : `Confirm ${checklistType}`}
                 </button>
               ) : null}
