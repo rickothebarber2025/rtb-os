@@ -1,0 +1,49 @@
+/* Operations Cleaning contractor portal
+   Keep non-employee cleaners focused on whole-shop operations only. */
+
+body:has(.occ-cleaner-scope-note) .staff-hub-ops-score-strip,
+body:has(.occ-cleaner-scope-note) .staff-hub-tabs-panel,
+body:has(.occ-cleaner-scope-note) .staff-hub-sticky-tabs,
+body:has(.occ-cleaner-scope-note) .staff-hub-pro-metrics,
+body:has(.occ-cleaner-scope-note) .staff-hub-daily-strip,
+body:has(.occ-cleaner-scope-note) .staff-hub-score-card,
+body:has(.occ-cleaner-scope-note) .staff-hub-money,
+body:has(.occ-cleaner-scope-note) .staff-hub-performance,
+body:has(.occ-cleaner-scope-note) .staff-hub-earnings {
+  display: none !important;
+}
+
+body:has(.occ-cleaner-scope-note) .daily-ops-hero .eyebrow,
+body:has(.occ-cleaner-scope-note) .daily-ops-hero p {
+  display: none;
+}
+
+body:has(.occ-cleaner-scope-note) .daily-ops-hero h2 {
+  margin-bottom: 0;
+}
+
+body:has(.occ-cleaner-scope-note) .daily-ops-hero > div::before {
+  content: 'OPERATIONS CLEANING CONTRACTOR';
+  display: block;
+  margin-bottom: .45rem;
+  color: var(--faint);
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .13em;
+}
+
+body:has(.occ-cleaner-scope-note) .daily-ops-hero > div::after {
+  content: 'Whole-salon cleaning, restocking, inventory checks, maintenance reporting and final walkthrough.';
+  display: block;
+  margin-top: .65rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+body:has(.occ-cleaner-scope-note) .staff-hub-page {
+  padding-bottom: 1rem;
+}
+
+body:has(.occ-cleaner-scope-note) .occ-panel {
+  margin-top: .75rem;
+}
