@@ -6,6 +6,7 @@ import MobileNavigationEnhancer from './components/MobileNavigationEnhancer.jsx'
 import { AuthProfileProvider } from './contexts/AuthProfileContext.jsx';
 import './styles/global.css';
 import './styles/mobileNavigation.css';
+import './styles/operationsChecklist.css';
 
 const CACHE_CLEANUP_KEY = 'rtb-os-cache-cleanup-2026-07-12';
 
