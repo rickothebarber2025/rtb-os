@@ -23,6 +23,12 @@ import {
   isAllBusinessesUnit,
 } from './utils/businessProfiles';
 import { shouldAutoGraduate, toGraduationPayload } from './utils/probation';
+import {
+  getSmartBusinessUnitId,
+  getSmartLandingPage,
+  getSmartStaffHubTab,
+  isOperationsCleaningProfile,
+} from './utils/smartDefaults.js';
 
 const AccessPage = lazy(() => import('./pages/AccessPage'));
 const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
@@ -53,6 +59,22 @@ function isPublicPromotionsRoute() {
   return /^\/(promotions|deals|specials)\/?$/.test(window.location.pathname);
 }
 
+function lastPageStorageKey(userId) {
+  return `rtb-os-last-page:${userId || 'anonymous'}`;
+}
+
+function countUrgentActionCenterItems(actionCenter) {
+  const rows = [
+    ...(Array.isArray(actionCenter?.warnings) ? actionCenter.warnings : []),
+    ...(Array.isArray(actionCenter?.documents) ? actionCenter.documents : []),
+  ];
+  return rows.filter(
+    (item) =>
+      !item.resolved_at &&
+      ['urgent', 'high'].includes(String(item.priority || '').toLowerCase()),
+  ).length;
+}
+
 export default function App() {
   const auth = useAuth();
   useSyncAuthProfile(auth.profile, auth.loading);
@@ -61,12 +83,8 @@ export default function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const [pageTarget, setPageTarget] = useState(null);
   const [staffHubTab, setStaffHubTab] = useState('daily');
+  const smartLandingAppliedRef = useRef(false);
 
-  // Lets a link elsewhere in the app (e.g. a Priority Board item) open a
-  // specific tab inside a page, not just the page's default tab. Without
-  // this, clicking "Time off request from X" landed on Staff Hub's Daily
-  // Ops tab with no indication the approve/decline buttons were two tabs
-  // away under Schedule.
   const navigateTo = useCallback((page, target = null) => {
     setActivePage(page);
     setPageTarget(target);
@@ -108,11 +126,20 @@ export default function App() {
   );
 
   useEffect(() => {
-    const selectedExists = businessOptions.some((unit) => unit.id === selectedBusinessUnitId);
-    if (data.businessUnits.length && (!selectedBusinessUnitId || !selectedExists)) {
-      setSelectedBusinessUnitId(businessOptions[0]?.id || data.businessUnits[0].id);
+    smartLandingAppliedRef.current = false;
+  }, [auth.user?.id]);
+
+  useEffect(() => {
+    if (!data.businessUnits.length || !businessOptions.length || !auth.profile) return;
+    const smartBusinessUnitId = getSmartBusinessUnitId({
+      businessOptions,
+      profile: auth.profile,
+      storedBusinessUnitId: selectedBusinessUnitId,
+    });
+    if (smartBusinessUnitId && smartBusinessUnitId !== selectedBusinessUnitId) {
+      setSelectedBusinessUnitId(smartBusinessUnitId);
     }
-  }, [businessOptions, data.businessUnits, selectedBusinessUnitId]);
+  }, [auth.profile, businessOptions, data.businessUnits.length, selectedBusinessUnitId]);
 
   useEffect(() => {
     if (selectedBusinessUnitId) {
@@ -121,10 +148,51 @@ export default function App() {
   }, [selectedBusinessUnitId]);
 
   useEffect(() => {
-    if (auth.profile && !canAccessPage(auth.profile, activePage)) {
-      setActivePage(navItems[0]?.id || 'my-role');
+    if (!auth.profile || !auth.user?.id || !navItems.length || data.loading || smartLandingAppliedRef.current) return;
+
+    let recentPage = '';
+    try {
+      recentPage = window.localStorage.getItem(lastPageStorageKey(auth.user.id)) || '';
+    } catch {
+      recentPage = '';
     }
-  }, [activePage, auth.profile, navItems]);
+
+    const target = getSmartLandingPage({
+      navItems,
+      profile: auth.profile,
+      recentPage,
+      signals: {
+        draftPayrollCount: (data.payrollRuns || []).filter((run) => run.status === 'draft').length,
+        pendingAccessCount: 0,
+        urgentActionCount: countUrgentActionCenterItems(data.actionCenter),
+      },
+    });
+
+    setActivePage(target);
+    if (target === 'staff-hub') {
+      setStaffHubTab(getSmartStaffHubTab({ profile: auth.profile, staffHub: data.staffHub }));
+    }
+    smartLandingAppliedRef.current = true;
+  }, [auth.profile, auth.user?.id, data.actionCenter, data.loading, data.payrollRuns, data.staffHub, navItems]);
+
+  useEffect(() => {
+    if (!smartLandingAppliedRef.current || !auth.user?.id || !canAccessPage(auth.profile, activePage)) return;
+    try {
+      window.localStorage.setItem(lastPageStorageKey(auth.user.id), activePage);
+    } catch {
+      // Recent context is a convenience only.
+    }
+  }, [activePage, auth.profile, auth.user?.id]);
+
+  useEffect(() => {
+    if (auth.profile && !canAccessPage(auth.profile, activePage)) {
+      const fallback = getSmartLandingPage({ profile: auth.profile, navItems });
+      setActivePage(fallback);
+      if (fallback === 'staff-hub') {
+        setStaffHubTab(getSmartStaffHubTab({ profile: auth.profile, staffHub: data.staffHub }));
+      }
+    }
+  }, [activePage, auth.profile, data.staffHub, navItems]);
 
   useEffect(() => {
     async function graduateDueProbationStaff() {
@@ -190,7 +258,7 @@ export default function App() {
 
   function renderPage() {
     if (data.loading) {
-      return <LoadingState label="Loading business data" />;
+      return <LoadingState label="Loading the right workspace" />;
     }
 
     if (data.error) {
@@ -343,10 +411,10 @@ export default function App() {
       user={auth.user}
       userPreferences={userPreferences}
     >
-      {isAllBusinessesId(selectedBusinessUnitId) ? (
+      {isAllBusinessesId(selectedBusinessUnitId) && !isOperationsCleaningProfile(auth.profile) ? (
         <div className="alert warning global-alert">
           <strong>All Businesses view</strong>
-          <span>Combined reporting. Choose one business before editing records.</span>
+          <span>Combined reporting. Choose one business before editing business-specific records.</span>
         </div>
       ) : null}
       {probationBanner ? <div className="alert success global-alert">{probationBanner}</div> : null}
