@@ -1,0 +1,250 @@
+/* Human-first interaction layer: motion communicates state, never hides meaning. */
+
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 9999;
+  transform: translateY(-150%);
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff;
+  color: #111;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,.28);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+#main-content:focus {
+  outline: none;
+}
+
+:where(a, button, input, select, textarea, [role='button'], [tabindex]):focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(127, 179, 221, .4);
+}
+
+html[data-input-mode='pointer'] :where(a, button, [role='button']):focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+button,
+.primary-button,
+.secondary-button,
+.ghost-button,
+.danger-button,
+.icon-button,
+.nav-item,
+.mobile-tabbar button,
+.dashboard-mobile-tabs__item {
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+select,
+textarea {
+  min-height: 44px;
+  line-height: 1.35;
+}
+
+::placeholder {
+  color: color-mix(in srgb, var(--text-soft, #dce6ee) 68%, transparent);
+  opacity: 1;
+}
+
+/* Glassmorphism kept restrained so text contrast stays strong. */
+.panel,
+.hero-panel,
+.metric-card,
+.behavioral-momentum,
+.smart-flow,
+.occ-category,
+.occ-history-card {
+  background-color: rgba(30, 50, 67, .78);
+  backdrop-filter: blur(14px) saturate(118%);
+  -webkit-backdrop-filter: blur(14px) saturate(118%);
+}
+
+.panel,
+.hero-panel,
+.metric-card {
+  border-color: rgba(220, 230, 238, .17);
+}
+
+.motion-standard .panel,
+.motion-standard .metric-card,
+.motion-standard .hero-panel,
+.motion-standard .occ-category,
+.motion-standard .behavioral-momentum {
+  transition:
+    transform 170ms cubic-bezier(.2,.8,.2,1),
+    border-color 170ms ease,
+    background-color 170ms ease,
+    box-shadow 170ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .motion-standard .metric-card:hover,
+  .motion-standard .occ-category:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,.28);
+  }
+
+  .motion-standard .primary-button:hover,
+  .motion-standard .secondary-button:hover,
+  .motion-standard .behavioral-momentum__action:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.motion-standard :where(button, .primary-button, .secondary-button, .ghost-button, .behavioral-momentum__action):active {
+  transform: scale(.975);
+  transition-duration: 70ms;
+}
+
+/* Emotional feedback: completed work settles; next work gently calls attention. */
+.motion-standard .occ-item--next {
+  animation: next-action-breathe 2.8s ease-in-out infinite;
+}
+
+.motion-standard .occ-item--completed .occ-item__check,
+.motion-standard .occ-item__check--completed {
+  animation: completion-pop 220ms cubic-bezier(.2,.9,.25,1.25);
+}
+
+.motion-standard .alert.success,
+.motion-standard .behavioral-momentum--value {
+  animation: positive-arrival 210ms ease-out;
+}
+
+.motion-standard .alert.danger,
+.motion-standard .behavioral-momentum--protect {
+  animation: attention-arrival 180ms ease-out;
+}
+
+@keyframes next-action-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(127,179,221,0); }
+  50% { box-shadow: 0 0 0 4px rgba(127,179,221,.12); }
+}
+
+@keyframes completion-pop {
+  0% { transform: scale(.82); }
+  100% { transform: scale(1); }
+}
+
+@keyframes positive-arrival {
+  from { opacity: .6; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes attention-arrival {
+  from { opacity: .68; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Illustration-like ambient shapes provide emotional depth without stealing focus. */
+.app-ambient::before,
+.app-ambient::after {
+  content: '';
+  position: fixed;
+  pointer-events: none;
+  border-radius: 999px;
+  filter: blur(70px);
+  opacity: .12;
+}
+
+.app-ambient::before {
+  width: 240px;
+  height: 240px;
+  right: -80px;
+  top: 18vh;
+  background: var(--info, #7fb3dd);
+}
+
+.app-ambient::after {
+  width: 190px;
+  height: 190px;
+  left: 24vw;
+  bottom: -80px;
+  background: var(--positive, #5fc79b);
+}
+
+/* Information should not depend on color alone. */
+.alert.danger::before { content: 'Important: '; font-weight: 850; }
+.alert.success::before { content: 'Done: '; font-weight: 850; }
+
+/* Large text and mobile readability. */
+@media (max-width: 680px) {
+  .content { padding-inline: 12px; }
+  .panel { padding: .9rem; }
+  body { font-size: 16px; }
+  .subtle-text,
+  .section-header span,
+  .metric-card p { font-size: .82rem; }
+}
+
+/* OS-level reduced motion always wins, even if a saved preference is stale. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+.motion-reduced *,
+.motion-reduced *::before,
+.motion-reduced *::after {
+  scroll-behavior: auto !important;
+  animation: none !important;
+  transition-duration: .001ms !important;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --muted: #dce6ee;
+    --faint: #c8d7e2;
+    --line: #73889a;
+  }
+
+  .panel,
+  .hero-panel,
+  .metric-card,
+  .behavioral-momentum,
+  .smart-flow {
+    border-width: 2px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .panel,
+  .hero-panel,
+  .metric-card,
+  .behavioral-momentum,
+  .smart-flow,
+  .occ-category {
+    forced-color-adjust: auto;
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid ButtonText;
+    box-shadow: none;
+  }
+
+  :where(a, button, input, select, textarea):focus-visible {
+    outline: 3px solid Highlight;
+    box-shadow: none;
+  }
+}
