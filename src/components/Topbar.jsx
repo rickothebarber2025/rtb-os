@@ -37,8 +37,8 @@ export default function Topbar({
   return (
     <header className="topbar">
       <div className="topbar__title">
-        <button className="icon-button topbar__menu" type="button" onClick={onMenuClick}>
-          <Menu size={20} />
+        <button aria-label="Open navigation menu" className="icon-button topbar__menu" type="button" onClick={onMenuClick}>
+          <Menu aria-hidden="true" size={20} />
         </button>
         <div>
           <span className="topbar__kicker">RTB OS</span>
@@ -47,13 +47,13 @@ export default function Topbar({
       </div>
 
       <div className="topbar__actions">
-        <div className="topbar__status" aria-label="Current date">
-          <CalendarDays size={16} />
+        <div className="topbar__status" aria-label={`Current date: ${todayLabel}`}>
+          <CalendarDays aria-hidden="true" size={16} />
           <span>{todayLabel}</span>
         </div>
         <div className="topbar__business">
           {wholeRtbCleaning ? (
-            <div className="business-unit-selector" aria-label="Assigned business scope">
+            <div className="business-unit-selector" aria-label="Assigned business scope: Whole RTB, RTB Lounge and RTB Beauty Lounge">
               <strong>Whole RTB</strong>
               <small>RTB Lounge + RTB Beauty Lounge</small>
             </div>
@@ -76,13 +76,13 @@ export default function Topbar({
             <OwnerActivityNotifications selectedBusinessUnitId={selectedBusinessUnitId} />
           ) : null}
           <button className="icon-button" type="button" onClick={onRefresh} aria-label="Refresh data">
-            <RefreshCw size={18} />
+            <RefreshCw aria-hidden="true" size={18} />
           </button>
-          <div className="user-chip" title={displayLabel}>
-            {displayInitial}
+          <div className="user-chip" aria-label={`Signed in as ${displayLabel}`} role="img">
+            <span aria-hidden="true">{displayInitial}</span>
           </div>
           <button className="icon-button" type="button" onClick={signOut} aria-label="Sign out">
-            <LogOut size={18} />
+            <LogOut aria-hidden="true" size={18} />
           </button>
         </div>
       </div>
