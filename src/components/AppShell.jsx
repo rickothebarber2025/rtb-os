@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import BehavioralMomentumBar from './BehavioralMomentumBar';
 import GeminiOpsBrief from './GeminiOpsBrief';
 import MobileTabBar from './MobileTabBar';
 import PushNotificationsManager from './PushNotificationsManager';
@@ -8,6 +9,7 @@ import { getBusinessProfile } from '../utils/businessProfiles';
 
 export default function AppShell({
   activePage,
+  behavioralSignals,
   businessOptions,
   businessUnits,
   children,
@@ -78,6 +80,13 @@ export default function AppShell({
           userPreferences={userPreferences}
         />
         <main className={`content ${pageClass}`}>
+          <BehavioralMomentumBar
+            activePage={activePage}
+            profile={profile}
+            setActivePage={setActivePage}
+            setStaffHubTab={setStaffHubTab}
+            signals={behavioralSignals}
+          />
           <GeminiOpsBrief activePage={activePage} businessUnitId={selectedBusinessUnitId} />
           {children}
         </main>
