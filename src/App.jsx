@@ -75,6 +75,15 @@ function countUrgentActionCenterItems(actionCenter) {
   ).length;
 }
 
+function countUnfinishedChecklists(staffHub) {
+  const runs = Array.isArray(staffHub?.checklistRuns) ? staffHub.checklistRuns : [];
+  const today = new Date().toISOString().slice(0, 10);
+  return runs.filter((run) => {
+    const date = String(run.run_date || run.date || '').slice(0, 10);
+    return date === today && Number(run.completion_percent || 0) < 100 && !run.final_confirmed_at;
+  }).length;
+}
+
 export default function App() {
   const auth = useAuth();
   useSyncAuthProfile(auth.profile, auth.loading);
@@ -120,6 +129,15 @@ export default function App() {
     );
     return announcements.filter((item) => !readIds.has(item.id)).length;
   }, [data.staffHub]);
+  const behavioralSignals = useMemo(
+    () => ({
+      draftPayrollCount: (data.payrollRuns || []).filter((run) => run.status === 'draft').length,
+      unfinishedChecklistCount: countUnfinishedChecklists(data.staffHub),
+      unreadAnnouncementCount,
+      urgentActionCount: countUrgentActionCenterItems(data.actionCenter),
+    }),
+    [data.actionCenter, data.payrollRuns, data.staffHub, unreadAnnouncementCount],
+  );
   const navBadges = useMemo(
     () => ({ 'staff-hub': unreadAnnouncementCount }),
     [unreadAnnouncementCount],
@@ -162,9 +180,9 @@ export default function App() {
       profile: auth.profile,
       recentPage,
       signals: {
-        draftPayrollCount: (data.payrollRuns || []).filter((run) => run.status === 'draft').length,
+        draftPayrollCount: behavioralSignals.draftPayrollCount,
         pendingAccessCount: 0,
-        urgentActionCount: countUrgentActionCenterItems(data.actionCenter),
+        urgentActionCount: behavioralSignals.urgentActionCount,
       },
     });
 
@@ -173,7 +191,7 @@ export default function App() {
       setStaffHubTab(getSmartStaffHubTab({ profile: auth.profile, staffHub: data.staffHub }));
     }
     smartLandingAppliedRef.current = true;
-  }, [auth.profile, auth.user?.id, data.actionCenter, data.loading, data.payrollRuns, data.staffHub, navItems]);
+  }, [auth.profile, auth.user?.id, behavioralSignals, data.loading, data.staffHub, navItems]);
 
   useEffect(() => {
     if (!smartLandingAppliedRef.current || !auth.user?.id || !canAccessPage(auth.profile, activePage)) return;
@@ -396,6 +414,7 @@ export default function App() {
   return (
     <AppShell
       activePage={activePage}
+      behavioralSignals={behavioralSignals}
       businessUnits={data.businessUnits}
       businessOptions={businessOptions}
       navBadges={navBadges}
