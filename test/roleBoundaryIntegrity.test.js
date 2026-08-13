@@ -4,13 +4,15 @@ import fs from 'node:fs';
 
 import { buildPermissionsFromTemplate } from '../src/lib/roleTemplates.js';
 import { canAccessPage } from '../src/utils/access.js';
+import { ALL_BUSINESSES_ID, getBusinessSelectionOptions } from '../src/utils/businessProfiles.js';
 
-function profileFor(templateId, role, userType = 'employee') {
+function profileFor(templateId, role, userType = 'employee', businessUnitIds = ['test-business']) {
   return {
     active: true,
-    business_unit_id: 'test-business',
+    business_unit_id: businessUnitIds[0] || 'test-business',
     permissions: buildPermissionsFromTemplate(templateId, {
-      business_unit_ids: ['test-business'],
+      business_scope: businessUnitIds.includes(ALL_BUSINESSES_ID) ? 'all' : 'selected',
+      business_unit_ids: businessUnitIds,
     }),
     role,
     user_type: userType,
@@ -77,4 +79,27 @@ test('mobile Staff Hub navigation has a dedicated Operations Cleaning branch', (
   assert.match(mobileTabBar, />Cleaning</);
   assert.match(mobileTabBar, /setStaffHubTab\('daily'\)/);
   assert.match(appShell, /profile=\{profile\}/);
+});
+
+test('Operations Cleaning with all-business access receives Whole RTB as the first scope', () => {
+  const profile = profileFor('operations_cleaning', 'contractor', 'contractor', [ALL_BUSINESSES_ID]);
+  const units = [
+    { id: 'lounge', name: 'RTB Lounge' },
+    { id: 'beauty', name: 'RTB Beauty Lounge' },
+  ];
+  const options = getBusinessSelectionOptions(units, profile);
+  assert.equal(options[0].id, ALL_BUSINESSES_ID);
+  assert.equal(options[0].name, 'Whole RTB');
+  assert.equal(options.length, 3);
+});
+
+test('Operations Cleaning header locks to Whole RTB instead of a business chooser', () => {
+  const topbar = fs.readFileSync(new URL('../src/components/Topbar.jsx', import.meta.url), 'utf8');
+  const operationsService = fs.readFileSync(new URL('../src/services/staffOperationsService.js', import.meta.url), 'utf8');
+
+  assert.match(topbar, /roleTemplate === 'operations_cleaning'/);
+  assert.match(topbar, /setSelectedBusinessUnitId\(ALL_BUSINESSES_ID\)/);
+  assert.match(topbar, /RTB Lounge \+ RTB Beauty Lounge/);
+  assert.match(operationsService, /get_my_cleaning_operations_all_businesses/);
+  assert.match(operationsService, /claim_my_cleaning_all_businesses/);
 });
