@@ -10,6 +10,7 @@ import './styles/operationsChecklist.css';
 import './styles/contractorCleaning.css';
 import './styles/smartFlow.css';
 import './styles/behavioralUX.css';
+import './styles/humanExperience.css';
 
 const CACHE_CLEANUP_KEY = 'rtb-os-cache-cleanup-2026-07-12';
 
