@@ -9,6 +9,7 @@ import './styles/mobileNavigation.css';
 import './styles/operationsChecklist.css';
 import './styles/contractorCleaning.css';
 import './styles/smartFlow.css';
+import './styles/behavioralUX.css';
 
 const CACHE_CLEANUP_KEY = 'rtb-os-cache-cleanup-2026-07-12';
 
@@ -26,7 +27,6 @@ function clearLegacyServiceWorkerCache() {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map((registration) => registration.unregister()));
 
-    // Do not install a service worker inside the Capacitor native WebView.
     const isNative = Boolean(window.Capacitor?.isNativePlatform?.());
     if (!isNative && !window.localStorage.getItem(CACHE_CLEANUP_KEY)) {
       const registration = await navigator.serviceWorker.register('/sw.js');
@@ -53,8 +53,6 @@ createRoot(document.getElementById('root')).render(
   </React.StrictMode>,
 );
 
-// Native services start only after the UI has mounted. A push failure must never
-// prevent RTB OS from rendering or leave the iOS WebView on a black screen.
 window.setTimeout(() => {
   import('./lib/pushNotifications.js')
     .then(({ initializePushNotifications }) => initializePushNotifications())
