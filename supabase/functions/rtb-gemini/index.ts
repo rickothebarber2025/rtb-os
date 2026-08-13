@@ -7,6 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const SUMMARY_CACHE_MS = 6 * 60 * 60 * 1000;
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -49,71 +51,145 @@ function torontoDate() {
   }).format(new Date());
 }
 
-async function gatherContext(
+function questionNeedsFinancialData(question: string) {
+  return /\b(payroll|pay|earnings|sales|revenue|tips|take[- ]?home|commission|money|financial)\b/i.test(question);
+}
+
+async function getCachedSummary(admin: ReturnType<typeof createClient>, businessId: string, audience: "admin" | "staff_hub") {
+  return await safe(
+    admin
+      .from("ai_operations_summaries")
+      .select("headline,summary,priorities,evidence,suggested_tasks,model,generated_at")
+      .eq("business_unit_id", businessId)
+      .eq("audience", audience)
+      .eq("summary_date", torontoDate())
+      .maybeSingle(),
+    null as any,
+  );
+}
+
+function cachedPayload(row: any) {
+  if (!row) return null;
+  return {
+    answer: row.summary || "",
+    summary: row.summary || "",
+    priorities: Array.isArray(row.priorities) ? row.priorities : [],
+    evidence: Array.isArray(row.evidence) ? row.evidence : [],
+    suggested_tasks: Array.isArray(row.suggested_tasks) ? row.suggested_tasks : [],
+    confidence_score: null,
+    model: row.model || null,
+    generated_at: row.generated_at || null,
+    cached: true,
+  };
+}
+
+async function gatherLeanContext(
   admin: ReturnType<typeof createClient>,
   businessId: string,
-  options: { audience: "admin" | "staff_hub"; currentStaffId?: string | null; allowFinancial: boolean },
+  options: {
+    audience: "admin" | "staff_hub";
+    currentStaffId?: string | null;
+    includeFinancial: boolean;
+  },
 ) {
-  const since = new Date(Date.now() - 30 * 86400000).toISOString();
   const today = torontoDate();
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const adminAudience = options.audience === "admin";
+  const ownStaffId = options.currentStaffId || null;
 
   const [business, staff] = await Promise.all([
     safe(admin.from("business_units").select("id,name,type").eq("id", businessId).maybeSingle(), null),
-    safe(admin.from("staff").select("id,full_name,role,tier,active,fixed_rate").eq("business_unit_id", businessId).order("full_name"), []),
+    safe(
+      admin
+        .from("staff")
+        .select("id,full_name,role,tier,active")
+        .eq("business_unit_id", businessId)
+        .eq("active", true)
+        .order("full_name")
+        .limit(30),
+      [],
+    ),
   ]);
 
-  const staffRows = staff as any[];
-  const staffIds = staffRows.map((row) => row.id);
-  const ownStaffId = options.currentStaffId || null;
-  const staffFilter = <T extends any[]>(rows: T) =>
-    adminAudience || !ownStaffId ? rows : rows.filter((row: any) => row.staff_id === ownStaffId || row.actor_staff_id === ownStaffId);
+  const roster = staff as any[];
+  const allowedStaffIds = adminAudience ? roster.map((row) => row.id) : ownStaffId ? [ownStaffId] : [];
 
-  const [performance, attendance, shifts, checklistRuns, tasks, operationsRequests, activity, feedback, payroll] = await Promise.all([
-    safe(admin.from("staff_performance_summary").select("*").eq("business_unit_id", businessId), []),
-    safe(admin.from("staff_attendance").select("staff_id,clock_in,clock_out,status,declared_tips").eq("business_unit_id", businessId).gte("clock_in", since).order("clock_in", { ascending: false }).limit(150), []),
-    safe(admin.from("staff_shift_records").select("staff_id,shift_date,scheduled_start,scheduled_end,checked_in_at,checked_out_at,status,late_minutes,early_leave_minutes,overtime_minutes,missed_shift,missed_checkout").eq("business_unit_id", businessId).gte("shift_date", today).order("shift_date", { ascending: false }).limit(100), []),
-    safe(admin.from("operation_checklist_runs").select("id,staff_id,run_date,checklist_type,scope,status,completion_percent,final_confirmed_by,final_confirmed_at,items:operation_checklist_run_items(label,status,completed_at,completed_by_staff_id,note,photo_url)").eq("business_unit_id", businessId).gte("run_date", today).order("created_at", { ascending: false }).limit(50), []),
-    safe(admin.from("staff_tasks").select("staff_id,title,category,details,due_date,status,completed_at,created_at").eq("business_unit_id", businessId).order("created_at", { ascending: false }).limit(100), []),
-    safe(admin.from("staff_operations_requests").select("staff_id,request_type,category,title,details,priority,status,manager_note,resolved_at,created_at").eq("business_unit_id", businessId).order("created_at", { ascending: false }).limit(100), []),
-    safe(admin.from("owner_activity_events").select("actor_staff_id,category,action,title,body,metadata,created_at").eq("business_unit_id", businessId).gte("created_at", since).order("created_at", { ascending: false }).limit(150), []),
-    safe(admin.from("customer_feedback_enriched").select("staff_id,rating,review_text,sentiment,main_category,priority,suggested_action,response_created_at").eq("business_id", businessId).order("response_created_at", { ascending: false }).limit(60), []),
-    options.allowFinancial && staffIds.length
-      ? safe(admin.from("payroll_entries").select("staff_id,staff_name_snapshot,net_sales,tips,take_home,created_at").in("staff_id", staffIds).order("created_at", { ascending: false }).limit(80), [])
+  const [checklists, tasks, requests, attendance, performance, payroll] = await Promise.all([
+    safe(
+      admin
+        .from("operation_checklist_runs")
+        .select("id,staff_id,run_date,checklist_type,scope,status,completion_percent,final_confirmed_at,items:operation_checklist_run_items(label,status,completed_at,completed_by_staff_id,note)")
+        .eq("business_unit_id", businessId)
+        .eq("run_date", today)
+        .order("created_at", { ascending: false })
+        .limit(16),
+      [],
+    ),
+    safe(
+      admin
+        .from("staff_tasks")
+        .select("staff_id,title,category,due_date,status,completed_at")
+        .eq("business_unit_id", businessId)
+        .in("status", ["pending", "in_progress"])
+        .order("due_date", { ascending: true })
+        .limit(24),
+      [],
+    ),
+    safe(
+      admin
+        .from("staff_operations_requests")
+        .select("staff_id,request_type,category,title,priority,status,created_at")
+        .eq("business_unit_id", businessId)
+        .neq("status", "resolved")
+        .order("created_at", { ascending: false })
+        .limit(16),
+      [],
+    ),
+    safe(
+      admin
+        .from("staff_attendance")
+        .select("staff_id,clock_in,clock_out,status")
+        .eq("business_unit_id", businessId)
+        .gte("clock_in", weekAgo)
+        .order("clock_in", { ascending: false })
+        .limit(24),
+      [],
+    ),
+    adminAudience
+      ? safe(
+          admin
+            .from("staff_performance_summary")
+            .select("staff_id,total_net_sales,transactions,average_ticket")
+            .eq("business_unit_id", businessId)
+            .limit(20),
+          [],
+        )
+      : Promise.resolve([]),
+    options.includeFinancial && allowedStaffIds.length
+      ? safe(
+          admin
+            .from("payroll_entries")
+            .select("staff_id,staff_name_snapshot,net_sales,tips,take_home,created_at")
+            .in("staff_id", allowedStaffIds)
+            .order("created_at", { ascending: false })
+            .limit(12),
+          [],
+        )
       : Promise.resolve([]),
   ]);
 
-  const ownPerformance = adminAudience || !ownStaffId
-    ? performance
-    : (performance as any[]).filter((row) => row.staff_id === ownStaffId);
+  const filterMine = (rows: any[]) =>
+    adminAudience || !ownStaffId ? rows : rows.filter((row) => row.staff_id === ownStaffId);
 
   return {
     business,
-    roster: adminAudience ? staffRows : staffRows.filter((row) => row.id === ownStaffId),
-    staff_performance: ownPerformance,
-    attendance_last_30_days: staffFilter(attendance as any[]),
-    shifts_today: staffFilter(shifts as any[]),
-    opening_closing_today: adminAudience
-      ? checklistRuns
-      : (checklistRuns as any[]).map((run: any) => ({
-          checklist_type: run.checklist_type,
-          scope: run.scope,
-          status: run.status,
-          completion_percent: run.completion_percent,
-          run_date: run.run_date,
-          my_items: Array.isArray(run.items)
-            ? run.items.filter((item: any) => item.completed_by_staff_id === ownStaffId)
-            : [],
-        })),
-    tasks: staffFilter(tasks as any[]),
-    operations_requests: staffFilter(operationsRequests as any[]),
-    owner_activity_last_30_days: adminAudience ? activity : staffFilter(activity as any[]),
-    customer_feedback: adminAudience
-      ? feedback
-      : (feedback as any[]).filter((row) => row.staff_id === ownStaffId),
-    payroll_recent: options.allowFinancial
-      ? (adminAudience || !ownStaffId ? payroll : (payroll as any[]).filter((row: any) => row.staff_id === ownStaffId))
-      : [],
+    roster: adminAudience ? roster : roster.filter((row) => row.id === ownStaffId),
+    today_checklists: adminAudience ? checklists : filterMine(checklists as any[]),
+    open_tasks: filterMine(tasks as any[]),
+    unresolved_requests: filterMine(requests as any[]),
+    attendance_last_7_days: filterMine(attendance as any[]),
+    performance_snapshot: adminAudience ? performance : [],
+    payroll_recent: options.includeFinancial ? filterMine(payroll as any[]) : [],
     generated_at: new Date().toISOString(),
     timezone: "America/Toronto",
     audience: options.audience,
@@ -128,21 +204,8 @@ const responseSchema = {
     confidence_score: { type: "number" },
     evidence: { type: "array", items: { type: "string" } },
     priorities: { type: "array", items: { type: "string" } },
-    suggested_tasks: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          details: { type: "string" },
-          category: { type: "string" },
-          suggested_staff_name: { type: "string" },
-        },
-        required: ["title", "details", "category", "suggested_staff_name"],
-      },
-    },
   },
-  required: ["answer", "summary", "confidence_score", "evidence", "priorities", "suggested_tasks"],
+  required: ["answer", "summary", "confidence_score", "evidence", "priorities"],
 };
 
 async function askGemini(apiKey: string, model: string, prompt: string, payload: unknown) {
@@ -153,7 +216,8 @@ async function askGemini(apiKey: string, model: string, prompt: string, payload:
       systemInstruction: { parts: [{ text: prompt }] },
       contents: [{ role: "user", parts: [{ text: JSON.stringify(payload) }] }],
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0.15,
+        maxOutputTokens: 500,
         responseMimeType: "application/json",
         responseSchema,
       },
@@ -161,9 +225,9 @@ async function askGemini(apiKey: string, model: string, prompt: string, payload:
   });
 
   const raw = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(raw?.error?.message || "Gemini request failed.");
+  if (!response.ok) throw new Error(raw?.error?.message || "AI request failed.");
   const text = raw?.candidates?.[0]?.content?.parts?.find((part: any) => part.text)?.text || "";
-  if (!text) throw new Error("Gemini returned an empty response.");
+  if (!text) throw new Error("AI returned an empty response.");
   return JSON.parse(text);
 }
 
@@ -176,7 +240,6 @@ Deno.serve(async (req) => {
     const key = serviceKey();
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     if (!supabaseUrl || !key) return json({ error: "Supabase function secrets are missing." }, 500);
-    if (!geminiKey) return json({ error: "GEMINI_API_KEY is not configured in Supabase secrets." }, 503);
 
     const admin = createClient(supabaseUrl, key, { auth: { persistSession: false } });
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
@@ -187,9 +250,17 @@ Deno.serve(async (req) => {
     const action = clean(body.action || "ask").toLowerCase();
     const businessId = clean(body.businessId || body.business_id);
     const question = clean(body.question);
+    const force = body.force === true;
     if (!businessId) return json({ error: "Choose one business first." }, 400);
 
-    const profile = await safe(admin.from("user_profiles").select("email,active,business_unit_id,permissions,role").eq("id", authData.user.id).maybeSingle(), null as any);
+    const profile = await safe(
+      admin
+        .from("user_profiles")
+        .select("email,active,business_unit_id,permissions,role")
+        .eq("id", authData.user.id)
+        .maybeSingle(),
+      null as any,
+    );
     const owner = clean(profile?.email).toLowerCase() === "rickothebarber@gmail.com";
     const permissions = profile?.permissions || {};
     const modules = permissions.modules || permissions;
@@ -203,9 +274,19 @@ Deno.serve(async (req) => {
     const manager = owner || operationsLevel >= 2 || dashboardLevel >= 1 || ["admin", "manager", "owner"].includes(clean(profile?.role).toLowerCase());
     const audience: "admin" | "staff_hub" = manager ? "admin" : "staff_hub";
     const currentStaff = await safe(
-      admin.from("staff").select("id,full_name,email").eq("business_unit_id", businessId).ilike("email", clean(profile?.email)).maybeSingle(),
+      admin
+        .from("staff")
+        .select("id,full_name,email")
+        .eq("business_unit_id", businessId)
+        .ilike("email", clean(profile?.email))
+        .maybeSingle(),
       null as any,
     );
+
+    if (action === "cached") {
+      const cached = await getCachedSummary(admin, businessId, audience);
+      return json(cachedPayload(cached) || { cached: false, audience });
+    }
 
     if (action === "automation") {
       if (!manager) return json({ error: "Manager access is required to run automations." }, 403);
@@ -214,80 +295,83 @@ Deno.serve(async (req) => {
       return json({ automation: data });
     }
 
+    if (!geminiKey) return json({ error: "AI is temporarily unavailable." }, 503);
     if (action === "ask" && !question) return json({ error: "Ask a question first." }, 400);
 
-    if (manager) {
-      // Best-effort: this runs on every summary/ask request just to keep
-      // automations fresh, so a failure here must never break the actual
-      // brief. Previously chained .catch() directly on admin.rpc(...),
-      // which threw "admin.rpc(...).catch is not a function" in
-      // production (confirmed via a live screenshot) instead of being
-      // swallowed -- try/catch works regardless of the exact shape the
-      // query builder returns.
-      try {
-        await admin.rpc("run_rtb_safe_automations");
-      } catch (_automationError) {
-        // Ignore -- this is a background nicety, not the actual request.
+    if (action === "summary" && !force) {
+      const cached = await getCachedSummary(admin, businessId, audience);
+      const generatedAt = cached?.generated_at ? new Date(cached.generated_at).getTime() : 0;
+      if (cached && Date.now() - generatedAt < SUMMARY_CACHE_MS) {
+        return json({ ...cachedPayload(cached), audience, cache_age_ms: Date.now() - generatedAt });
       }
     }
 
-    const context = await gatherContext(admin, businessId, {
+    const includeFinancial = Boolean(
+      (owner || payrollLevel >= 1) && action === "ask" && questionNeedsFinancialData(question),
+    );
+
+    const context = await gatherLeanContext(admin, businessId, {
       audience,
       currentStaffId: currentStaff?.id || null,
-      allowFinancial: owner || payrollLevel >= 1,
+      includeFinancial,
     });
     const model = Deno.env.get("GEMINI_MODEL") || "gemini-flash-latest";
 
     const system = audience === "admin"
       ? [
-          "You are RTB Gemini, the private operating copilot for the owner and managers of RTB Lounge and RTB Beauty Lounge.",
-          "Use only supplied RTB OS data as factual evidence. Never invent staff actions, sales, attendance, checklist completion, or customer feedback.",
-          "Summarize what matters, identify operational risk, accountability gaps, revenue opportunities, and the next best actions.",
-          "Prioritize today's shifts, opening/closing, overdue tasks, unresolved operations issues, staff activity, and performance.",
-          "Do not alter payroll, permissions, compensation, terminations, or financial records. Return JSON only.",
+          "You are RTB AI, a lightweight in-app helper for RTB Lounge and RTB Beauty Lounge.",
+          "Use only supplied RTB OS data. Never invent facts.",
+          "Answer the user's immediate question directly and briefly.",
+          "Prefer one to three useful priorities over a broad business analysis.",
+          "Do not run actions or alter payroll, permissions, compensation, or staff records.",
+          "Return JSON only.",
         ].join(" ")
       : [
-          "You are RTB Gemini inside Staff Hub. You are coaching one staff member using only their own permitted RTB OS data.",
-          "Do not reveal other staff payroll, private performance, attendance, or management-only information.",
-          "Summarize today's responsibilities, checklist participation, assigned tasks, attendance signals, client feedback tied to this staff member, and the clearest next action.",
-          "Be constructive, specific, concise, and operational. Return JSON only.",
+          "You are RTB AI inside Staff Hub, a lightweight helper for one staff member.",
+          "Use only the permitted data supplied for that person. Never reveal other staff private data.",
+          "Answer briefly and focus on the clearest next action.",
+          "Do not run actions or alter records. Return JSON only.",
         ].join(" ");
 
     const effectiveQuestion = action === "summary"
       ? audience === "admin"
-        ? "Give me the current RTB owner operations brief. What needs attention now, what is going well, and what should management do next?"
-        : "Give me my Staff Hub brief for today: what I need to finish, anything I missed, and the most useful next action."
+        ? "Give a short operations brief for today. Mention only what needs attention now and one positive signal if present."
+        : "Give a short brief for today with the most useful next action."
       : question;
 
     const parsed = await askGemini(geminiKey, model, system, {
       question: effectiveQuestion,
-      business_context: context,
+      context,
     });
+
+    const normalized = {
+      ...parsed,
+      suggested_tasks: [],
+      model,
+      audience,
+      data_scope: audience === "admin" ? "rtb_os_lean_admin" : "rtb_os_lean_staff",
+      generated_at: new Date().toISOString(),
+      cached: false,
+    };
 
     if (action === "summary") {
       const { error: saveError } = await admin.from("ai_operations_summaries").upsert({
         business_unit_id: businessId,
         audience,
         summary_date: torontoDate(),
-        headline: parsed.priorities?.[0] || (audience === "admin" ? "RTB operations brief" : "My RTB brief"),
+        headline: parsed.priorities?.[0] || "RTB AI brief",
         summary: parsed.summary || parsed.answer,
-        priorities: parsed.priorities || [],
-        evidence: parsed.evidence || [],
-        suggested_tasks: parsed.suggested_tasks || [],
+        priorities: (parsed.priorities || []).slice(0, 3),
+        evidence: (parsed.evidence || []).slice(0, 3),
+        suggested_tasks: [],
         model,
-        generated_at: new Date().toISOString(),
+        generated_at: normalized.generated_at,
       }, { onConflict: "business_unit_id,audience,summary_date" });
       if (saveError) throw saveError;
     }
 
-    return json({
-      ...parsed,
-      model,
-      audience,
-      data_scope: audience === "admin" ? "rtb_os_admin_live" : "rtb_os_staff_live",
-      generated_at: new Date().toISOString(),
-    });
+    return json(normalized);
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "RTB Gemini failed." }, 500);
+    return json({ error: error instanceof Error ? error.message : "RTB AI failed." }, 500);
   }
 });
