@@ -5,7 +5,7 @@ import fs from 'node:fs';
 test('RTB AI does not auto-generate a brief on component mount', () => {
   const source = fs.readFileSync(new URL('../src/components/GeminiOpsBrief.jsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /useEffect\s*\([^]*loadBrief\(/);
-  assert.match(source, /setExpanded\(false\)/);
+  assert.match(source, /\[expanded, setExpanded\] = useState\(false\)/);
   assert.match(source, /action: 'cached'/);
   assert.match(source, /RTB AI does not run in the background/);
 });
