@@ -67,3 +67,14 @@ test('Operations Cleaning template contains no financial, roster, appointment, a
   }
   assert.equal(modules.staff_hub, 'view');
 });
+
+test('mobile Staff Hub navigation has a dedicated Operations Cleaning branch', () => {
+  const mobileTabBar = fs.readFileSync(new URL('../src/components/MobileTabBar.jsx', import.meta.url), 'utf8');
+  const appShell = fs.readFileSync(new URL('../src/components/AppShell.jsx', import.meta.url), 'utf8');
+
+  assert.match(mobileTabBar, /role_template === 'operations_cleaning'/);
+  assert.match(mobileTabBar, /mobile-app-nav--cleaning/);
+  assert.match(mobileTabBar, />Cleaning</);
+  assert.match(mobileTabBar, /setStaffHubTab\('daily'\)/);
+  assert.match(appShell, /profile=\{profile\}/);
+});
