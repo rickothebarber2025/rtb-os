@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { CalendarDays, LogOut, Menu, RefreshCw } from 'lucide-react';
 import BusinessUnitSelector from './BusinessUnitSelector';
 import OwnerActivityNotifications from './OwnerActivityNotifications';
-import { getProfileRoleTitle, isOwnerProfile } from '../lib/permissions.js';
+import { getEffectivePermissionsPayload, getProfileRoleTitle, isOwnerProfile } from '../lib/permissions.js';
+import { ALL_BUSINESSES_ID } from '../utils/businessProfiles.js';
 
 export default function Topbar({
   businessOptions,
@@ -23,6 +25,14 @@ export default function Topbar({
     day: 'numeric',
     weekday: 'short',
   }).format(new Date());
+  const roleTemplate = getEffectivePermissionsPayload(profile).role_template;
+  const wholeRtbCleaning = roleTemplate === 'operations_cleaning';
+
+  useEffect(() => {
+    if (wholeRtbCleaning && selectedBusinessUnitId !== ALL_BUSINESSES_ID) {
+      setSelectedBusinessUnitId(ALL_BUSINESSES_ID);
+    }
+  }, [selectedBusinessUnitId, setSelectedBusinessUnitId, wholeRtbCleaning]);
 
   return (
     <header className="topbar">
@@ -42,12 +52,19 @@ export default function Topbar({
           <span>{todayLabel}</span>
         </div>
         <div className="topbar__business">
-          <BusinessUnitSelector
-            businessOptions={businessOptions}
-            businessUnits={businessUnits}
-            selectedBusinessUnitId={selectedBusinessUnitId}
-            setSelectedBusinessUnitId={setSelectedBusinessUnitId}
-          />
+          {wholeRtbCleaning ? (
+            <div className="business-unit-selector" aria-label="Assigned business scope">
+              <strong>Whole RTB</strong>
+              <small>RTB Lounge + RTB Beauty Lounge</small>
+            </div>
+          ) : (
+            <BusinessUnitSelector
+              businessOptions={businessOptions}
+              businessUnits={businessUnits}
+              selectedBusinessUnitId={selectedBusinessUnitId}
+              setSelectedBusinessUnitId={setSelectedBusinessUnitId}
+            />
+          )}
         </div>
         <div className="topbar__user-controls">
           {profile ? (
