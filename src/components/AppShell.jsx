@@ -86,6 +86,7 @@ export default function AppShell({
           navBadges={navBadges}
           navItems={navItems}
           onMoreClick={() => setSidebarOpen(true)}
+          profile={profile}
           setActivePage={setActivePage}
           setStaffHubTab={setStaffHubTab}
           staffHubTab={staffHubTab}
