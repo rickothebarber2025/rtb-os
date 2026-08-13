@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import AccessibilityRuntime from './AccessibilityRuntime';
 import BehavioralMomentumBar from './BehavioralMomentumBar';
 import GeminiOpsBrief from './GeminiOpsBrief';
 import MobileTabBar from './MobileTabBar';
@@ -50,6 +51,8 @@ export default function AppShell({
     <div
       className={`app-shell ${preferredTheme} ${densityClass} ${navigationClass} ${motionClass} ${sidebarClass}`}
     >
+      <AccessibilityRuntime pageTitle={pageTitle} />
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <PushNotificationsManager enabled={Boolean(profile?.active && user?.id)} setActivePage={setActivePage} />
       <div className="app-ambient" aria-hidden="true" />
       <Sidebar
@@ -79,7 +82,7 @@ export default function AppShell({
           user={user}
           userPreferences={userPreferences}
         />
-        <main className={`content ${pageClass}`}>
+        <main aria-label={pageTitle} className={`content ${pageClass}`} id="main-content" tabIndex={-1}>
           <BehavioralMomentumBar
             activePage={activePage}
             profile={profile}
