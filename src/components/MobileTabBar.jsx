@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { ClipboardCheck, Coffee, Home, Menu, Trophy } from 'lucide-react';
+import { getEffectivePermissionsPayload } from '../lib/permissions.js';
 
 const QUICK_NAV_IDS = ['dashboard', 'action-center', 'payroll', 'staff', 'performance', 'staff-hub'];
 
@@ -11,12 +13,6 @@ const SHORT_LABELS = {
   staff: 'Roster',
 };
 
-// When inside Staff Hub, the global quick-nav above is mostly empty for
-// regular staff -- they don't have access to Dashboard/Payroll/Roster/
-// Performance as top-level pages, so it collapses down to just "Hub" and
-// "More", wasting the bar. This shows Staff Hub's own most-used tabs
-// instead, so switching between them doesn't require scrolling the
-// horizontal tab strip at the top of the page.
 const STAFF_HUB_QUICK_TABS = [
   { icon: ClipboardCheck, id: 'daily', label: 'Daily Ops' },
   { icon: Home, id: 'home', label: 'Today' },
@@ -24,8 +20,44 @@ const STAFF_HUB_QUICK_TABS = [
   { icon: Coffee, id: 'tips', label: 'Tips' },
 ];
 
-export default function MobileTabBar({ activePage, navBadges, navItems, onMoreClick, setActivePage, setStaffHubTab, staffHubTab }) {
+function isOperationsCleaning(profile) {
+  if (!profile) return false;
+  const payload = getEffectivePermissionsPayload(profile);
+  return payload.role_template === 'operations_cleaning' || profile.user_type === 'contractor' && payload.role_title === 'Operations Cleaning';
+}
+
+export default function MobileTabBar({ activePage, navBadges, navItems, onMoreClick, profile, setActivePage, setStaffHubTab, staffHubTab }) {
   const insideStaffHub = activePage === 'staff-hub' && typeof setStaffHubTab === 'function';
+  const cleanerPortal = insideStaffHub && isOperationsCleaning(profile);
+
+  useEffect(() => {
+    if (cleanerPortal && staffHubTab !== 'daily') setStaffHubTab('daily');
+  }, [cleanerPortal, setStaffHubTab, staffHubTab]);
+
+  if (cleanerPortal) {
+    return (
+      <div className="mobile-app-nav mobile-app-nav--cleaning">
+        <div className="mobile-app-nav__handle">
+          <span>Operations Cleaning</span>
+        </div>
+        <nav className="mobile-tabbar mobile-tabbar--cleaning" aria-label="Operations Cleaning navigation">
+          <button
+            aria-current="page"
+            aria-label="Cleaning workspace"
+            className="mobile-tabbar__item active"
+            title="Cleaning"
+            type="button"
+            onClick={() => setStaffHubTab('daily')}
+          >
+            <span className="mobile-tabbar__icon-wrap">
+              <ClipboardCheck size={20} />
+            </span>
+            <span>Cleaning</span>
+          </button>
+        </nav>
+      </div>
+    );
+  }
 
   if (insideStaffHub) {
     const moreActive = !STAFF_HUB_QUICK_TABS.some((tab) => tab.id === staffHubTab);
