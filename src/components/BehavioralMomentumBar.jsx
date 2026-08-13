@@ -27,7 +27,10 @@ export default function BehavioralMomentumBar({
   }
 
   return (
-    <section className={`behavioral-momentum behavioral-momentum--${cue.tone || 'value'}`}>
+    <section
+      aria-label="Recommended next action"
+      className={`behavioral-momentum behavioral-momentum--${cue.tone || 'value'}`}
+    >
       <div className="behavioral-momentum__icon" aria-hidden="true">
         <Icon size={18} />
       </div>
@@ -42,7 +45,7 @@ export default function BehavioralMomentumBar({
       {cue.actionLabel ? (
         <button className="behavioral-momentum__action" type="button" onClick={handleAction}>
           {cue.actionLabel}
-          <ArrowRight size={15} />
+          <ArrowRight aria-hidden="true" size={15} />
         </button>
       ) : null}
     </section>
