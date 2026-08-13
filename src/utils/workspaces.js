@@ -51,6 +51,11 @@ const WORKSPACE_PRESETS = {
     focus: ['action-center', 'operations', 'staff', 'performance'],
     title: 'Operations Workspace',
   },
+  operations_cleaning: {
+    description: 'Complete whole-shop cleaning, restocking, inventory checks, issue reporting, and final walkthroughs.',
+    focus: ['staff-hub'],
+    title: 'Operations Cleaning Workspace',
+  },
   owner: {
     description: 'See the highest-impact decisions across access, payroll, operations, and performance.',
     focus: ['action-center', 'payroll', 'access', 'ai-consultant', 'system'],
@@ -110,7 +115,7 @@ export function buildRoleWorkspace(profile, navItems = [], businessUnit = null) 
   const payload = getEffectivePermissionsPayload(profile);
   const preset = inferPreset(profile);
   const allowedPageIds = new Set(navItems.map((item) => item.id));
-  const includeMyRole = payload.role_template !== 'staff_portal';
+  const includeMyRole = !['staff_portal', 'operations_cleaning'].includes(payload.role_template);
   const focusPages = unique([
     ...preset.focus,
     ...pagesFromPermissions(profile),
@@ -128,23 +133,17 @@ export function buildRoleWorkspace(profile, navItems = [], businessUnit = null) 
   const onboarding = [
     {
       complete: visibleModules.length > 0,
-      detail: visibleModules.length
-        ? `${visibleModules.length} modules assigned`
-        : 'Ask an access admin to assign module permissions.',
+      detail: visibleModules.length ? `${visibleModules.length} modules assigned` : 'Ask an access admin to assign module permissions.',
       label: 'Module access',
     },
     {
       complete: isOwnerProfile(profile) || hasAllBusinessAccess(profile) || Boolean(profile?.business_unit_id),
-      detail: isOwnerProfile(profile) || hasAllBusinessAccess(profile)
-        ? 'All businesses'
-        : businessUnit?.name || 'Choose a business in Access',
+      detail: isOwnerProfile(profile) || hasAllBusinessAccess(profile) ? 'All businesses' : businessUnit?.name || 'Choose a business in Access',
       label: 'Business scope',
     },
     {
       complete: payload.responsibilities.length > 0,
-      detail: payload.responsibilities.length
-        ? `${payload.responsibilities.length} responsibilities listed`
-        : 'Add responsibilities so the user knows what to own.',
+      detail: payload.responsibilities.length ? `${payload.responsibilities.length} responsibilities listed` : 'Add responsibilities so the user knows what to own.',
       label: 'Responsibilities',
     },
   ];
@@ -152,10 +151,7 @@ export function buildRoleWorkspace(profile, navItems = [], businessUnit = null) 
   return {
     description: preset.description,
     editableModules,
-    focusPages: focusPages.map((pageId) => ({
-      id: pageId,
-      label: navLabel(pageId),
-    })),
+    focusPages: focusPages.map((pageId) => ({ id: pageId, label: navLabel(pageId) })),
     onboarding,
     responsibilities: payload.responsibilities,
     restrictions: payload.restrictions,
