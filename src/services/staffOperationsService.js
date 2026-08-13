@@ -16,7 +16,21 @@ async function call(name, args) {
   return data;
 }
 
-export function getMyDailyOperations(businessUnitId) {
+async function optionalCall(name, args = {}) {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc(name, args);
+  if (error) throw error;
+  return data;
+}
+
+export async function getMyDailyOperations(businessUnitId) {
+  // Operations Cleaning is a whole-RTB assignment. The backend returns a
+  // synthetic combined checklist spanning every business in the contractor's
+  // access scope. Other roles receive null here and continue through the
+  // normal single-business operation flow below.
+  const combined = await optionalCall('get_my_cleaning_operations_all_businesses');
+  if (combined?.combined_businesses) return combined;
+
   return call('get_my_daily_operations', { p_business_unit_id: businessUnitId || null });
 }
 
@@ -34,7 +48,12 @@ export function endMyShift(businessUnitId, afterHoursReason = '') {
   });
 }
 
-export function claimMyOperationChecklist(businessUnitId, checklistType, scope = 'shared') {
+export async function claimMyOperationChecklist(businessUnitId, checklistType, scope = 'shared') {
+  if (scope === 'cleaning') {
+    const combinedRunId = await optionalCall('claim_my_cleaning_all_businesses');
+    if (combinedRunId) return combinedRunId;
+  }
+
   return call('claim_my_operation_checklist', {
     p_business_unit_id: businessUnitId || null,
     p_checklist_type: checklistType,
