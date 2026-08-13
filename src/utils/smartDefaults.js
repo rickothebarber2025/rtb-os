@@ -30,17 +30,23 @@ export function getSmartBusinessUnitId({ businessOptions = [], profile, storedBu
   return businessOptions[0]?.id || '';
 }
 
-export function getSmartLandingPage({ profile, navItems = [], signals = {} }) {
+export function getSmartLandingPage({ profile, navItems = [], recentPage = '', signals = {} }) {
   const allowed = new Set(navItems.map((item) => item.id));
   const template = getRoleTemplate(profile);
 
+  // Role-specific workspaces always beat stale navigation history.
   if ((template === 'operations_cleaning' || template === 'staff_portal') && allowed.has('staff-hub')) {
     return 'staff-hub';
   }
 
+  // Urgent or incomplete work beats convenience. This keeps the default useful,
+  // not merely familiar.
   if (signals.pendingAccessCount > 0 && allowed.has('access')) return 'access';
   if (signals.urgentActionCount > 0 && allowed.has('action-center')) return 'action-center';
   if (signals.draftPayrollCount > 0 && allowed.has('payroll')) return 'payroll';
+
+  // Only resume recent context when nothing more important is waiting.
+  if (recentPage && allowed.has(recentPage)) return recentPage;
   if (allowed.has('dashboard')) return 'dashboard';
   if (allowed.has('staff-hub')) return 'staff-hub';
   return navItems[0]?.id || 'my-role';
