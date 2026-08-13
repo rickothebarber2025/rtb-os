@@ -1,5 +1,6 @@
 import { isAdmin } from './access.js';
 import {
+  getEffectivePermissionsPayload,
   getProfileBusinessUnitIds,
   hasAllBusinessAccess,
   isOwnerProfile,
@@ -80,7 +81,7 @@ export const ALL_BUSINESSES_UNIT = {
   instagram_format: 'Business-specific rules',
   isAllBusinesses: true,
   logo_url: '/assets/rtb-combined-logo.png',
-  name: 'All Businesses',
+  name: 'Whole RTB',
   portal_theme: 'theme-combined',
   portal_tone: 'balanced',
   pos_platform: 'Square',
@@ -162,6 +163,11 @@ export function getAccessibleBusinessUnits(businessUnits, profile) {
 }
 
 export function canUseAllBusinesses(profile, businessUnits = []) {
+  const payload = getEffectivePermissionsPayload(profile);
+  const isWholeRtbCleaning =
+    payload.role_template === 'operations_cleaning' && hasAllBusinessAccess(profile);
+
+  if (isWholeRtbCleaning) return true;
   if (!isAdmin(profile)) return false;
   if (isOwnerProfile(profile) || hasAllBusinessAccess(profile)) return true;
 
