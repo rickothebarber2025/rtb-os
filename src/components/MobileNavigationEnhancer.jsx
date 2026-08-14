@@ -63,6 +63,10 @@ function enhanceDashboard() {
   const originalNav = page?.querySelector('.dashboard-mobile-tabs');
   if (!page || !originalNav || originalNav.dataset.enhanced === 'true') return null;
 
+  // DashboardPage now owns its tab state in React. Do not replace its dynamic,
+  // permission-aware buttons or duplicate keyboard/history listeners.
+  if (originalNav.dataset.managed === 'react') return null;
+
   originalNav.dataset.enhanced = 'true';
   originalNav.setAttribute('role', 'tablist');
   originalNav.setAttribute('aria-label', 'Dashboard sections');
