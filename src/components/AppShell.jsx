@@ -48,12 +48,14 @@ export default function AppShell({
   const pageClass = `page-${activePage}`;
 
   return (
-    <div
-      className={`app-shell ${preferredTheme} ${densityClass} ${navigationClass} ${motionClass} ${sidebarClass}`}
-    >
+    <div className={`app-shell ${preferredTheme} ${densityClass} ${navigationClass} ${motionClass} ${sidebarClass}`}>
       <AccessibilityRuntime pageTitle={pageTitle} />
       <a className="skip-link" href="#main-content">Skip to main content</a>
-      <PushNotificationsManager enabled={Boolean(profile?.active && user?.id)} setActivePage={setActivePage} />
+      <PushNotificationsManager
+        enabled={Boolean(profile?.active && user?.id)}
+        setActivePage={setActivePage}
+        setStaffHubTab={setStaffHubTab}
+      />
       <div className="app-ambient" aria-hidden="true" />
       <Sidebar
         activePage={activePage}
@@ -65,9 +67,7 @@ export default function AppShell({
         selectedBusinessUnitId={selectedBusinessUnitId}
         setActivePage={setActivePage}
       />
-      {sidebarOpen ? (
-        <button className="scrim" type="button" onClick={() => setSidebarOpen(false)} />
-      ) : null}
+      {sidebarOpen ? <button className="scrim" type="button" onClick={() => setSidebarOpen(false)} /> : null}
       <div className="main-area">
         <Topbar
           businessUnits={businessUnits}
@@ -77,7 +77,9 @@ export default function AppShell({
           pageTitle={pageTitle}
           profile={profile}
           selectedBusinessUnitId={selectedBusinessUnitId}
+          setActivePage={setActivePage}
           setSelectedBusinessUnitId={setSelectedBusinessUnitId}
+          setStaffHubTab={setStaffHubTab}
           signOut={signOut}
           user={user}
           userPreferences={userPreferences}
