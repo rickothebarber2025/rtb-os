@@ -26,6 +26,46 @@
     scroll-margin-top: max(0.75rem, env(safe-area-inset-top));
   }
 
+  .dashboard-mobile-tabs {
+    align-items: center;
+    display: flex;
+    gap: 0.45rem;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding: 0.25rem 0.05rem 0.45rem;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .dashboard-mobile-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dashboard-mobile-tabs__item {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 0.25rem;
+    justify-content: center;
+    min-height: 44px;
+    scroll-snap-align: start;
+    white-space: nowrap;
+  }
+
+  .dashboard-mobile-tabs__item[aria-selected='true'] {
+    border-color: color-mix(in srgb, var(--gold-strong, #e5bd57) 62%, transparent);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  }
+
+  .dashboard-page [data-mobile-group]:not(.is-active-mobile-tab) {
+    display: none !important;
+  }
+
+  .dashboard-appointment-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .staff-hub-sticky-tabs {
     top: max(0px, env(safe-area-inset-top));
   }
@@ -34,5 +74,11 @@
   .staff-hub-sticky-tabs button:focus-visible {
     outline: 2px solid currentColor;
     outline-offset: 2px;
+  }
+}
+
+@media (max-width: 520px) {
+  .dashboard-appointment-metrics {
+    grid-template-columns: 1fr 1fr;
   }
 }
