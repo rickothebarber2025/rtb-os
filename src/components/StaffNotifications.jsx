@@ -17,7 +17,7 @@ function formatWhen(value) {
 
 function notificationDestination(notification) {
   const type = String(notification?.notification_type || '').toLowerCase();
-  if (/clean|opening|closing|shift|attendance|task|inventory|maintenance/.test(type)) {
+  if (/clean|opening|closing|shift|attendance|task|inventory|maintenance|shop_status/.test(type)) {
     return { page: 'staff-hub', tab: 'daily' };
   }
   if (/announcement|policy|update/.test(type)) return { page: 'staff-hub', tab: 'home' };
@@ -49,12 +49,20 @@ export default function StaffNotifications({ setActivePage, setStaffHubTab }) {
   useEffect(() => {
     load();
     if (!supabase) return undefined;
+
+    const refreshFromPush = () => load();
+    window.addEventListener('rtb:notification-received', refreshFromPush);
+
     const channel = supabase
       .channel('my-operation-notifications')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'staff_operation_notifications' }, () => load())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'staff_operation_notifications' }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      window.removeEventListener('rtb:notification-received', refreshFromPush);
+      supabase.removeChannel(channel);
+    };
   }, [load]);
 
   const unread = useMemo(() => notifications.filter((item) => !item.read_at).length, [notifications]);
