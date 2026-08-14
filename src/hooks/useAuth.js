@@ -15,6 +15,17 @@ function isNativeApp() {
   return Capacitor.isNativePlatform();
 }
 
+function notifySessionReady(session, profile = null) {
+  if (!session?.user || typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('rtb:auth-session-ready', {
+    detail: {
+      userId: session.user.id,
+      email: session.user.email || '',
+      profile,
+    },
+  }));
+}
+
 function getAuthRedirectUrl() {
   return isNativeApp() ? NATIVE_AUTH_CALLBACK_URL : window.location.origin;
 }
@@ -46,61 +57,39 @@ function clearAuthRedirectParams(sourceUrl = window.location.href) {
 
 async function closeNativeAuthBrowser() {
   if (!isNativeApp()) return;
-
-  try {
-    await Browser.close();
-  } catch {
-    // Browser.close throws when no auth browser is currently open.
-  }
+  try { await Browser.close(); } catch { /* no auth browser open */ }
 }
 
 function getAuthRedirectErrorMessage(error) {
   const message = error?.message || String(error || '');
-
   if (/expired|invalid|used|otp|token/i.test(message)) {
     return 'That invite link is expired or already used. Ask an admin to send a new invite, or use a magic link to sign in.';
   }
-
   return message || 'Unable to finish the invite sign-in.';
 }
 
 async function completeAuthRedirect(sourceUrl = window.location.href) {
   const params = readAuthRedirectParams(sourceUrl);
-
-  if (params.error) {
-    throw new Error(params.error);
-  }
+  if (params.error) throw new Error(params.error);
 
   if (params.accessToken && params.refreshToken) {
-    const { data, error } = await supabase.auth.setSession({
-      access_token: params.accessToken,
-      refresh_token: params.refreshToken,
-    });
-
+    const { data, error } = await supabase.auth.setSession({ access_token: params.accessToken, refresh_token: params.refreshToken });
     if (error) throw error;
     clearAuthRedirectParams(sourceUrl);
     return data.session || null;
   }
-
   if (params.code) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
-
     if (error) throw error;
     clearAuthRedirectParams(sourceUrl);
     return data.session || null;
   }
-
   if (params.tokenHash && EMAIL_AUTH_TYPES.has(params.type)) {
-    const { data, error } = await supabase.auth.verifyOtp({
-      token_hash: params.tokenHash,
-      type: params.type,
-    });
-
+    const { data, error } = await supabase.auth.verifyOtp({ token_hash: params.tokenHash, type: params.type });
     if (error) throw error;
     clearAuthRedirectParams(sourceUrl);
     return data.session || null;
   }
-
   return null;
 }
 
@@ -115,22 +104,17 @@ export function useAuth() {
 
   useEffect(() => {
     let active = true;
-
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      return undefined;
-    }
+    if (!isSupabaseConfigured) { setLoading(false); return undefined; }
 
     async function loadSession() {
       try {
         setAuthError('');
         await completeAuthRedirect();
-
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
-
         if (!active) return;
         setSession(data.session);
+        notifySessionReady(data.session);
       } catch (err) {
         if (!active) return;
         setAuthError(getAuthRedirectErrorMessage(err));
@@ -141,62 +125,45 @@ export function useAuth() {
     }
 
     loadSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (nextSession) {
         setAuthError('');
+        window.setTimeout(() => notifySessionReady(nextSession), 0);
       } else if (event === 'SIGNED_OUT') {
-        // A session can end two ways: the user deliberately signed out (no
-        // message needed -- they know why), or the refresh token failed/
-        // expired and Supabase signed them out automatically, which
-        // previously left staff silently booted to the login screen with
-        // zero explanation, looking like the app had just broken. Only
-        // show this message for the latter.
-        if (intentionalSignOutRef.current) {
-          intentionalSignOutRef.current = false;
-        } else {
-          setAuthError((current) => current || 'Your session ended. Please sign in again to continue.');
-        }
+        if (intentionalSignOutRef.current) intentionalSignOutRef.current = false;
+        else setAuthError((current) => current || 'Your session ended. Please sign in again to continue.');
       }
       setSession(nextSession);
       setLoading(false);
     });
 
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
+    return () => { active = false; subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !isNativeApp()) {
-      return undefined;
-    }
-
+    if (!isSupabaseConfigured || !isNativeApp()) return undefined;
     let active = true;
     let appUrlOpenListener = null;
 
     async function handleNativeAuthReturn(url) {
       if (!isNativeAuthRedirect(url)) return;
-
       try {
         setLoading(true);
         setAuthError('');
         await closeNativeAuthBrowser();
-
         const nextSession = await completeAuthRedirect(url);
         if (!active) return;
-
         if (nextSession) {
           setSession(nextSession);
+          notifySessionReady(nextSession);
           return;
         }
-
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
-        if (active) setSession(data.session);
+        if (active) {
+          setSession(data.session);
+          notifySessionReady(data.session);
+        }
       } catch (err) {
         if (!active) return;
         setAuthError(getAuthRedirectErrorMessage(err));
@@ -206,168 +173,87 @@ export function useAuth() {
       }
     }
 
-    CapacitorApp.addListener('appUrlOpen', ({ url }) => {
-      handleNativeAuthReturn(url);
-    }).then((listener) => {
-      if (active) {
-        appUrlOpenListener = listener;
-      } else {
-        listener.remove();
-      }
+    CapacitorApp.addListener('appUrlOpen', ({ url }) => { handleNativeAuthReturn(url); }).then((listener) => {
+      if (active) appUrlOpenListener = listener;
+      else listener.remove();
     });
-
-    CapacitorApp.getLaunchUrl().then(({ url }) => {
-      if (active && url) handleNativeAuthReturn(url);
-    });
-
-    return () => {
-      active = false;
-      appUrlOpenListener?.remove();
-    };
+    CapacitorApp.getLaunchUrl().then(({ url }) => { if (active && url) handleNativeAuthReturn(url); });
+    return () => { active = false; appUrlOpenListener?.remove(); };
   }, []);
 
   const refreshProfile = useCallback(async () => {
     if (!session?.user) {
-      setProfile(null);
-      setProfileError('');
-      setProfileLoading(false);
-      return null;
+      setProfile(null); setProfileError(''); setProfileLoading(false); return null;
     }
-
-    setProfileLoading(true);
-    setProfileError('');
-
+    setProfileLoading(true); setProfileError('');
     try {
       let nextProfile = await getCurrentUserProfile(session.user.id);
-
-      if (!nextProfile) {
-        nextProfile = await createPendingUserProfile(session.user);
-      }
-
+      if (!nextProfile) nextProfile = await createPendingUserProfile(session.user);
       setProfile(nextProfile);
+      notifySessionReady(session, nextProfile);
       return nextProfile;
     } catch (err) {
       setProfile(null);
       setProfileError(err.message || 'Unable to load your access profile.');
       return null;
-    } finally {
-      setProfileLoading(false);
-    }
+    } finally { setProfileLoading(false); }
   }, [session]);
 
   useEffect(() => {
     let active = true;
-
     async function loadProfile() {
       if (!session?.user) {
         if (!active) return;
-        setProfile(null);
-        setProfileError('');
-        setProfileLoading(false);
-        return;
+        setProfile(null); setProfileError(''); setProfileLoading(false); return;
       }
-
-      setProfileLoading(true);
-      setProfileError('');
-
+      setProfileLoading(true); setProfileError('');
       try {
         let nextProfile = await getCurrentUserProfile(session.user.id);
-
-        if (!nextProfile) {
-          nextProfile = await createPendingUserProfile(session.user);
+        if (!nextProfile) nextProfile = await createPendingUserProfile(session.user);
+        if (active) {
+          setProfile(nextProfile);
+          notifySessionReady(session, nextProfile);
         }
-
-        if (active) setProfile(nextProfile);
       } catch (err) {
         if (!active) return;
         setProfile(null);
         setProfileError(err.message || 'Unable to load your access profile.');
-      } finally {
-        if (active) setProfileLoading(false);
-      }
+      } finally { if (active) setProfileLoading(false); }
     }
-
     loadProfile();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [session?.user?.email, session?.user?.id]);
 
   const signInWithPassword = useCallback(async ({ email, password }) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   }, []);
-
   const signUp = useCallback(async ({ email, password }) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: getAuthRedirectUrl() },
-    });
+    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: getAuthRedirectUrl() } });
     if (error) throw error;
   }, []);
-
   const sendMagicLink = useCallback(async (email) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: getAuthRedirectUrl() },
-    });
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: getAuthRedirectUrl() } });
     if (error) throw error;
   }, []);
-
   const signInWithGoogle = useCallback(async () => {
     const native = isNativeApp();
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: getAuthRedirectUrl(),
-        skipBrowserRedirect: native,
-      },
-    });
+    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: getAuthRedirectUrl(), skipBrowserRedirect: native } });
     if (error) throw error;
-    if (native && data?.url) {
-      await Browser.open({ presentationStyle: 'fullscreen', url: data.url });
-    }
+    if (native && data?.url) await Browser.open({ presentationStyle: 'fullscreen', url: data.url });
   }, []);
-
   const signOut = useCallback(async () => {
     if (!supabase) return;
     intentionalSignOutRef.current = true;
-    setProfile(null);
-    setProfileError('');
+    setProfile(null); setProfileError('');
     await supabase.auth.signOut();
   }, []);
 
-  return useMemo(
-    () => ({
-      isConfigured: isSupabaseConfigured,
-      authError,
-      loading: loading || profileLoading || Boolean(session && !profile && !profileError),
-      profile,
-      profileError,
-      refreshProfile,
-      sendMagicLink,
-      session,
-      signInWithGoogle,
-      signInWithPassword,
-      signOut,
-      signUp,
-      user: session?.user ?? null,
-    }),
-    [
-      authError,
-      loading,
-      profile,
-      profileError,
-      profileLoading,
-      refreshProfile,
-      sendMagicLink,
-      session,
-      signInWithGoogle,
-      signInWithPassword,
-      signOut,
-      signUp,
-    ],
-  );
+  return useMemo(() => ({
+    isConfigured: isSupabaseConfigured,
+    authError,
+    loading: loading || profileLoading || Boolean(session && !profile && !profileError),
+    profile, profileError, refreshProfile, sendMagicLink, session, signInWithGoogle,
+    signInWithPassword, signOut, signUp, user: session?.user ?? null,
+  }), [authError, loading, profile, profileError, profileLoading, refreshProfile, sendMagicLink, session, signInWithGoogle, signInWithPassword, signOut, signUp]);
 }
