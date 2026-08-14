@@ -5,7 +5,24 @@ import {
   syncStoredPushToken,
 } from '../lib/pushNotifications';
 
-export default function PushNotificationsManager({ enabled, setActivePage }) {
+function normalizePushDestination(detail = {}) {
+  const data = detail?.data || {};
+  const route = detail?.route || data.route || data.page || '';
+  const tab = data.tab || data.staff_hub_tab || '';
+
+  if (route === 'cleaning' || route === 'daily-ops' || route === 'opening' || route === 'closing') {
+    return { page: 'staff-hub', tab: 'daily' };
+  }
+  if (route === 'announcements' || route === 'updates') {
+    return { page: 'staff-hub', tab: 'home' };
+  }
+  if (route === 'performance' || route === 'coaching') {
+    return { page: 'staff-hub', tab: 'performance' };
+  }
+  return { page: route || 'staff-hub', tab };
+}
+
+export default function PushNotificationsManager({ enabled, setActivePage, setStaffHubTab }) {
   useEffect(() => {
     if (!enabled || !Capacitor.isNativePlatform()) return undefined;
 
@@ -14,27 +31,36 @@ export default function PushNotificationsManager({ enabled, setActivePage }) {
 
     async function syncAuthenticatedDevice() {
       try {
-        // initializePushNotifications is idempotent. If APNs already delivered a
-        // token before login, this immediately retries that stored token now that
-        // AppShell knows the authenticated profile is active.
         await initializePushNotifications();
         const registered = await syncStoredPushToken();
-        if (!registered && !cancelled) {
-          retryTimer = window.setTimeout(syncAuthenticatedDevice, 2000);
-        }
+        if (!registered && !cancelled) retryTimer = window.setTimeout(syncAuthenticatedDevice, 2000);
       } catch (error) {
         console.error('[RTB Push] authenticated token sync failed', error);
         if (!cancelled) retryTimer = window.setTimeout(syncAuthenticatedDevice, 2000);
       }
     }
 
+    function navigate(detail) {
+      const destination = normalizePushDestination(detail);
+      if (destination.tab && typeof setStaffHubTab === 'function') setStaffHubTab(destination.tab);
+      if (destination.page && typeof setActivePage === 'function') setActivePage(destination.page);
+    }
+
     function handlePushNavigation(event) {
-      const target = event?.detail?.route;
-      if (target && typeof setActivePage === 'function') setActivePage(target);
+      navigate(event?.detail || {});
     }
 
     function handleAuthReady() {
       syncAuthenticatedDevice();
+      try {
+        const raw = window.localStorage.getItem('rtb-os-push-destination');
+        if (raw) {
+          window.localStorage.removeItem('rtb-os-push-destination');
+          navigate(JSON.parse(raw));
+        }
+      } catch {
+        // A stale or malformed destination must never block app startup.
+      }
     }
 
     window.addEventListener('rtb:push-navigation', handlePushNavigation);
@@ -47,7 +73,7 @@ export default function PushNotificationsManager({ enabled, setActivePage }) {
       window.removeEventListener('rtb:push-navigation', handlePushNavigation);
       window.removeEventListener('rtb:auth-session-ready', handleAuthReady);
     };
-  }, [enabled, setActivePage]);
+  }, [enabled, setActivePage, setStaffHubTab]);
 
   return null;
 }
