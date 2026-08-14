@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { CalendarDays, LogOut, Menu, RefreshCw } from 'lucide-react';
 import BusinessUnitSelector from './BusinessUnitSelector';
 import OwnerActivityNotifications from './OwnerActivityNotifications';
+import StaffNotifications from './StaffNotifications';
 import { getEffectivePermissionsPayload, getProfileRoleTitle, isOwnerProfile } from '../lib/permissions.js';
 import { ALL_BUSINESSES_ID } from '../utils/businessProfiles.js';
 
@@ -13,7 +14,9 @@ export default function Topbar({
   pageTitle,
   profile,
   selectedBusinessUnitId,
+  setActivePage,
   setSelectedBusinessUnitId,
+  setStaffHubTab,
   signOut,
   user,
   userPreferences,
@@ -74,7 +77,9 @@ export default function Topbar({
           ) : null}
           {isOwnerProfile(profile) ? (
             <OwnerActivityNotifications selectedBusinessUnitId={selectedBusinessUnitId} />
-          ) : null}
+          ) : (
+            <StaffNotifications setActivePage={setActivePage} setStaffHubTab={setStaffHubTab} />
+          )}
           <button className="icon-button" type="button" onClick={onRefresh} aria-label="Refresh data">
             <RefreshCw aria-hidden="true" size={18} />
           </button>
