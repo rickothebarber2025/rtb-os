@@ -45,7 +45,7 @@ test('dashboard tabs expose accessible tab semantics and keyboard navigation', (
 });
 
 test('dashboard tab state deep-links through the section query parameter', () => {
-  assert.match(dashboard, /searchParams\.get\('section'\)/);
+  assert.match(dashboard, /(?:searchParams|URLSearchParams\(window\.location\.search\))\.get\('section'\)/);
   assert.match(dashboard, /searchParams\.set\('section', id\)/);
   assert.match(dashboard, /popstate/);
   assert.match(dashboard, /pushState/);
