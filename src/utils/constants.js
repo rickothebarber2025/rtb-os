@@ -7,6 +7,7 @@
   IdCard,
   LayoutDashboard,
   MessageSquareText,
+  PlugZap,
   UserCog,
   ShieldCheck,
   SlidersHorizontal,
@@ -25,6 +26,7 @@ export const NAV_ITEMS = [
   { group: 'Intelligence', id: 'customer-intelligence', label: 'Customer IQ', icon: MessageSquareText },
   { group: 'Intelligence', id: 'ai-consultant', label: 'AI Consultant', icon: Brain },
   { group: 'Admin', id: 'access', label: 'Access', icon: ShieldCheck },
+  { group: 'Admin', id: 'integrations', label: 'Connections', icon: PlugZap },
   { group: 'Admin', id: 'system', label: 'System Tools', icon: SlidersHorizontal },
 ];
 

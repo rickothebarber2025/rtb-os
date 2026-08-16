@@ -11,6 +11,7 @@ import './styles/contractorCleaning.css';
 import './styles/smartFlow.css';
 import './styles/behavioralUX.css';
 import './styles/humanExperience.css';
+import './styles/integrations.css';
 
 const CACHE_CLEANUP_KEY = 'rtb-os-cache-cleanup-2026-07-12';
 
