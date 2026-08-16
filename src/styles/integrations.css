@@ -1,0 +1,25 @@
+.integrations-page .hero-panel { align-items: center; }
+.integrations-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.integration-metric-card { display: flex; align-items: center; gap: 12px; min-height: 92px; }
+.integration-metric-card div { display: grid; gap: 2px; }
+.integration-metric-card strong { font-size: 1.2rem; }
+.integration-metric-card span { color: var(--muted, #9ba3b2); font-size: .82rem; }
+.integrations-toolbar { display: grid; gap: 14px; }
+.integration-search { display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 0 12px; min-height: 42px; }
+.integration-search input { width: 100%; border: 0; outline: 0; background: transparent; color: inherit; }
+.integration-category-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.integration-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.integration-card { display: flex; flex-direction: column; gap: 14px; min-height: 270px; }
+.integration-card-header { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: start; gap: 12px; }
+.integration-provider-icon { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); }
+.integration-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.integration-title-row h3 { margin: 0; }
+.integration-recommended { font-size: .68rem; letter-spacing: .04em; text-transform: uppercase; border-radius: 999px; padding: 3px 7px; background: rgba(241,199,104,.12); color: #f1c768; border: 1px solid rgba(241,199,104,.28); }
+.integration-capabilities { display: flex; flex-wrap: wrap; gap: 6px; }
+.integration-capabilities span { font-size: .72rem; border-radius: 999px; padding: 4px 8px; border: 1px solid rgba(255,255,255,.1); color: var(--muted, #9ba3b2); }
+.integration-actions { margin-top: auto; }
+@media (max-width: 860px) {
+  .integration-grid, .integrations-metrics { grid-template-columns: 1fr; }
+  .integration-card-header { grid-template-columns: auto minmax(0,1fr); }
+  .integration-card-header > :last-child { grid-column: 2; justify-self: start; }
+}
