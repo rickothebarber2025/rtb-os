@@ -17,7 +17,9 @@ if [[ ! -d .venv ]]; then
 fi
 
 source .venv/bin/activate
-pip install -q -r requirements.txt
+python -m pip install -q --upgrade pip
+python -m pip install -q -r requirements.txt
+python -m pip install -q --no-deps 'git+https://github.com/leogomezz4t/PyTextNow_API.git@d54771ad1e52681a72e180d89db43f1ab975f854'
 
 echo "Starting RTB TextNow Bridge on http://127.0.0.1:8795"
 exec uvicorn app:app --host 127.0.0.1 --port 8795
