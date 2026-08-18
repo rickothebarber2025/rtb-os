@@ -56,6 +56,9 @@ grant execute on function private.hub_is_admin() to authenticated;
 grant execute on function private.hub_my_profile_id() to authenticated;
 grant execute on function private.hub_my_business_id() to authenticated;
 
+-- Preview databases can legitimately lack historical policies that production had
+-- when this migration originally ran. Execute each rewrite only when that exact
+-- policy exists so a fresh branch can replay migration history safely.
 -- ============================================================
 -- 2. Repoint every policy that referenced the old public
 --    functions to the private versions. Same logic, same
@@ -202,6 +205,8 @@ set search_path = public, pg_catalog
 as $fn$
 begin
   if exists (
+    select 1
+    from pg_policies
     select 1 from pg_policies
     where schemaname = 'public'
       and tablename = p_table
