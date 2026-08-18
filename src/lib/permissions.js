@@ -39,6 +39,7 @@ export const PAGE_MODULE_MAP = {
   'customer-intelligence': 'performance',
   dashboard: 'dashboard',
   insights: 'appointments',
+  integrations: 'settings',
   messages: 'messages',
   'my-role': 'profile',
   operations: 'operations',

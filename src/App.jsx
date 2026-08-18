@@ -208,6 +208,78 @@ export default function App() {
     if (data.error) return <div className="panel full-span"><div className="alert danger">{data.error}</div><button className="secondary-button" type="button" onClick={data.refresh}>Retry</button></div>;
 
     switch (activePage) {
+      case 'access':
+        return (
+          <ModuleGate module="access">
+            <AccessPage
+              accessProfile={auth.profile}
+              businessUnits={data.businessUnits}
+              currentUserId={auth.user?.id}
+            />
+          </ModuleGate>
+        );
+      case 'action-center':
+        return (
+          <ModuleGate module="operations">
+            <ActionCenterPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'ai-consultant':
+        return (
+          <ModuleGate module="operations">
+            <AiConsultantPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'payroll':
+        return (
+          <ModuleGate module="payroll">
+            <PayrollPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'staff':
+        return (
+          <ModuleGate module="roster">
+            <StaffPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'staff-hub':
+        return (
+          <ModuleGate module="staff_hub">
+            <StaffHubPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'performance':
+        return (
+          <ModuleGate module="performance">
+            <PerformancePage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'customer-intelligence':
+        return (
+          <ModuleGate module="performance">
+            <CustomerIntelligencePage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'operations':
+        return (
+          <ModuleGate module="operations">
+            <OperationsPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'integrations':
+        return (
+          <ModuleGate module="settings">
+            <IntegrationsPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'system':
+        return (
+          <ModuleGate module="settings">
+            <SystemPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'my-role':
+        return <MyRolePage {...pageProps} />;
       case 'access': return <ModuleGate module="access"><AccessPage accessProfile={auth.profile} businessUnits={data.businessUnits} currentUserId={auth.user?.id} /></ModuleGate>;
       case 'action-center': return <ModuleGate module="operations"><ActionCenterPage {...pageProps} /></ModuleGate>;
       case 'ai-consultant': return <ModuleGate module="operations"><AiConsultantPage {...pageProps} /></ModuleGate>;
