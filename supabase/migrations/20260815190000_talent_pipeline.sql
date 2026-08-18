@@ -59,12 +59,73 @@ create index if not exists talent_reviews_candidate_idx on public.talent_reviews
 alter table public.talent_candidates enable row level security;
 alter table public.talent_reviews enable row level security;
 
--- Talent decisions are management data. Existing RTB OS access admins/managers are authenticated users;
--- business scoping is enforced by the business_unit_id carried on every row and by the UI/module gate.
-drop policy if exists talent_candidates_authenticated on public.talent_candidates;
-create policy talent_candidates_authenticated on public.talent_candidates for all to authenticated using (true) with check (true);
-drop policy if exists talent_reviews_authenticated on public.talent_reviews;
-create policy talent_reviews_authenticated on public.talent_reviews for all to authenticated using (true) with check (true);
+-- Row-level security (RLS) policies
+-- NOTE: The original policies allowed full access to any authenticated user. That is too permissive for
+-- management/decision data. We replace the permissive "for all to authenticated using (true) with check (true)"
+-- policies with a safer default:
+--  - SELECT: allow authenticated users to read pipeline summaries so the UI can render.
+--  - INSERT/UPDATE/DELETE: restrict to the Supabase service role only (server-side). This prevents client-side
+--    authenticated users from modifying management data directly. After review, replace service-role writes with
+--    business-scoped manager policies (examples below) appropriate for your RBAC model.
+-- To validate in Supabase Preview: run the migration, then test SELECT as an authenticated user and attempt INSERT/UPDATE
+-- as a regular client user (should fail) and as a service_role (should succeed). Work with your DB/ops team to adapt.
+
+-- talent_candidates: SELECT allowed for authenticated users
+drop policy if exists talent_candidates_select on public.talent_candidates;
+create policy talent_candidates_select on public.talent_candidates
+  for select
+  to authenticated
+  using (true);
+
+-- talent_candidates: write operations limited to service role (server-side)
+drop policy if exists talent_candidates_write_service on public.talent_candidates;
+create policy talent_candidates_write_service on public.talent_candidates
+  for insert, update, delete
+  to authenticated
+  using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+-- talent_reviews: SELECT allowed for authenticated users
+drop policy if exists talent_reviews_select on public.talent_reviews;
+create policy talent_reviews_select on public.talent_reviews
+  for select
+  to authenticated
+  using (true);
+
+-- talent_reviews: write operations limited to service role (server-side)
+drop policy if exists talent_reviews_write_service on public.talent_reviews;
+create policy talent_reviews_write_service on public.talent_reviews
+  for insert, update, delete
+  to authenticated
+  using (auth.role() = 'service_role')
+  with check (auth.role() = 'service_role');
+
+-- Guidance: If you want managers to write directly, replace the write policies above with a business-scoped
+-- policy such as:
+--
+-- create policy talent_candidates_write_managers on public.talent_candidates
+--   for insert, update, delete
+--   to authenticated
+--   using (
+--     (
+--       -- allow server-side service invocations
+--       auth.role() = 'service_role'
+--     ) OR (
+--       -- or allow users who are in the managers table for the same business_unit
+--       auth.uid() IS NOT NULL AND EXISTS (
+--         SELECT 1 FROM public.business_managers bm
+--         WHERE bm.user_id = auth.uid() AND bm.business_unit_id = public.talent_candidates.business_unit_id
+--       )
+--     )
+--   )
+--   with check (
+--     auth.role() = 'service_role' OR (
+--       auth.uid() IS NOT NULL AND EXISTS (
+--         SELECT 1 FROM public.business_managers bm
+--         WHERE bm.user_id = auth.uid() AND bm.business_unit_id = public.talent_candidates.business_unit_id
+--       )
+--     )
+--   );
 
 create or replace view public.talent_pipeline_summary as
 select
