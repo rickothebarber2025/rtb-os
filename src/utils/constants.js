@@ -1,4 +1,4 @@
-  import {
+import {
   BarChart3,
   BellRing,
   Brain,
@@ -6,6 +6,7 @@
   ClipboardCheck,
   IdCard,
   LayoutDashboard,
+  MessageCircle,
   MessageSquareText,
   UserCog,
   ShieldCheck,
@@ -17,6 +18,7 @@ export const NAV_ITEMS = [
   { group: 'Workspace', id: 'dashboard', label: 'My Workspace', icon: LayoutDashboard },
   { group: 'Workspace', id: 'action-center', label: 'Action Center', icon: BellRing },
   { group: 'Workspace', id: 'staff-hub', label: 'Staff Hub', icon: IdCard },
+  { group: 'Workspace', id: 'messages', label: 'Messages', icon: MessageCircle },
   { group: 'Workspace', id: 'my-role', label: 'My Role', icon: UserCog },
   { group: 'Operations', id: 'payroll', label: 'Payroll', icon: CircleDollarSign },
   { group: 'Operations', id: 'staff', label: 'Roster', icon: Users },
