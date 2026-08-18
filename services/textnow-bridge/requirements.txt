@@ -1,3 +1,3 @@
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
-PyTextNow==1.2.1
+git+https://github.com/leogomezz4t/PyTextNow_API.git@d54771ad1e52681a72e180d89db43f1ab975f854
