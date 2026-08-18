@@ -6,7 +6,9 @@ import {
   ClipboardCheck,
   IdCard,
   LayoutDashboard,
+  MessageCircle,
   MessageSquareText,
+  PlugZap,
   UserCog,
   ShieldCheck,
   SlidersHorizontal,
@@ -18,6 +20,7 @@ export const NAV_ITEMS = [
   { group: 'Workspace', id: 'dashboard', label: 'My Workspace', icon: LayoutDashboard },
   { group: 'Workspace', id: 'action-center', label: 'Action Center', icon: BellRing },
   { group: 'Workspace', id: 'staff-hub', label: 'Staff Hub', icon: IdCard },
+  { group: 'Workspace', id: 'messages', label: 'Messages', icon: MessageCircle },
   { group: 'Workspace', id: 'my-role', label: 'My Role', icon: UserCog },
   { group: 'Operations', id: 'payroll', label: 'Payroll', icon: CircleDollarSign },
   { group: 'Operations', id: 'staff', label: 'Roster', icon: Users },
@@ -27,6 +30,7 @@ export const NAV_ITEMS = [
   { group: 'Intelligence', id: 'customer-intelligence', label: 'Customer IQ', icon: MessageSquareText },
   { group: 'Intelligence', id: 'ai-consultant', label: 'AI Consultant', icon: Brain },
   { group: 'Admin', id: 'access', label: 'Access', icon: ShieldCheck },
+  { group: 'Admin', id: 'integrations', label: 'Connections', icon: PlugZap },
   { group: 'Admin', id: 'system', label: 'System Tools', icon: SlidersHorizontal },
 ];
 
