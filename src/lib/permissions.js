@@ -10,6 +10,7 @@ export const MODULE_IDS = [
   'payroll',
   'performance',
   'appointments',
+  'messages',
   'booth_rent',
   'operations',
   'access',
@@ -21,6 +22,7 @@ export const MODULE_LABELS = {
   appointments: 'Appointments',
   booth_rent: 'Booth Rent',
   dashboard: 'Dashboard',
+  messages: 'Messages',
   operations: 'Operations',
   payroll: 'Payroll',
   performance: 'Performance',
@@ -38,6 +40,7 @@ export const PAGE_MODULE_MAP = {
   dashboard: 'dashboard',
   insights: 'appointments',
   integrations: 'settings',
+  messages: 'messages',
   'my-role': 'profile',
   operations: 'operations',
   payroll: 'payroll',
@@ -164,8 +167,7 @@ export function normalizePermissionsPayload(value) {
   const raw = safeObject(value);
   const modules = normalizeModulePermissions(raw.modules || raw);
   const businessUnitIds = uniqueArray(raw.business_unit_ids || raw.businessUnitIds);
-  const hasAllBusinesses =
-    raw.business_scope === 'all' || businessUnitIds.includes(ALL_BUSINESSES_ACCESS);
+  const hasAllBusinesses = raw.business_scope === 'all' || businessUnitIds.includes(ALL_BUSINESSES_ACCESS);
 
   return {
     business_scope: hasAllBusinesses ? 'all' : DEFAULT_PAYLOAD_META.business_scope,
@@ -183,18 +185,14 @@ export function normalizePermissionsPayload(value) {
 export function buildPermissionsPayload(value = {}) {
   const base = normalizePermissionsPayload(value);
   const businessUnitIds = uniqueArray(value.business_unit_ids || base.business_unit_ids);
-  const hasAllBusinesses =
-    value.business_scope === 'all' || base.business_scope === 'all' || businessUnitIds.includes(ALL_BUSINESSES_ACCESS);
+  const hasAllBusinesses = value.business_scope === 'all' || base.business_scope === 'all' || businessUnitIds.includes(ALL_BUSINESSES_ACCESS);
 
   return {
     ...base,
     business_scope: hasAllBusinesses ? 'all' : 'selected',
     business_unit_ids: hasAllBusinesses ? [ALL_BUSINESSES_ACCESS] : businessUnitIds,
     expectations: String(value.expectations ?? base.expectations ?? ''),
-    modules: normalizeModulePermissions({
-      ...base.modules,
-      ...(value.modules || {}),
-    }),
+    modules: normalizeModulePermissions({ ...base.modules, ...(value.modules || {}) }),
     responsibilities: safeArray(value.responsibilities || base.responsibilities),
     restrictions: safeArray(value.restrictions || base.restrictions),
     role_description: String(value.role_description || base.role_description),
@@ -224,182 +222,63 @@ export function createLegacyPermissionsFromRole(profile = {}) {
     });
   }
 
-  if (role === 'admin') {
-    return buildPermissionsPayload({
-      business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [],
-      expectations: 'Legacy admin fallback. Save an explicit role template to replace this fallback.',
-      modules: createModulePermissions('admin'),
-      responsibilities: ['Manage assigned business operations until explicit permissions are saved.'],
-      restrictions: ['Legacy fallback should be replaced with a saved role template.'],
-      role_description: 'Temporary fallback for an existing admin profile without saved permissions.',
-      role_template: 'legacy_admin',
-      role_title: 'Legacy Admin',
-    });
-  }
+  if (isStaffRole(profile)) return createStaffPortalPermissions(profile);
 
-  if (role === 'manager') {
-    return buildPermissionsPayload({
-      business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [],
-      expectations: 'Legacy manager fallback. Save an explicit role template to replace this fallback.',
-      modules: {
-        ...createModulePermissions(),
-        appointments: 'edit',
-        booth_rent: 'edit',
-        dashboard: 'view',
-        operations: 'edit',
-        payroll: 'view',
-        performance: 'edit',
-        roster: 'edit',
-        settings: 'view',
-      },
-      responsibilities: ['Run assigned business operations until explicit permissions are saved.'],
-      restrictions: ['Cannot manage user access unless permissions are customized.'],
-      role_description: 'Temporary fallback for an existing manager profile without saved permissions.',
-      role_template: 'legacy_manager',
-      role_title: 'Legacy Manager',
-    });
-  }
-
-  if (role === 'staff') {
-    return createStaffPortalPermissions(profile);
-  }
-
-  return normalizePermissionsPayload(null);
-}
-
-export function mergeProfilePermissionFields(profile = {}) {
-  const raw = safeObject(profile.permissions);
-  const payload = normalizePermissionsPayload({
-    ...raw,
-    expectations: profile.expectations ?? raw.expectations,
-    responsibilities: profile.responsibilities ?? raw.responsibilities,
-    restrictions: profile.restrictions ?? raw.restrictions,
-    role_description: profile.role_description || raw.role_description,
-    role_title: profile.role_title || raw.role_title,
+  const legacyPermissions = profile?.legacy_permissions || {};
+  return buildPermissionsPayload({
+    business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [],
+    modules: legacyPermissions,
+    role_description: `${titleCase(role || 'custom')} access profile.`,
+    role_template: role || 'custom',
+    role_title: titleCase(profile.role_title || role || 'Custom Role'),
   });
-
-  return {
-    ...profile,
-    expectations: payload.expectations,
-    permissions: payload,
-    responsibilities: payload.responsibilities,
-    restrictions: payload.restrictions,
-    role_description: payload.role_description,
-    role_title: payload.role_title,
-  };
 }
 
-export function isOwnerEmail(email) {
-  return String(email || '').trim().toLowerCase() === OWNER_EMAIL;
-}
+export function getEffectivePermissionsPayload(profile = {}) {
+  if (!profile) return normalizePermissionsPayload({});
+  if (isOwnerProfile(profile)) return createLegacyPermissionsFromRole({ ...profile, role: 'owner' });
 
-export function isOwnerProfile(profile) {
-  return Boolean(
-    profile?.is_owner ||
-      profile?.owner ||
-      profile?.owner_override ||
-      profile?.role === 'owner' ||
-      isOwnerEmail(profile?.email),
-  );
-}
-
-export function hasAllBusinessAccess(profile) {
-  if (isOwnerProfile(profile)) return true;
-  const payload = normalizePermissionsPayload(profile?.permissions);
-  return (
-    payload.business_scope === 'all' ||
-    payload.business_unit_ids.includes(ALL_BUSINESSES_ACCESS)
-  );
-}
-
-export function getProfileBusinessUnitIds(profile) {
-  if (isOwnerProfile(profile)) return [ALL_BUSINESSES_ACCESS];
-
-  const payload = normalizePermissionsPayload(profile?.permissions);
-  if (payload.business_scope === 'all') return [ALL_BUSINESSES_ACCESS];
-
-  const explicitIds = payload.business_unit_ids.filter((id) => id !== ALL_BUSINESSES_ACCESS);
-  if (explicitIds.length) return uniqueArray(explicitIds);
-
-  return profile?.business_unit_id ? [String(profile.business_unit_id)] : [];
-}
-
-export function profileCanAccessBusiness(profile, businessUnitId) {
-  if (!businessUnitId) return false;
-  if (hasAllBusinessAccess(profile)) return true;
-  return getProfileBusinessUnitIds(profile).includes(String(businessUnitId));
-}
-
-export function getEffectivePermissionsPayload(profile) {
-  if (isOwnerProfile(profile)) {
-    return buildPermissionsPayload({
-      business_scope: 'all',
-      business_unit_ids: [ALL_BUSINESSES_ACCESS],
-      expectations: 'Owner access is protected and cannot be restricted inside RTB OS.',
-      modules: createModulePermissions('admin'),
-      responsibilities: [
-        'Own final business decisions',
-        'Manage user access',
-        'Approve payroll and operational changes',
-      ],
-      restrictions: ['Owner access cannot be restricted inside RTB OS.'],
-      role_description: 'Owner-level access across every RTB OS module.',
-      role_template: 'owner',
-      role_title: 'Owner',
-    });
-  }
-
-  if (profile && shouldUseLegacyPermissionFallback(profile)) {
-    return createLegacyPermissionsFromRole(profile);
-  }
-
-  const profilePayload = mergeProfilePermissionFields(profile || {});
-  const payload = normalizePermissionsPayload(profilePayload.permissions);
-  if (isStaffRole(profile) && !hasAssignedModuleAccess(payload)) {
-    return createStaffPortalPermissions(profile);
-  }
-
-  if (payload.role_title !== DEFAULT_PAYLOAD_META.role_title) return payload;
-
-  const role = String(profile?.role || '').trim();
-  return {
-    ...payload,
-    role_title: role ? titleCase(role) : payload.role_title,
-  };
-}
-
-export function getProfileRoleTitle(profile) {
-  return getEffectivePermissionsPayload(profile).role_title || 'Custom Role';
-}
-
-export function getProfileResponsibilities(profile) {
-  return getEffectivePermissionsPayload(profile).responsibilities;
-}
-
-export function getProfileRestrictions(profile) {
-  return getEffectivePermissionsPayload(profile).restrictions;
-}
-
-export function getProfileExpectations(profile) {
-  return getEffectivePermissionsPayload(profile).expectations;
+  const normalized = normalizePermissionsPayload(profile.permissions);
+  if (hasAssignedModuleAccess(normalized)) return normalized;
+  if (shouldUseLegacyPermissionFallback(profile)) return createLegacyPermissionsFromRole(profile);
+  if (isStaffRole(profile)) return createStaffPortalPermissions(profile);
+  return normalized;
 }
 
 export function getModulePermission(profile, moduleId) {
   return getEffectivePermissionsPayload(profile).modules[moduleId] || 'none';
 }
 
-export function isPermissionAtLeast(current, required) {
-  return PERMISSION_LEVELS.indexOf(current) >= PERMISSION_LEVELS.indexOf(required);
-}
-
 export function hasModulePermission(profile, moduleId, minimum = 'view') {
-  if (!profile) return false;
-  if (!isOwnerProfile(profile) && !profile.active) return false;
-  return isPermissionAtLeast(getModulePermission(profile, moduleId), minimum);
+  return PERMISSION_LEVELS.indexOf(getModulePermission(profile, moduleId)) >= PERMISSION_LEVELS.indexOf(minimum);
 }
 
 export function hasAnyModulePermission(profile, minimum = 'view') {
-  if (!profile) return false;
-  if (!isOwnerProfile(profile) && !profile.active) return false;
   return MODULE_IDS.some((moduleId) => hasModulePermission(profile, moduleId, minimum));
+}
+
+export function isOwnerProfile(profile = {}) {
+  return String(profile?.email || '').trim().toLowerCase() === OWNER_EMAIL || String(profile?.role || '').trim().toLowerCase() === 'owner';
+}
+
+export function getProfileRoleTitle(profile = {}) {
+  const payload = getEffectivePermissionsPayload(profile);
+  return payload.role_title || titleCase(profile?.role_title || profile?.role || 'Custom Role');
+}
+
+export function getProfileResponsibilities(profile = {}) {
+  return getEffectivePermissionsPayload(profile).responsibilities;
+}
+
+export function getProfileRestrictions(profile = {}) {
+  return getEffectivePermissionsPayload(profile).restrictions;
+}
+
+export function getProfileExpectations(profile = {}) {
+  return getEffectivePermissionsPayload(profile).expectations;
+}
+
+export function hasAllBusinessAccess(profile = {}) {
+  const payload = getEffectivePermissionsPayload(profile);
+  return payload.business_scope === 'all' || payload.business_unit_ids.includes(ALL_BUSINESSES_ACCESS);
 }

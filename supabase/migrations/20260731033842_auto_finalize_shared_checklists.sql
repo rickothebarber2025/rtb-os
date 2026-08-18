@@ -24,11 +24,13 @@ begin
     return new;
   end if;
 
+  -- At this point in migration history, checklist items have `completed`
+  -- but not the later `status` / `required` columns. Use the original
+  -- completion flag so fresh Supabase Preview databases can replay safely.
   select count(*) into v_blocking
   from public.operation_checklist_run_items
   where run_id = v_run.id
-    and required
-    and status = 'pending';
+    and not completed;
 
   if v_blocking > 0 then
     return new;

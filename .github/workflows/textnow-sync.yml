@@ -1,0 +1,42 @@
+name: TextNow Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: textnow-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/textnow-github-worker/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r services/textnow-github-worker/requirements.txt
+          python -m pip install --no-deps 'git+https://github.com/leogomezz4t/PyTextNow_API.git@d54771ad1e52681a72e180d89db43f1ab975f854'
+
+      - name: Sync TextNow with RTB OS
+        env:
+          TEXTNOW_USERNAME: ${{ secrets.TEXTNOW_USERNAME }}
+          TEXTNOW_CONNECT_SID: ${{ secrets.TEXTNOW_CONNECT_SID }}
+          TEXTNOW_CSRF: ${{ secrets.TEXTNOW_CSRF }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python services/textnow-github-worker/worker.py
