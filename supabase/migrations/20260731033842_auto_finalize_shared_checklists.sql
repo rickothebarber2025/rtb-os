@@ -82,7 +82,7 @@ drop trigger if exists auto_finalize_shared_operation_checklist_trigger
   on public.operation_checklist_run_items;
 
 create trigger auto_finalize_shared_operation_checklist_trigger
-after insert or update of status, completed, completed_by_staff_id
+after insert or update of completed, completed_by_staff_id
 on public.operation_checklist_run_items
 for each row
 execute function public.auto_finalize_shared_operation_checklist();
