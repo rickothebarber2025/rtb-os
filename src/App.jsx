@@ -45,6 +45,7 @@ const StaffPage = lazy(() => import('./pages/StaffPage'));
 const StaffHubPage = lazy(() => import('./pages/StaffHubPage'));
 const SurveyPage = lazy(() => import('./pages/SurveyPage'));
 const SystemPage = lazy(() => import('./pages/SystemPage'));
+const IntegrationsPage = lazy(() => import('./pages/IntegrationsPage'));
 
 const STORAGE_KEY = 'rtb-os-business-unit';
 
@@ -217,6 +218,7 @@ export default function App() {
       case 'performance': return <ModuleGate module="performance"><PerformancePage {...pageProps} /></ModuleGate>;
       case 'customer-intelligence': return <ModuleGate module="performance"><CustomerIntelligencePage {...pageProps} /></ModuleGate>;
       case 'operations': return <ModuleGate module="operations"><OperationsPage {...pageProps} /></ModuleGate>;
+      case 'integrations': return <ModuleGate module="settings"><IntegrationsPage {...pageProps} /></ModuleGate>;
       case 'system': return <ModuleGate module="settings"><SystemPage {...pageProps} /></ModuleGate>;
       case 'my-role': return <MyRolePage {...pageProps} />;
       case 'dashboard':
