@@ -33,13 +33,21 @@ def client():
 
 
 def message_to_dict(message: Any):
+    raw_direction = getattr(message, "direction", "")
+    if raw_direction == getattr(pytextnow, "SENT_MESSAGE_TYPE", 2):
+        direction = "outgoing"
+    elif raw_direction == getattr(pytextnow, "RECEIVED_MESSAGE_TYPE", 1):
+        direction = "incoming"
+    else:
+        direction = str(raw_direction)
+
     return {
         "id": str(getattr(message, "id", "")),
         "number": str(getattr(message, "number", "")),
         "content": str(getattr(message, "content", "")),
         "date": getattr(message, "date", None).isoformat() if getattr(message, "date", None) else None,
         "read": bool(getattr(message, "read", False)),
-        "direction": str(getattr(message, "direction", "")),
+        "direction": direction,
         "first_contact": bool(getattr(message, "first_contact", False)),
         "type": str(getattr(message, "type", "")),
         "content_type": getattr(message, "content_type", None),
