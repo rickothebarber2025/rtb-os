@@ -1,3 +1,6 @@
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
-git+https://github.com/leogomezz4t/PyTextNow_API.git@d54771ad1e52681a72e180d89db43f1ab975f854
+requests~=2.25.1
+python-dateutil~=2.8.1
+cloudscraper~=1.2.58
+setuptools>=57
