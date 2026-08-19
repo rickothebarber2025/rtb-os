@@ -223,6 +223,7 @@ export function createLegacyPermissionsFromRole(profile = {}) {
     });
   }
  
+
   if (role === 'admin') {
     return buildPermissionsPayload({
       business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [],
@@ -236,6 +237,7 @@ export function createLegacyPermissionsFromRole(profile = {}) {
     });
   }
  
+
   if (role === 'manager') {
     return buildPermissionsPayload({
       business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [],
@@ -259,6 +261,7 @@ export function createLegacyPermissionsFromRole(profile = {}) {
     });
   }
  
+
   if (isStaffRole(profile)) return createStaffPortalPermissions(profile);
  
   const legacyPermissions = profile?.legacy_permissions || {};
@@ -271,6 +274,7 @@ export function createLegacyPermissionsFromRole(profile = {}) {
   });
 }
  
+
 export function mergeProfilePermissionFields(profile = {}) {
   const raw = safeObject(profile.permissions);
   const payload = normalizePermissionsPayload({
@@ -296,6 +300,11 @@ export function isOwnerEmail(email) {
   return String(email || '').trim().toLowerCase() === OWNER_EMAIL;
 }
  
+
+export function isOwnerEmail(email) {
+  return String(email || '').trim().toLowerCase() === OWNER_EMAIL;
+}
+
 export function isOwnerProfile(profile) {
   return Boolean(
     profile?.is_owner
@@ -306,6 +315,7 @@ export function isOwnerProfile(profile) {
   );
 }
  
+
 export function getProfileBusinessUnitIds(profile) {
   if (isOwnerProfile(profile)) return [ALL_BUSINESSES_ACCESS];
   const payload = normalizePermissionsPayload(profile?.permissions);
@@ -315,6 +325,7 @@ export function getProfileBusinessUnitIds(profile) {
   return profile?.business_unit_id ? [String(profile.business_unit_id)] : [];
 }
  
+
 export function profileCanAccessBusiness(profile, businessUnitId) {
   if (!businessUnitId) return false;
   if (hasAllBusinessAccess(profile)) return true;
@@ -327,11 +338,19 @@ export function getEffectivePermissionsPayload(profile = {}) {
  
   if (shouldUseLegacyPermissionFallback(profile)) return createLegacyPermissionsFromRole(profile);
  
+
+export function getEffectivePermissionsPayload(profile = {}) {
+  if (!profile) return normalizePermissionsPayload({});
+  if (isOwnerProfile(profile)) return createLegacyPermissionsFromRole({ ...profile, role: 'owner' });
+
+  if (shouldUseLegacyPermissionFallback(profile)) return createLegacyPermissionsFromRole(profile);
+
   const profilePayload = mergeProfilePermissionFields(profile);
   const normalized = normalizePermissionsPayload(profilePayload.permissions);
   if (isStaffRole(profile) && !hasAssignedModuleAccess(normalized)) return createStaffPortalPermissions(profile);
   if (normalized.role_title !== DEFAULT_PAYLOAD_META.role_title) return normalized;
  
+
   const role = String(profile?.role || '').trim();
   return { ...normalized, role_title: role ? titleCase(role) : normalized.role_title };
 }
@@ -344,6 +363,11 @@ export function isPermissionAtLeast(current, required) {
   return PERMISSION_LEVELS.indexOf(current) >= PERMISSION_LEVELS.indexOf(required);
 }
  
+
+export function isPermissionAtLeast(current, required) {
+  return PERMISSION_LEVELS.indexOf(current) >= PERMISSION_LEVELS.indexOf(required);
+}
+
 export function hasModulePermission(profile, moduleId, minimum = 'view') {
   if (!profile) return false;
   if (!isOwnerProfile(profile) && !profile.active) return false;
@@ -356,6 +380,7 @@ export function hasAnyModulePermission(profile, minimum = 'view') {
   return MODULE_IDS.some((moduleId) => hasModulePermission(profile, moduleId, minimum));
 }
  
+
 export function getProfileRoleTitle(profile = {}) {
   return getEffectivePermissionsPayload(profile).role_title || 'Custom Role';
 }
@@ -372,6 +397,7 @@ export function getProfileExpectations(profile = {}) {
   return getEffectivePermissionsPayload(profile).expectations;
 }
  
+
 export function hasAllBusinessAccess(profile) {
   if (isOwnerProfile(profile)) return true;
   const payload = normalizePermissionsPayload(profile?.permissions);

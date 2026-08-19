@@ -54,11 +54,3 @@ createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </React.StrictMode>,
 );
-
-window.setTimeout(() => {
-  import('./lib/pushNotifications.js')
-    .then(({ initializePushNotifications }) => initializePushNotifications())
-    .catch((error) => {
-      console.error('RTB push initialization failed', error);
-    });
-}, 750);

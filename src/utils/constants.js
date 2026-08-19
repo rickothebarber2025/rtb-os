@@ -12,6 +12,7 @@ import {
   UserCog,
   ShieldCheck,
   SlidersHorizontal,
+  UserRoundSearch,
   Users,
 } from 'lucide-react';
 
@@ -23,6 +24,7 @@ export const NAV_ITEMS = [
   { group: 'Workspace', id: 'my-role', label: 'My Role', icon: UserCog },
   { group: 'Operations', id: 'payroll', label: 'Payroll', icon: CircleDollarSign },
   { group: 'Operations', id: 'staff', label: 'Roster', icon: Users },
+  { group: 'Operations', id: 'talent-pipeline', label: 'Talent Pipeline', icon: UserRoundSearch },
   { group: 'Operations', id: 'operations', label: 'Operations', icon: ClipboardCheck },
   { group: 'Intelligence', id: 'performance', label: 'Performance', icon: BarChart3 },
   { group: 'Intelligence', id: 'customer-intelligence', label: 'Customer IQ', icon: MessageSquareText },

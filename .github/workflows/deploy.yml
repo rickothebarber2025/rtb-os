@@ -26,10 +26,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: npm
@@ -47,3 +47,11 @@ jobs:
 
       - name: Verify Operations Cleaning template is bundled
         run: grep -R "Operations Cleaning" dist >/dev/null
+
+      - name: Upload validated build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: rtb-os-dist-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
