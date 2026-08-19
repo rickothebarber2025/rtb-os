@@ -4,6 +4,19 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const OWNER_EMAIL = Deno.env.get("RTB_OWNER_EMAIL") || "rickothebarber@gmail.com";
 const APP_URL = Deno.env.get("RTB_OS_PUBLIC_URL") || Deno.env.get("SITE_URL") || "https://rtbheadquaters.com/";
 
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...cors, "Content-Type": "application/json" },
+  });
+}
+
 function secretKey() {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (legacy) return legacy;
@@ -74,7 +87,8 @@ function safeConnection(row: Record<string, unknown>) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
   try {
     const { admin } = await requireOwner(req);
     const body = req.method === "GET" ? {} : await req.json().catch(() => ({}));
@@ -83,9 +97,12 @@ Deno.serve(async (req) => {
     const businessUnitId = body.businessUnitId || null;
 
     if (action === "list") {
-      const { data, error } = await admin.from("integration_connections").select("id, provider, business_unit_id, status, merchant_id, scopes, metadata, expires_at, created_at, updated_at").order("provider");
+      const { data, error } = await admin
+        .from("integration_connections")
+        .select("id, provider, business_unit_id, status, merchant_id, scopes, metadata, expires_at, created_at, updated_at")
+        .order("provider");
       if (error) throw error;
-      return Response.json({ connections: (data || []).map(safeConnection) });
+      return json({ connections: (data || []).map(safeConnection) });
     }
 
     if (!provider) throw new Error("Provider is required.");
@@ -95,27 +112,33 @@ Deno.serve(async (req) => {
       query = businessUnitId ? query.eq("business_unit_id", businessUnitId) : query.is("business_unit_id", null);
       const { error } = await query;
       if (error) throw error;
-      return Response.json({ ok: true });
+      return json({ ok: true });
     }
 
     if (action === "test") {
-      let query = admin.from("integration_connections").select("status, expires_at, updated_at, metadata").eq("provider", provider);
+      let query = admin
+        .from("integration_connections")
+        .select("status, expires_at, updated_at, metadata")
+        .eq("provider", provider);
       query = businessUnitId ? query.eq("business_unit_id", businessUnitId) : query.is("business_unit_id", null);
       const { data, error } = await query.maybeSingle();
       if (error) throw error;
-      if (!data) return Response.json({ message: `${provider} is not connected.` });
+      if (!data) return json({ message: `${provider} is not connected.` });
       const expired = data.expires_at && new Date(data.expires_at).getTime() <= Date.now();
       if (expired) {
-        await admin.from("integration_connections").update({ status: "reauthorize", updated_at: new Date().toISOString() }).eq("provider", provider);
-        return Response.json({ message: `${provider} needs reauthorization.` });
+        await admin
+          .from("integration_connections")
+          .update({ status: "reauthorize", updated_at: new Date().toISOString() })
+          .eq("provider", provider);
+        return json({ message: `${provider} needs reauthorization.` });
       }
-      return Response.json({ message: `${provider} connection is ${data.status || "connected"}.` });
+      return json({ message: `${provider} connection is ${data.status || "connected"}.` });
     }
 
     if (action === "begin_connect") {
       const apiKeyProviders = new Set(["jotform", "openai", "base44", "cloudflare", "metricool", "twilio", "resend"]);
       if (apiKeyProviders.has(provider)) {
-        return Response.json({
+        return json({
           mode: "api_key",
           message: `${provider} uses a server-side credential. Ricko OS will never expose that credential back to the browser.`,
         });
@@ -123,7 +146,7 @@ Deno.serve(async (req) => {
 
       const config = provider === "square" ? squareOAuthConfig() : genericOAuthConfig(provider);
       if (!config.clientId || !config.authorizeUrl) {
-        return Response.json({
+        return json({
           mode: "setup_required",
           message: `${provider} is available in Ricko OS, but its OAuth application credentials still need to be configured on the server.`,
         });
@@ -150,11 +173,11 @@ Deno.serve(async (req) => {
         url.searchParams.set("access_type", "offline");
         url.searchParams.set("prompt", "consent");
       }
-      return Response.json({ authorizationUrl: url.toString(), mode: "oauth" });
+      return json({ authorizationUrl: url.toString(), mode: "oauth" });
     }
 
     throw new Error("Unsupported integration action.");
   } catch (error) {
-    return Response.json({ error: error.message || "Integration request failed." }, { status: 400 });
+    return json({ error: error instanceof Error ? error.message : "Integration request failed." }, 400);
   }
 });
