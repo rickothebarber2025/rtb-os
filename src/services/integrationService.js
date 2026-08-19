@@ -6,7 +6,7 @@ function friendlyIntegrationError(error, data) {
 
   const message = String(error?.message || '').trim();
   if (/non-2xx/i.test(message)) {
-    return 'RTB OS could not reach the integrations service. The connection manager may still be deploying or needs server configuration.';
+    return 'RTB OS could not complete that integrations request. Refresh the page and try again.';
   }
   if (/failed to send|fetch/i.test(message)) {
     return 'RTB OS could not reach the integrations service. Check your connection and try again.';
@@ -29,21 +29,8 @@ async function invoke(action, payload = {}) {
 }
 
 export async function listIntegrationConnections() {
-  try {
-    const result = await invoke('list');
-    return {
-      connections: Array.isArray(result.connections) ? result.connections : [],
-      available: true,
-      error: '',
-    };
-  } catch (error) {
-    // Status discovery must never take down the entire Connections page.
-    return {
-      connections: [],
-      available: false,
-      error: error.message || 'The integrations service is temporarily unavailable.',
-    };
-  }
+  const result = await invoke('list');
+  return Array.isArray(result.connections) ? result.connections : [];
 }
 
 export async function beginIntegrationConnection(provider, businessUnitId) {
