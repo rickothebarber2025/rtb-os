@@ -24,8 +24,12 @@ function secretKey() {
   if (legacy) return legacy;
   const raw = Deno.env.get("SUPABASE_SECRET_KEYS");
   if (!raw) return "";
-  const parsed = JSON.parse(raw);
-  return parsed.default || Object.values(parsed)[0] || "";
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed.default || Object.values(parsed)[0] || "";
+  } catch {
+    return raw;
+  }
 }
 
 function adminClient() {
@@ -37,12 +41,12 @@ function adminClient() {
 async function requireOwner(req: Request) {
   const authorization = req.headers.get("Authorization") || "";
   const token = authorization.replace(/^Bearer\s+/i, "");
-  if (!token) throw new Error("Authentication required.");
+  if (!token) throw new Error("AUTH_REQUIRED");
   const admin = adminClient();
   const { data, error } = await admin.auth.getUser(token);
-  if (error || !data.user) throw new Error("Authentication required.");
+  if (error || !data.user) throw new Error("AUTH_REQUIRED");
   if (String(data.user.email || "").toLowerCase() !== OWNER_EMAIL.toLowerCase()) {
-    throw new Error("Owner access required.");
+    throw new Error("OWNER_REQUIRED");
   }
   return { admin, user: data.user };
 }
@@ -130,9 +134,19 @@ Deno.serve(async (req) => {
   try {
     const { admin } = await requireOwner(req);
     const body = req.method === "GET" ? {} : await req.json().catch(() => ({}));
-    const action = String(body.action || "list");
+    const requestedAction = String(body.action || "list").trim().toLowerCase();
+    // Backward-compatible aliases keep older mobile/PWA bundles from failing after API changes.
+    const action = requestedAction === "status" || requestedAction === "refresh" || requestedAction === "connections"
+      ? "list"
+      : requestedAction === "connect"
+        ? "begin_connect"
+        : requestedAction === "save"
+          ? "save_setup"
+          : requestedAction === "check"
+            ? "test"
+            : requestedAction;
     const provider = String(body.provider || "").trim().toLowerCase();
-    const businessUnitId = body.businessUnitId || null;
+    const businessUnitId = body.businessUnitId || body.business_unit_id || null;
 
     if (action === "list") {
       const { data, error } = await admin
@@ -140,10 +154,10 @@ Deno.serve(async (req) => {
         .select("id, provider, business_unit_id, status, connection_type, merchant_id, scopes, metadata, expires_at, created_at, updated_at")
         .order("provider");
       if (error) throw error;
-      return json({ connections: (data || []).map(safeConnection) });
+      return json({ ok: true, connections: (data || []).map(safeConnection) });
     }
 
-    if (!provider) throw new Error("Provider is required.");
+    if (!provider) return json({ ok: false, error: "Provider is required.", code: "PROVIDER_REQUIRED" });
 
     if (action === "save_setup") {
       const credentials = body.credentials && typeof body.credentials === "object" ? body.credentials : {};
@@ -165,7 +179,7 @@ Deno.serve(async (req) => {
         saved += 1;
       }
 
-      if (!saved) throw new Error("Enter the connection details before saving.");
+      if (!saved) return json({ ok: false, error: "Enter the connection details before saving.", code: "SETUP_REQUIRED" });
       await upsertConfiguredConnection(admin, provider, businessUnitId, API_KEY_PROVIDERS.has(provider) ? "api_key" : "oauth");
       return json({
         ok: true,
@@ -192,15 +206,15 @@ Deno.serve(async (req) => {
       query = businessUnitId ? query.eq("business_unit_id", businessUnitId) : query.is("business_unit_id", null);
       const { data, error } = await query.maybeSingle();
       if (error) throw error;
-      if (!data) return json({ message: `${provider} is not connected.` });
+      if (!data) return json({ ok: true, connected: false, message: `${provider} is not connected.` });
       const expired = data.expires_at && new Date(data.expires_at).getTime() <= Date.now();
       if (expired) {
         await admin.from("integration_connections").update({ status: "reauthorize", updated_at: new Date().toISOString() }).eq("provider", provider);
-        return json({ message: `${provider} needs reauthorization.` });
+        return json({ ok: true, connected: false, message: `${provider} needs reauthorization.` });
       }
-      if (data.status === "configured") return json({ message: `${provider} credential is stored securely in RTB OS.` });
-      if (data.status === "setup_ready") return json({ message: `${provider} setup is ready. Sign in to finish connecting.` });
-      return json({ message: `${provider} connection is ${data.status || "connected"}.` });
+      if (data.status === "configured") return json({ ok: true, connected: true, message: `${provider} credential is stored securely in RTB OS.` });
+      if (data.status === "setup_ready") return json({ ok: true, connected: false, message: `${provider} setup is ready. Sign in to finish connecting.` });
+      return json({ ok: true, connected: data.status === "connected", message: `${provider} connection is ${data.status || "connected"}.` });
     }
 
     if (action === "begin_connect") {
@@ -208,18 +222,20 @@ Deno.serve(async (req) => {
         const apiKey = await vaultCredential(admin, provider, businessUnitId, "api_key");
         if (!apiKey) {
           return json({
+            ok: true,
             mode: "api_key",
             setupRequired: true,
             message: `Add the ${provider} credential once inside RTB OS. It will be encrypted and hidden after saving.`,
           });
         }
         await upsertConfiguredConnection(admin, provider, businessUnitId, "api_key");
-        return json({ mode: "api_key", configured: true, message: `${provider} is configured in RTB OS.` });
+        return json({ ok: true, mode: "api_key", configured: true, message: `${provider} is configured in RTB OS.` });
       }
 
       const config = provider === "square" ? squareOAuthConfig() : await genericOAuthConfig(admin, provider, businessUnitId);
       if (!config.clientId || !config.authorizeUrl) {
         return json({
+          ok: true,
           mode: "oauth_setup",
           setupRequired: true,
           redirectUrl: CALLBACK_URL,
@@ -248,11 +264,20 @@ Deno.serve(async (req) => {
         url.searchParams.set("access_type", "offline");
         url.searchParams.set("prompt", "consent");
       }
-      return json({ authorizationUrl: url.toString(), mode: "oauth" });
+      return json({ ok: true, authorizationUrl: url.toString(), mode: "oauth" });
     }
 
-    throw new Error("Unsupported integration action.");
+    return json({ ok: false, error: "That integration action is no longer supported. Refresh RTB OS and try again.", code: "UNSUPPORTED_ACTION" });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "Integration request failed." }, 400);
+    const message = error instanceof Error ? error.message : "Integration request failed.";
+    if (message === "AUTH_REQUIRED") {
+      return json({ ok: false, error: "Your RTB OS session expired. Refreshing your sign-in should fix this.", code: "AUTH_REQUIRED" });
+    }
+    if (message === "OWNER_REQUIRED") {
+      return json({ ok: false, error: "Owner access is required to manage integrations.", code: "OWNER_REQUIRED" });
+    }
+    // Return structured JSON with HTTP 200 so Supabase JS preserves the actual error
+    // instead of replacing it with the generic "Edge Function returned a non-2xx" message.
+    return json({ ok: false, error: message, code: "INTEGRATION_ERROR" });
   }
 });
