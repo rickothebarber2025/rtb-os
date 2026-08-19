@@ -1,8 +1,8 @@
 export const OWNER_EMAIL = 'rickothebarber@gmail.com';
 export const ALL_BUSINESSES_ACCESS = 'all-businesses';
-
+ 
 export const PERMISSION_LEVELS = ['none', 'view', 'edit', 'admin'];
-
+ 
 export const MODULE_IDS = [
   'staff_hub',
   'dashboard',
@@ -16,7 +16,7 @@ export const MODULE_IDS = [
   'access',
   'settings',
 ];
-
+ 
 export const MODULE_LABELS = {
   access: 'Access',
   appointments: 'Appointments',
@@ -30,7 +30,7 @@ export const MODULE_LABELS = {
   settings: 'Settings',
   staff_hub: 'Staff Hub',
 };
-
+ 
 export const PAGE_MODULE_MAP = {
   access: 'access',
   'action-center': 'operations',
@@ -47,9 +47,10 @@ export const PAGE_MODULE_MAP = {
   performance: 'performance',
   'staff-hub': 'staff_hub',
   staff: 'roster',
+  'talent-pipeline': 'roster',
   system: 'settings',
 };
-
+ 
 const DEFAULT_PAYLOAD_META = {
   business_scope: 'selected',
   business_unit_ids: [],
@@ -60,7 +61,7 @@ const DEFAULT_PAYLOAD_META = {
   role_template: 'custom',
   role_title: 'Custom Role',
 };
-
+ 
 function titleCase(value) {
   return value
     .split(/[\s_-]+/)
@@ -68,17 +69,17 @@ function titleCase(value) {
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
     .join(' ');
 }
-
+ 
 function safeArray(value) {
   return Array.isArray(value)
     ? value.map((item) => String(item || '').trim()).filter(Boolean)
     : [];
 }
-
+ 
 function uniqueArray(values) {
   return [...new Set(safeArray(values))];
 }
-
+ 
 function safeObject(value) {
   if (!value) return {};
   if (typeof value === 'string') {
@@ -89,19 +90,19 @@ function safeObject(value) {
       return {};
     }
   }
-
+ 
   return typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
-
+ 
 function shouldUseLegacyPermissionFallback(profile) {
   return Object.prototype.hasOwnProperty.call(profile || {}, 'permissions') && profile.permissions === null;
 }
-
+ 
 export function normalizePermissionLevel(value) {
   const normalized = String(value || 'none').trim().toLowerCase();
   return PERMISSION_LEVELS.includes(normalized) ? normalized : 'none';
 }
-
+ 
 export function createModulePermissions(level = 'none') {
   return MODULE_IDS.reduce(
     (permissions, moduleId) => ({
@@ -111,21 +112,21 @@ export function createModulePermissions(level = 'none') {
     {},
   );
 }
-
+ 
 function hasAssignedModuleAccess(payload) {
   return MODULE_IDS.some(
     (moduleId) => normalizePermissionLevel(payload?.modules?.[moduleId]) !== 'none',
   );
 }
-
+ 
 function isStaffRole(profile = {}) {
   const safeProfile = profile || {};
   return String(safeProfile.role || '').trim().toLowerCase() === 'staff';
 }
-
+ 
 function createStaffPortalPermissions(profile = {}) {
   const businessUnitIds = profile.business_unit_id ? [profile.business_unit_id] : [];
-
+ 
   return buildPermissionsPayload({
     business_unit_ids: businessUnitIds,
     expectations: 'Use Staff Hub to review your own profile, earnings, performance, role expectations, and assigned business.',
@@ -151,7 +152,7 @@ function createStaffPortalPermissions(profile = {}) {
     role_title: 'Staff Portal',
   });
 }
-
+ 
 export function normalizeModulePermissions(value) {
   const raw = safeObject(value);
   return MODULE_IDS.reduce(
@@ -162,13 +163,13 @@ export function normalizeModulePermissions(value) {
     createModulePermissions(),
   );
 }
-
+ 
 export function normalizePermissionsPayload(value) {
   const raw = safeObject(value);
   const modules = normalizeModulePermissions(raw.modules || raw);
   const businessUnitIds = uniqueArray(raw.business_unit_ids || raw.businessUnitIds);
   const hasAllBusinesses = raw.business_scope === 'all' || businessUnitIds.includes(ALL_BUSINESSES_ACCESS);
-
+ 
   return {
     business_scope: hasAllBusinesses ? 'all' : DEFAULT_PAYLOAD_META.business_scope,
     business_unit_ids: hasAllBusinesses ? [ALL_BUSINESSES_ACCESS] : businessUnitIds,
@@ -181,12 +182,12 @@ export function normalizePermissionsPayload(value) {
     role_title: String(raw.role_title || DEFAULT_PAYLOAD_META.role_title),
   };
 }
-
+ 
 export function buildPermissionsPayload(value = {}) {
   const base = normalizePermissionsPayload(value);
   const businessUnitIds = uniqueArray(value.business_unit_ids || base.business_unit_ids);
   const hasAllBusinesses = value.business_scope === 'all' || base.business_scope === 'all' || businessUnitIds.includes(ALL_BUSINESSES_ACCESS);
-
+ 
   return {
     ...base,
     business_scope: hasAllBusinesses ? 'all' : 'selected',
@@ -200,10 +201,10 @@ export function buildPermissionsPayload(value = {}) {
     role_title: String(value.role_title || base.role_title),
   };
 }
-
+ 
 export function createLegacyPermissionsFromRole(profile = {}) {
   const role = String(profile.role || '').trim().toLowerCase();
-
+ 
   if (isOwnerProfile(profile) || role === 'owner') {
     return buildPermissionsPayload({
       business_scope: 'all',
@@ -221,9 +222,45 @@ export function createLegacyPermissionsFromRole(profile = {}) {
       role_title: 'Owner',
     });
   }
-
+ 
+  if (role === 'admin') {
+    return buildPermissionsPayload({
+      business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [],
+      expectations: 'Legacy admin fallback. Save an explicit role template to replace this fallback.',
+      modules: createModulePermissions('admin'),
+      responsibilities: ['Manage assigned business operations until explicit permissions are saved.'],
+      restrictions: ['Legacy fallback should be replaced with a saved role template.'],
+      role_description: 'Temporary fallback for an existing admin profile without saved permissions.',
+      role_template: 'legacy_admin',
+      role_title: 'Legacy Admin',
+    });
+  }
+ 
+  if (role === 'manager') {
+    return buildPermissionsPayload({
+      business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [],
+      expectations: 'Legacy manager fallback. Save an explicit role template to replace this fallback.',
+      modules: {
+        ...createModulePermissions(),
+        appointments: 'edit',
+        booth_rent: 'edit',
+        dashboard: 'view',
+        operations: 'edit',
+        payroll: 'view',
+        performance: 'edit',
+        roster: 'edit',
+        settings: 'view',
+      },
+      responsibilities: ['Run assigned business operations until explicit permissions are saved.'],
+      restrictions: ['Cannot manage user access unless permissions are customized.'],
+      role_description: 'Temporary fallback for an existing manager profile without saved permissions.',
+      role_template: 'legacy_manager',
+      role_title: 'Legacy Manager',
+    });
+  }
+ 
   if (isStaffRole(profile)) return createStaffPortalPermissions(profile);
-
+ 
   const legacyPermissions = profile?.legacy_permissions || {};
   return buildPermissionsPayload({
     business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [],
@@ -233,52 +270,113 @@ export function createLegacyPermissionsFromRole(profile = {}) {
     role_title: titleCase(profile.role_title || role || 'Custom Role'),
   });
 }
-
+ 
+export function mergeProfilePermissionFields(profile = {}) {
+  const raw = safeObject(profile.permissions);
+  const payload = normalizePermissionsPayload({
+    ...raw,
+    expectations: profile.expectations ?? raw.expectations,
+    responsibilities: profile.responsibilities ?? raw.responsibilities,
+    restrictions: profile.restrictions ?? raw.restrictions,
+    role_description: profile.role_description || raw.role_description,
+    role_title: profile.role_title || raw.role_title,
+  });
+  return {
+    ...profile,
+    expectations: payload.expectations,
+    permissions: payload,
+    responsibilities: payload.responsibilities,
+    restrictions: payload.restrictions,
+    role_description: payload.role_description,
+    role_title: payload.role_title,
+  };
+}
+ 
+export function isOwnerEmail(email) {
+  return String(email || '').trim().toLowerCase() === OWNER_EMAIL;
+}
+ 
+export function isOwnerProfile(profile) {
+  return Boolean(
+    profile?.is_owner
+    || profile?.owner
+    || profile?.owner_override
+    || String(profile?.role || '').trim().toLowerCase() === 'owner'
+    || isOwnerEmail(profile?.email),
+  );
+}
+ 
+export function getProfileBusinessUnitIds(profile) {
+  if (isOwnerProfile(profile)) return [ALL_BUSINESSES_ACCESS];
+  const payload = normalizePermissionsPayload(profile?.permissions);
+  if (payload.business_scope === 'all') return [ALL_BUSINESSES_ACCESS];
+  const explicitIds = payload.business_unit_ids.filter((id) => id !== ALL_BUSINESSES_ACCESS);
+  if (explicitIds.length) return uniqueArray(explicitIds);
+  return profile?.business_unit_id ? [String(profile.business_unit_id)] : [];
+}
+ 
+export function profileCanAccessBusiness(profile, businessUnitId) {
+  if (!businessUnitId) return false;
+  if (hasAllBusinessAccess(profile)) return true;
+  return getProfileBusinessUnitIds(profile).includes(String(businessUnitId));
+}
+ 
 export function getEffectivePermissionsPayload(profile = {}) {
   if (!profile) return normalizePermissionsPayload({});
   if (isOwnerProfile(profile)) return createLegacyPermissionsFromRole({ ...profile, role: 'owner' });
-
-  const normalized = normalizePermissionsPayload(profile.permissions);
-  if (hasAssignedModuleAccess(normalized)) return normalized;
+ 
   if (shouldUseLegacyPermissionFallback(profile)) return createLegacyPermissionsFromRole(profile);
-  if (isStaffRole(profile)) return createStaffPortalPermissions(profile);
-  return normalized;
+ 
+  const profilePayload = mergeProfilePermissionFields(profile);
+  const normalized = normalizePermissionsPayload(profilePayload.permissions);
+  if (isStaffRole(profile) && !hasAssignedModuleAccess(normalized)) return createStaffPortalPermissions(profile);
+  if (normalized.role_title !== DEFAULT_PAYLOAD_META.role_title) return normalized;
+ 
+  const role = String(profile?.role || '').trim();
+  return { ...normalized, role_title: role ? titleCase(role) : normalized.role_title };
 }
-
+ 
 export function getModulePermission(profile, moduleId) {
   return getEffectivePermissionsPayload(profile).modules[moduleId] || 'none';
 }
-
-export function hasModulePermission(profile, moduleId, minimum = 'view') {
-  return PERMISSION_LEVELS.indexOf(getModulePermission(profile, moduleId)) >= PERMISSION_LEVELS.indexOf(minimum);
+ 
+export function isPermissionAtLeast(current, required) {
+  return PERMISSION_LEVELS.indexOf(current) >= PERMISSION_LEVELS.indexOf(required);
 }
-
+ 
+export function hasModulePermission(profile, moduleId, minimum = 'view') {
+  if (!profile) return false;
+  if (!isOwnerProfile(profile) && !profile.active) return false;
+  return isPermissionAtLeast(getModulePermission(profile, moduleId), minimum);
+}
+ 
 export function hasAnyModulePermission(profile, minimum = 'view') {
+  if (!profile) return false;
+  if (!isOwnerProfile(profile) && !profile.active) return false;
   return MODULE_IDS.some((moduleId) => hasModulePermission(profile, moduleId, minimum));
 }
-
-export function isOwnerProfile(profile = {}) {
-  return String(profile?.email || '').trim().toLowerCase() === OWNER_EMAIL || String(profile?.role || '').trim().toLowerCase() === 'owner';
-}
-
+ 
 export function getProfileRoleTitle(profile = {}) {
-  const payload = getEffectivePermissionsPayload(profile);
-  return payload.role_title || titleCase(profile?.role_title || profile?.role || 'Custom Role');
+  return getEffectivePermissionsPayload(profile).role_title || 'Custom Role';
 }
-
+ 
 export function getProfileResponsibilities(profile = {}) {
   return getEffectivePermissionsPayload(profile).responsibilities;
 }
-
+ 
 export function getProfileRestrictions(profile = {}) {
   return getEffectivePermissionsPayload(profile).restrictions;
 }
-
+ 
 export function getProfileExpectations(profile = {}) {
   return getEffectivePermissionsPayload(profile).expectations;
 }
-
-export function hasAllBusinessAccess(profile = {}) {
-  const payload = getEffectivePermissionsPayload(profile);
+ 
+export function hasAllBusinessAccess(profile) {
+  if (isOwnerProfile(profile)) return true;
+  const payload = normalizePermissionsPayload(profile?.permissions);
   return payload.business_scope === 'all' || payload.business_unit_ids.includes(ALL_BUSINESSES_ACCESS);
 }
+ 
+
+
