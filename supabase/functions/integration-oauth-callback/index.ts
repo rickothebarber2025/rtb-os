@@ -18,6 +18,20 @@ function envName(provider: string, suffix: string) {
   return `INTEGRATION_${provider.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_${suffix}`;
 }
 
+async function vaultCredential(admin: any, provider: string, businessUnitId: string | null, credentialKey: string) {
+  const { data, error } = await admin.rpc("get_integration_credential", {
+    p_provider: provider,
+    p_business_unit_id: businessUnitId,
+    p_credential_key: credentialKey,
+  });
+  if (error) return "";
+  return String(data || "");
+}
+
+async function credential(admin: any, provider: string, businessUnitId: string | null, key: string, envSuffix: string) {
+  return Deno.env.get(envName(provider, envSuffix)) || await vaultCredential(admin, provider, businessUnitId, key);
+}
+
 function page(title: string, message: string, ok = false) {
   const appUrl = Deno.env.get("RTB_OS_PUBLIC_URL") || Deno.env.get("SITE_URL") || "https://rtbheadquaters.com/";
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{background:#08090d;color:#f7f3e8;font-family:Inter,system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px}main{max-width:560px;background:#12151d;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:24px}h1{color:${ok ? "#8fe3a2" : "#f1c768"}}p{color:#a7adba;line-height:1.55}a{color:#f1c768}</style></head><body><main><h1>${title}</h1><p>${message}</p><p><a href="${appUrl}">Return to Ricko OS</a></p></main></body></html>`;
@@ -45,16 +59,17 @@ Deno.serve(async (req) => {
       .gte("expires_at", new Date().toISOString())
       .maybeSingle();
     if (stateError) throw stateError;
-    if (!oauthState) return html(page("Connection expired", "Start the connection again from Ricko OS."), 400);
+    if (!oauthState) return html(page("Connection expired", "Start the connection again from RTB OS."), 400);
 
     const provider = String(oauthState.provider || "").toLowerCase();
-    if (provider === "square") return html(page("Use Square connection", "Square uses its dedicated secure callback. Start Square again from Ricko OS."), 400);
+    const businessUnitId = oauthState.business_unit_id || null;
+    if (provider === "square") return html(page("Use Square connection", "Square uses its dedicated secure callback. Start Square again from RTB OS."), 400);
 
-    const clientId = Deno.env.get(envName(provider, "CLIENT_ID")) || "";
-    const clientSecret = Deno.env.get(envName(provider, "CLIENT_SECRET")) || "";
-    const tokenUrl = Deno.env.get(envName(provider, "TOKEN_URL")) || "";
-    const redirectUrl = Deno.env.get(envName(provider, "REDIRECT_URL")) || `${Deno.env.get("SUPABASE_URL")}/functions/v1/integration-oauth-callback`;
-    if (!clientId || !clientSecret || !tokenUrl) throw new Error(`${provider} OAuth server configuration is incomplete.`);
+    const clientId = await credential(admin, provider, businessUnitId, "client_id", "CLIENT_ID");
+    const clientSecret = await credential(admin, provider, businessUnitId, "client_secret", "CLIENT_SECRET");
+    const tokenUrl = await credential(admin, provider, businessUnitId, "token_url", "TOKEN_URL");
+    const redirectUrl = await credential(admin, provider, businessUnitId, "redirect_url", "REDIRECT_URL") || `${Deno.env.get("SUPABASE_URL")}/functions/v1/integration-oauth-callback`;
+    if (!clientId || !clientSecret || !tokenUrl) throw new Error(`${provider} connection setup is incomplete. Return to RTB OS and finish the one-time setup.`);
 
     const tokenResponse = await fetch(tokenUrl, {
       method: "POST",
@@ -75,7 +90,7 @@ Deno.serve(async (req) => {
     const scopes = Array.isArray(scopeText) ? scopeText : scopeText.split(/[ ,]+/).filter(Boolean);
     const row = {
       provider,
-      business_unit_id: oauthState.business_unit_id || null,
+      business_unit_id: businessUnitId,
       status: "connected",
       connection_type: "oauth",
       access_token: token.access_token,
@@ -83,12 +98,12 @@ Deno.serve(async (req) => {
       token_type: token.token_type || "bearer",
       scopes,
       expires_at: expiresAt,
-      metadata: { connectedAt: new Date().toISOString() },
+      metadata: { connectedAt: new Date().toISOString(), managed_by: "rtb_os" },
       updated_at: new Date().toISOString(),
     };
 
     let existingQuery = admin.from("integration_connections").select("id").eq("provider", provider);
-    existingQuery = oauthState.business_unit_id ? existingQuery.eq("business_unit_id", oauthState.business_unit_id) : existingQuery.is("business_unit_id", null);
+    existingQuery = businessUnitId ? existingQuery.eq("business_unit_id", businessUnitId) : existingQuery.is("business_unit_id", null);
     const { data: existing } = await existingQuery.maybeSingle();
     if (existing?.id) {
       const { error } = await admin.from("integration_connections").update(row).eq("id", existing.id);
@@ -99,8 +114,8 @@ Deno.serve(async (req) => {
     }
 
     await admin.from("integration_oauth_states").update({ consumed_at: new Date().toISOString() }).eq("id", oauthState.id);
-    return html(page(`${provider} connected`, "The connection is active. Ricko OS can now use the permissions you approved.", true));
+    return html(page(`${provider} connected`, "Connection complete. Return to RTB OS; the account is ready to use.", true));
   } catch (error) {
-    return html(page("Connection failed", error.message || "OAuth connection failed."), 400);
+    return html(page("Connection failed", error instanceof Error ? error.message : "OAuth connection failed."), 400);
   }
 });
