@@ -16,22 +16,32 @@ function serviceKey() {
   if (direct) return direct;
   const keys = Deno.env.get("SUPABASE_SECRET_KEYS");
   if (!keys) return "";
-  try {
-    const parsed = JSON.parse(keys);
-    return parsed.default || Object.values(parsed)[0] || "";
-  } catch { return ""; }
+  try { const parsed = JSON.parse(keys); return parsed.default || Object.values(parsed)[0] || ""; }
+  catch { return ""; }
+}
+
+function permissionPayload(profile: any) {
+  let permissions = profile?.permissions || {};
+  if (typeof permissions === "string") { try { permissions = JSON.parse(permissions || "{}"); } catch { permissions = {}; } }
+  return permissions || {};
 }
 
 function isFinanceAllowed(profile: any) {
   if (!profile) return false;
   if (String(profile.email || "").toLowerCase() === "rickothebarber@gmail.com" || String(profile.role || "").toLowerCase() === "owner") return true;
   if (profile.active === false) return false;
-  let permissions = profile.permissions || {};
-  if (typeof permissions === "string") {
-    try { permissions = JSON.parse(permissions || "{}"); } catch { permissions = {}; }
-  }
+  const permissions = permissionPayload(profile);
   const level = permissions?.modules?.finance || permissions?.finance || "none";
   return ["view", "edit", "admin"].includes(String(level).toLowerCase());
+}
+
+function canAccessBusiness(profile: any, businessId: string) {
+  if (!profile || !businessId || businessId === "all-businesses") return false;
+  if (String(profile.email || "").toLowerCase() === "rickothebarber@gmail.com" || String(profile.role || "").toLowerCase() === "owner") return true;
+  const permissions = permissionPayload(profile);
+  if (String(permissions.business_scope || "").toLowerCase() === "all") return true;
+  const ids = Array.isArray(permissions.business_unit_ids) ? permissions.business_unit_ids.map(String) : [];
+  return ids.includes("all-businesses") || ids.includes(businessId) || String(profile.business_unit_id || "") === businessId;
 }
 
 Deno.serve(async (req) => {
@@ -50,30 +60,53 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData.user) return json({ error: "Your session is invalid or expired." }, 401);
 
-    const { data: profile, error: profileError } = await admin.from("user_profiles").select("email,role,permissions,active").eq("id", authData.user.id).maybeSingle();
+    const { data: profile, error: profileError } = await admin.from("user_profiles").select("email,role,permissions,active,business_unit_id").eq("id", authData.user.id).maybeSingle();
     if (profileError) return json({ error: "Could not verify Finance access." }, 500);
     if (!isFinanceAllowed(profile)) return json({ error: "Finance access is not enabled for this account." }, 403);
 
     const body = await req.json().catch(() => ({}));
     const businessId = String(body.businessId || body.business_id || "").trim();
     const question = String(body.question || "Give me a concise financial health check.").trim();
-    if (!businessId || businessId === "all-businesses") return json({ error: "Choose one business before asking Financial Buddy." }, 400);
+    if (!canAccessBusiness(profile, businessId)) return json({ error: "Choose a Finance business you are allowed to access." }, 403);
 
     const monthStart = new Date();
     monthStart.setDate(1);
     const monthStartIso = monthStart.toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
 
-    const [{ data: business }, { data: transactions }, { data: obligations }, { data: payrollRuns }, { data: performance }] = await Promise.all([
+    const [businessR, transactionsR, obligationsR, payrollR, performanceR, reconciliationsR, calendarR, forecastsR, patternsR] = await Promise.all([
       admin.from("business_units").select("id,name,type").eq("id", businessId).maybeSingle(),
-      admin.from("finance_transactions").select("transaction_date,direction,amount,category,description,source").eq("business_unit_id", businessId).gte("transaction_date", monthStartIso).order("transaction_date", { ascending: false }).limit(120),
+      admin.from("finance_transactions").select("transaction_date,direction,amount,category,description,source,external_ref").eq("business_unit_id", businessId).gte("transaction_date", monthStartIso).order("transaction_date", { ascending: false }).limit(160),
       admin.from("finance_obligations").select("name,amount,due_day,frequency,category,status").eq("business_unit_id", businessId).eq("status", "active").order("due_day"),
       admin.from("payroll_runs").select("week_label,status,total_net_sales,total_staff_payout,total_deductions,rtb_net,week_start,week_end").eq("business_unit_id", businessId).order("week_start", { ascending: false }).limit(8),
       admin.from("staff_performance_summary").select("total_net_sales,transactions,average_ticket").eq("business_unit_id", businessId).limit(30),
+      admin.from("finance_reconciliations").select("match_type,match_label,expected_amount,actual_amount,confidence,status,reason").eq("business_unit_id", businessId).order("confidence", { ascending: false }).limit(40),
+      admin.from("finance_calendar_events").select("event_date,event_type,label,direction,expected_amount,status,confidence,source_type").eq("business_unit_id", businessId).gte("event_date", today).order("event_date").limit(80),
+      admin.from("finance_forecast_snapshots").select("horizon_days,expected_in,expected_out,expected_net,confirmed_in,confirmed_out,risk_level,generated_at").eq("business_unit_id", businessId).order("generated_at", { ascending: false }).limit(12),
+      admin.from("finance_recurring_patterns").select("label,direction,avg_amount,cadence,occurrence_count,next_expected_date,confidence").eq("business_unit_id", businessId).eq("active", true).order("confidence", { ascending: false }).limit(30),
     ]);
 
-    const payload = { business, month_start: monthStartIso, transactions: transactions || [], recurring_obligations: obligations || [], recent_payroll: payrollRuns || [], performance: performance || [] };
+    const queryErrors = [businessR, transactionsR, obligationsR, payrollR, performanceR, reconciliationsR, calendarR, forecastsR, patternsR].map((r: any) => r.error).filter(Boolean);
+    if (queryErrors.length) throw queryErrors[0];
+
+    const latestForecasts = new Map<number, any>();
+    for (const row of forecastsR.data || []) if (!latestForecasts.has(Number(row.horizon_days))) latestForecasts.set(Number(row.horizon_days), row);
+
+    const payload = {
+      business: businessR.data,
+      month_start: monthStartIso,
+      transactions: transactionsR.data || [],
+      recurring_obligations: obligationsR.data || [],
+      detected_recurring_patterns: patternsR.data || [],
+      recent_payroll: payrollR.data || [],
+      performance: performanceR.data || [],
+      bank_reconciliation: reconciliationsR.data || [],
+      upcoming_financial_calendar: calendarR.data || [],
+      forecasts: [...latestForecasts.values()].sort((a, b) => Number(a.horizon_days) - Number(b.horizon_days)),
+    };
+
     const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
-    const system = `You are Financial Buddy inside RTB OS. You advise the owner of a service business using only the supplied business data. Be concise, numerical, practical, and conservative. Distinguish facts from estimates. Focus on cash flow, recurring obligations, payroll pressure, unusual expenses, margin, and the next 1-3 actions. Never invent balances, revenue, taxes, or bank data that are not present. If data is incomplete, say exactly what is missing.`;
+    const system = `You are Financial Buddy inside RTB OS, the owner's financial decision-support system. Use only supplied Supabase data. Treat operational revenue, imported bank cash movement, payroll, recurring obligations, reconciliation evidence, calendar events, and forecasts as related but distinct concepts. Never double-count a bank transaction that reconciles an existing payroll, obligation, or Square source. Clearly distinguish confirmed values from predicted values and suggested reconciliation matches. Prioritize cash-flow risk, upcoming commitments, unmatched payments, payroll pressure, recurring expenses, and the next 1-3 owner actions. Never invent bank balances, tax balances, revenue, expenses, or payment status. When evidence is incomplete, name exactly what is missing. Keep answers concise, numerical and practical.`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
@@ -81,7 +114,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: JSON.stringify({ question, financial_context: payload }) }] }],
-        generationConfig: { temperature: 0.15, maxOutputTokens: 700 },
+        generationConfig: { temperature: 0.12, maxOutputTokens: 850 },
       }),
     });
 
@@ -89,7 +122,7 @@ Deno.serve(async (req) => {
     if (!response.ok) return json({ error: raw?.error?.message || "Financial Buddy request failed." }, 502);
     const answer = raw?.candidates?.[0]?.content?.parts?.find((part: any) => part.text)?.text || "";
     if (!answer) return json({ error: "Financial Buddy returned an empty response." }, 502);
-    return json({ answer, generated_at: new Date().toISOString(), business: business?.name || "Selected business" });
+    return json({ answer, generated_at: new Date().toISOString(), business: businessR.data?.name || "Selected business" });
   } catch (error) {
     console.error("financial-buddy", error);
     return json({ error: error instanceof Error ? error.message : "Financial Buddy failed." }, 500);
