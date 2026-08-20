@@ -30,16 +30,6 @@ export const INTEGRATION_PROVIDERS = [
     recommended: true,
   },
   {
-    id: 'textnow',
-    name: 'TextNow',
-    category: 'Business systems',
-    authType: 'manual',
-    defaultStatus: 'error',
-    description: 'Client texting inside RTB OS. Production inbox sync still needs end-to-end verification.',
-    capabilities: ['Inbox', 'Conversations', 'SMS'],
-    recommended: true,
-  },
-  {
     id: 'supabase',
     name: 'RTB Database',
     category: 'Core system',
