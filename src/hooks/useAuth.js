@@ -224,6 +224,27 @@ export function useAuth() {
     return () => { active = false; };
   }, [session?.user?.email, session?.user?.id]);
 
+  // Access changes must take effect while the employee is already signed in.
+  // This keeps role templates, module permissions, business scope and role copy live
+  // without asking staff to sign out or reinstall the app.
+  useEffect(() => {
+    if (!supabase || !session?.user?.id) return undefined;
+    const userId = session.user.id;
+    const channel = supabase
+      .channel(`user-profile-access-${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_profiles',
+        filter: `id=eq.${userId}`,
+      }, () => {
+        window.setTimeout(() => refreshProfile(), 50);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [refreshProfile, session?.user?.id]);
+
   const signInWithPassword = useCallback(async ({ email, password }) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
