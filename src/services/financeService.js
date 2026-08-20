@@ -48,8 +48,17 @@ export async function syncFinancePaymentEvidence(businessId) {
   return invokeFunction('gmail-payroll-sync', {
     businessId,
     maxMessages: 250,
-    query: 'newer_than:180d',
+    query: 'newer_than:180d from:catch@payments.interac.ca',
   });
+}
+
+export async function reconcileFinancePaymentEvidence(businessId) {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc('refresh_my_finance_payment_evidence', {
+    p_business_unit_id: businessId,
+  });
+  if (error) throw error;
+  return data || {};
 }
 
 export async function createFinanceTransaction(payload) {
@@ -64,6 +73,7 @@ export async function importFinanceCsv({ businessId, csvText, fileName }) {
 export async function deleteFinanceTransaction(id, businessId) {
   await invokeFinance('delete_transaction', { id, businessId });
   await refreshFinanceIntelligence(businessId);
+  await reconcileFinancePaymentEvidence(businessId);
 }
 
 export async function createFinanceObligation(payload) {
@@ -91,7 +101,9 @@ export async function refreshFinanceWithEvidence(businessId) {
   } catch (error) {
     evidenceWarning = error instanceof Error ? error.message : 'Gmail payment evidence could not sync.';
   }
-  const intelligence = await refreshFinanceIntelligence(businessId);
+  await refreshFinanceIntelligence(businessId);
+  await reconcileFinancePaymentEvidence(businessId);
+  const intelligence = await loadFinanceIntelligence(businessId);
   return { intelligence, evidenceSync, evidenceWarning };
 }
 
