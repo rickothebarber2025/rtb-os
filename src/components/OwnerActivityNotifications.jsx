@@ -45,14 +45,30 @@ function eventText(event) {
   if (title.includes('clock') || title.includes('shift')) return body ? `${actor}: ${body}` : `${actor} updated their shift.`;
   if (title.includes('time off')) return body ? `${actor} requested time off: ${body}` : `${actor} submitted a time-off request.`;
   if (title.includes('incident') || title.includes('issue') || title.includes('failed')) return body ? `${actor} reported: ${body}` : `${actor} reported an issue that needs attention.`;
-  return body || `${actor} recorded a staff activity update.`;
+  return body || event.title || `${actor} recorded a staff activity update.`;
 }
 
 function eventSearchText(event) {
   return `${event.title || ''} ${event.body || ''} ${event.actor_name || ''}`.toLowerCase();
 }
 
+function normalizeCategory(value) {
+  const category = String(value || '').trim().toLowerCase();
+  if (['request', 'requests', 'approval', 'time_off', 'time-off'].includes(category)) return 'requests';
+  if (['operation', 'operations', 'maintenance', 'inventory', 'incident', 'checklist'].includes(category)) return 'operations';
+  if (['staff', 'attendance', 'shift', 'profile', 'performance'].includes(category)) return 'staff';
+  return '';
+}
+
 function priorityFor(event) {
+  const explicit = String(event.metadata?.priority || event.priority || '').trim().toLowerCase();
+  if (['urgent', 'high', 'attention', 'action_required'].includes(explicit)) return 'attention';
+  if (['done', 'resolved', 'completed', 'success'].includes(explicit)) return 'done';
+
+  const action = String(event.action || '').toLowerCase();
+  if (/request|approve|decline|incident|failed|missing|late|no.?show|urgent|damage/.test(action)) return 'attention';
+  if (/complete|resolve|approve|close/.test(action)) return 'done';
+
   const text = eventSearchText(event);
   if (/incident|failed|could not|missing|late|no.?show|urgent|damage|problem|request|approval|time off/.test(text)) return 'attention';
   if (/completed|finished|closed|approved/.test(text)) return 'done';
@@ -60,6 +76,14 @@ function priorityFor(event) {
 }
 
 function categoryFor(event) {
+  const explicit = normalizeCategory(event.category || event.metadata?.category);
+  if (explicit) return explicit;
+
+  const action = String(event.action || '').toLowerCase();
+  if (/request|approve|decline|time.?off/.test(action)) return 'requests';
+  if (/incident|maintenance|inventory|restock|checklist|operation/.test(action)) return 'operations';
+  if (/clock|shift|attendance|staff|profile|task/.test(action)) return 'staff';
+
   const text = eventSearchText(event);
   if (/time off|request|approval|approve|decline/.test(text)) return 'requests';
   if (/incident|issue|failed|damage|maintenance|inventory|restock|broken|repair|problem/.test(text)) return 'operations';
@@ -68,10 +92,15 @@ function categoryFor(event) {
 }
 
 function destinationFor(event) {
+  const metadataPage = String(event.metadata?.page || '').trim();
+  const metadataTab = String(event.metadata?.tab || '').trim();
+  const metadataLabel = String(event.metadata?.action_label || '').trim();
+  if (metadataPage) return { page: metadataPage, tab: metadataTab || 'home', label: metadataLabel || 'Open' };
+
   const category = categoryFor(event);
-  if (category === 'operations') return { page: 'staff-hub', tab: 'daily', label: 'Open operations' };
+  if (category === 'operations') return { page: 'staff-hub', tab: 'daily', label: 'Open work' };
   if (category === 'requests') return { page: 'staff-hub', tab: 'schedule', label: 'Review request' };
-  if (category === 'staff') return { page: 'staff-hub', tab: 'daily', label: 'Review staff' };
+  if (category === 'staff') return { page: 'staff-hub', tab: 'home', label: 'Review staff' };
   return { page: 'staff-hub', tab: 'home', label: 'Open Staff Hub' };
 }
 
