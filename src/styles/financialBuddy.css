@@ -1,0 +1,25 @@
+.financial-buddy { display: grid; gap: 18px; }
+.financial-buddy__hero { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.financial-buddy__hero h1 { margin: 4px 0 6px; }
+.financial-buddy__eyebrow { color: var(--muted, #8f98a8); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.financial-buddy__metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.financial-buddy__metric { padding: 14px; border: 1px solid var(--border, rgba(255,255,255,.1)); border-radius: 14px; background: rgba(255,255,255,.025); }
+.financial-buddy__metric span { display: block; color: var(--muted, #8f98a8); font-size: 12px; }
+.financial-buddy__metric strong { display: block; margin-top: 5px; font-size: 22px; }
+.financial-buddy__grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr); gap: 16px; }
+.financial-buddy__form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.financial-buddy__form .full { grid-column: 1 / -1; }
+.financial-buddy__form label { display: grid; gap: 5px; color: var(--muted, #8f98a8); font-size: 12px; }
+.financial-buddy__form input, .financial-buddy__form select, .financial-buddy__ask textarea { width: 100%; box-sizing: border-box; }
+.financial-buddy__list { display: grid; gap: 8px; margin-top: 12px; }
+.financial-buddy__row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border, rgba(255,255,255,.08)); }
+.financial-buddy__row small { color: var(--muted, #8f98a8); }
+.financial-buddy__amount--expense { color: #ff9a9a; }
+.financial-buddy__amount--income { color: #8de0ac; }
+.financial-buddy__ask { display: grid; gap: 10px; }
+.financial-buddy__answer { white-space: pre-wrap; line-height: 1.55; padding: 12px; border-radius: 12px; background: rgba(255,255,255,.035); }
+.financial-buddy__quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.financial-buddy__quick button { font-size: 12px; }
+.financial-buddy__empty { color: var(--muted, #8f98a8); font-size: 13px; }
+@media (max-width: 900px) { .financial-buddy__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .financial-buddy__grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .financial-buddy__hero { display: block; } .financial-buddy__metrics, .financial-buddy__form { grid-template-columns: 1fr; } .financial-buddy__form .full { grid-column: auto; } .financial-buddy__row { grid-template-columns: 1fr auto; } .financial-buddy__row button { grid-column: 1 / -1; justify-self: start; } }
