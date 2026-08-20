@@ -4,7 +4,7 @@ export const ALL_BUSINESSES_ACCESS = 'all-businesses';
 export const PERMISSION_LEVELS = ['none', 'view', 'edit', 'admin'];
 
 export const MODULE_IDS = [
-  'staff_hub', 'dashboard', 'roster', 'payroll', 'performance', 'appointments', 'booth_rent', 'operations', 'access', 'settings',
+  'staff_hub', 'dashboard', 'roster', 'payroll', 'performance', 'finance', 'appointments', 'booth_rent', 'operations', 'access', 'settings',
 ];
 
 export const MODULE_LABELS = {
@@ -12,6 +12,7 @@ export const MODULE_LABELS = {
   appointments: 'Appointments',
   booth_rent: 'Booth Rent',
   dashboard: 'Dashboard',
+  finance: 'Financial Buddy',
   operations: 'Operations',
   payroll: 'Payroll',
   performance: 'Performance',
@@ -27,6 +28,7 @@ export const PAGE_MODULE_MAP = {
   'booth-rent': 'booth_rent',
   'customer-intelligence': 'performance',
   dashboard: 'dashboard',
+  finance: 'finance',
   insights: 'appointments',
   integrations: 'settings',
   'my-role': 'profile',
@@ -154,8 +156,8 @@ export function buildPermissionsPayload(value = {}) {
 export function createLegacyPermissionsFromRole(profile = {}) {
   const role = String(profile.role || '').trim().toLowerCase();
   if (isOwnerProfile(profile) || role === 'owner') return buildPermissionsPayload({ business_scope: 'all', business_unit_ids: [ALL_BUSINESSES_ACCESS], expectations: 'Owner access is protected and cannot be restricted inside RTB OS.', modules: createModulePermissions('admin'), responsibilities: ['Own final business decisions', 'Manage user access', 'Approve payroll and operational changes'], restrictions: ['Owner access cannot be restricted inside RTB OS.'], role_description: 'Owner-level access across every RTB OS module.', role_template: 'owner', role_title: 'Owner' });
-  if (role === 'admin') return buildPermissionsPayload({ business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [], expectations: 'Legacy admin fallback. Save an explicit role template to replace this fallback.', modules: createModulePermissions('admin'), responsibilities: ['Manage assigned business operations until explicit permissions are saved.'], restrictions: ['Legacy fallback should be replaced with a saved role template.'], role_description: 'Temporary fallback for an existing admin profile without saved permissions.', role_template: 'legacy_admin', role_title: 'Legacy Admin' });
-  if (role === 'manager') return buildPermissionsPayload({ business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [], expectations: 'Legacy manager fallback. Save an explicit role template to replace this fallback.', modules: { ...createModulePermissions(), staff_hub: 'view', appointments: 'edit', booth_rent: 'edit', dashboard: 'view', operations: 'edit', payroll: 'view', performance: 'edit', roster: 'edit', settings: 'view' }, responsibilities: ['Run assigned business operations until explicit permissions are saved.'], restrictions: ['Cannot manage user access unless permissions are customized.'], role_description: 'Temporary fallback for an existing manager profile without saved permissions.', role_template: 'legacy_manager', role_title: 'Legacy Manager' });
+  if (role === 'admin') return buildPermissionsPayload({ business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [], expectations: 'Legacy admin fallback. Save an explicit role template to replace this fallback.', modules: { ...createModulePermissions('admin'), finance: 'none' }, responsibilities: ['Manage assigned business operations until explicit permissions are saved.'], restrictions: ['Legacy fallback should be replaced with a saved role template.', 'Finance access must be explicitly granted by the owner.'], role_description: 'Temporary fallback for an existing admin profile without saved permissions.', role_template: 'legacy_admin', role_title: 'Legacy Admin' });
+  if (role === 'manager') return buildPermissionsPayload({ business_unit_ids: profile.business_unit_id ? [profile.business_unit_id] : [], expectations: 'Legacy manager fallback. Save an explicit role template to replace this fallback.', modules: { ...createModulePermissions(), staff_hub: 'view', appointments: 'edit', booth_rent: 'edit', dashboard: 'view', operations: 'edit', payroll: 'view', performance: 'edit', roster: 'edit', settings: 'view', finance: 'none' }, responsibilities: ['Run assigned business operations until explicit permissions are saved.'], restrictions: ['Cannot manage user access unless permissions are customized.', 'Finance access must be explicitly granted by the owner.'], role_description: 'Temporary fallback for an existing manager profile without saved permissions.', role_template: 'legacy_manager', role_title: 'Legacy Manager' });
   if (role === 'staff') return createStaffPortalPermissions(profile);
   return normalizePermissionsPayload(null);
 }
