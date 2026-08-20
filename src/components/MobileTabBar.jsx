@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ClipboardCheck, Coffee, Home, Menu, Trophy } from 'lucide-react';
+import { CalendarDays, CircleDollarSign, ClipboardCheck, Home, Menu } from 'lucide-react';
 import { getEffectivePermissionsPayload } from '../lib/permissions.js';
 
 const QUICK_NAV_IDS = ['dashboard', 'action-center', 'payroll', 'staff', 'performance', 'staff-hub'];
@@ -14,10 +14,10 @@ const SHORT_LABELS = {
 };
 
 const STAFF_HUB_QUICK_TABS = [
-  { icon: ClipboardCheck, id: 'daily', label: 'Daily Ops' },
-  { icon: Home, id: 'home', label: 'Today' },
-  { icon: Trophy, id: 'spotlight', label: 'Spotlight' },
-  { icon: Coffee, id: 'tips', label: 'Tips' },
+  { icon: Home, id: 'home', label: 'Home' },
+  { icon: ClipboardCheck, id: 'daily', label: 'Work' },
+  { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
+  { icon: CircleDollarSign, id: 'money', label: 'Money' },
 ];
 
 function isOperationsCleaning(profile) {
@@ -49,9 +49,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
             type="button"
             onClick={() => setStaffHubTab('daily')}
           >
-            <span className="mobile-tabbar__icon-wrap">
-              <ClipboardCheck size={20} />
-            </span>
+            <span className="mobile-tabbar__icon-wrap"><ClipboardCheck size={20} /></span>
             <span>Cleaning</span>
           </button>
         </nav>
@@ -65,9 +63,9 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
     return (
       <div className="mobile-app-nav">
         <div className="mobile-app-nav__handle">
-          <span>{STAFF_HUB_QUICK_TABS.find((tab) => tab.id === staffHubTab)?.label || 'Staff Hub'}</span>
+          <span>{STAFF_HUB_QUICK_TABS.find((tab) => tab.id === staffHubTab)?.label || (staffHubTab === 'stats' ? 'Growth' : 'Team')}</span>
         </div>
-        <nav className="mobile-tabbar" aria-label="Staff Hub quick navigation">
+        <nav className="mobile-tabbar" aria-label="Staff Hub navigation">
           {STAFF_HUB_QUICK_TABS.map((tab) => {
             const Icon = tab.icon;
             const active = staffHubTab === tab.id;
@@ -81,24 +79,20 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
                 type="button"
                 onClick={() => setStaffHubTab(tab.id)}
               >
-                <span className="mobile-tabbar__icon-wrap">
-                  <Icon size={20} />
-                </span>
+                <span className="mobile-tabbar__icon-wrap"><Icon size={20} /></span>
                 <span>{tab.label}</span>
               </button>
             );
           })}
           <button
             aria-current={moreActive ? 'page' : undefined}
-            aria-label="More Staff Hub sections"
+            aria-label="Open Growth and Team sections"
             className={`mobile-tabbar__item ${moreActive ? 'active' : ''}`}
             title="More"
             type="button"
             onClick={() => setStaffHubTab('more')}
           >
-            <span className="mobile-tabbar__icon-wrap">
-              <Menu size={20} />
-            </span>
+            <span className="mobile-tabbar__icon-wrap"><Menu size={20} /></span>
             <span>More</span>
           </button>
         </nav>
@@ -118,15 +112,12 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
 
   return (
     <div className="mobile-app-nav">
-      <div className="mobile-app-nav__handle">
-        <span>{activeItem?.label || 'RTB OS'}</span>
-      </div>
+      <div className="mobile-app-nav__handle"><span>{activeItem?.label || 'RTB OS'}</span></div>
       <nav className="mobile-tabbar" aria-label="Quick navigation">
         {quickItems.map((item) => {
           const Icon = item.icon;
           const active = activePage === item.id;
           const badgeCount = Number(navBadges?.[item.id] || 0);
-
           return (
             <button
               aria-current={active ? 'page' : undefined}
@@ -139,11 +130,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
             >
               <span className="mobile-tabbar__icon-wrap">
                 <Icon size={20} />
-                {badgeCount > 0 ? (
-                  <span className="mobile-tabbar__badge" aria-label={`${badgeCount} unread`}>
-                    {badgeCount > 99 ? '99+' : badgeCount}
-                  </span>
-                ) : null}
+                {badgeCount > 0 ? <span className="mobile-tabbar__badge" aria-label={`${badgeCount} unread`}>{badgeCount > 99 ? '99+' : badgeCount}</span> : null}
               </span>
               <span>{SHORT_LABELS[item.id] || item.label}</span>
             </button>
@@ -159,11 +146,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
         >
           <span className="mobile-tabbar__icon-wrap">
             <Menu size={20} />
-            {moreBadgeCount > 0 ? (
-              <span className="mobile-tabbar__badge" aria-label={`${moreBadgeCount} unread`}>
-                {moreBadgeCount > 99 ? '99+' : moreBadgeCount}
-              </span>
-            ) : null}
+            {moreBadgeCount > 0 ? <span className="mobile-tabbar__badge" aria-label={`${moreBadgeCount} unread`}>{moreBadgeCount > 99 ? '99+' : moreBadgeCount}</span> : null}
           </span>
           <span>More</span>
         </button>
