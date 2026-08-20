@@ -14,6 +14,7 @@ import './styles/behavioralUX.css';
 import './styles/humanExperience.css';
 import './styles/integrations.css';
 import './styles/staffHubHumanNav.css';
+import './styles/staffHubVibes.css';
 
 const CACHE_CLEANUP_KEY = 'rtb-os-cache-cleanup-2026-07-12';
 
