@@ -36,10 +36,10 @@ export async function loadFinancePaymentEvidence(businessUnitId) {
   const client = requireSupabase();
   const { data, error } = await client
     .from('finance_payment_confirmations')
-    .select('id,business_unit_id,recipient_name,amount,deposited_at,payment_kind,category_hint,match_status,match_confidence,bank_transaction_id,payroll_entry_id,evidence,subject,updated_at')
+    .select('id,business_unit_id,recipient_name,amount,deposited_at,direction,counterparty_type,routing_method,payment_kind,category_hint,match_status,match_confidence,bank_transaction_id,payroll_entry_id,obligation_id,evidence,subject,updated_at')
     .eq('business_unit_id', businessUnitId)
     .order('deposited_at', { ascending: false })
-    .limit(100);
+    .limit(150);
   if (error) throw error;
   return data || [];
 }
@@ -47,8 +47,8 @@ export async function loadFinancePaymentEvidence(businessUnitId) {
 export async function syncFinancePaymentEvidence(businessId) {
   return invokeFunction('gmail-payroll-sync', {
     businessId,
-    maxMessages: 250,
-    query: 'newer_than:180d from:catch@payments.interac.ca',
+    maxMessages: 500,
+    query: 'newer_than:180d (from:catch@payments.interac.ca OR from:notify@payments.interac.ca)',
   });
 }
 
