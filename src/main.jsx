@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import MobileNavigationEnhancer from './components/MobileNavigationEnhancer.jsx';
+import StaffHubNavigationEnhancer from './components/StaffHubNavigationEnhancer.jsx';
 import { AuthProfileProvider } from './contexts/AuthProfileContext.jsx';
 import './styles/global.css';
 import './styles/mobileNavigation.css';
@@ -12,6 +13,7 @@ import './styles/smartFlow.css';
 import './styles/behavioralUX.css';
 import './styles/humanExperience.css';
 import './styles/integrations.css';
+import './styles/staffHubHumanNav.css';
 
 const CACHE_CLEANUP_KEY = 'rtb-os-cache-cleanup-2026-07-12';
 
@@ -49,6 +51,7 @@ createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <AuthProfileProvider>
         <MobileNavigationEnhancer />
+        <StaffHubNavigationEnhancer />
         <App />
       </AuthProfileProvider>
     </ErrorBoundary>
