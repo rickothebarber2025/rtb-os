@@ -6,10 +6,33 @@ function client() {
 }
 function dataOrThrow({ data, error }) { if (error) throw error; return data; }
 
+const CANDIDATE_FIELDS = [
+  'business_unit_id','staff_id','full_name','email','phone','specialty','stage','hiring_reason','source','start_date',
+  'stage_started_at','public_booking_enabled','walk_ins_enabled','social_visibility_enabled','permanent_brand_endorsement',
+  'notes','exit_reason','assigned_manager_id',
+];
+
+function candidatePayload(candidate = {}) {
+  const payload = {};
+  CANDIDATE_FIELDS.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(candidate, key)) payload[key] = candidate[key];
+  });
+  payload.permanent_brand_endorsement = candidate.stage === 'official'
+    ? true
+    : Boolean(candidate.permanent_brand_endorsement);
+  payload.updated_at = new Date().toISOString();
+  return payload;
+}
+
 export async function getTalentPipeline(businessUnitId) {
   let query = client().from('talent_pipeline_summary').select('*').order('created_at', { ascending: false });
   if (businessUnitId) query = query.eq('business_unit_id', businessUnitId);
   return dataOrThrow(await query);
+}
+
+export async function getTalentManagers(businessUnitId) {
+  if (!businessUnitId) return [];
+  return dataOrThrow(await client().rpc('get_talent_manager_options', { p_business_unit_id: businessUnitId }));
 }
 
 export async function getTalentReviews(candidateId) {
@@ -17,15 +40,15 @@ export async function getTalentReviews(candidateId) {
 }
 
 export async function saveTalentCandidate(candidate) {
-  const payload = {
-    ...candidate,
-    permanent_brand_endorsement: candidate.stage === 'official' ? true : Boolean(candidate.permanent_brand_endorsement),
-    updated_at: new Date().toISOString(),
-  };
+  const payload = candidatePayload(candidate);
   const result = candidate.id
     ? await client().from('talent_candidates').update(payload).eq('id', candidate.id).select().single()
     : await client().from('talent_candidates').insert(payload).select().single();
   return dataOrThrow(result);
+}
+
+export async function assignTalentManager(candidate, assignedManagerId) {
+  return saveTalentCandidate({ ...candidate, assigned_manager_id: assignedManagerId || null });
 }
 
 export async function advanceTalentCandidate(candidate, stage) {
