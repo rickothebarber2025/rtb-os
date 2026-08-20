@@ -24,8 +24,12 @@ function serviceKey() {
 
 function isFinanceAllowed(profile: any) {
   if (!profile) return false;
-  if (String(profile.email || "").toLowerCase() === "rickothebarber@gmail.com" || profile.role === "owner" || profile.is_owner) return true;
-  const permissions = typeof profile.permissions === "string" ? JSON.parse(profile.permissions || "{}") : (profile.permissions || {});
+  if (String(profile.email || "").toLowerCase() === "rickothebarber@gmail.com" || String(profile.role || "").toLowerCase() === "owner") return true;
+  if (profile.active === false) return false;
+  let permissions = profile.permissions || {};
+  if (typeof permissions === "string") {
+    try { permissions = JSON.parse(permissions || "{}"); } catch { permissions = {}; }
+  }
   const level = permissions?.modules?.finance || permissions?.finance || "none";
   return ["view", "edit", "admin"].includes(String(level).toLowerCase());
 }
@@ -46,7 +50,8 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData.user) return json({ error: "Your session is invalid or expired." }, 401);
 
-    const { data: profile } = await admin.from("user_profiles").select("email,role,is_owner,permissions,active").eq("id", authData.user.id).maybeSingle();
+    const { data: profile, error: profileError } = await admin.from("user_profiles").select("email,role,permissions,active").eq("id", authData.user.id).maybeSingle();
+    if (profileError) return json({ error: "Could not verify Finance access." }, 500);
     if (!isFinanceAllowed(profile)) return json({ error: "Finance access is not enabled for this account." }, 403);
 
     const body = await req.json().catch(() => ({}));
