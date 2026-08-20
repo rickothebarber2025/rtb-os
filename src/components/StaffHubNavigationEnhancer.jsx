@@ -48,33 +48,31 @@ function applyRoleContext() {
   const role = rolePayload(currentProfile);
   if (!role.title) return;
 
-  const accountRole = document.querySelector('.staff-hub-account-card > strong');
-  if (accountRole && accountRole.textContent !== role.title) accountRole.textContent = role.title;
-
-  const proRole = document.querySelector('.staff-hub-pro-profile > div:first-child > span');
-  if (proRole && proRole.textContent !== role.title) proRole.textContent = role.title;
+  document.querySelectorAll('.staff-hub-account-card > strong, .staff-hub-pro-profile > div:first-child > span').forEach((node) => {
+    if (node.textContent !== role.title) node.textContent = role.title;
+  });
 
   const heroEyebrow = document.querySelector('.staff-hub-brand-lockup .eyebrow');
   if (heroEyebrow && role.template && role.template !== 'staff_portal') {
-    heroEyebrow.textContent = `${role.title} workspace`;
+    const label = `${role.title} workspace`;
+    if (heroEyebrow.textContent !== label) heroEyebrow.textContent = label;
   }
 
   const context = document.querySelector('.staff-hub-human-nav-context');
   const activeButton = document.querySelector('.staff-hub-tabs button.active, .staff-hub-sticky-tabs button.active');
   if (context) {
     const actionCopy = activeButton?.dataset.navDescription || 'Choose what you need to do.';
-    context.textContent = `${role.title} · ${actionCopy}`;
+    const copy = `${role.title} · ${actionCopy}`;
+    if (context.textContent !== copy) context.textContent = copy;
   }
 }
 
 function enhanceStaffHub() {
-  const desktopList = document.querySelector('.staff-hub-tabs');
-  const stickyList = document.querySelector('.staff-hub-sticky-tabs');
-  if (!desktopList && !stickyList) {
-    applyRoleContext();
-    return;
-  }
+  const page = document.querySelector('.staff-hub-page');
+  if (!page) return;
 
+  const desktopList = page.querySelector('.staff-hub-tabs');
+  const stickyList = page.querySelector('.staff-hub-sticky-tabs');
   enhanceTabList(desktopList);
   enhanceTabList(stickyList);
 
@@ -91,16 +89,30 @@ function enhanceStaffHub() {
 
 export default function StaffHubNavigationEnhancer() {
   useEffect(() => {
+    let scheduled = false;
+
+    const scheduleEnhance = () => {
+      if (scheduled) return;
+      scheduled = true;
+      window.requestAnimationFrame(() => {
+        scheduled = false;
+        enhanceStaffHub();
+      });
+    };
+
     function onProfile(event) {
       if (event?.detail?.profile) currentProfile = event.detail.profile;
-      enhanceStaffHub();
+      scheduleEnhance();
     }
 
     window.addEventListener('rtb:auth-session-ready', onProfile);
-    enhanceStaffHub();
+    scheduleEnhance();
 
-    const observer = new MutationObserver(() => enhanceStaffHub());
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    // Only watch React mounting/unmounting nodes. Do not observe class/attribute
+    // mutations; that previously caused repeated enhancer work during tab changes.
+    const observer = new MutationObserver(scheduleEnhance);
+    const root = document.getElementById('root');
+    if (root) observer.observe(root, { childList: true, subtree: true });
 
     return () => {
       window.removeEventListener('rtb:auth-session-ready', onProfile);
