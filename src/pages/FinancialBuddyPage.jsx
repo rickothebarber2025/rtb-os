@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Bot, CalendarDays, CheckCircle2, FileUp, Plus, RefreshCw, Send, Trash2, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Bot, CalendarDays, CheckCircle2, FileUp, MailCheck, Plus, RefreshCw, Send, Trash2, XCircle } from 'lucide-react';
 import {
   askFinancialBuddy,
   confirmFinanceMatch,
@@ -9,8 +9,9 @@ import {
   deleteFinanceTransaction,
   importFinanceCsv,
   loadFinanceIntelligence,
+  loadFinancePaymentEvidence,
   loadFinanceSnapshot,
-  refreshFinanceIntelligence,
+  refreshFinanceWithEvidence,
   rejectFinanceMatch,
 } from '../services/financeService';
 import '../styles/financialBuddy.css';
@@ -30,6 +31,14 @@ function confidenceLabel(score) {
   return 'Possible';
 }
 
+function evidenceStatus(row) {
+  if (row.match_status === 'confirmed') return 'Email + payroll + bank confirmed';
+  if (row.bank_transaction_id) return 'Email + bank matched · review';
+  if (row.payroll_entry_id) return 'Email + payroll matched · awaiting bank';
+  if (row.payment_kind === 'payroll') return 'Email identifies staff payment · awaiting bank';
+  return 'Email evidence · needs classification';
+}
+
 export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, onRefresh }) {
   const businessId = businessUnit?.id;
   const [transactions, setTransactions] = useState([]);
@@ -37,9 +46,11 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
   const [metrics, setMetrics] = useState(EMPTY_METRICS);
   const [recentImports, setRecentImports] = useState([]);
   const [intelligence, setIntelligence] = useState(EMPTY_INTELLIGENCE);
+  const [paymentEvidence, setPaymentEvidence] = useState([]);
   const [loading, setLoading] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [error, setError] = useState('');
+  const [syncNotice, setSyncNotice] = useState('');
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [asking, setAsking] = useState(false);
@@ -47,16 +58,21 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
   const [transactionForm, setTransactionForm] = useState({ transaction_date: new Date().toISOString().slice(0, 10), direction: 'expense', amount: '', category: 'Operating expense', description: '' });
   const [obligationForm, setObligationForm] = useState({ name: '', amount: '', due_day: '1', frequency: 'monthly', category: 'Operating expense' });
 
-  async function load() {
+  async function load({ clearError = true } = {}) {
     if (!businessId || isAllBusinessesView) return;
-    setLoading(true); setError('');
+    setLoading(true); if (clearError) setError('');
     try {
-      const [snapshot, intel] = await Promise.all([loadFinanceSnapshot(businessId), loadFinanceIntelligence(businessId)]);
+      const [snapshot, intel, evidence] = await Promise.all([
+        loadFinanceSnapshot(businessId),
+        loadFinanceIntelligence(businessId),
+        loadFinancePaymentEvidence(businessId),
+      ]);
       setTransactions(snapshot.transactions || []);
       setObligations(snapshot.obligations || []);
       setMetrics(snapshot.metrics || EMPTY_METRICS);
       setRecentImports(snapshot.recent_imports || []);
       setIntelligence({ ...EMPTY_INTELLIGENCE, ...intel });
+      setPaymentEvidence(evidence || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Finance data could not load.');
     } finally { setLoading(false); }
@@ -66,11 +82,16 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
 
   async function recalculate() {
     if (!businessId) return;
-    setRecalculating(true); setError('');
+    setRecalculating(true); setError(''); setSyncNotice('');
     try {
-      const intel = await refreshFinanceIntelligence(businessId);
-      setIntelligence({ ...EMPTY_INTELLIGENCE, ...intel });
-      await load();
+      const result = await refreshFinanceWithEvidence(businessId);
+      setIntelligence({ ...EMPTY_INTELLIGENCE, ...(result.intelligence || {}) });
+      if (result.evidenceWarning) {
+        setSyncNotice(`Finance recalculated. Gmail auto-sync needs attention: ${result.evidenceWarning}`);
+      } else if (result.evidenceSync) {
+        setSyncNotice(`Payment evidence checked automatically · ${result.evidenceSync.stored || 0} email confirmations updated.`);
+      }
+      await load({ clearError: false });
       onRefresh?.();
     } catch (err) { setError(err instanceof Error ? err.message : 'Finance intelligence could not refresh.'); }
     finally { setRecalculating(false); }
@@ -113,12 +134,12 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
   async function importCsv(event) {
     const file = event.target.files?.[0];
     if (!file || !businessId) return;
-    setImporting(true); setError('');
+    setImporting(true); setError(''); setSyncNotice('');
     try {
       const csvText = await file.text();
       const result = await importFinanceCsv({ businessId, csvText, fileName: file.name });
       if (!result.transactions?.length) throw new Error('No transactions were imported.');
-      await load();
+      await recalculate();
     } catch (err) { setError(err instanceof Error ? err.message : 'CSV import failed.'); }
     finally { setImporting(false); event.target.value = ''; }
   }
@@ -141,6 +162,13 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
     finally { setAsking(false); }
   }
 
+  const evidenceSummary = useMemo(() => ({
+    total: paymentEvidence.length,
+    confirmed: paymentEvidence.filter((row) => row.match_status === 'confirmed').length,
+    awaitingBank: paymentEvidence.filter((row) => !row.bank_transaction_id && row.payment_kind === 'payroll').length,
+    bankMatched: paymentEvidence.filter((row) => Boolean(row.bank_transaction_id)).length,
+  }), [paymentEvidence]);
+
   if (isAllBusinessesView) {
     return <section className="panel"><h1>Financial Buddy</h1><p>Choose one business first. Finance records, reconciliation and forecasting stay business-specific so the two locations are never mixed together.</p></section>;
   }
@@ -151,11 +179,12 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
   return (
     <div className="financial-buddy">
       <section className="panel financial-buddy__hero">
-        <div><span className="financial-buddy__eyebrow">Finance · {businessUnit?.name || 'Selected business'}</span><h1>Financial Buddy</h1><p>One Supabase financial system for revenue, payroll, imported bank activity, reconciliation, recurring expenses, calendar planning and forecasts.</p></div>
+        <div><span className="financial-buddy__eyebrow">Finance · {businessUnit?.name || 'Selected business'}</span><h1>Financial Buddy</h1><p>One Supabase financial system for revenue, payroll, Gmail payment evidence, imported bank activity, reconciliation, recurring expenses, calendar planning and forecasts.</p></div>
         <button className="secondary-button" disabled={recalculating} onClick={recalculate} type="button"><RefreshCw size={16} /> {recalculating ? 'Analyzing…' : 'Recalculate finance'}</button>
       </section>
 
       {error ? <div className="alert danger">{error}</div> : null}
+      {syncNotice ? <div className="alert info">{syncNotice}</div> : null}
 
       <section className="financial-buddy__metrics">
         <div className="financial-buddy__metric"><span>Income recorded this month</span><strong>{money.format(Number(metrics.income || 0))}</strong></div>
@@ -165,10 +194,23 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
       </section>
 
       <section className="panel">
-        <div className="section-heading"><div><span className="financial-buddy__eyebrow">Prediction</span><h2>Cash-flow outlook</h2></div><CalendarDays size={20} /></div>
+        <div className="section-heading"><div><span className="financial-buddy__eyebrow">Automatic payment evidence</span><h2><MailCheck size={20} style={{ verticalAlign: 'middle' }} /> Gmail + payroll + bank</h2></div><span>{evidenceSummary.confirmed} three-way confirmed</span></div>
         <div className="financial-buddy__metrics">
-          {(intelligence.forecasts || []).map((row) => <div className="financial-buddy__metric" key={row.id}><span>{row.horizon_days}-day forecast · {row.risk_level}</span><strong>{money.format(Number(row.expected_net || 0))}</strong><small>In {money.format(Number(row.expected_in || 0))} · Out {money.format(Number(row.expected_out || 0))}</small></div>)}
+          <div className="financial-buddy__metric"><span>Email confirmations</span><strong>{evidenceSummary.total}</strong></div>
+          <div className="financial-buddy__metric"><span>Matched to bank</span><strong>{evidenceSummary.bankMatched}</strong></div>
+          <div className="financial-buddy__metric"><span>Awaiting bank statement</span><strong>{evidenceSummary.awaitingBank}</strong></div>
+          <div className="financial-buddy__metric"><span>Three-way confirmed</span><strong>{evidenceSummary.confirmed}</strong></div>
         </div>
+        <div className="financial-buddy__list">
+          {paymentEvidence.slice(0, 20).map((row) => <div className="financial-buddy__row" key={row.id}><div><strong>{row.recipient_name}</strong><br /><small>{String(row.deposited_at || '').slice(0, 10)} · {evidenceStatus(row)} · {row.match_confidence || 0}% confidence</small></div><strong>{money.format(Number(row.amount || 0))}</strong></div>)}
+          {!paymentEvidence.length ? <p className="financial-buddy__empty">No payment confirmations have been captured for this business yet. Connect Google in Connections and Financial Buddy will scan trusted Interac confirmations automatically.</p> : null}
+        </div>
+        {evidenceSummary.awaitingBank > 0 && !recentImports.length ? <div className="alert warning">{evidenceSummary.awaitingBank} staff payment confirmation{evidenceSummary.awaitingBank === 1 ? '' : 's'} are waiting for bank-statement evidence. Import this business's bank CSV once; matching runs automatically after import.</div> : null}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading"><div><span className="financial-buddy__eyebrow">Prediction</span><h2>Cash-flow outlook</h2></div><CalendarDays size={20} /></div>
+        <div className="financial-buddy__metrics">{(intelligence.forecasts || []).map((row) => <div className="financial-buddy__metric" key={row.id}><span>{row.horizon_days}-day forecast · {row.risk_level}</span><strong>{money.format(Number(row.expected_net || 0))}</strong><small>In {money.format(Number(row.expected_in || 0))} · Out {money.format(Number(row.expected_out || 0))}</small></div>)}</div>
         {!intelligence.forecasts?.length ? <p className="financial-buddy__empty">Recalculate Finance to build the first 7/30/60/90-day forecast.</p> : null}
       </section>
 
@@ -177,20 +219,13 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
           <div className="section-heading"><div><span className="financial-buddy__eyebrow">Bank reconciliation</span><h2>Suggested matches</h2></div><span>{confirmedMatches.length} confirmed</span></div>
           <div className="financial-buddy__list">
             {suggestedMatches.slice(0, 20).map((row) => <div className="financial-buddy__row" key={row.id}><div><strong>{row.match_label}</strong><br /><small>{confidenceLabel(row.confidence)} · {row.confidence}% · expected {money.format(Number(row.expected_amount || 0))} · bank {money.format(Number(row.actual_amount || 0))}</small></div><div className="financial-buddy__actions"><button className="ghost-button small" onClick={() => reviewMatch(row.id, true)} title="Confirm match" type="button"><CheckCircle2 size={16} /></button><button className="ghost-button small" onClick={() => reviewMatch(row.id, false)} title="Reject match" type="button"><XCircle size={16} /></button></div></div>)}
-            {!suggestedMatches.length ? <p className="financial-buddy__empty">No suggested bank matches need review.</p> : null}
+            {!suggestedMatches.length ? <p className="financial-buddy__empty">No suggested bank matches need review. Gmail-only payment evidence is shown above until a bank statement is available.</p> : null}
           </div>
         </section>
-
-        <section className="panel">
-          <span className="financial-buddy__eyebrow">Detected automatically</span><h2>Recurring patterns</h2>
-          <div className="financial-buddy__list">{(intelligence.recurring_patterns || []).slice(0, 20).map((row) => <div className="financial-buddy__row" key={row.id}><div><strong>{row.label}</strong><br /><small>{row.cadence} · {row.occurrence_count} occurrences · {row.confidence}% confidence · next {row.next_expected_date || 'unknown'}</small></div><strong>{row.direction === 'income' ? '+' : '-'}{money.format(Number(row.avg_amount || 0))}</strong></div>)}{!intelligence.recurring_patterns?.length ? <p className="financial-buddy__empty">Recurring patterns appear after enough imported bank history is available.</p> : null}</div>
-        </section>
+        <section className="panel"><span className="financial-buddy__eyebrow">Detected automatically</span><h2>Recurring patterns</h2><div className="financial-buddy__list">{(intelligence.recurring_patterns || []).slice(0, 20).map((row) => <div className="financial-buddy__row" key={row.id}><div><strong>{row.label}</strong><br /><small>{row.cadence} · {row.occurrence_count} occurrences · {row.confidence}% confidence · next {row.next_expected_date || 'unknown'}</small></div><strong>{row.direction === 'income' ? '+' : '-'}{money.format(Number(row.avg_amount || 0))}</strong></div>)}{!intelligence.recurring_patterns?.length ? <p className="financial-buddy__empty">Recurring patterns appear after enough imported bank history is available.</p> : null}</div></section>
       </div>
 
-      <section className="panel">
-        <div className="section-heading"><div><span className="financial-buddy__eyebrow">Financial calendar</span><h2>Upcoming 90 days</h2></div><CalendarDays size={20} /></div>
-        <div className="financial-buddy__list">{(intelligence.calendar || []).slice(0, 40).map((row) => <div className="financial-buddy__row" key={row.id}><div><strong>{row.event_date} · {row.label}</strong><br /><small>{row.event_type} · {row.status} · {row.confidence}% confidence</small></div><strong className={row.direction === 'income' ? 'financial-buddy__amount--income' : 'financial-buddy__amount--expense'}>{row.direction === 'income' ? '+' : '-'}{money.format(Number(row.expected_amount || 0))}</strong></div>)}{!intelligence.calendar?.length ? <p className="financial-buddy__empty">Recalculate Finance to generate upcoming obligations and predicted recurring cash movements.</p> : null}</div>
-      </section>
+      <section className="panel"><div className="section-heading"><div><span className="financial-buddy__eyebrow">Financial calendar</span><h2>Upcoming 90 days</h2></div><CalendarDays size={20} /></div><div className="financial-buddy__list">{(intelligence.calendar || []).slice(0, 40).map((row) => <div className="financial-buddy__row" key={row.id}><div><strong>{row.event_date} · {row.label}</strong><br /><small>{row.event_type} · {row.status} · {row.confidence}% confidence</small></div><strong className={row.direction === 'income' ? 'financial-buddy__amount--income' : 'financial-buddy__amount--expense'}>{row.direction === 'income' ? '+' : '-'}{money.format(Number(row.expected_amount || 0))}</strong></div>)}{!intelligence.calendar?.length ? <p className="financial-buddy__empty">Recalculate Finance to generate upcoming obligations and predicted recurring cash movements.</p> : null}</div></section>
 
       <div className="financial-buddy__grid">
         <section className="panel">
@@ -222,12 +257,13 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
       </div>
 
       <section className="panel financial-buddy__ask">
-        <div><span className="financial-buddy__eyebrow">Decision support</span><h2><Bot size={20} style={{ verticalAlign: 'middle' }} /> Ask Financial Buddy</h2><p>Financial Buddy uses the same Supabase transactions, payroll, reconciliation status, calendar and cash-flow forecasts shown above.</p></div>
+        <div><span className="financial-buddy__eyebrow">Decision support</span><h2><Bot size={20} style={{ verticalAlign: 'middle' }} /> Ask Financial Buddy</h2><p>Financial Buddy uses the same Supabase transactions, payroll, payment evidence, reconciliation status, calendar and cash-flow forecasts shown above.</p></div>
         <div className="financial-buddy__quick">{QUICK_PROMPTS.map((prompt) => <button className="secondary-button" disabled={asking} key={prompt} onClick={() => ask(prompt)} type="button">{prompt}</button>)}</div>
         <textarea onChange={(e) => setQuestion(e.target.value)} placeholder="Example: What expenses are coming in the next 30 days and where is the biggest cash-flow risk?" rows={3} value={question} />
         <button className="primary-button" disabled={asking || !question.trim()} onClick={() => ask()} type="button"><Send size={16} /> {asking ? 'Analyzing…' : 'Ask Financial Buddy'}</button>
         {answer ? <div className="financial-buddy__answer">{answer}</div> : null}
       </section>
+      {loading ? <span className="financial-buddy__empty">Refreshing Finance…</span> : null}
     </div>
   );
 }
