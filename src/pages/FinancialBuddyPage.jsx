@@ -30,9 +30,57 @@ function normalizedMonthlyAmount(row) {
   }
 }
 
+function csvKey(row, names) {
+  return Object.keys(row || {}).find((candidate) => names.some((name) => candidate.toLowerCase().includes(name)));
+}
+
 function csvValue(row, names) {
-  const key = Object.keys(row || {}).find((candidate) => names.some((name) => candidate.toLowerCase().includes(name)));
+  const key = csvKey(row, names);
   return key ? row[key] : undefined;
+}
+
+function parseMoney(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const normalized = String(value).replace(/[,$()\s]/g, '').trim();
+  const number = Number(normalized);
+  if (!Number.isFinite(number)) return null;
+  return String(value).includes('(') && number > 0 ? -number : number;
+}
+
+function transactionFromCsv(raw, businessId) {
+  const description = String(csvValue(raw, ['description', 'merchant', 'payee', 'details', 'memo', 'name']) || '').trim();
+  const dateRaw = String(csvValue(raw, ['transaction date', 'posted date', 'date']) || '').trim();
+  const debitKey = csvKey(raw, ['debit', 'withdrawal', 'money out', 'charge']);
+  const creditKey = csvKey(raw, ['credit', 'deposit', 'money in', 'payment received']);
+  const amountKey = csvKey(raw, ['amount']);
+
+  const debit = debitKey ? parseMoney(raw[debitKey]) : null;
+  const credit = creditKey ? parseMoney(raw[creditKey]) : null;
+  const signedAmount = amountKey ? parseMoney(raw[amountKey]) : null;
+
+  let direction;
+  let amount;
+  if (debit !== null && Math.abs(debit) > 0) {
+    direction = 'expense';
+    amount = Math.abs(debit);
+  } else if (credit !== null && Math.abs(credit) > 0) {
+    direction = 'income';
+    amount = Math.abs(credit);
+  } else if (signedAmount !== null && signedAmount !== 0) {
+    direction = signedAmount < 0 ? 'expense' : 'income';
+    amount = Math.abs(signedAmount);
+  }
+
+  if (!description || !direction || !amount || !Number.isFinite(amount)) return null;
+  return {
+    business_unit_id: businessId,
+    transaction_date: /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? dateRaw : new Date().toISOString().slice(0, 10),
+    direction,
+    amount,
+    category: 'Imported',
+    description,
+    source: 'csv',
+  };
 }
 
 export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, onRefresh }) {
@@ -41,6 +89,7 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
   const [obligations, setObligations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [asking, setAsking] = useState(false);
@@ -74,29 +123,35 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
   async function addTransaction(event) {
     event.preventDefault();
     if (!businessId || !transactionForm.description.trim() || Number(transactionForm.amount) <= 0) return;
+    setError(''); setNotice('');
     try {
       const row = await createFinanceTransaction({ ...transactionForm, business_unit_id: businessId, amount: Number(transactionForm.amount), description: transactionForm.description.trim(), source: 'manual' });
       setTransactions((current) => [row, ...current]);
       setTransactionForm((current) => ({ ...current, amount: '', description: '' }));
+      setNotice('Transaction saved.');
     } catch (err) { setError(err instanceof Error ? err.message : 'Transaction could not be saved.'); }
   }
 
   async function addObligation(event) {
     event.preventDefault();
     if (!businessId || !obligationForm.name.trim() || Number(obligationForm.amount) <= 0) return;
+    setError(''); setNotice('');
     try {
       const row = await createFinanceObligation({ ...obligationForm, business_unit_id: businessId, amount: Number(obligationForm.amount), due_day: Number(obligationForm.due_day), status: 'active' });
       setObligations((current) => [...current, row].sort((a, b) => a.due_day - b.due_day));
       setObligationForm((current) => ({ ...current, name: '', amount: '' }));
+      setNotice('Recurring commitment saved.');
     } catch (err) { setError(err instanceof Error ? err.message : 'Recurring obligation could not be saved.'); }
   }
 
   async function removeTransaction(id) {
+    setError('');
     try { await deleteFinanceTransaction(id); setTransactions((current) => current.filter((row) => row.id !== id)); }
     catch (err) { setError(err instanceof Error ? err.message : 'Transaction could not be deleted.'); }
   }
 
   async function removeObligation(id) {
+    setError('');
     try { await deleteFinanceObligation(id); setObligations((current) => current.filter((row) => row.id !== id)); }
     catch (err) { setError(err instanceof Error ? err.message : 'Obligation could not be deleted.'); }
   }
@@ -104,29 +159,17 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
   function importCsv(event) {
     const file = event.target.files?.[0];
     if (!file || !businessId) return;
+    setError(''); setNotice('');
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       complete: async ({ data }) => {
         try {
-          const rows = data.map((raw) => {
-            const description = String(csvValue(raw, ['description', 'merchant', 'payee', 'name']) || '').trim();
-            const rawAmount = String(csvValue(raw, ['amount', 'debit', 'withdrawal', 'credit']) || '').replace(/[$,]/g, '').trim();
-            const amountNumber = Number(rawAmount);
-            const dateRaw = String(csvValue(raw, ['date']) || '').trim();
-            if (!description || !Number.isFinite(amountNumber) || amountNumber === 0) return null;
-            return {
-              business_unit_id: businessId,
-              transaction_date: /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? dateRaw : new Date().toISOString().slice(0, 10),
-              direction: amountNumber > 0 ? 'expense' : 'income',
-              amount: Math.abs(amountNumber),
-              category: 'Imported',
-              description,
-              source: 'csv',
-            };
-          }).filter(Boolean);
+          const rows = data.map((raw) => transactionFromCsv(raw, businessId)).filter(Boolean);
+          if (!rows.length) throw new Error('No recognizable transactions were found. The CSV needs a description plus an amount, debit/withdrawal, or credit/deposit column.');
           const inserted = await importFinanceTransactions(rows);
           setTransactions((current) => [...inserted, ...current]);
+          setNotice(`Imported ${inserted.length} transactions. Review imported rows before relying on the totals.`);
         } catch (err) { setError(err instanceof Error ? err.message : 'CSV import failed.'); }
         finally { event.target.value = ''; }
       },
@@ -146,7 +189,7 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
   }
 
   if (isAllBusinessesView) {
-    return <section className="panel"><h1>Financial Buddy</h1><p>Choose one business first. Finance records are intentionally kept business-specific so RTB Lounge and RTB Beauty Lounge do not get mixed together.</p></section>;
+    return <section className="panel"><h1>Financial Buddy</h1><p>Choose one business first. Finance records are intentionally kept business-specific so the businesses do not get mixed together.</p></section>;
   }
 
   return (
@@ -157,6 +200,7 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
       </section>
 
       {error ? <div className="alert danger">{error}</div> : null}
+      {notice ? <div className="alert success">{notice}</div> : null}
 
       <section className="financial-buddy__metrics">
         <div className="financial-buddy__metric"><span>Income recorded this month</span><strong>{money.format(metrics.income)}</strong></div>
@@ -168,6 +212,7 @@ export default function FinancialBuddyPage({ businessUnit, isAllBusinessesView, 
       <div className="financial-buddy__grid">
         <section className="panel">
           <div className="section-heading"><div><span className="financial-buddy__eyebrow">Transactions</span><h2>Money in and out</h2></div><label className="secondary-button" style={{ cursor: 'pointer' }}><FileUp size={16} /> Import CSV<input accept=".csv,text/csv" hidden onChange={importCsv} type="file" /></label></div>
+          <p className="financial-buddy__empty">CSV imports detect separate debit/credit columns first; signed amount columns use negative as expense and positive as income. Always review imported rows.</p>
           <form className="financial-buddy__form" onSubmit={addTransaction}>
             <label>Date<input type="date" value={transactionForm.transaction_date} onChange={(e) => setTransactionForm((v) => ({ ...v, transaction_date: e.target.value }))} /></label>
             <label>Type<select value={transactionForm.direction} onChange={(e) => setTransactionForm((v) => ({ ...v, direction: e.target.value }))}><option value="expense">Expense</option><option value="income">Income</option></select></label>
