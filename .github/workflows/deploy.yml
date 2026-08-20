@@ -6,8 +6,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
-      - 'services/textnow-github-worker/**'
-      - '.github/workflows/textnow-sync.yml'
   pull_request:
     branches: [main]
   workflow_dispatch:
