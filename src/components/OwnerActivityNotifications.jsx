@@ -1,7 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, CheckCheck, ChevronRight, X } from 'lucide-react';
+import {
+  Bell,
+  Check,
+  CheckCheck,
+  ChevronRight,
+  ClipboardCheck,
+  Clock3,
+  ListFilter,
+  UserRoundCheck,
+  Wrench,
+  X,
+} from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import '../styles/ownerActivityNotifications.css';
+
+const NOTIFICATION_TABS = [
+  { id: 'for-you', label: 'For You' },
+  { id: 'requests', label: 'Requests' },
+  { id: 'staff', label: 'Staff' },
+  { id: 'operations', label: 'Operations' },
+  { id: 'all', label: 'All' },
+];
 
 function formatWhen(value) {
   if (!value) return '';
@@ -29,27 +48,49 @@ function eventText(event) {
   return body || `${actor} recorded a staff activity update.`;
 }
 
+function eventSearchText(event) {
+  return `${event.title || ''} ${event.body || ''} ${event.actor_name || ''}`.toLowerCase();
+}
+
 function priorityFor(event) {
-  const text = `${event.title || ''} ${event.body || ''}`.toLowerCase();
-  if (/incident|failed|could not|missing|late|no.?show|urgent|damage|problem|request|approval/.test(text)) return 'attention';
+  const text = eventSearchText(event);
+  if (/incident|failed|could not|missing|late|no.?show|urgent|damage|problem|request|approval|time off/.test(text)) return 'attention';
   if (/completed|finished|closed|approved/.test(text)) return 'done';
   return 'info';
 }
 
-function groupEvents(events) {
-  const now = new Date();
-  const today = now.toDateString();
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString();
-  const groups = { 'Needs attention': [], Today: [], Yesterday: [], Earlier: [] };
-  events.forEach((event) => {
-    if (priorityFor(event) === 'attention' && !event.read) return groups['Needs attention'].push(event);
-    const stamp = new Date(event.created_at);
-    const day = Number.isNaN(stamp.getTime()) ? '' : stamp.toDateString();
-    if (day === today) groups.Today.push(event);
-    else if (day === yesterday) groups.Yesterday.push(event);
-    else groups.Earlier.push(event);
-  });
-  return Object.entries(groups).filter(([, items]) => items.length);
+function categoryFor(event) {
+  const text = eventSearchText(event);
+  if (/time off|request|approval|approve|decline/.test(text)) return 'requests';
+  if (/incident|issue|failed|damage|maintenance|inventory|restock|broken|repair|problem/.test(text)) return 'operations';
+  if (/clock|shift|late|no.?show|checklist|attendance|staff|task/.test(text)) return 'staff';
+  return 'all';
+}
+
+function destinationFor(event) {
+  const category = categoryFor(event);
+  if (category === 'operations') return { page: 'staff-hub', tab: 'daily', label: 'Open operations' };
+  if (category === 'requests') return { page: 'staff-hub', tab: 'schedule', label: 'Review request' };
+  if (category === 'staff') return { page: 'staff-hub', tab: 'daily', label: 'Review staff' };
+  return { page: 'staff-hub', tab: 'home', label: 'Open Staff Hub' };
+}
+
+function iconFor(event) {
+  const category = categoryFor(event);
+  if (category === 'requests') return UserRoundCheck;
+  if (category === 'operations') return Wrench;
+  if (category === 'staff') return Clock3;
+  return ClipboardCheck;
+}
+
+function filterEvents(events, tab) {
+  if (tab === 'all') return events;
+  if (tab === 'for-you') return events.filter((event) => !event.read && priorityFor(event) === 'attention');
+  return events.filter((event) => categoryFor(event) === tab);
+}
+
+function tabCount(events, tab) {
+  return filterEvents(events, tab).filter((event) => !event.read).length;
 }
 
 export default function OwnerActivityNotifications({ selectedBusinessUnitId, setActivePage, setStaffHubTab }) {
@@ -57,6 +98,7 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
   const [open, setOpen] = useState(false);
   const [available, setAvailable] = useState(true);
   const [working, setWorking] = useState(false);
+  const [activeTab, setActiveTab] = useState('for-you');
   const businessId = useMemo(() => (selectedBusinessUnitId === 'all-businesses' ? null : selectedBusinessUnitId || null), [selectedBusinessUnitId]);
 
   const load = useCallback(async () => {
@@ -85,6 +127,21 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
     setWorking(false);
   }
 
+  async function markOneRead(eventId) {
+    if (!supabase || !eventId) return;
+    setWorking(true);
+    const { error } = await supabase.rpc('mark_owner_activity_read', { p_event_ids: [eventId] });
+    if (!error) await load();
+    setWorking(false);
+  }
+
+  function openEvent(event) {
+    const destination = destinationFor(event);
+    setStaffHubTab?.(destination.tab);
+    setActivePage?.(destination.page);
+    setOpen(false);
+  }
+
   function reviewActivity() {
     setStaffHubTab?.('daily');
     setActivePage?.('staff-hub');
@@ -94,7 +151,7 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
   if (!available) return null;
   const unread = Number(feed.unread_count || 0);
   const events = Array.isArray(feed.events) ? feed.events : [];
-  const groups = groupEvents(events);
+  const visibleEvents = filterEvents(events, activeTab);
   const attention = events.filter((event) => priorityFor(event) === 'attention' && !event.read).length;
 
   return <div className="owner-activity-notifications">
@@ -102,24 +159,62 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
       <Bell aria-hidden="true" size={18} />
       {unread > 0 ? <span className="owner-activity-badge">{unread > 99 ? '99+' : unread}</span> : null}
     </button>
-    {open ? <div className="owner-activity-popover" role="dialog" aria-label="Staff updates">
+
+    {open ? <div className="owner-activity-popover" role="dialog" aria-label="Owner notifications">
       <div className="owner-activity-header">
-        <div><strong>What’s happening</strong><small>{attention ? `${attention} update${attention === 1 ? '' : 's'} may need you` : unread ? `${unread} new since you last checked` : 'You’re caught up'}</small></div>
-        <button className="owner-activity-close" aria-label="Close staff updates" onClick={() => setOpen(false)} type="button"><X size={18} /></button>
+        <div>
+          <strong>Notifications</strong>
+          <small>{attention ? `${attention} need${attention === 1 ? 's' : ''} your attention` : unread ? `${unread} new update${unread === 1 ? '' : 's'}` : 'You’re caught up'}</small>
+        </div>
+        <button className="owner-activity-close" aria-label="Close notifications" onClick={() => setOpen(false)} type="button"><X size={18} /></button>
       </div>
-      {attention ? <div className="owner-activity-summary"><strong>{attention} need a closer look</strong><span>Requests, issues and exceptions stay at the top.</span></div> : null}
+
+      <nav className="owner-activity-tabs" aria-label="Notification categories">
+        {NOTIFICATION_TABS.map((tab) => {
+          const count = tabCount(events, tab.id);
+          return <button
+            aria-current={activeTab === tab.id ? 'page' : undefined}
+            className={activeTab === tab.id ? 'active' : ''}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            type="button"
+          >
+            <span>{tab.label}</span>
+            {count ? <em>{count > 99 ? '99+' : count}</em> : null}
+          </button>;
+        })}
+      </nav>
+
+      {activeTab === 'for-you' && attention ? <div className="owner-activity-summary">
+        <strong>{attention} item{attention === 1 ? '' : 's'} worth checking</strong>
+        <span>Only exceptions, requests and problems that may need a decision are shown here.</span>
+      </div> : null}
+
       <div className="owner-activity-list">
-        {groups.length ? groups.map(([label, items]) => <section className="owner-activity-group" key={label}>
-          <h3>{label}</h3>
-          {items.map((event) => <article className={`${event.read ? '' : 'unread'} ${priorityFor(event)}`} key={event.id}>
-            <div className="owner-activity-dot" />
-            <div><strong>{eventText(event)}</strong><small>{[event.business_name, formatWhen(event.created_at)].filter(Boolean).join(' · ')}</small></div>
-          </article>)}
-        </section>) : <p className="owner-activity-empty">Nothing needs your attention right now.</p>}
+        {visibleEvents.length ? visibleEvents.map((event) => {
+          const EventIcon = iconFor(event);
+          const destination = destinationFor(event);
+          return <article className={`${event.read ? '' : 'unread'} ${priorityFor(event)}`} key={event.id}>
+            <div className="owner-activity-event-icon"><EventIcon size={15} /></div>
+            <div className="owner-activity-event-body">
+              <strong>{eventText(event)}</strong>
+              <small>{[event.business_name, formatWhen(event.created_at)].filter(Boolean).join(' · ')}</small>
+              <div className="owner-activity-event-actions">
+                <button onClick={() => openEvent(event)} type="button">{destination.label}<ChevronRight size={14} /></button>
+                {!event.read ? <button disabled={working} onClick={() => markOneRead(event.id)} type="button"><Check size={13} /> Mark read</button> : null}
+              </div>
+            </div>
+          </article>;
+        }) : <div className="owner-activity-empty">
+          <ListFilter size={24} />
+          <strong>{activeTab === 'for-you' ? 'Nothing needs you right now' : `No ${NOTIFICATION_TABS.find((tab) => tab.id === activeTab)?.label.toLowerCase()} updates`}</strong>
+          <span>{activeTab === 'for-you' ? 'Routine updates stay out of the way until something needs a decision.' : 'New activity will appear here automatically.'}</span>
+        </div>}
       </div>
+
       <div className="owner-activity-footer">
-        <button className="owner-activity-review" onClick={reviewActivity} type="button">Review daily operations <ChevronRight size={16} /></button>
-        {unread ? <button className="owner-activity-read" disabled={working} onClick={markAllRead} type="button"><CheckCheck size={15} /> Clear new updates</button> : null}
+        <button className="owner-activity-review" onClick={reviewActivity} type="button">Open Staff Hub <ChevronRight size={16} /></button>
+        {unread ? <button className="owner-activity-read" disabled={working} onClick={markAllRead} type="button"><CheckCheck size={15} /> Mark all read</button> : null}
       </div>
     </div> : null}
   </div>;
