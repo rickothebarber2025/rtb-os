@@ -25,8 +25,8 @@ export const INTEGRATION_PROVIDERS = [
     category: 'Business systems',
     authType: 'oauth',
     defaultStatus: 'setup_ready',
-    description: 'Owner sign-in plus approved Google services such as Gmail, Calendar and Drive when enabled.',
-    capabilities: ['Sign-in', 'Gmail', 'Calendar', 'Drive'],
+    description: 'Connect the owner Google account so RTB OS can read approved Gmail payment confirmations and use Calendar, Drive and other enabled Google services.',
+    capabilities: ['Gmail payment evidence', 'Calendar', 'Drive', 'Sign-in'],
     recommended: true,
   },
   {
