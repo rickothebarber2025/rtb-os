@@ -5,6 +5,7 @@ const OWNER_EMAIL = Deno.env.get("RTB_OWNER_EMAIL") || "rickothebarber@gmail.com
 const APP_URL = Deno.env.get("RTB_OS_PUBLIC_URL") || Deno.env.get("SITE_URL") || "https://rtbheadquaters.com/";
 const CALLBACK_URL = `${Deno.env.get("SUPABASE_URL")}/functions/v1/integration-oauth-callback`;
 const API_KEY_PROVIDERS = new Set(["jotform", "openai", "base44", "cloudflare", "metricool", "twilio", "resend"]);
+const SUPABASE_ACCOUNT_PROVIDERS = new Set(["google", "google_business"]);
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -65,6 +66,17 @@ async function vaultCredential(admin: any, provider: string, businessUnitId: str
   return String(data || "");
 }
 
+async function storeCredential(admin: any, provider: string, businessUnitId: string | null, key: string, value: string) {
+  if (!value) return;
+  const { error } = await admin.rpc("store_integration_credential", {
+    p_provider: provider,
+    p_business_unit_id: businessUnitId,
+    p_credential_key: key,
+    p_secret: value,
+  });
+  if (error) throw error;
+}
+
 async function credential(admin: any, provider: string, businessUnitId: string | null, key: string, envSuffix: string) {
   return Deno.env.get(envName(provider, envSuffix)) || await vaultCredential(admin, provider, businessUnitId, key);
 }
@@ -104,28 +116,32 @@ function safeConnection(row: Record<string, unknown>) {
   };
 }
 
-async function upsertConfiguredConnection(admin: any, provider: string, businessUnitId: string | null, connectionType: string) {
+async function findConnection(admin: any, provider: string, businessUnitId: string | null) {
   let query = admin.from("integration_connections").select("id").eq("provider", provider);
   query = businessUnitId ? query.eq("business_unit_id", businessUnitId) : query.is("business_unit_id", null);
-  const { data: existing, error: lookupError } = await query.maybeSingle();
-  if (lookupError) throw lookupError;
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return data;
+}
 
-  const row = {
-    provider,
-    business_unit_id: businessUnitId,
+async function upsertConnection(admin: any, provider: string, businessUnitId: string | null, row: Record<string, unknown>) {
+  const existing = await findConnection(admin, provider, businessUnitId);
+  const payload = { provider, business_unit_id: businessUnitId, ...row, updated_at: new Date().toISOString() };
+  if (existing?.id) {
+    const { error } = await admin.from("integration_connections").update(payload).eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await admin.from("integration_connections").insert(payload);
+    if (error) throw error;
+  }
+}
+
+async function upsertConfiguredConnection(admin: any, provider: string, businessUnitId: string | null, connectionType: string) {
+  await upsertConnection(admin, provider, businessUnitId, {
     status: connectionType === "api_key" ? "configured" : "setup_ready",
     connection_type: connectionType,
     metadata: { managed_by: "rtb_os", credential_vault: true },
-    updated_at: new Date().toISOString(),
-  };
-
-  if (existing?.id) {
-    const { error } = await admin.from("integration_connections").update(row).eq("id", existing.id);
-    if (error) throw error;
-  } else {
-    const { error } = await admin.from("integration_connections").insert(row);
-    if (error) throw error;
-  }
+  });
 }
 
 Deno.serve(async (req) => {
@@ -135,7 +151,6 @@ Deno.serve(async (req) => {
     const { admin } = await requireOwner(req);
     const body = req.method === "GET" ? {} : await req.json().catch(() => ({}));
     const requestedAction = String(body.action || "list").trim().toLowerCase();
-    // Backward-compatible aliases keep older mobile/PWA bundles from failing after API changes.
     const action = requestedAction === "status" || requestedAction === "refresh" || requestedAction === "connections"
       ? "list"
       : requestedAction === "connect"
@@ -159,6 +174,38 @@ Deno.serve(async (req) => {
 
     if (!provider) return json({ ok: false, error: "Provider is required.", code: "PROVIDER_REQUIRED" });
 
+    if (action === "capture_oauth_session") {
+      if (!SUPABASE_ACCOUNT_PROVIDERS.has(provider)) {
+        return json({ ok: false, error: "This provider does not support RTB OS account-login capture.", code: "UNSUPPORTED_PROVIDER" });
+      }
+      const accessToken = String(body.accessToken || "").trim();
+      const refreshToken = String(body.refreshToken || "").trim();
+      const scopes = Array.isArray(body.scopes) ? body.scopes.map(String) : [];
+      if (!accessToken) return json({ ok: false, error: "The provider did not return an access token. Reconnect and approve access.", code: "TOKEN_MISSING" });
+
+      const profileResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!profileResponse.ok) {
+        return json({ ok: false, error: "Google did not accept the returned account token. Reconnect and approve access.", code: "TOKEN_INVALID" });
+      }
+      const profile = await profileResponse.json().catch(() => ({}));
+      await storeCredential(admin, provider, businessUnitId, "access_token", accessToken);
+      if (refreshToken) await storeCredential(admin, provider, businessUnitId, "refresh_token", refreshToken);
+      await upsertConnection(admin, provider, businessUnitId, {
+        status: "connected",
+        connection_type: "oauth",
+        scopes,
+        metadata: {
+          managed_by: "rtb_os",
+          credential_vault: true,
+          account_name: profile.email || profile.name || "Google account",
+          provider_user_id: profile.sub || null,
+        },
+      });
+      return json({ ok: true, connected: true, accountName: profile.email || profile.name || "Google account", message: `${provider === "google_business" ? "Google Business Profile" : "Google Workspace"} connected.` });
+    }
+
     if (action === "save_setup") {
       const credentials = body.credentials && typeof body.credentials === "object" ? body.credentials : {};
       const allowedKeys = API_KEY_PROVIDERS.has(provider)
@@ -169,13 +216,7 @@ Deno.serve(async (req) => {
       for (const key of allowedKeys) {
         const value = String(credentials[key] || "").trim();
         if (!value) continue;
-        const { error } = await admin.rpc("store_integration_credential", {
-          p_provider: provider,
-          p_business_unit_id: businessUnitId,
-          p_credential_key: key,
-          p_secret: value,
-        });
-        if (error) throw error;
+        await storeCredential(admin, provider, businessUnitId, key, value);
         saved += 1;
       }
 
@@ -218,6 +259,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === "begin_connect") {
+      if (SUPABASE_ACCOUNT_PROVIDERS.has(provider)) {
+        return json({ ok: true, mode: "account_login", accountLogin: true, message: "Sign in with your Google account to connect. RTB OS handles the app credentials behind the scenes." });
+      }
+
       if (API_KEY_PROVIDERS.has(provider)) {
         const apiKey = await vaultCredential(admin, provider, businessUnitId, "api_key");
         if (!apiKey) {
@@ -236,10 +281,9 @@ Deno.serve(async (req) => {
       if (!config.clientId || !config.authorizeUrl) {
         return json({
           ok: true,
-          mode: "oauth_setup",
+          mode: "managed_oauth",
           setupRequired: true,
-          redirectUrl: CALLBACK_URL,
-          message: `Complete the one-time ${provider} app setup inside RTB OS, then sign in normally.`,
+          message: `${provider} needs one-time server setup by RTB OS before account sign-in is available. You do not need to enter a client ID or secret here.`,
         });
       }
 
@@ -260,10 +304,6 @@ Deno.serve(async (req) => {
       url.searchParams.set("response_type", "code");
       url.searchParams.set("state", state);
       if (config.scopes.length) url.searchParams.set("scope", config.scopes.join(" "));
-      if (provider === "google" || provider === "google_business") {
-        url.searchParams.set("access_type", "offline");
-        url.searchParams.set("prompt", "consent");
-      }
       return json({ ok: true, authorizationUrl: url.toString(), mode: "oauth" });
     }
 
@@ -276,8 +316,6 @@ Deno.serve(async (req) => {
     if (message === "OWNER_REQUIRED") {
       return json({ ok: false, error: "Owner access is required to manage integrations.", code: "OWNER_REQUIRED" });
     }
-    // Return structured JSON with HTTP 200 so Supabase JS preserves the actual error
-    // instead of replacing it with the generic "Edge Function returned a non-2xx" message.
     return json({ ok: false, error: message, code: "INTEGRATION_ERROR" });
   }
 });
