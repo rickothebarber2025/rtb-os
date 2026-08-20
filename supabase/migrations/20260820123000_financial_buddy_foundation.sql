@@ -35,8 +35,12 @@ create index if not exists finance_transactions_business_date_idx
   on public.finance_transactions (business_unit_id, transaction_date desc);
 create index if not exists finance_transactions_category_idx
   on public.finance_transactions (business_unit_id, category);
+create index if not exists finance_transactions_created_by_idx
+  on public.finance_transactions (created_by);
 create index if not exists finance_obligations_business_status_idx
   on public.finance_obligations (business_unit_id, status);
+create index if not exists finance_obligations_created_by_idx
+  on public.finance_obligations (created_by);
 
 alter table public.finance_transactions enable row level security;
 alter table public.finance_obligations enable row level security;
@@ -155,5 +159,8 @@ using (
   private.permission_rank(private.module_permission('finance')) >= private.permission_rank('admin')
   and private.finance_business_allowed(business_unit_id)
 );
+
+grant select, insert, update, delete on public.finance_transactions to authenticated;
+grant select, insert, update, delete on public.finance_obligations to authenticated;
 
 commit;
