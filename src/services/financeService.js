@@ -5,12 +5,16 @@ function requireSupabase() {
   return supabase;
 }
 
-async function invokeFinance(action, payload = {}) {
+async function invokeFunction(name, body = {}) {
   const client = requireSupabase();
-  const { data, error } = await client.functions.invoke('finance-api', { body: { action, ...payload } });
+  const { data, error } = await client.functions.invoke(name, { body });
   if (error) throw error;
   if (data?.error) throw new Error(data.error);
   return data || {};
+}
+
+async function invokeFinance(action, payload = {}) {
+  return invokeFunction('finance-api', { action, ...payload });
 }
 
 export async function loadFinanceSnapshot(businessUnitId) {
@@ -23,26 +27,43 @@ export async function createFinanceTransaction(payload) {
 }
 
 export async function importFinanceCsv({ businessId, csvText, fileName }) {
-  return invokeFinance('import_csv', { businessId, csvText, fileName });
+  const result = await invokeFinance('import_csv', { businessId, csvText, fileName });
+  await refreshFinanceIntelligence(businessId);
+  return result;
 }
 
 export async function deleteFinanceTransaction(id, businessId) {
   await invokeFinance('delete_transaction', { id, businessId });
+  await refreshFinanceIntelligence(businessId);
 }
 
 export async function createFinanceObligation(payload) {
   const result = await invokeFinance('create_obligation', { businessId: payload.business_unit_id, payload });
+  await refreshFinanceIntelligence(payload.business_unit_id);
   return result.obligation;
 }
 
 export async function deleteFinanceObligation(id, businessId) {
   await invokeFinance('delete_obligation', { id, businessId });
+  await refreshFinanceIntelligence(businessId);
+}
+
+export async function refreshFinanceIntelligence(businessId) {
+  return invokeFunction('finance-intelligence', { action: 'full_refresh', businessId });
+}
+
+export async function loadFinanceIntelligence(businessId) {
+  return invokeFunction('finance-intelligence', { action: 'snapshot', businessId });
+}
+
+export async function confirmFinanceMatch(id, businessId) {
+  return invokeFunction('finance-intelligence', { action: 'confirm_match', id, businessId });
+}
+
+export async function rejectFinanceMatch(id, businessId) {
+  return invokeFunction('finance-intelligence', { action: 'reject_match', id, businessId });
 }
 
 export async function askFinancialBuddy({ businessId, question }) {
-  const client = requireSupabase();
-  const { data, error } = await client.functions.invoke('financial-buddy', { body: { businessId, question } });
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
-  return data;
+  return invokeFunction('financial-buddy', { businessId, question });
 }
