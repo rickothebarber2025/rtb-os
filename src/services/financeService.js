@@ -27,9 +27,7 @@ export async function createFinanceTransaction(payload) {
 }
 
 export async function importFinanceCsv({ businessId, csvText, fileName }) {
-  const result = await invokeFinance('import_csv', { businessId, csvText, fileName });
-  await refreshFinanceIntelligence(businessId);
-  return result;
+  return invokeFinance('import_csv', { businessId, csvText, fileName });
 }
 
 export async function deleteFinanceTransaction(id, businessId) {
@@ -39,13 +37,11 @@ export async function deleteFinanceTransaction(id, businessId) {
 
 export async function createFinanceObligation(payload) {
   const result = await invokeFinance('create_obligation', { businessId: payload.business_unit_id, payload });
-  await refreshFinanceIntelligence(payload.business_unit_id);
   return result.obligation;
 }
 
 export async function deleteFinanceObligation(id, businessId) {
   await invokeFinance('delete_obligation', { id, businessId });
-  await refreshFinanceIntelligence(businessId);
 }
 
 export async function refreshFinanceIntelligence(businessId) {
