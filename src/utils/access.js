@@ -20,44 +20,22 @@ export const ROLE_OPTIONS = [
 const ROLE_LABELS = ROLE_OPTIONS.reduce((labels, role) => ({ ...labels, [role.value]: role.label }), {});
 const HUB_ONLY_TEMPLATES = new Set(['staff_portal', 'operations_cleaning']);
 
-export function getRoleLabel(role) {
-  return ROLE_LABELS[role] || 'Custom';
-}
-
-export function isAdmin(profile) {
-  return isOwnerProfile(profile) || getModulePermission(profile, 'access') === 'admin';
-}
-
-export function isManager(profile) {
-  return hasAnyModulePermission(profile, 'edit');
-}
-
-export function canUseApp(profile) {
-  return hasAnyModulePermission(profile, 'view');
-}
+export function getRoleLabel(role) { return ROLE_LABELS[role] || 'Custom'; }
+export function isAdmin(profile) { return isOwnerProfile(profile) || getModulePermission(profile, 'access') === 'admin'; }
+export function isManager(profile) { return hasAnyModulePermission(profile, 'edit'); }
+export function canUseApp(profile) { return hasAnyModulePermission(profile, 'view'); }
 
 export function canAccessPage(profile, pageId) {
   if (!canUseApp(profile)) return false;
   const payload = getEffectivePermissionsPayload(profile);
+  if (pageId === 'talent-pipeline') return hasModulePermission(profile, 'operations', 'view') || hasModulePermission(profile, 'roster', 'view');
   const moduleId = PAGE_MODULE_MAP[pageId] || PAGE_MODULE_MAP.dashboard;
-
-  if (moduleId === 'profile') {
-    return !HUB_ONLY_TEMPLATES.has(payload.role_template);
-  }
-
-  // Hub-only templates must never inherit unrelated pages through a future
-  // fallback or navigation change. Their assigned module is the source of truth.
-  if (HUB_ONLY_TEMPLATES.has(payload.role_template) && pageId !== 'staff-hub') {
-    return false;
-  }
-
+  if (moduleId === 'profile') return !HUB_ONLY_TEMPLATES.has(payload.role_template);
+  if (HUB_ONLY_TEMPLATES.has(payload.role_template) && pageId !== 'staff-hub') return false;
   return hasModulePermission(profile, moduleId, 'view');
 }
 
-export function getAllowedNavItems(profile) {
-  return NAV_ITEMS.filter((item) => canAccessPage(profile, item.id));
-}
-
+export function getAllowedNavItems(profile) { return NAV_ITEMS.filter((item) => canAccessPage(profile, item.id)); }
 export function canManageAccess(profile) { return hasModulePermission(profile, 'access', 'admin'); }
 export function canManageStaff(profile) { return hasModulePermission(profile, 'roster', 'edit'); }
 export function canDeleteStaff(profile) { return hasModulePermission(profile, 'roster', 'admin'); }
