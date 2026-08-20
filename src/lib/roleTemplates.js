@@ -6,6 +6,7 @@ import {
 function permissions(overrides) {
   return {
     ...createModulePermissions(),
+    staff_hub: 'view',
     ...overrides,
   };
 }
