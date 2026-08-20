@@ -35,10 +35,10 @@ function statusTone(status) {
 function statusLabel(status) {
   if (status === 'connected') return 'Connected';
   if (status === 'configured') return 'Configured';
-  if (status === 'setup_ready') return 'Ready to sign in';
+  if (status === 'setup_ready') return 'Optional setup';
   if (status === 'reauthorize') return 'Reconnect';
   if (status === 'error') return 'Needs attention';
-  if (status === 'setup_required') return 'Server setup needed';
+  if (status === 'setup_required') return 'Setup needed';
   return 'Not connected';
 }
 
@@ -47,7 +47,7 @@ function connectionKey(provider, businessUnitId) {
 }
 
 const EMPTY_SETUP = { api_key: '' };
-const ACCOUNT_LOGIN_PROVIDERS = new Set(['google', 'google_business']);
+const ACCOUNT_LOGIN_PROVIDERS = new Set(['google']);
 
 export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) {
   const [connections, setConnections] = useState([]);
@@ -68,7 +68,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
     try {
       setConnections(await listIntegrationConnections());
     } catch (err) {
-      setError(err.message || 'Could not load integrations. Try Refresh status.');
+      setError(err.message || 'Could not refresh connection details. Existing working systems remain available.');
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
           await refresh();
         }
       } catch (err) {
-        if (!cancelled) setError(err.message || 'The account sign-in finished, but RTB OS could not save the connection.');
+        if (!cancelled) setError(err.message || 'The account sign-in finished, but RTB OS could not save the optional Google connection.');
       } finally {
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete('integration_return');
@@ -119,9 +119,18 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
     return map;
   }, [connections]);
 
+  const providerRows = useMemo(() => INTEGRATION_PROVIDERS.map((provider) => {
+    const connection = byKey.get(connectionKey(provider.id, businessUnitId)) || byKey.get(connectionKey(provider.id, null));
+    return {
+      provider,
+      connection,
+      status: connection?.status || provider.defaultStatus || 'disconnected',
+    };
+  }), [byKey, businessUnitId]);
+
   const visibleProviders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return INTEGRATION_PROVIDERS.filter((provider) => {
+    return providerRows.filter(({ provider }) => {
       if (category !== 'All' && provider.category !== category) return false;
       if (!normalizedQuery) return true;
       return [provider.name, provider.description, provider.category, ...provider.capabilities]
@@ -129,10 +138,10 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
         .toLowerCase()
         .includes(normalizedQuery);
     });
-  }, [category, query]);
+  }, [category, providerRows, query]);
 
-  const connectedCount = connections.filter((item) => ['connected', 'configured'].includes(item.status)).length;
-  const attentionCount = connections.filter((item) => ['error', 'reauthorize'].includes(item.status)).length;
+  const connectedCount = providerRows.filter(({ status }) => ['connected', 'configured'].includes(status)).length;
+  const attentionCount = providerRows.filter(({ status }) => ['error', 'reauthorize'].includes(status)).length;
 
   function openApiKeySetup(provider) {
     setSetupProvider(provider);
@@ -143,12 +152,12 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
 
   async function handleConnect(provider) {
     if (provider.authType === 'manual') {
-      setNotice(`${provider.name} does not currently support direct account sign-in. RTB OS will use imports or a supported data feed when available.`);
+      setNotice(`${provider.name} is not being reconfigured from this screen. RTB OS will keep the existing source isolated until its production sync is verified.`);
       return;
     }
 
     if (provider.authType === 'system') {
-      setNotice(`${provider.name} is managed automatically by RTB OS.`);
+      setNotice(`${provider.name} is already managed automatically by RTB OS. No login is required here.`);
       return;
     }
 
@@ -171,7 +180,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
         return;
       }
       if (result.setupRequired) {
-        setNotice(result.message || `${provider.name} needs one-time server setup by RTB OS. You do not need to enter developer credentials.`);
+        setNotice(result.message || `${provider.name} needs one-time server setup by RTB OS.`);
         return;
       }
       setNotice(result.message || `${provider.name} is ready.`);
@@ -186,7 +195,6 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
   async function handleSaveSetup(event) {
     event.preventDefault();
     if (!setupProvider) return;
-
     setBusyProvider(setupProvider.id);
     setError('');
     setNotice('');
@@ -204,6 +212,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
   }
 
   async function handleDisconnect(provider) {
+    if (provider.authType === 'system') return;
     if (!window.confirm(`Disconnect ${provider.name} from RTB OS?`)) return;
     setBusyProvider(provider.id);
     setError('');
@@ -219,6 +228,10 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
   }
 
   async function handleTest(provider) {
+    if (provider.authType === 'system') {
+      setNotice(`${provider.name} is already verified through its production data path.`);
+      return;
+    }
     setBusyProvider(provider.id);
     setError('');
     try {
@@ -236,10 +249,8 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
     <div className="page-grid integrations-page">
       <section className="hero-panel full-span">
         <div>
-          <h2>Connections & integrations</h2>
-          <p>
-            Connect your accounts with normal provider sign-in. RTB OS keeps developer credentials and technical setup out of your way.
-          </p>
+          <h2>Business connections</h2>
+          <p>Only systems RTB actually depends on are shown here. Working data paths stay untouched unless there is a real production problem.</p>
         </div>
         <button className="secondary-button" type="button" onClick={refresh} disabled={loading}>
           <RefreshCw size={16} />
@@ -247,7 +258,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
         </button>
       </section>
 
-      {error ? <div className="alert danger full-span">{error}</div> : null}
+      {error ? <div className="alert warning full-span">{error}</div> : null}
       {notice ? <div className="alert success full-span">{notice}</div> : null}
 
       {setupProvider ? (
@@ -256,116 +267,72 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
             <div className="integration-provider-icon"><ShieldCheck size={20} /></div>
             <div>
               <h3>Connect {setupProvider.name}</h3>
-              <p className="subtle-text">This service uses an API credential instead of account sign-in. Enter it once; RTB OS encrypts it and does not show it again.</p>
+              <p className="subtle-text">Enter this credential once. RTB OS stores it server-side and does not show it again.</p>
             </div>
           </div>
-
           <form className="page-grid" onSubmit={handleSaveSetup}>
             <label className="full-span">
               <span>Credential / API key</span>
-              <input
-                type="password"
-                autoComplete="off"
-                value={setupForm.api_key}
-                onChange={(event) => setSetupForm({ api_key: event.target.value })}
-                placeholder={`Paste your ${setupProvider.name} credential`}
-                required
-              />
+              <input type="password" autoComplete="off" value={setupForm.api_key} onChange={(event) => setSetupForm({ api_key: event.target.value })} required />
             </label>
             <div className="action-row full-span">
-              <button className="primary-button" type="submit" disabled={busyProvider === setupProvider.id}>
-                {busyProvider === setupProvider.id ? 'Saving…' : 'Save securely'}
-              </button>
-              <button className="ghost-button" type="button" disabled={busyProvider === setupProvider.id} onClick={() => setSetupProvider(null)}>
-                Cancel
-              </button>
+              <button className="primary-button" type="submit" disabled={busyProvider === setupProvider.id}>{busyProvider === setupProvider.id ? 'Saving…' : 'Save securely'}</button>
+              <button className="ghost-button" type="button" disabled={busyProvider === setupProvider.id} onClick={() => setSetupProvider(null)}>Cancel</button>
             </div>
           </form>
         </section>
       ) : null}
 
       <section className="metrics-grid full-span integrations-metrics">
-        <div className="panel integration-metric-card">
-          <CheckCircle2 size={20} />
-          <div><strong>{connectedCount}</strong><span>Ready</span></div>
-        </div>
-        <div className="panel integration-metric-card">
-          <CircleAlert size={20} />
-          <div><strong>{attentionCount}</strong><span>Need attention</span></div>
-        </div>
-        <div className="panel integration-metric-card">
-          <ShieldCheck size={20} />
-          <div><strong>Protected</strong><span>Server-side credentials</span></div>
-        </div>
+        <div className="panel integration-metric-card"><CheckCircle2 size={20} /><div><strong>{connectedCount}</strong><span>Working</span></div></div>
+        <div className="panel integration-metric-card"><CircleAlert size={20} /><div><strong>{attentionCount}</strong><span>Need attention</span></div></div>
+        <div className="panel integration-metric-card"><ShieldCheck size={20} /><div><strong>5</strong><span>Core systems only</span></div></div>
       </section>
 
       <section className="panel full-span integrations-toolbar">
-        <label className="integration-search">
-          <Search size={16} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search integrations" />
-        </label>
+        <label className="integration-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search business systems" /></label>
         <div className="integration-category-row">
           {INTEGRATION_CATEGORIES.map((item) => (
-            <button className={category === item ? 'secondary-button small' : 'ghost-button small'} key={item} type="button" onClick={() => setCategory(item)}>
-              {item}
-            </button>
+            <button className={category === item ? 'secondary-button small' : 'ghost-button small'} key={item} type="button" onClick={() => setCategory(item)}>{item}</button>
           ))}
         </div>
       </section>
 
       <section className="integration-grid full-span">
-        {visibleProviders.map((provider) => {
-          const connection = byKey.get(connectionKey(provider.id, businessUnitId)) || byKey.get(connectionKey(provider.id, null));
-          const status = connection?.status || (provider.id === 'supabase' ? 'connected' : 'disconnected');
+        {visibleProviders.map(({ provider, connection, status }) => {
           const busy = busyProvider === provider.id;
           const AuthIcon = provider.authType === 'api_key' ? KeyRound : provider.authType === 'manual' ? Plug : Link2;
-          const ready = ['connected', 'configured', 'setup_ready'].includes(status);
+          const ready = ['connected', 'configured'].includes(status);
+          const systemManaged = provider.authType === 'system';
 
           return (
             <article className="panel integration-card" key={provider.id}>
               <div className="integration-card-header">
                 <div className="integration-provider-icon"><AuthIcon size={20} /></div>
                 <div>
-                  <div className="integration-title-row">
-                    <h3>{provider.name}</h3>
-                    {provider.recommended ? <span className="integration-recommended">Recommended</span> : null}
-                  </div>
-                  <span className="subtle-text">
-                    {provider.category} · {provider.authType === 'oauth' ? 'Sign in to connect' : provider.authType === 'api_key' ? 'Enter once' : provider.authType.replace('_', ' ')}
-                  </span>
+                  <div className="integration-title-row"><h3>{provider.name}</h3>{provider.recommended ? <span className="integration-recommended">Core</span> : null}</div>
+                  <span className="subtle-text">{provider.category} · {systemManaged ? 'RTB managed' : provider.authType === 'oauth' ? 'Optional account access' : 'Production sync'}</span>
                 </div>
                 <StatusBadge tone={statusTone(status)}>{statusLabel(status)}</StatusBadge>
               </div>
 
               <p>{provider.description}</p>
-
-              <div className="integration-capabilities">
-                {provider.capabilities.map((item) => <span key={item}>{item}</span>)}
-              </div>
-
+              <div className="integration-capabilities">{provider.capabilities.map((item) => <span key={item}>{item}</span>)}</div>
               {connection?.account_name ? <p className="subtle-text">Connected account: {connection.account_name}</p> : null}
               {connection?.last_error ? <div className="alert warning">{connection.last_error}</div> : null}
 
               <div className="action-row integration-actions">
-                {ready && provider.id !== 'supabase' ? (
+                {systemManaged ? (
+                  <button className="ghost-button small" type="button" onClick={() => handleTest(provider)}><CheckCircle2 size={14} /> Managed by RTB OS</button>
+                ) : ready ? (
                   <>
-                    <button className="ghost-button small" type="button" disabled={busy} onClick={() => handleTest(provider)}>
-                      <RefreshCw size={14} /> Check
-                    </button>
-                    {status === 'setup_ready' ? (
-                      <button className="primary-button small" type="button" disabled={busy} onClick={() => handleConnect(provider)}>
-                        <Link2 size={14} /> Sign in
-                      </button>
-                    ) : null}
-                    <button className="ghost-button small danger" type="button" disabled={busy} onClick={() => handleDisconnect(provider)}>
-                      <Unplug size={14} /> Disconnect
-                    </button>
+                    <button className="ghost-button small" type="button" disabled={busy} onClick={() => handleTest(provider)}><RefreshCw size={14} /> Check</button>
+                    <button className="ghost-button small danger" type="button" disabled={busy} onClick={() => handleDisconnect(provider)}><Unplug size={14} /> Disconnect</button>
                   </>
+                ) : status === 'setup_ready' ? (
+                  <button className="secondary-button small" type="button" disabled={busy} onClick={() => handleConnect(provider)}><Link2 size={14} /> Enable if needed</button>
                 ) : (
-                  <button className="primary-button small" type="button" disabled={busy || provider.id === 'supabase'} onClick={() => handleConnect(provider)}>
-                    <Link2 size={14} />
-                    {busy ? 'Connecting…' : status === 'reauthorize' ? 'Reconnect' : provider.authType === 'api_key' ? 'Set up' : 'Sign in'}
-                  </button>
+                  <button className="ghost-button small" type="button" disabled={busy} onClick={() => handleConnect(provider)}><RefreshCw size={14} /> View status</button>
                 )}
               </div>
             </article>
