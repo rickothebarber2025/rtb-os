@@ -1,11 +1,30 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 
+const GOOGLE_PROVIDER_SCOPES = {
+  google: [
+    'openid',
+    'email',
+    'profile',
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/contacts.readonly',
+    'https://www.googleapis.com/auth/spreadsheets.readonly',
+    'https://www.googleapis.com/auth/gmail.readonly',
+  ],
+  google_business: [
+    'openid',
+    'email',
+    'profile',
+    'https://www.googleapis.com/auth/business.manage',
+  ],
+};
+
 function friendlyIntegrationError(error, data) {
   const code = String(data?.code || '').trim();
   if (code === 'AUTH_REQUIRED') return 'Your RTB OS session expired. Sign in again or refresh and retry.';
   if (code === 'OWNER_REQUIRED') return 'Owner access is required to manage integrations.';
   if (code === 'PROVIDER_REQUIRED') return 'Choose an integration and try again.';
-  if (code === 'SETUP_REQUIRED') return 'Finish the one-time connection setup, then try again.';
+  if (code === 'SETUP_REQUIRED') return 'This connection is not enabled on the RTB OS server yet.';
 
   const serverMessage = data?.error || data?.message;
   if (serverMessage) return String(serverMessage);
@@ -39,8 +58,6 @@ async function invoke(action, payload = {}) {
 
   let response = await callFunction(action, payload);
 
-  // Mobile/PWA sessions can remain open while their JWT expires. Refresh only when
-  // the server or Supabase gateway explicitly reports an authentication problem.
   if (shouldRefreshSession(response)) {
     const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
     if (!refreshError && refreshed?.session?.access_token) {
@@ -61,6 +78,50 @@ export async function listIntegrationConnections() {
 
 export async function beginIntegrationConnection(provider, businessUnitId) {
   return invoke('begin_connect', { provider, businessUnitId: businessUnitId || null });
+}
+
+export async function beginAccountLogin(provider, businessUnitId) {
+  if (!GOOGLE_PROVIDER_SCOPES[provider]) return null;
+  if (!isSupabaseConfigured || !supabase) throw new Error('RTB OS sign-in is not configured.');
+
+  const returnUrl = new URL(window.location.href);
+  returnUrl.searchParams.set('integration_return', provider);
+  if (businessUnitId) returnUrl.searchParams.set('integration_business', businessUnitId);
+  else returnUrl.searchParams.delete('integration_business');
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: returnUrl.toString(),
+      scopes: GOOGLE_PROVIDER_SCOPES[provider].join(' '),
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+        include_granted_scopes: 'true',
+      },
+    },
+  });
+  if (error) throw error;
+  if (data?.url) window.location.assign(data.url);
+  return data || {};
+}
+
+export async function finalizeAccountLogin(provider, businessUnitId) {
+  if (!GOOGLE_PROVIDER_SCOPES[provider]) return null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  const session = data?.session;
+  if (!session?.provider_token) {
+    throw new Error('Google sign-in completed, but Google did not return an account access token. Reconnect and approve the requested permissions.');
+  }
+
+  return invoke('capture_oauth_session', {
+    provider,
+    businessUnitId: businessUnitId || null,
+    accessToken: session.provider_token,
+    refreshToken: session.provider_refresh_token || '',
+    scopes: GOOGLE_PROVIDER_SCOPES[provider],
+  });
 }
 
 export async function saveIntegrationSetup(provider, businessUnitId, credentials) {
