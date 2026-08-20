@@ -26,7 +26,6 @@ const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
 const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
 const PublicPromotionsPage = lazy(() => import('./pages/PublicPromotionsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const OperationsPage = lazy(() => import('./pages/OperationsPage'));
 const MyRolePage = lazy(() => import('./pages/MyRolePage'));
 const PayrollPage = lazy(() => import('./pages/PayrollPage'));
@@ -200,96 +199,34 @@ export default function App() {
 
     switch (activePage) {
       case 'access':
-        return (
-          <ModuleGate module="access">
-            <AccessPage
-              accessProfile={auth.profile}
-              businessUnits={data.businessUnits}
-              currentUserId={auth.user?.id}
-            />
-          </ModuleGate>
-        );
+        return <ModuleGate module="access"><AccessPage accessProfile={auth.profile} businessUnits={data.businessUnits} currentUserId={auth.user?.id} /></ModuleGate>;
       case 'action-center':
-        return (
-          <ModuleGate module="operations">
-            <ActionCenterPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="operations"><ActionCenterPage {...pageProps} /></ModuleGate>;
       case 'ai-consultant':
-        return (
-          <ModuleGate module="operations">
-            <AiConsultantPage {...pageProps} />
-          </ModuleGate>
-        );
-      case 'messages':
-        return (
-          <ModuleGate module="messages">
-            <MessagesPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="operations"><AiConsultantPage {...pageProps} /></ModuleGate>;
       case 'payroll':
-        return (
-          <ModuleGate module="payroll">
-            <PayrollPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="payroll"><PayrollPage {...pageProps} /></ModuleGate>;
       case 'staff':
-        return (
-          <ModuleGate module="roster">
-            <StaffPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="roster"><StaffPage {...pageProps} /></ModuleGate>;
       case 'talent-pipeline':
-        return (
-          <ModuleGate module="roster" minimum="edit">
-            <TalentPipelinePage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="roster" minimum="edit"><TalentPipelinePage {...pageProps} /></ModuleGate>;
       case 'staff-hub':
-        return (
-          <ModuleGate module="staff_hub">
-            <StaffHubPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="staff_hub"><StaffHubPage {...pageProps} /></ModuleGate>;
       case 'performance':
-        return (
-          <ModuleGate module="performance">
-            <PerformancePage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="performance"><PerformancePage {...pageProps} /></ModuleGate>;
       case 'customer-intelligence':
-        return (
-          <ModuleGate module="performance">
-            <CustomerIntelligencePage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="performance"><CustomerIntelligencePage {...pageProps} /></ModuleGate>;
       case 'operations':
-        return (
-          <ModuleGate module="operations">
-            <OperationsPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="operations"><OperationsPage {...pageProps} /></ModuleGate>;
       case 'integrations':
-        return (
-          <ModuleGate module="settings">
-            <IntegrationsPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="settings"><IntegrationsPage {...pageProps} /></ModuleGate>;
       case 'system':
-        return (
-          <ModuleGate module="settings">
-            <SystemPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="settings"><SystemPage {...pageProps} /></ModuleGate>;
       case 'my-role':
         return <MyRolePage {...pageProps} />;
       case 'dashboard':
       default:
-        return (
-          <ModuleGate module="dashboard">
-            <DashboardPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="dashboard"><DashboardPage {...pageProps} /></ModuleGate>;
     }
   }
 
