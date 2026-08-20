@@ -20,6 +20,7 @@ import {
   beginIntegrationConnection,
   disconnectIntegration,
   finalizeAccountLogin,
+  getPendingAccountLogin,
   listIntegrationConnections,
   saveIntegrationSetup,
   testIntegrationConnection,
@@ -80,10 +81,11 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const provider = params.get('integration_return');
+    const pending = getPendingAccountLogin();
+    const provider = params.get('integration_return') || pending?.provider || '';
     if (!provider || !ACCOUNT_LOGIN_PROVIDERS.has(provider)) return;
 
-    const returnedBusinessUnitId = params.get('integration_business') || null;
+    const returnedBusinessUnitId = params.get('integration_business') || pending?.businessUnitId || null;
     let cancelled = false;
 
     async function finish() {
