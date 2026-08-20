@@ -57,13 +57,17 @@ begin
   from public.user_profiles
   where id = (select auth.uid());
 
-  if current_profile.id is null or current_profile.active is false then
+  if current_profile.id is null then
     return false;
   end if;
 
   if lower(coalesce(current_profile.email, '')) = 'rickothebarber@gmail.com'
      or lower(coalesce(current_profile.role, '')) = 'owner' then
     return true;
+  end if;
+
+  if current_profile.active is false then
+    return false;
   end if;
 
   payload := coalesce(current_profile.permissions, '{}'::jsonb);
