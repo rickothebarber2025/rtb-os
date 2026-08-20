@@ -16,8 +16,10 @@ import {
   INTEGRATION_PROVIDERS,
 } from '../config/integrationProviders';
 import {
+  beginAccountLogin,
   beginIntegrationConnection,
   disconnectIntegration,
+  finalizeAccountLogin,
   listIntegrationConnections,
   saveIntegrationSetup,
   testIntegrationConnection,
@@ -36,7 +38,7 @@ function statusLabel(status) {
   if (status === 'setup_ready') return 'Ready to sign in';
   if (status === 'reauthorize') return 'Reconnect';
   if (status === 'error') return 'Needs attention';
-  if (status === 'setup_required') return 'One-time setup';
+  if (status === 'setup_required') return 'Server setup needed';
   return 'Not connected';
 }
 
@@ -44,15 +46,8 @@ function connectionKey(provider, businessUnitId) {
   return `${provider}:${businessUnitId || 'global'}`;
 }
 
-const EMPTY_SETUP = {
-  api_key: '',
-  client_id: '',
-  client_secret: '',
-  authorize_url: '',
-  token_url: '',
-  redirect_url: '',
-  scopes: '',
-};
+const EMPTY_SETUP = { api_key: '' };
+const ACCOUNT_LOGIN_PROVIDERS = new Set(['google', 'google_business']);
 
 export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) {
   const [connections, setConnections] = useState([]);
@@ -63,9 +58,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
   const [category, setCategory] = useState('All');
   const [query, setQuery] = useState('');
   const [setupProvider, setSetupProvider] = useState(null);
-  const [setupMode, setSetupMode] = useState('');
   const [setupForm, setSetupForm] = useState(EMPTY_SETUP);
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const businessUnitId = isAllBusinessesView ? null : businessUnit?.id || null;
 
@@ -83,6 +76,38 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
 
   useEffect(() => {
     refresh();
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const provider = params.get('integration_return');
+    if (!provider || !ACCOUNT_LOGIN_PROVIDERS.has(provider)) return;
+
+    const returnedBusinessUnitId = params.get('integration_business') || null;
+    let cancelled = false;
+
+    async function finish() {
+      setBusyProvider(provider);
+      setError('');
+      try {
+        const result = await finalizeAccountLogin(provider, returnedBusinessUnitId);
+        if (!cancelled) {
+          setNotice(result?.message || 'Account connected to RTB OS.');
+          await refresh();
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'The account sign-in finished, but RTB OS could not save the connection.');
+      } finally {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('integration_return');
+        cleanUrl.searchParams.delete('integration_business');
+        window.history.replaceState({}, '', cleanUrl.toString());
+        if (!cancelled) setBusyProvider('');
+      }
+    }
+
+    finish();
+    return () => { cancelled = true; };
   }, []);
 
   const byKey = useMemo(() => {
@@ -109,18 +134,16 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
   const connectedCount = connections.filter((item) => ['connected', 'configured'].includes(item.status)).length;
   const attentionCount = connections.filter((item) => ['error', 'reauthorize'].includes(item.status)).length;
 
-  function openSetup(provider, mode, result = {}) {
+  function openApiKeySetup(provider) {
     setSetupProvider(provider);
-    setSetupMode(mode);
-    setSetupForm({ ...EMPTY_SETUP, redirect_url: result.redirectUrl || '' });
-    setShowAdvanced(false);
+    setSetupForm(EMPTY_SETUP);
     setNotice('');
     setError('');
   }
 
   async function handleConnect(provider) {
     if (provider.authType === 'manual') {
-      setNotice(`${provider.name} does not currently support a direct sign-in connection. RTB OS will use imports or a supported data feed when available.`);
+      setNotice(`${provider.name} does not currently support direct account sign-in. RTB OS will use imports or a supported data feed when available.`);
       return;
     }
 
@@ -133,13 +156,22 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
     setError('');
     setNotice('');
     try {
+      if (ACCOUNT_LOGIN_PROVIDERS.has(provider.id)) {
+        await beginAccountLogin(provider.id, businessUnitId);
+        return;
+      }
+
       const result = await beginIntegrationConnection(provider.id, businessUnitId);
       if (result.authorizationUrl) {
         window.location.assign(result.authorizationUrl);
         return;
       }
+      if (result.mode === 'api_key' && result.setupRequired) {
+        openApiKeySetup(provider);
+        return;
+      }
       if (result.setupRequired) {
-        openSetup(provider, result.mode, result);
+        setNotice(result.message || `${provider.name} needs one-time server setup by RTB OS. You do not need to enter developer credentials.`);
         return;
       }
       setNotice(result.message || `${provider.name} is ready.`);
@@ -155,35 +187,15 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
     event.preventDefault();
     if (!setupProvider) return;
 
-    const credentials = setupMode === 'api_key'
-      ? { api_key: setupForm.api_key }
-      : {
-          client_id: setupForm.client_id,
-          client_secret: setupForm.client_secret,
-          authorize_url: setupForm.authorize_url,
-          token_url: setupForm.token_url,
-          redirect_url: setupForm.redirect_url,
-          scopes: setupForm.scopes,
-        };
-
     setBusyProvider(setupProvider.id);
     setError('');
     setNotice('');
     try {
-      const result = await saveIntegrationSetup(setupProvider.id, businessUnitId, credentials);
-      setNotice(result.message || `${setupProvider.name} setup saved securely.`);
-      const provider = setupProvider;
+      const result = await saveIntegrationSetup(setupProvider.id, businessUnitId, { api_key: setupForm.api_key });
+      setNotice(result.message || `${setupProvider.name} credential saved securely.`);
       setSetupProvider(null);
-      setSetupMode('');
       setSetupForm(EMPTY_SETUP);
       await refresh();
-
-      if (result.mode === 'oauth') {
-        const next = await beginIntegrationConnection(provider.id, businessUnitId);
-        if (next.authorizationUrl) window.location.assign(next.authorizationUrl);
-        else if (next.setupRequired) openSetup(provider, next.mode, next);
-        else setNotice(next.message || `${provider.name} setup saved.`);
-      }
     } catch (err) {
       setError(err.message || `Could not save ${setupProvider.name} setup.`);
     } finally {
@@ -192,7 +204,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
   }
 
   async function handleDisconnect(provider) {
-    if (!window.confirm(`Disconnect ${provider.name} from RTB OS? The stored connection record will be removed.`)) return;
+    if (!window.confirm(`Disconnect ${provider.name} from RTB OS?`)) return;
     setBusyProvider(provider.id);
     setError('');
     try {
@@ -226,8 +238,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
         <div>
           <h2>Connections & integrations</h2>
           <p>
-            Connect once. RTB OS handles the technical setup, stores credentials securely,
-            and reuses the connection wherever the platform needs it.
+            Connect your accounts with normal provider sign-in. RTB OS keeps developer credentials and technical setup out of your way.
           </p>
         </div>
         <button className="secondary-button" type="button" onClick={refresh} disabled={loading}>
@@ -245,80 +256,25 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
             <div className="integration-provider-icon"><ShieldCheck size={20} /></div>
             <div>
               <h3>Connect {setupProvider.name}</h3>
-              <p className="subtle-text">
-                {setupMode === 'api_key'
-                  ? 'Enter the credential once. RTB OS encrypts it in the server vault and does not show it again.'
-                  : 'This provider needs a one-time app connection setup. Save it here, then RTB OS will send you to the normal provider sign-in screen.'}
-              </p>
+              <p className="subtle-text">This service uses an API credential instead of account sign-in. Enter it once; RTB OS encrypts it and does not show it again.</p>
             </div>
           </div>
 
           <form className="page-grid" onSubmit={handleSaveSetup}>
-            {setupMode === 'api_key' ? (
-              <label className="full-span">
-                <span>Credential / API key</span>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  value={setupForm.api_key}
-                  onChange={(event) => setSetupForm((current) => ({ ...current, api_key: event.target.value }))}
-                  placeholder={`Paste your ${setupProvider.name} credential`}
-                  required
-                />
-              </label>
-            ) : (
-              <>
-                <label>
-                  <span>Client ID</span>
-                  <input
-                    value={setupForm.client_id}
-                    onChange={(event) => setSetupForm((current) => ({ ...current, client_id: event.target.value }))}
-                    placeholder="Client ID"
-                    required
-                  />
-                </label>
-                <label>
-                  <span>Client secret</span>
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    value={setupForm.client_secret}
-                    onChange={(event) => setSetupForm((current) => ({ ...current, client_secret: event.target.value }))}
-                    placeholder="Client secret"
-                    required
-                  />
-                </label>
-                <div className="full-span">
-                  <button className="ghost-button small" type="button" onClick={() => setShowAdvanced((value) => !value)}>
-                    {showAdvanced ? 'Hide advanced setup' : 'Advanced setup'}
-                  </button>
-                </div>
-                {showAdvanced ? (
-                  <>
-                    <label className="full-span">
-                      <span>Authorization URL</span>
-                      <input value={setupForm.authorize_url} onChange={(event) => setSetupForm((current) => ({ ...current, authorize_url: event.target.value }))} placeholder="Provider authorization URL" />
-                    </label>
-                    <label className="full-span">
-                      <span>Token URL</span>
-                      <input value={setupForm.token_url} onChange={(event) => setSetupForm((current) => ({ ...current, token_url: event.target.value }))} placeholder="Provider token URL" />
-                    </label>
-                    <label className="full-span">
-                      <span>Redirect URL</span>
-                      <input value={setupForm.redirect_url} onChange={(event) => setSetupForm((current) => ({ ...current, redirect_url: event.target.value }))} placeholder="RTB OS callback URL" />
-                    </label>
-                    <label className="full-span">
-                      <span>Scopes</span>
-                      <input value={setupForm.scopes} onChange={(event) => setSetupForm((current) => ({ ...current, scopes: event.target.value }))} placeholder="Space-separated permissions" />
-                    </label>
-                  </>
-                ) : null}
-              </>
-            )}
-
+            <label className="full-span">
+              <span>Credential / API key</span>
+              <input
+                type="password"
+                autoComplete="off"
+                value={setupForm.api_key}
+                onChange={(event) => setSetupForm({ api_key: event.target.value })}
+                placeholder={`Paste your ${setupProvider.name} credential`}
+                required
+              />
+            </label>
             <div className="action-row full-span">
               <button className="primary-button" type="submit" disabled={busyProvider === setupProvider.id}>
-                {busyProvider === setupProvider.id ? 'Saving…' : setupMode === 'api_key' ? 'Save securely' : 'Save & continue'}
+                {busyProvider === setupProvider.id ? 'Saving…' : 'Save securely'}
               </button>
               <button className="ghost-button" type="button" disabled={busyProvider === setupProvider.id} onClick={() => setSetupProvider(null)}>
                 Cancel
@@ -339,7 +295,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
         </div>
         <div className="panel integration-metric-card">
           <ShieldCheck size={20} />
-          <div><strong>Encrypted</strong><span>Credential vault</span></div>
+          <div><strong>Protected</strong><span>Server-side credentials</span></div>
         </div>
       </section>
 
@@ -408,7 +364,7 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
                 ) : (
                   <button className="primary-button small" type="button" disabled={busy || provider.id === 'supabase'} onClick={() => handleConnect(provider)}>
                     <Link2 size={14} />
-                    {busy ? 'Connecting…' : status === 'reauthorize' ? 'Reconnect' : 'Connect'}
+                    {busy ? 'Connecting…' : status === 'reauthorize' ? 'Reconnect' : provider.authType === 'api_key' ? 'Set up' : 'Sign in'}
                   </button>
                 )}
               </div>
