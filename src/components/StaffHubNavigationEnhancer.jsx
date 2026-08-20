@@ -9,6 +9,16 @@ const NAV_ITEMS = [
   { label: 'Team', description: 'Updates, policies, spotlight, profile and team resources.' },
 ];
 
+let currentProfile = null;
+
+function rolePayload(profile) {
+  const permissions = profile?.permissions && typeof profile.permissions === 'object' ? profile.permissions : {};
+  return {
+    template: String(permissions.role_template || '').trim(),
+    title: String(profile?.role_title || permissions.role_title || profile?.role || 'Staff').trim(),
+  };
+}
+
 function setButtonLabel(button, item) {
   if (!button || !item) return;
   button.dataset.humanNav = 'true';
@@ -33,10 +43,37 @@ function enhanceTabList(list) {
   buttons.forEach((button, index) => setButtonLabel(button, NAV_ITEMS[index]));
 }
 
+function applyRoleContext() {
+  if (!currentProfile) return;
+  const role = rolePayload(currentProfile);
+  if (!role.title) return;
+
+  const accountRole = document.querySelector('.staff-hub-account-card > strong');
+  if (accountRole && accountRole.textContent !== role.title) accountRole.textContent = role.title;
+
+  const proRole = document.querySelector('.staff-hub-pro-profile > div:first-child > span');
+  if (proRole && proRole.textContent !== role.title) proRole.textContent = role.title;
+
+  const heroEyebrow = document.querySelector('.staff-hub-brand-lockup .eyebrow');
+  if (heroEyebrow && role.template && role.template !== 'staff_portal') {
+    heroEyebrow.textContent = `${role.title} workspace`;
+  }
+
+  const context = document.querySelector('.staff-hub-human-nav-context');
+  const activeButton = document.querySelector('.staff-hub-tabs button.active, .staff-hub-sticky-tabs button.active');
+  if (context) {
+    const actionCopy = activeButton?.dataset.navDescription || 'Choose what you need to do.';
+    context.textContent = `${role.title} · ${actionCopy}`;
+  }
+}
+
 function enhanceStaffHub() {
   const desktopList = document.querySelector('.staff-hub-tabs');
   const stickyList = document.querySelector('.staff-hub-sticky-tabs');
-  if (!desktopList && !stickyList) return;
+  if (!desktopList && !stickyList) {
+    applyRoleContext();
+    return;
+  }
 
   enhanceTabList(desktopList);
   enhanceTabList(stickyList);
@@ -49,19 +86,26 @@ function enhanceStaffHub() {
     panel.insertBefore(heading, desktopList);
   }
 
-  const activeButton = desktopList?.querySelector('button.active') || stickyList?.querySelector('button.active');
-  const context = panel?.querySelector('.staff-hub-human-nav-context');
-  if (context && activeButton) {
-    context.textContent = activeButton.dataset.navDescription || '';
-  }
+  applyRoleContext();
 }
 
 export default function StaffHubNavigationEnhancer() {
   useEffect(() => {
+    function onProfile(event) {
+      if (event?.detail?.profile) currentProfile = event.detail.profile;
+      enhanceStaffHub();
+    }
+
+    window.addEventListener('rtb:auth-session-ready', onProfile);
     enhanceStaffHub();
+
     const observer = new MutationObserver(() => enhanceStaffHub());
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
+
+    return () => {
+      window.removeEventListener('rtb:auth-session-ready', onProfile);
+      observer.disconnect();
+    };
   }, []);
 
   return null;
