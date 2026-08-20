@@ -7,6 +7,13 @@
   RewriteRule ^ https://rtbheadquaters.com%{REQUEST_URI} [R=301,L]
 
   RewriteRule ^index\.html$ - [L]
+
+  # Never rewrite missing compiled assets to index.html. Returning HTML for a
+  # JavaScript chunk causes the browser error: 'text/html' is not a valid
+  # JavaScript MIME type. A real 404 lets the app's recovery path reload the
+  # current deployment instead of hard-crashing on a stale chunk reference.
+  RewriteRule ^assets/ - [L]
+
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]
@@ -18,5 +25,8 @@
   </FilesMatch>
   <FilesMatch "^sw\.js$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "\.(js|mjs|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
 </IfModule>
