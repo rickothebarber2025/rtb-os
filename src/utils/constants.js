@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   UserRoundSearch,
   Users,
+  WalletCards,
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
@@ -25,6 +26,7 @@ export const NAV_ITEMS = [
   { group: 'Operations', id: 'talent-pipeline', label: 'Talent Pipeline', icon: UserRoundSearch },
   { group: 'Operations', id: 'operations', label: 'Operations', icon: ClipboardCheck },
   { group: 'Intelligence', id: 'performance', label: 'Performance', icon: BarChart3 },
+  { group: 'Intelligence', id: 'finance', label: 'Financial Buddy', icon: WalletCards },
   { group: 'Intelligence', id: 'customer-intelligence', label: 'Customer IQ', icon: MessageSquareText },
   { group: 'Intelligence', id: 'ai-consultant', label: 'AI Consultant', icon: Brain },
   { group: 'Admin', id: 'access', label: 'Access', icon: ShieldCheck },
