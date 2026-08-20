@@ -5,60 +5,38 @@ function requireSupabase() {
   return supabase;
 }
 
-function businessScoped(query, businessUnitId) {
-  if (!businessUnitId || businessUnitId === 'all-businesses') return query;
-  return query.eq('business_unit_id', businessUnitId);
+async function invokeFinance(action, payload = {}) {
+  const client = requireSupabase();
+  const { data, error } = await client.functions.invoke('finance-api', { body: { action, ...payload } });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data || {};
 }
 
 export async function loadFinanceSnapshot(businessUnitId) {
-  const client = requireSupabase();
-  const [transactionsResult, obligationsResult] = await Promise.all([
-    businessScoped(client.from('finance_transactions').select('*'), businessUnitId)
-      .order('transaction_date', { ascending: false })
-      .limit(250),
-    businessScoped(client.from('finance_obligations').select('*'), businessUnitId)
-      .order('due_day', { ascending: true }),
-  ]);
-  if (transactionsResult.error) throw transactionsResult.error;
-  if (obligationsResult.error) throw obligationsResult.error;
-  return { transactions: transactionsResult.data || [], obligations: obligationsResult.data || [] };
+  return invokeFinance('snapshot', { businessId: businessUnitId });
 }
 
 export async function createFinanceTransaction(payload) {
-  const client = requireSupabase();
-  const { data: authData } = await client.auth.getUser();
-  const { data, error } = await client.from('finance_transactions').insert({ ...payload, created_by: authData?.user?.id || null }).select('*').single();
-  if (error) throw error;
-  return data;
+  const result = await invokeFinance('create_transaction', { businessId: payload.business_unit_id, payload });
+  return result.transaction;
 }
 
-export async function importFinanceTransactions(rows) {
-  if (!rows.length) return [];
-  const client = requireSupabase();
-  const { data: authData } = await client.auth.getUser();
-  const { data, error } = await client.from('finance_transactions').insert(rows.map((row) => ({ ...row, created_by: authData?.user?.id || null }))).select('*');
-  if (error) throw error;
-  return data || [];
+export async function importFinanceCsv({ businessId, csvText, fileName }) {
+  return invokeFinance('import_csv', { businessId, csvText, fileName });
 }
 
-export async function deleteFinanceTransaction(id) {
-  const client = requireSupabase();
-  const { error } = await client.from('finance_transactions').delete().eq('id', id);
-  if (error) throw error;
+export async function deleteFinanceTransaction(id, businessId) {
+  await invokeFinance('delete_transaction', { id, businessId });
 }
 
 export async function createFinanceObligation(payload) {
-  const client = requireSupabase();
-  const { data: authData } = await client.auth.getUser();
-  const { data, error } = await client.from('finance_obligations').insert({ ...payload, created_by: authData?.user?.id || null }).select('*').single();
-  if (error) throw error;
-  return data;
+  const result = await invokeFinance('create_obligation', { businessId: payload.business_unit_id, payload });
+  return result.obligation;
 }
 
-export async function deleteFinanceObligation(id) {
-  const client = requireSupabase();
-  const { error } = await client.from('finance_obligations').delete().eq('id', id);
-  if (error) throw error;
+export async function deleteFinanceObligation(id, businessId) {
+  await invokeFinance('delete_obligation', { id, businessId });
 }
 
 export async function askFinancialBuddy({ businessId, question }) {
