@@ -19,6 +19,8 @@ const GOOGLE_PROVIDER_SCOPES = {
   ],
 };
 
+const PENDING_ACCOUNT_LOGIN_KEY = 'rtb:pending-integration-account-login';
+
 function friendlyIntegrationError(error, data) {
   const code = String(data?.code || '').trim();
   if (code === 'AUTH_REQUIRED') return 'Your RTB OS session expired. Sign in again or refresh and retry.';
@@ -71,6 +73,44 @@ async function invoke(action, payload = {}) {
   return data || {};
 }
 
+function writePendingAccountLogin(provider, businessUnitId) {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(PENDING_ACCOUNT_LOGIN_KEY, JSON.stringify({
+    provider,
+    businessUnitId: businessUnitId || null,
+    startedAt: Date.now(),
+  }));
+}
+
+function clearPendingAccountLogin() {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem(PENDING_ACCOUNT_LOGIN_KEY);
+}
+
+export function getPendingAccountLogin() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_ACCOUNT_LOGIN_KEY);
+    if (!raw) return null;
+    const pending = JSON.parse(raw);
+    if (!GOOGLE_PROVIDER_SCOPES[pending?.provider]) {
+      clearPendingAccountLogin();
+      return null;
+    }
+    if (!pending?.startedAt || Date.now() - Number(pending.startedAt) > 15 * 60 * 1000) {
+      clearPendingAccountLogin();
+      return null;
+    }
+    return {
+      provider: pending.provider,
+      businessUnitId: pending.businessUnitId || null,
+    };
+  } catch {
+    clearPendingAccountLogin();
+    return null;
+  }
+}
+
 export async function listIntegrationConnections() {
   const result = await invoke('list');
   return Array.isArray(result.connections) ? result.connections : [];
@@ -83,6 +123,8 @@ export async function beginIntegrationConnection(provider, businessUnitId) {
 export async function beginAccountLogin(provider, businessUnitId) {
   if (!GOOGLE_PROVIDER_SCOPES[provider]) return null;
   if (!isSupabaseConfigured || !supabase) throw new Error('RTB OS sign-in is not configured.');
+
+  writePendingAccountLogin(provider, businessUnitId);
 
   const returnUrl = new URL(window.location.href);
   returnUrl.searchParams.set('integration_return', provider);
@@ -101,7 +143,10 @@ export async function beginAccountLogin(provider, businessUnitId) {
       },
     },
   });
-  if (error) throw error;
+  if (error) {
+    clearPendingAccountLogin();
+    throw error;
+  }
   if (data?.url) window.location.assign(data.url);
   return data || {};
 }
@@ -115,13 +160,15 @@ export async function finalizeAccountLogin(provider, businessUnitId) {
     throw new Error('Google sign-in completed, but Google did not return an account access token. Reconnect and approve the requested permissions.');
   }
 
-  return invoke('capture_oauth_session', {
+  const result = await invoke('capture_oauth_session', {
     provider,
     businessUnitId: businessUnitId || null,
     accessToken: session.provider_token,
     refreshToken: session.provider_refresh_token || '',
     scopes: GOOGLE_PROVIDER_SCOPES[provider],
   });
+  clearPendingAccountLogin();
+  return result;
 }
 
 export async function saveIntegrationSetup(provider, businessUnitId, credentials) {
