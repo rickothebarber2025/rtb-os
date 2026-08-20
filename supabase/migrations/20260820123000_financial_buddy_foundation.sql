@@ -41,46 +41,115 @@ create index if not exists finance_obligations_business_status_idx
 alter table public.finance_transactions enable row level security;
 alter table public.finance_obligations enable row level security;
 
+create or replace function private.finance_business_allowed(p_business_unit_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $function$
+declare
+  current_profile public.user_profiles%rowtype;
+  payload jsonb;
+  business_ids jsonb;
+begin
+  select * into current_profile
+  from public.user_profiles
+  where id = (select auth.uid());
+
+  if current_profile.id is null or current_profile.active is false then
+    return false;
+  end if;
+
+  if lower(coalesce(current_profile.email, '')) = 'rickothebarber@gmail.com'
+     or lower(coalesce(current_profile.role, '')) = 'owner' then
+    return true;
+  end if;
+
+  payload := coalesce(current_profile.permissions, '{}'::jsonb);
+  if lower(coalesce(payload->>'business_scope', '')) = 'all' then
+    return true;
+  end if;
+
+  business_ids := coalesce(payload->'business_unit_ids', '[]'::jsonb);
+  if business_ids ? 'all-businesses' or business_ids ? p_business_unit_id::text then
+    return true;
+  end if;
+
+  return current_profile.business_unit_id = p_business_unit_id;
+end;
+$function$;
+
 drop policy if exists finance_transactions_select on public.finance_transactions;
 create policy finance_transactions_select on public.finance_transactions
 for select to authenticated
-using (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('view'));
+using (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('view')
+  and private.finance_business_allowed(business_unit_id)
+);
 
 drop policy if exists finance_transactions_insert on public.finance_transactions;
 create policy finance_transactions_insert on public.finance_transactions
 for insert to authenticated
-with check (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit'));
+with check (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit')
+  and private.finance_business_allowed(business_unit_id)
+);
 
 drop policy if exists finance_transactions_update on public.finance_transactions;
 create policy finance_transactions_update on public.finance_transactions
 for update to authenticated
-using (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit'))
-with check (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit'));
+using (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit')
+  and private.finance_business_allowed(business_unit_id)
+)
+with check (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit')
+  and private.finance_business_allowed(business_unit_id)
+);
 
 drop policy if exists finance_transactions_delete on public.finance_transactions;
 create policy finance_transactions_delete on public.finance_transactions
 for delete to authenticated
-using (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('admin'));
+using (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('admin')
+  and private.finance_business_allowed(business_unit_id)
+);
 
 drop policy if exists finance_obligations_select on public.finance_obligations;
 create policy finance_obligations_select on public.finance_obligations
 for select to authenticated
-using (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('view'));
+using (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('view')
+  and private.finance_business_allowed(business_unit_id)
+);
 
 drop policy if exists finance_obligations_insert on public.finance_obligations;
 create policy finance_obligations_insert on public.finance_obligations
 for insert to authenticated
-with check (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit'));
+with check (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit')
+  and private.finance_business_allowed(business_unit_id)
+);
 
 drop policy if exists finance_obligations_update on public.finance_obligations;
 create policy finance_obligations_update on public.finance_obligations
 for update to authenticated
-using (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit'))
-with check (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit'));
+using (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit')
+  and private.finance_business_allowed(business_unit_id)
+)
+with check (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('edit')
+  and private.finance_business_allowed(business_unit_id)
+);
 
 drop policy if exists finance_obligations_delete on public.finance_obligations;
 create policy finance_obligations_delete on public.finance_obligations
 for delete to authenticated
-using (private.permission_rank(private.module_permission('finance')) >= private.permission_rank('admin'));
+using (
+  private.permission_rank(private.module_permission('finance')) >= private.permission_rank('admin')
+  and private.finance_business_allowed(business_unit_id)
+);
 
 commit;
