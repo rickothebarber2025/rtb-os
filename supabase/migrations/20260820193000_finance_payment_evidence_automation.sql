@@ -57,7 +57,6 @@ grant execute on function public.refresh_finance_payment_evidence(uuid) to servi
 
 with ranked as (select id,row_number() over(partition by business_unit_id,horizon_days order by generated_at desc,id desc) rn from public.finance_forecast_snapshots)
 delete from public.finance_forecast_snapshots f using ranked r where f.id=r.id and r.rn>1;
-create unique index if not exists finance_forecast_business_horizon_unique on public.finance_forecast_snapshots(business_unit_id,horizon_days);
 
 insert into public.app_settings(key,value)
 select 'finance_gmail_cron_token',jsonb_build_object('token',encode(gen_random_bytes(32),'hex'))
