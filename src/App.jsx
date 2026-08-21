@@ -27,6 +27,7 @@ const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligence
 const PublicPromotionsPage = lazy(() => import('./pages/PublicPromotionsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const FinancialBuddyPage = lazy(() => import('./pages/FinancialBuddyPage'));
+const MarketingCalendarPage = lazy(() => import('./pages/MarketingCalendarPage'));
 const OperationsPage = lazy(() => import('./pages/OperationsPage'));
 const MyRolePage = lazy(() => import('./pages/MyRolePage'));
 const PayrollPage = lazy(() => import('./pages/PayrollPage'));
@@ -207,6 +208,8 @@ export default function App() {
         return <ModuleGate module="operations"><AiConsultantPage {...pageProps} /></ModuleGate>;
       case 'finance':
         return <ModuleGate module="finance"><FinancialBuddyPage {...pageProps} /></ModuleGate>;
+      case 'marketing-calendar':
+        return <ModuleGate module="performance"><MarketingCalendarPage {...pageProps} /></ModuleGate>;
       case 'payroll':
         return <ModuleGate module="payroll"><PayrollPage {...pageProps} /></ModuleGate>;
       case 'staff':
