@@ -7,6 +7,7 @@ import StaffHubNavigationEnhancer from './components/StaffHubNavigationEnhancer.
 import { AuthProfileProvider } from './contexts/AuthProfileContext.jsx';
 import './styles/global.css';
 import './styles/mobileNavigation.css';
+import './styles/mobileTopbar.css';
 import './styles/operationsChecklist.css';
 import './styles/contractorCleaning.css';
 import './styles/smartFlow.css';
