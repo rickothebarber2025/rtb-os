@@ -2,9 +2,21 @@ name: Validate iOS RTB OS
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'ios/**'
+      - 'capacitor.config.*'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ios-build.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'src/**'
+      - 'public/**'
       - 'ios/**'
       - 'capacitor.config.*'
       - 'package.json'
