@@ -6,7 +6,6 @@ import { isAllBusinessesUnit, usesSquareAppointments } from '../utils/businessPr
 
 const CORE_REFRESH_TABLES = [
   'app_settings',
-  'appointments',
   'booth_rent',
   'business_units',
   'integration_connections',
