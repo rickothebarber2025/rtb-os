@@ -9,6 +9,7 @@ import { useAuth } from './hooks/useAuth';
 import { useLiveRefresh, useSquareAutoSync } from './hooks/useLiveRefresh';
 import { useRtbData } from './hooks/useRtbData';
 import { useUserPreferences } from './hooks/useUserPreferences';
+import { onAppEvent } from './lib/appEvents';
 import { saveStaff } from './services/rtbService';
 import { canAccessPage, canManageAppointments, canManageStaff, canUseApp, getAllowedNavItems } from './utils/access';
 import { getBusinessSelectionOptions, isAllBusinessesId, isAllBusinessesUnit } from './utils/businessProfiles';
@@ -112,6 +113,27 @@ export default function App() {
   const navBadges = useMemo(() => ({ 'staff-hub': unreadAnnouncementCount }), [unreadAnnouncementCount]);
 
   useEffect(() => { smartLandingAppliedRef.current = false; }, [auth.user?.id]);
+
+  useEffect(() => {
+    if (!appEnabled) return undefined;
+    return onAppEvent((event) => {
+      if (event?.type !== 'navigation.request') return;
+      const page = String(event.detail?.page || '');
+      if (!page || !canAccessPage(auth.profile, page)) return;
+
+      const businessUnitId = String(event.detail?.businessUnitId || '');
+      if (businessUnitId && businessOptions.some((option) => option.id === businessUnitId)) {
+        setSelectedBusinessUnitId(businessUnitId);
+      }
+
+      if (page === 'staff-hub' && event.detail?.staffHubTab) {
+        setStaffHubTab(String(event.detail.staffHubTab));
+      }
+
+      setActivePage(page);
+      setPageTarget(event.detail?.target ?? null);
+    });
+  }, [appEnabled, auth.profile, businessOptions]);
 
   useEffect(() => {
     if (!data.businessUnits.length || !businessOptions.length || !auth.profile) return;
