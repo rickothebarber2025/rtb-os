@@ -5,26 +5,19 @@ import { syncSquareAppointments } from '../services/rtbService';
 import { isAllBusinessesUnit, usesSquareAppointments } from '../utils/businessProfiles';
 
 const CORE_REFRESH_TABLES = [
-  'app_settings',
-  'booth_rent',
   'business_units',
   'integration_connections',
   'operation_checklist_runs',
   'owner_activity_events',
-  'payroll_entries',
   'payroll_runs',
-  'performance_history',
   'staff',
   'staff_announcements',
-  'staff_attendance',
-  'staff_availability',
-  'staff_content_submissions',
+  'staff_operation_notifications',
   'staff_operations_requests',
   'staff_shift_records',
   'staff_tasks',
   'staff_time_off_requests',
   'talent_candidates',
-  'talent_reviews',
   'user_profiles',
 ];
 
