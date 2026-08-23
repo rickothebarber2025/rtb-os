@@ -17,6 +17,7 @@ const CORE_REFRESH_TABLES = [
   'staff_shift_records',
   'staff_tasks',
   'staff_time_off_requests',
+  'staff_warnings',
   'talent_candidates',
   'user_profiles',
 ];
