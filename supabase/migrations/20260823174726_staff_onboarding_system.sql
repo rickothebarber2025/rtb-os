@@ -537,6 +537,10 @@ as $$
 declare
   invitation public.staff_onboarding_invitations%rowtype;
   saved public.staff_onboarding_quiz_attempts%rowtype;
+  answer_key jsonb;
+  correct_count integer;
+  question_count integer;
+  calculated_score numeric;
 begin
   select *
   into invitation
@@ -555,6 +559,30 @@ begin
     raise exception 'Onboarding access denied.';
   end if;
 
+  answer_key := case p_section_id
+    when 'rtb_standards' then '{"schedule_block":"request_approval"}'::jsonb
+    when 'operational_training' then '{"manual_booking":"verify_booking_details"}'::jsonb
+    when 'cash_payments' then '{"cash_handling":"record_and_register"}'::jsonb
+    when 'conduct_confidentiality' then '{"client_privacy":"protect_and_report"}'::jsonb
+    else null
+  end;
+
+  if answer_key is null then
+    raise exception 'Unknown onboarding quiz section.';
+  end if;
+
+  if jsonb_typeof(coalesce(p_answers, '{}'::jsonb)) <> 'object' then
+    raise exception 'Quiz answers must be submitted as an answer object.';
+  end if;
+
+  select count(*) into question_count from jsonb_each_text(answer_key);
+  select count(*)
+  into correct_count
+  from jsonb_each_text(answer_key) expected
+  where lower(trim(coalesce(p_answers ->> expected.key, ''))) = lower(expected.value);
+
+  calculated_score := round((correct_count::numeric / greatest(question_count, 1)) * 100, 2);
+
   insert into public.staff_onboarding_quiz_attempts (
     invitation_id,
     business_unit_id,
@@ -569,8 +597,8 @@ begin
     invitation.business_unit_id,
     invitation.staff_id,
     p_section_id,
-    greatest(0, least(100, coalesce(p_score, 0))),
-    greatest(0, least(100, coalesce(p_passing_score, 80))),
+    calculated_score,
+    100,
     coalesce(p_answers, '{}'::jsonb)
   )
   returning * into saved;
