@@ -61,7 +61,7 @@ import {
   submitOnboardingStage,
   updateStaffTaskStatus,
 } from '../services/rtbService';
-import { canManageOperations } from '../utils/access';
+import { canManageAccess, canManageOperations } from '../utils/access';
 import { normalizeActionCenterState } from '../utils/actionCenter';
 import { getBusinessProfile, isAllBusinessesUnit } from '../utils/businessProfiles';
 import { buildDailyOperationsSummary, getTodayKey as getOperationsTodayKey } from '../utils/dailyOperations';
@@ -556,6 +556,7 @@ export default function StaffHubPage({
   const staffOnlyPortal =
     !ownerView && getEffectivePermissionsPayload(accessProfile).role_template === 'staff_portal';
   const canManageHub = ownerView || canManageOperations(accessProfile);
+  const canApproveOnboarding = canManageAccess(accessProfile);
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const businessProfile = getBusinessProfile(businessUnit);
   useEffect(() => {
@@ -2086,14 +2087,16 @@ export default function StaffHubPage({
                   >
                     Approve practical
                   </button>
-                  <button
-                    className="primary-button small"
-                    disabled={invitation.status !== 'submitted' || savingHubAction === `onboarding-approve-${invitation.id}`}
-                    onClick={() => approveOnboarding(invitation)}
-                    type="button"
-                  >
-                    Approve full access
-                  </button>
+                  {canApproveOnboarding ? (
+                    <button
+                      className="primary-button small"
+                      disabled={invitation.status !== 'submitted' || savingHubAction === `onboarding-approve-${invitation.id}`}
+                      onClick={() => approveOnboarding(invitation)}
+                      type="button"
+                    >
+                      Approve & activate RTB OS
+                    </button>
+                  ) : null}
                   {certificate ? (
                     <button
                       className="secondary-button small"
