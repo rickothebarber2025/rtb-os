@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildPermissionsFromTemplate } from '../src/lib/roleTemplates.js';
 import { MODULE_IDS, hasModulePermission } from '../src/lib/permissions.js';
+import { canAccessPage } from '../src/utils/access.js';
 import {
   ONBOARDING_STAGE_IDS,
   buildOnboardingChecklist,
@@ -25,6 +26,9 @@ test('Onboarding Restricted template grants only Staff Hub view access', () => {
   });
 
   assert.equal(isOnboardingRestrictedProfile(profile), true);
+  assert.equal(canAccessPage(profile, 'staff-hub'), true);
+  assert.equal(canAccessPage(profile, 'my-role'), false);
+  assert.equal(canAccessPage(profile, 'dashboard'), false);
 });
 
 test('Onboarding checklist requires stages, passing quizzes, and current policy signatures', () => {
