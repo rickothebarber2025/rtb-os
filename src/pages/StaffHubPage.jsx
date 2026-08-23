@@ -661,12 +661,12 @@ export default function StaffHubPage({
   );
   const managerOnboardingInvitations = useMemo(
     () =>
-      canManageHub
+      canManageHub || canApproveOnboarding
         ? hubRecords.onboardingInvitations.filter((invitation) =>
             !['archived', 'cancelled'].includes(invitation.status),
           )
         : [],
-    [canManageHub, hubRecords.onboardingInvitations],
+    [canApproveOnboarding, canManageHub, hubRecords.onboardingInvitations],
   );
   useEffect(() => {
     if (!myOnboardingInvitation) return;
@@ -2058,7 +2058,7 @@ export default function StaffHubPage({
   }
 
   function renderManagerOnboarding() {
-    if (!canManageHub || !managerOnboardingInvitations.length) return null;
+    if (!(canManageHub || canApproveOnboarding) || !managerOnboardingInvitations.length) return null;
 
     return (
       <section className="panel full-span onboarding-manager-panel">
