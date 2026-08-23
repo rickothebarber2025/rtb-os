@@ -18,7 +18,7 @@ export const ROLE_OPTIONS = [
 ];
 
 const ROLE_LABELS = ROLE_OPTIONS.reduce((labels, role) => ({ ...labels, [role.value]: role.label }), {});
-const HUB_ONLY_TEMPLATES = new Set(['staff_portal', 'operations_cleaning']);
+const HUB_ONLY_TEMPLATES = new Set(['staff_portal', 'operations_cleaning', 'onboarding_restricted']);
 
 export function getRoleLabel(role) { return ROLE_LABELS[role] || 'Custom'; }
 export function isAdmin(profile) { return isOwnerProfile(profile) || getModulePermission(profile, 'access') === 'admin'; }
