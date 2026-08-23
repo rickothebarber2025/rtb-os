@@ -247,6 +247,46 @@ async function findUserByEmail(admin: ReturnType<typeof createClient>, email: st
   return null;
 }
 
+async function resolveOnboardingStaff(
+  admin: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+  email: string,
+  fullName: string,
+  businessUnitId: string,
+) {
+  if (body.staff_id) return String(body.staff_id);
+
+  const { data: existing, error: findError } = await admin
+    .from("staff")
+    .select("id")
+    .eq("business_unit_id", businessUnitId)
+    .ilike("email", email)
+    .limit(1)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (existing?.id) return existing.id;
+
+  const startDate = body.start_date ? String(body.start_date) : new Date().toISOString().slice(0, 10);
+  const { data: created, error: createError } = await admin
+    .from("staff")
+    .insert({
+      active: true,
+      business_unit_id: businessUnitId,
+      commission_rate: 50,
+      email,
+      fixed_rate: false,
+      full_name: fullName,
+      probation_start_date: startDate,
+      role: body.position_title ? String(body.position_title) : "Staff",
+      start_date: startDate,
+      tier: "probation",
+    })
+    .select("id")
+    .single();
+  if (createError) throw createError;
+  return created.id;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -343,6 +383,7 @@ Deno.serve(async (req) => {
     if (profileError) throw profileError;
 
     if (onboardingRequired && businessUnitId) {
+      const onboardingStaffId = await resolveOnboardingStaff(admin, body, email, fullName, businessUnitId);
       const { error: onboardingError } = await admin
         .from("staff_onboarding_invitations")
         .upsert(
@@ -353,7 +394,7 @@ Deno.serve(async (req) => {
             full_name: fullName || email,
             position_title: body.position_title ? String(body.position_title) : null,
             required_documents: Array.isArray(body.required_documents) ? body.required_documents : [],
-            staff_id: body.staff_id || null,
+            staff_id: onboardingStaffId,
             start_date: body.start_date || null,
             status: "invited",
             target_permissions: onboardingTargetPermissions,
