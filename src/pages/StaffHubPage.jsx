@@ -40,6 +40,7 @@ import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissio
 import {
   acknowledgePolicyDocument,
   approveStaffOnboarding,
+  closeStaffOnboarding,
   decideContentSubmission,
   decideTimeOffRequest,
   markStaffAnnouncementRead,
@@ -1714,6 +1715,25 @@ export default function StaffHubPage({
     );
   }
 
+  async function closeOnboarding(invitation, status) {
+    const action = status === 'archived' ? 'archive' : 'cancel';
+    const confirmed = window.confirm(
+      status === 'archived'
+        ? `Archive ${invitation.full_name}'s completed onboarding record?`
+        : `Cancel ${invitation.full_name}'s onboarding and deactivate their restricted login?`,
+    );
+    if (!confirmed) return;
+    await runHubAction(
+      `onboarding-close-${invitation.id}`,
+      () => closeStaffOnboarding(
+        invitation.id,
+        status,
+        status === 'archived' ? 'Archived after approval.' : 'Cancelled by Access Admin.',
+      ),
+      `${invitation.full_name}'s onboarding was ${action}d.`,
+    );
+  }
+
   async function completePracticalCertification(invitation) {
     await runHubAction(
       `onboarding-practical-${invitation.id}`,
@@ -2105,6 +2125,16 @@ export default function StaffHubPage({
                       type="button"
                     >
                       Certificate
+                    </button>
+                  ) : null}
+                  {canApproveOnboarding ? (
+                    <button
+                      className="ghost-button small danger"
+                      disabled={savingHubAction === `onboarding-close-${invitation.id}`}
+                      onClick={() => closeOnboarding(invitation, invitation.status === 'approved' ? 'archived' : 'cancelled')}
+                      type="button"
+                    >
+                      {invitation.status === 'approved' ? 'Archive record' : 'Cancel onboarding'}
                     </button>
                   ) : null}
                 </div>
