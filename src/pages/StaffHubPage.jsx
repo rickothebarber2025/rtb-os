@@ -478,7 +478,7 @@ export default function StaffHubPage({
     position_title: '',
     start_date: '',
   });
-  const [onboardingQuizScores, setOnboardingQuizScores] = useState({});
+  const [onboardingQuizAnswers, setOnboardingQuizAnswers] = useState({});
   const [onboardingSignatures, setOnboardingSignatures] = useState({});
   const [probationDrafts, setProbationDrafts] = useState({});
 
@@ -1668,13 +1668,11 @@ export default function StaffHubPage({
 
   async function saveOnboardingQuiz(section) {
     if (!myOnboardingInvitation) return;
-    const score = numberInputValue(onboardingQuizScores[section.id]);
+    const answers = onboardingQuizAnswers[section.id] || {};
     await runHubAction(
       `onboarding-quiz-${section.id}`,
-      () => submitOnboardingQuiz(myOnboardingInvitation.id, section.id, score, section.passingScore, {
-        recorded_by: 'staff_hub',
-      }),
-      score >= section.passingScore ? 'Knowledge check passed.' : 'Knowledge check saved. Review and retry this section.',
+      () => submitOnboardingQuiz(myOnboardingInvitation.id, section.id, null, section.passingScore, answers),
+      'Knowledge check submitted. Your result was calculated securely.',
     );
   }
 
@@ -1955,23 +1953,36 @@ export default function StaffHubPage({
                   {section.passed ? 'Passed' : `${section.passingScore}% required`}
                 </StatusBadge>
               </div>
-              <label className="field">
-                <span>Score</span>
-                <input
-                  max="100"
-                  min="0"
-                  onChange={(event) => setOnboardingQuizScores((current) => ({ ...current, [section.id]: event.target.value }))}
-                  type="number"
-                  value={onboardingQuizScores[section.id] || ''}
-                />
-              </label>
+              {(section.questions || []).map((question) => (
+                <label className="field" key={question.id}>
+                  <span>{question.prompt}</span>
+                  <select
+                    onChange={(event) => setOnboardingQuizAnswers((current) => ({
+                      ...current,
+                      [section.id]: {
+                        ...(current[section.id] || {}),
+                        [question.id]: event.target.value,
+                      },
+                    }))}
+                    value={onboardingQuizAnswers[section.id]?.[question.id] || ''}
+                  >
+                    <option value="">Choose an answer</option>
+                    {question.options.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
               <button
                 className="secondary-button small"
-                disabled={savingHubAction === `onboarding-quiz-${section.id}`}
+                disabled={
+                  savingHubAction === `onboarding-quiz-${section.id}` ||
+                  (section.questions || []).some((question) => !onboardingQuizAnswers[section.id]?.[question.id])
+                }
                 onClick={() => saveOnboardingQuiz(section)}
                 type="button"
               >
-                Save score
+                Submit answers
               </button>
             </article>
           ))}
