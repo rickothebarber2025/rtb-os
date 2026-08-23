@@ -16,6 +16,7 @@ const MODULE_IDS = [
   "roster",
   "payroll",
   "performance",
+  "finance",
   "appointments",
   "booth_rent",
   "operations",
@@ -268,10 +269,17 @@ Deno.serve(async (req) => {
     const role = String(body.role || "staff").trim().toLowerCase();
     const businessUnitId = body.business_unit_id ? String(body.business_unit_id) : null;
     let permissions = normalizePermissionsPayload(body.permissions);
+    const onboardingRequired =
+      Boolean(body.onboarding_required) || permissions.role_template === "onboarding_restricted";
+    let onboardingTargetPermissions = normalizePermissionsPayload(body.onboarding_target_permissions);
     const redirectTo = cleanRedirectTo(body.redirectTo, req.headers.get("Origin"));
 
     if (role === "staff" && !hasAssignedModuleAccess(permissions)) {
       permissions = applyStaffPortalDefaults(permissions, businessUnitId);
+    }
+
+    if (!hasAssignedModuleAccess(onboardingTargetPermissions)) {
+      onboardingTargetPermissions = applyStaffPortalDefaults(onboardingTargetPermissions, businessUnitId);
     }
 
     if (!email || !email.includes("@")) {
@@ -284,6 +292,10 @@ Deno.serve(async (req) => {
 
     if (email !== OWNER_EMAIL && !hasAssignedBusiness(permissions, businessUnitId)) {
       return jsonResponse({ error: "Choose at least one business for this user." }, 400);
+    }
+
+    if (onboardingRequired && !businessUnitId) {
+      return jsonResponse({ error: "Choose one primary business for onboarding." }, 400);
     }
 
     let invited = false;
@@ -329,6 +341,30 @@ Deno.serve(async (req) => {
       .single();
 
     if (profileError) throw profileError;
+
+    if (onboardingRequired && businessUnitId) {
+      const { error: onboardingError } = await admin
+        .from("staff_onboarding_invitations")
+        .upsert(
+          {
+            availability_notes: String(body.availability_notes || ""),
+            business_unit_id: businessUnitId,
+            email,
+            full_name: fullName || email,
+            position_title: body.position_title ? String(body.position_title) : null,
+            required_documents: Array.isArray(body.required_documents) ? body.required_documents : [],
+            staff_id: body.staff_id || null,
+            start_date: body.start_date || null,
+            status: "invited",
+            target_permissions: onboardingTargetPermissions,
+            target_role_template: onboardingTargetPermissions.role_template || "staff_portal",
+            user_profile_id: targetUser.id,
+          },
+          { onConflict: "user_profile_id" },
+        );
+
+      if (onboardingError) throw onboardingError;
+    }
 
     return jsonResponse({ invited, profile });
   } catch (err) {

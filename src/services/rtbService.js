@@ -81,6 +81,11 @@ function profileRolePayload(profile) {
   };
 }
 
+function applyOnboardingScope(query, businessUnitId) {
+  if (!businessUnitId) return query;
+  return query.eq('business_unit_id', businessUnitId);
+}
+
 async function getFunctionErrorMessage(error) {
   const response = error?.context;
 
@@ -222,11 +227,21 @@ export async function linkUserProfile(signInProfileId, keepProfileId) {
 
 export async function inviteUserProfile(invite) {
   const rolePayload = profileRolePayload(invite);
+  const onboardingRequired =
+    Boolean(invite.onboarding_required) ||
+    normalizePermissionsPayload(rolePayload.permissions).role_template === 'onboarding_restricted';
+  const onboardingTargetPermissions = normalizePermissionsPayload(
+    invite.onboarding_target_permissions || buildPermissionsFromTemplate('staff_portal'),
+  );
   return invokeFunction('invite-user', {
     business_unit_id: invite.business_unit_id || null,
     email: invite.email,
     full_name: invite.full_name,
     active: Boolean(invite.active),
+    onboarding_required: onboardingRequired,
+    onboarding_target_permissions: onboardingTargetPermissions,
+    position_title: invite.position_title || null,
+    start_date: invite.start_date || null,
     ...rolePayload,
     redirectTo: window.location.origin,
     role: invite.role || 'staff',
@@ -256,6 +271,12 @@ function staffHubOperationsFallback() {
     operationsRequests: [],
     policyAcknowledgements: [],
     policyDocuments: [],
+    onboardingCertificates: [],
+    onboardingInvitations: [],
+    onboardingPolicySignatures: [],
+    onboardingQuizAttempts: [],
+    onboardingStageProgress: [],
+    probationReviews: [],
     shiftNotes: [],
     shiftRecords: [],
     shopStatusEvents: [],
@@ -879,6 +900,12 @@ export async function getStaffHubOperationsRecords({ businessUnitId = null, staf
     operationsRequests,
     policyDocuments,
     policyAcknowledgements,
+    onboardingInvitations,
+    onboardingStageProgress,
+    onboardingQuizAttempts,
+    onboardingPolicySignatures,
+    onboardingCertificates,
+    probationReviews,
     shiftNotes,
     auditLogs,
   ] = await Promise.all([
@@ -965,6 +992,67 @@ export async function getStaffHubOperationsRecords({ businessUnitId = null, staf
         )
       : fallback.policyAcknowledgements,
     optionalData(
+      applyOnboardingScope(
+        client
+          .from('staff_onboarding_invitations')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(80),
+        businessUnitId,
+      ),
+      fallback.onboardingInvitations,
+    ),
+    optionalData(
+      applyOnboardingScope(
+        client
+          .from('staff_onboarding_stage_progress')
+          .select('*')
+          .order('created_at', { ascending: true }),
+        businessUnitId,
+      ),
+      fallback.onboardingStageProgress,
+    ),
+    optionalData(
+      applyOnboardingScope(
+        client
+          .from('staff_onboarding_quiz_attempts')
+          .select('*')
+          .order('attempted_at', { ascending: false }),
+        businessUnitId,
+      ),
+      fallback.onboardingQuizAttempts,
+    ),
+    optionalData(
+      applyOnboardingScope(
+        client
+          .from('staff_onboarding_policy_signatures')
+          .select('*')
+          .order('signed_at', { ascending: false }),
+        businessUnitId,
+      ),
+      fallback.onboardingPolicySignatures,
+    ),
+    optionalData(
+      applyOnboardingScope(
+        client
+          .from('staff_onboarding_certificates')
+          .select('*')
+          .order('issued_at', { ascending: false }),
+        businessUnitId,
+      ),
+      fallback.onboardingCertificates,
+    ),
+    optionalData(
+      applyOnboardingScope(
+        client
+          .from('staff_probation_reviews')
+          .select('*')
+          .order('scheduled_date', { ascending: true }),
+        businessUnitId,
+      ),
+      fallback.probationReviews,
+    ),
+    optionalData(
       applyBusinessScope(
         client
           .from('shift_notes')
@@ -996,12 +1084,90 @@ export async function getStaffHubOperationsRecords({ businessUnitId = null, staf
       items: [...(template.items || [])].sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)),
     })),
     operationsRequests,
+    onboardingCertificates,
+    onboardingInvitations,
+    onboardingPolicySignatures,
+    onboardingQuizAttempts,
+    onboardingStageProgress,
     policyAcknowledgements,
     policyDocuments,
+    probationReviews,
     shiftNotes,
     shiftRecords,
     shopStatusEvents,
   };
+}
+
+export async function submitOnboardingStage(invitationId, stageId, metadata = {}, completed = true) {
+  const client = requireClient();
+  return requireData(
+    await client.rpc('submit_staff_onboarding_stage', {
+      p_completed: completed,
+      p_invitation_id: invitationId,
+      p_metadata: metadata,
+      p_stage_id: stageId,
+    }),
+  );
+}
+
+export async function submitOnboardingQuiz(invitationId, sectionId, score, passingScore = 80, answers = {}) {
+  const client = requireClient();
+  return requireData(
+    await client.rpc('submit_staff_onboarding_quiz', {
+      p_answers: answers,
+      p_invitation_id: invitationId,
+      p_passing_score: passingScore,
+      p_score: Number(score || 0),
+      p_section_id: sectionId,
+    }),
+  );
+}
+
+export async function signOnboardingPolicy(invitationId, policyId, signerName, signatureText) {
+  const client = requireClient();
+  return requireData(
+    await client.rpc('sign_staff_onboarding_policy', {
+      p_invitation_id: invitationId,
+      p_policy_id: policyId,
+      p_signature_text: signatureText,
+      p_signer_name: signerName,
+    }),
+  );
+}
+
+export async function submitOnboardingForApproval(invitationId) {
+  const client = requireClient();
+  return requireData(
+    await client.rpc('submit_staff_onboarding_for_approval', {
+      p_invitation_id: invitationId,
+    }),
+  );
+}
+
+export async function approveStaffOnboarding(invitationId, permissions, role = 'staff', managerNote = '') {
+  const client = requireClient();
+  return requireData(
+    await client.rpc('approve_staff_onboarding', {
+      p_invitation_id: invitationId,
+      p_manager_note: managerNote || null,
+      p_permissions: normalizePermissionsPayload(permissions),
+      p_role: role,
+    }),
+  );
+}
+
+export async function saveStaffProbationReview(reviewId, staffKpis, rtbSupportKpis, managerNotes = '', recommendation = '', status = 'completed') {
+  const client = requireClient();
+  return requireData(
+    await client.rpc('save_staff_probation_review', {
+      p_manager_notes: managerNotes || null,
+      p_recommendation: recommendation || null,
+      p_review_id: reviewId,
+      p_rtb_support_kpis: rtbSupportKpis || {},
+      p_staff_kpis: staffKpis || {},
+      p_status: status,
+    }),
+  );
 }
 
 export async function saveStaffShiftRecord(record) {

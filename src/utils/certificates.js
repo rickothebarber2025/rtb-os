@@ -161,3 +161,84 @@ export async function downloadStaffOfMonthCertificate({
 
   doc.save(`${slug(businessName)}-${slug(performer.full_name)}-${slug(month)}-staff-of-the-month.pdf`);
 }
+
+export async function downloadOnboardingCertificate({
+  businessUnit,
+  certificate,
+  issuedAt = new Date(certificate?.issued_at || Date.now()),
+}) {
+  if (!certificate) {
+    throw new Error('No onboarding certificate is available yet.');
+  }
+
+  const { jsPDF } = await import('jspdf');
+  const businessName = businessUnit?.name || 'RTB Lounge';
+  const doc = new jsPDF({ format: 'letter', orientation: 'landscape', unit: 'pt' });
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const logoDataUrl = await imageToDataUrl(RTB_LOGO_URL);
+  const issuedLabel = new Intl.DateTimeFormat('en-US', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(issuedAt);
+  const policies = Array.isArray(certificate.policy_versions) ? certificate.policy_versions : [];
+
+  doc.setFillColor(CERT_COLORS.cream);
+  doc.rect(0, 0, width, height, 'F');
+  doc.setDrawColor(CERT_COLORS.line);
+  doc.setLineWidth(4);
+  doc.rect(34, 34, width - 68, height - 68, 'S');
+  doc.setLineWidth(1);
+  doc.rect(48, 48, width - 96, height - 96, 'S');
+
+  drawDiagonalBand(doc, width - 220, 0, 220, 220, CERT_COLORS.brassDeep);
+  drawDiagonalBand(doc, width - 115, 0, 220, 220, CERT_COLORS.ink);
+  drawSeal(doc, width - 150, 150, businessName, logoDataUrl);
+
+  doc.setTextColor(CERT_COLORS.ink);
+  doc.setFont('times', 'normal');
+  doc.setFontSize(52);
+  doc.text('ONBOARDING CERTIFICATE', 72, 140);
+
+  doc.setTextColor(CERT_COLORS.brassDeep);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('RTB OS STAFF ONBOARDING COMPLETION', 76, 176);
+
+  doc.setTextColor(CERT_COLORS.ink);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('THIS CERTIFIES THAT', 78, 250);
+
+  doc.setTextColor(CERT_COLORS.brassDeep);
+  doc.setFont('times', 'italic');
+  doc.setFontSize(50);
+  doc.text(certificate.issued_to || 'New Staff Member', 78, 322);
+
+  doc.setTextColor(CERT_COLORS.ink);
+  doc.setFont('times', 'normal');
+  doc.setFontSize(17);
+  doc.text(
+    `completed RTB standards, operational training, knowledge checks, practical shop certification, and required policy signatures for ${businessName}.`,
+    78,
+    376,
+    { maxWidth: 620 },
+  );
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(`Certificate: ${certificate.certificate_number}`, 78, 444);
+  doc.text(`Issued: ${issuedLabel}`, 78, 466);
+  doc.text(`Policy versions recorded: ${policies.length}`, 78, 488);
+
+  doc.setDrawColor(CERT_COLORS.ink);
+  doc.line(width - 360, height - 105, width - 120, height - 105);
+  doc.setTextColor(CERT_COLORS.ink);
+  doc.setFont('helvetica', 'bold');
+  doc.text('MANAGER APPROVAL', width - 240, height - 82, { align: 'center' });
+  doc.setTextColor(CERT_COLORS.brassDeep);
+  doc.text('RTB OS', width - 240, height - 65, { align: 'center' });
+
+  doc.save(`${slug(businessName)}-${slug(certificate.issued_to)}-onboarding-certificate.pdf`);
+}

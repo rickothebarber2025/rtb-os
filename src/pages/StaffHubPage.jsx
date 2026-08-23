@@ -39,9 +39,11 @@ import WeeklyGoalProgress from '../components/WeeklyGoalProgress';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
 import {
   acknowledgePolicyDocument,
+  approveStaffOnboarding,
   decideContentSubmission,
   decideTimeOffRequest,
   markStaffAnnouncementRead,
+  saveStaffProbationReview,
   saveContentSubmission,
   saveMyStaffPortalProfile,
   saveStaff,
@@ -53,6 +55,10 @@ import {
   saveShiftNote,
   saveShopStatusEvent,
   saveTimeOffRequest,
+  signOnboardingPolicy,
+  submitOnboardingForApproval,
+  submitOnboardingQuiz,
+  submitOnboardingStage,
   updateStaffTaskStatus,
 } from '../services/rtbService';
 import { canManageOperations } from '../utils/access';
@@ -69,6 +75,12 @@ import {
   buildTodayMoneyStats,
   getDefaultMonthlyGoal,
 } from '../utils/staffHubInsights';
+import { downloadOnboardingCertificate } from '../utils/certificates';
+import {
+  buildOnboardingChecklist,
+  isOnboardingRestrictedProfile,
+  probationReviewDueLabel,
+} from '../utils/onboarding';
 
 const TABS = [
   { icon: ClipboardCheck, id: 'daily', label: 'Daily Ops' },
@@ -100,9 +112,15 @@ const EMPTY_STAFF_HUB = {
   checklistTemplates: [],
   contentSubmissions: [],
   newsletters: [],
+  onboardingCertificates: [],
+  onboardingInvitations: [],
+  onboardingPolicySignatures: [],
+  onboardingQuizAttempts: [],
+  onboardingStageProgress: [],
   operationsRequests: [],
   policyAcknowledgements: [],
   policyDocuments: [],
+  probationReviews: [],
   shiftNotes: [],
   shiftRecords: [],
   shopStatusEvents: [],
@@ -226,6 +244,15 @@ function rowBelongsToStaff(row, staffProfile) {
     (row.staff_id && row.staff_id === staffProfile.id) ||
     normalize(row.full_name) === normalize(staffProfile.full_name)
   );
+}
+
+function recordBelongsToOnboarding(record, invitation) {
+  return record?.invitation_id === invitation?.id;
+}
+
+function numberInputValue(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 function sum(rows, field) {
@@ -442,6 +469,17 @@ export default function StaffHubPage({
   const [hubMessage, setHubMessage] = useState('');
   const [hubError, setHubError] = useState('');
   const [savingHubAction, setSavingHubAction] = useState('');
+  const [onboardingPersonalForm, setOnboardingPersonalForm] = useState({
+    availability_notes: '',
+    contract_uploaded: false,
+    emergency_name: '',
+    emergency_phone: '',
+    position_title: '',
+    start_date: '',
+  });
+  const [onboardingQuizScores, setOnboardingQuizScores] = useState({});
+  const [onboardingSignatures, setOnboardingSignatures] = useState({});
+  const [probationDrafts, setProbationDrafts] = useState({});
 
   // When something elsewhere in the app links here with a specific tab in
   // mind (e.g. the Priority Board's "Time off request from X"), open that
@@ -585,6 +623,65 @@ export default function StaffHubPage({
     ...EMPTY_STAFF_HUB,
     ...(staffHub || {}),
   };
+  const restrictedOnboarding = isOnboardingRestrictedProfile(accessProfile);
+  const myOnboardingInvitation = useMemo(
+    () =>
+      hubRecords.onboardingInvitations.find((invitation) =>
+        invitation.user_profile_id === accessProfile?.id ||
+        (staffProfile?.id && invitation.staff_id === staffProfile.id),
+      ) ||
+      (restrictedOnboarding ? hubRecords.onboardingInvitations[0] : null),
+    [accessProfile?.id, hubRecords.onboardingInvitations, restrictedOnboarding, staffProfile?.id],
+  );
+  const myOnboardingChecklist = useMemo(
+    () =>
+      buildOnboardingChecklist({
+        policyDocuments: hubRecords.policyDocuments,
+        quizAttempts: hubRecords.onboardingQuizAttempts.filter((attempt) =>
+          recordBelongsToOnboarding(attempt, myOnboardingInvitation),
+        ),
+        signatures: hubRecords.onboardingPolicySignatures.filter((signature) =>
+          recordBelongsToOnboarding(signature, myOnboardingInvitation),
+        ),
+        stageProgress: hubRecords.onboardingStageProgress.filter((stage) =>
+          recordBelongsToOnboarding(stage, myOnboardingInvitation),
+        ),
+      }),
+    [
+      hubRecords.onboardingPolicySignatures,
+      hubRecords.onboardingQuizAttempts,
+      hubRecords.onboardingStageProgress,
+      hubRecords.policyDocuments,
+      myOnboardingInvitation,
+    ],
+  );
+  const myOnboardingCertificate = useMemo(
+    () =>
+      hubRecords.onboardingCertificates.find((certificate) =>
+        recordBelongsToOnboarding(certificate, myOnboardingInvitation),
+      ) || null,
+    [hubRecords.onboardingCertificates, myOnboardingInvitation],
+  );
+  const managerOnboardingInvitations = useMemo(
+    () =>
+      canManageHub
+        ? hubRecords.onboardingInvitations.filter((invitation) =>
+            !['archived', 'cancelled'].includes(invitation.status),
+          )
+        : [],
+    [canManageHub, hubRecords.onboardingInvitations],
+  );
+  useEffect(() => {
+    if (!myOnboardingInvitation) return;
+    setOnboardingPersonalForm((current) => ({
+      ...current,
+      availability_notes: myOnboardingInvitation.availability_notes || current.availability_notes || '',
+      emergency_name: myOnboardingInvitation.emergency_contact?.name || current.emergency_name || '',
+      emergency_phone: myOnboardingInvitation.emergency_contact?.phone || current.emergency_phone || '',
+      position_title: myOnboardingInvitation.position_title || current.position_title || staffProfile?.role || '',
+      start_date: myOnboardingInvitation.start_date || current.start_date || staffProfile?.start_date || '',
+    }));
+  }, [myOnboardingInvitation, staffProfile]);
   const operationsBusinessId = staffProfile?.business_unit_id || (!allBusinessesView ? businessUnit?.id : '');
   const operationsTodayKey = getOperationsTodayKey();
   const dailyOperations = useMemo(
@@ -1544,6 +1641,589 @@ export default function StaffHubPage({
     );
   }
 
+  async function saveOnboardingStage(stageId, metadata = {}, completed = true) {
+    if (!myOnboardingInvitation) return;
+    await runHubAction(
+      `onboarding-stage-${stageId}`,
+      () => submitOnboardingStage(myOnboardingInvitation.id, stageId, metadata, completed),
+      completed ? 'Onboarding stage saved.' : 'Onboarding progress saved.',
+    );
+  }
+
+  async function savePersonalSetup(event) {
+    event.preventDefault();
+    await saveOnboardingStage('personal_setup', {
+      availability_notes: onboardingPersonalForm.availability_notes,
+      contract_uploaded: Boolean(onboardingPersonalForm.contract_uploaded),
+      emergency_contact: {
+        name: onboardingPersonalForm.emergency_name,
+        phone: onboardingPersonalForm.emergency_phone,
+      },
+      position_title: onboardingPersonalForm.position_title,
+      start_date: onboardingPersonalForm.start_date,
+    });
+  }
+
+  async function saveOnboardingQuiz(section) {
+    if (!myOnboardingInvitation) return;
+    const score = numberInputValue(onboardingQuizScores[section.id]);
+    await runHubAction(
+      `onboarding-quiz-${section.id}`,
+      () => submitOnboardingQuiz(myOnboardingInvitation.id, section.id, score, section.passingScore, {
+        recorded_by: 'staff_hub',
+      }),
+      score >= section.passingScore ? 'Knowledge check passed.' : 'Knowledge check saved. Review and retry this section.',
+    );
+  }
+
+  async function saveOnboardingSignature(policy) {
+    if (!myOnboardingInvitation) return;
+    const draft = onboardingSignatures[policy.id] || {};
+    await runHubAction(
+      `onboarding-sign-${policy.id}`,
+      () => signOnboardingPolicy(
+        myOnboardingInvitation.id,
+        policy.id,
+        draft.signer_name || profileName,
+        draft.signature_text || draft.signer_name || profileName,
+      ),
+      'Policy signature recorded.',
+    );
+  }
+
+  async function submitOnboarding() {
+    if (!myOnboardingInvitation) return;
+    await runHubAction(
+      'onboarding-submit',
+      () => submitOnboardingForApproval(myOnboardingInvitation.id),
+      'Onboarding submitted for manager approval.',
+    );
+  }
+
+  async function approveOnboarding(invitation) {
+    await runHubAction(
+      `onboarding-approve-${invitation.id}`,
+      () => approveStaffOnboarding(
+        invitation.id,
+        invitation.target_permissions,
+        invitation.target_permissions?.role_template === 'owner' ? 'admin' : 'staff',
+        'Approved from Staff Hub onboarding review.',
+      ),
+      `${invitation.full_name} has been approved and promoted.`,
+    );
+  }
+
+  async function completePracticalCertification(invitation) {
+    await runHubAction(
+      `onboarding-practical-${invitation.id}`,
+      () => submitOnboardingStage(invitation.id, 'practical_certification', {
+        approved_by_manager: true,
+        checklist: ['Shop tour', 'Mock booking', 'Mock checkout', 'Opening/closing demonstration', 'Cleaning inspection'],
+      }),
+      'Practical certification approved.',
+    );
+  }
+
+  async function downloadCertificate(certificate) {
+    await runHubAction(
+      `onboarding-certificate-${certificate.id}`,
+      () => downloadOnboardingCertificate({ businessUnit, certificate }),
+      'Certificate downloaded.',
+    );
+  }
+
+  function updateProbationDraft(reviewId, field, value) {
+    setProbationDrafts((current) => ({
+      ...current,
+      [reviewId]: {
+        ...(current[reviewId] || {}),
+        [field]: value,
+      },
+    }));
+  }
+
+  async function saveProbationReview(review) {
+    const draft = probationDrafts[review.id] || {};
+    await runHubAction(
+      `probation-review-${review.id}`,
+      () => saveStaffProbationReview(
+        review.id,
+        {
+          attendance: numberInputValue(draft.attendance),
+          client_experience: numberInputValue(draft.client_experience),
+          policy_compliance: numberInputValue(draft.policy_compliance),
+          professionalism: numberInputValue(draft.professionalism),
+          service_quality: numberInputValue(draft.service_quality),
+        },
+        {
+          bookings_offered: numberInputValue(draft.bookings_offered),
+          content_exposure_count: numberInputValue(draft.content_exposure_count),
+          manager_support_notes: draft.manager_support_notes || '',
+          qualified_leads_shared: numberInputValue(draft.qualified_leads_shared),
+          training_sessions_provided: numberInputValue(draft.training_sessions_provided),
+        },
+        draft.manager_notes || '',
+        draft.recommendation || 'continue',
+      ),
+      'Probation review saved.',
+    );
+  }
+
+  function renderOnboardingWorkspace(invitation, checklist, certificate = null) {
+    if (!invitation) {
+      return (
+        <section className="panel full-span onboarding-workspace">
+          <div className="alert warning">
+            <strong>Onboarding record is not ready yet.</strong>
+            <span>Ask a manager to resend the onboarding invitation or refresh Staff Hub.</span>
+          </div>
+        </section>
+      );
+    }
+
+    const waitingForManager = invitation.status === 'submitted';
+    const approved = invitation.status === 'approved';
+
+    return (
+      <section className="panel full-span onboarding-workspace">
+        <div className="section-header">
+          <div>
+            <span>Onboarding — Restricted</span>
+            <h2>{approved ? 'Onboarding approved' : waitingForManager ? 'Waiting for manager approval' : 'Complete your RTB onboarding'}</h2>
+            <p>
+              Finish each stage, pass every knowledge check, sign required policies, then submit for manager approval.
+            </p>
+          </div>
+          <StatusBadge tone={approved ? 'success' : waitingForManager ? 'warning' : 'gold'}>
+            {formatCategory(invitation.status)}
+          </StatusBadge>
+        </div>
+
+        <div className="onboarding-status-grid">
+          <article>
+            <strong>{checklist.stages.filter((stage) => stage.completed).length}/{checklist.stages.length}</strong>
+            <span>Stages complete</span>
+          </article>
+          <article>
+            <strong>{checklist.quizSections.filter((section) => section.passed).length}/{checklist.quizSections.length}</strong>
+            <span>Knowledge checks passed</span>
+          </article>
+          <article>
+            <strong>{checklist.signedPolicyCount}/{checklist.policies.length}</strong>
+            <span>Policies signed</span>
+          </article>
+        </div>
+
+        {certificate ? (
+          <div className="onboarding-certificate-strip">
+            <Award size={20} />
+            <span>
+              <strong>{certificate.certificate_number}</strong>
+              <small>Issued {formatDateTime(certificate.issued_at)}</small>
+            </span>
+            <button
+              className="secondary-button small"
+              disabled={savingHubAction === `onboarding-certificate-${certificate.id}`}
+              onClick={() => downloadCertificate(certificate)}
+              type="button"
+            >
+              Download certificate
+            </button>
+          </div>
+        ) : null}
+
+        <form className="onboarding-personal-form" onSubmit={savePersonalSetup}>
+          <div className="section-header compact">
+            <div>
+              <span>Personal setup</span>
+              <h3>Contact, emergency, position and documents</h3>
+            </div>
+            <StatusBadge tone={checklist.stages.find((stage) => stage.id === 'personal_setup')?.completed ? 'success' : 'warning'}>
+              {checklist.stages.find((stage) => stage.id === 'personal_setup')?.completed ? 'Complete' : 'Required'}
+            </StatusBadge>
+          </div>
+          <div className="form-grid compact">
+            <label className="field">
+              <span>Position</span>
+              <input
+                onChange={(event) => setOnboardingPersonalForm((current) => ({ ...current, position_title: event.target.value }))}
+                required
+                value={onboardingPersonalForm.position_title}
+              />
+            </label>
+            <label className="field">
+              <span>Start date</span>
+              <input
+                onChange={(event) => setOnboardingPersonalForm((current) => ({ ...current, start_date: event.target.value }))}
+                required
+                type="date"
+                value={onboardingPersonalForm.start_date}
+              />
+            </label>
+            <label className="field">
+              <span>Emergency contact</span>
+              <input
+                onChange={(event) => setOnboardingPersonalForm((current) => ({ ...current, emergency_name: event.target.value }))}
+                required
+                value={onboardingPersonalForm.emergency_name}
+              />
+            </label>
+            <label className="field">
+              <span>Emergency phone</span>
+              <input
+                onChange={(event) => setOnboardingPersonalForm((current) => ({ ...current, emergency_phone: event.target.value }))}
+                required
+                value={onboardingPersonalForm.emergency_phone}
+              />
+            </label>
+          </div>
+          <label className="field">
+            <span>Availability notes</span>
+            <textarea
+              onChange={(event) => setOnboardingPersonalForm((current) => ({ ...current, availability_notes: event.target.value }))}
+              value={onboardingPersonalForm.availability_notes}
+            />
+          </label>
+          <label className="check-row">
+            <input
+              checked={Boolean(onboardingPersonalForm.contract_uploaded)}
+              onChange={(event) => setOnboardingPersonalForm((current) => ({ ...current, contract_uploaded: event.target.checked }))}
+              type="checkbox"
+            />
+            <span>Contract and required documents are ready for manager review</span>
+          </label>
+          <button className="primary-button" disabled={savingHubAction === 'onboarding-stage-personal_setup'} type="submit">
+            Save personal setup
+          </button>
+        </form>
+
+        <div className="onboarding-stage-grid">
+          {checklist.stages.filter((stage) => stage.id !== 'personal_setup').map((stage) => (
+            <article className={stage.completed ? 'onboarding-stage-card complete' : 'onboarding-stage-card'} key={stage.id}>
+              <div>
+                <strong>{stage.label}</strong>
+                <StatusBadge tone={stage.completed ? 'success' : 'warning'}>
+                  {stage.completed ? 'Complete' : 'Open'}
+                </StatusBadge>
+              </div>
+              <ul>
+                {stage.items.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+              {stage.id === 'practical_certification' ? (
+                <small className="subtle-text">A manager completes this after the shop walk-through and mock workflow.</small>
+              ) : (
+                <button
+                  className="secondary-button small"
+                  disabled={stage.completed || savingHubAction === `onboarding-stage-${stage.id}`}
+                  onClick={() => saveOnboardingStage(stage.id, { confirmed_items: stage.items })}
+                  type="button"
+                >
+                  Mark complete
+                </button>
+              )}
+            </article>
+          ))}
+        </div>
+
+        <div className="onboarding-quiz-grid">
+          {checklist.quizSections.map((section) => (
+            <article className={section.passed ? 'onboarding-stage-card complete' : 'onboarding-stage-card'} key={section.id}>
+              <div>
+                <strong>{section.label}</strong>
+                <StatusBadge tone={section.passed ? 'success' : 'warning'}>
+                  {section.passed ? 'Passed' : `${section.passingScore}% required`}
+                </StatusBadge>
+              </div>
+              <label className="field">
+                <span>Score</span>
+                <input
+                  max="100"
+                  min="0"
+                  onChange={(event) => setOnboardingQuizScores((current) => ({ ...current, [section.id]: event.target.value }))}
+                  type="number"
+                  value={onboardingQuizScores[section.id] || ''}
+                />
+              </label>
+              <button
+                className="secondary-button small"
+                disabled={savingHubAction === `onboarding-quiz-${section.id}`}
+                onClick={() => saveOnboardingQuiz(section)}
+                type="button"
+              >
+                Save score
+              </button>
+            </article>
+          ))}
+        </div>
+
+        <div className="onboarding-policy-list">
+          <div className="section-header compact">
+            <div>
+              <span>Policy signatures</span>
+              <h3>Sign each active policy version</h3>
+            </div>
+            <StatusBadge tone={checklist.policies.every((policy) => policy.signed) ? 'success' : 'warning'}>
+              {checklist.signedPolicyCount}/{checklist.policies.length}
+            </StatusBadge>
+          </div>
+          {checklist.policies.map((policy) => (
+            <article className={policy.signed ? 'onboarding-policy-row signed' : 'onboarding-policy-row'} key={policy.id}>
+              <span>
+                <strong>{policy.title}</strong>
+                <small>{formatCategory(policy.category)} · v{policy.version}</small>
+              </span>
+              {policy.signed ? (
+                <StatusBadge tone="success">Signed</StatusBadge>
+              ) : (
+                <div className="onboarding-signature-controls">
+                  <input
+                    onChange={(event) => setOnboardingSignatures((current) => ({
+                      ...current,
+                      [policy.id]: { ...(current[policy.id] || {}), signer_name: event.target.value },
+                    }))}
+                    placeholder="Legal name"
+                    value={onboardingSignatures[policy.id]?.signer_name || profileName}
+                  />
+                  <input
+                    onChange={(event) => setOnboardingSignatures((current) => ({
+                      ...current,
+                      [policy.id]: { ...(current[policy.id] || {}), signature_text: event.target.value },
+                    }))}
+                    placeholder="Type signature"
+                    value={onboardingSignatures[policy.id]?.signature_text || ''}
+                  />
+                  <button
+                    className="secondary-button small"
+                    disabled={savingHubAction === `onboarding-sign-${policy.id}`}
+                    onClick={() => saveOnboardingSignature(policy)}
+                    type="button"
+                  >
+                    Sign
+                  </button>
+                </div>
+              )}
+            </article>
+          ))}
+          {!checklist.policies.length ? (
+            <div className="staff-hub-empty-compact">
+              <strong>No required policies are active yet.</strong>
+              <span>A manager can publish policy documents from Daily Ops.</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="onboarding-submit-row">
+          <span>
+            <strong>{checklist.readyForSubmission ? 'Ready for manager approval' : 'Finish the checklist before submitting'}</strong>
+            <small>Full scheduling, payment, and admin access stay locked until approval.</small>
+          </span>
+          <button
+            className="primary-button"
+            disabled={!checklist.readyForSubmission || waitingForManager || approved || savingHubAction === 'onboarding-submit'}
+            onClick={submitOnboarding}
+            type="button"
+          >
+            Submit for approval
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  function renderManagerOnboarding() {
+    if (!canManageHub || !managerOnboardingInvitations.length) return null;
+
+    return (
+      <section className="panel full-span onboarding-manager-panel">
+        <div className="section-header">
+          <div>
+            <span>Manager onboarding</span>
+            <h2>New-hire approval queue</h2>
+            <p>Complete practical certification, approve submitted staff, and keep probation reviews documented.</p>
+          </div>
+          <StatusBadge tone="gold">{managerOnboardingInvitations.length} active</StatusBadge>
+        </div>
+        <div className="onboarding-manager-list">
+          {managerOnboardingInvitations.map((invitation) => {
+            const checklist = buildOnboardingChecklist({
+              policyDocuments: hubRecords.policyDocuments,
+              quizAttempts: hubRecords.onboardingQuizAttempts.filter((attempt) =>
+                recordBelongsToOnboarding(attempt, invitation),
+              ),
+              signatures: hubRecords.onboardingPolicySignatures.filter((signature) =>
+                recordBelongsToOnboarding(signature, invitation),
+              ),
+              stageProgress: hubRecords.onboardingStageProgress.filter((stage) =>
+                recordBelongsToOnboarding(stage, invitation),
+              ),
+            });
+            const practicalComplete = checklist.stages.find((stage) => stage.id === 'practical_certification')?.completed;
+            const certificate = hubRecords.onboardingCertificates.find((row) => recordBelongsToOnboarding(row, invitation));
+            const reviews = hubRecords.probationReviews.filter((review) => recordBelongsToOnboarding(review, invitation));
+
+            return (
+              <article className="onboarding-manager-card" key={invitation.id}>
+                <div className="onboarding-manager-card__header">
+                  <span>
+                    <strong>{invitation.full_name}</strong>
+                    <small>{invitation.position_title || 'New hire'} · {formatCategory(invitation.status)}</small>
+                  </span>
+                  <StatusBadge tone={invitation.status === 'submitted' ? 'warning' : invitation.status === 'approved' ? 'success' : 'muted'}>
+                    {formatCategory(invitation.target_role_template)}
+                  </StatusBadge>
+                </div>
+                <div className="onboarding-status-grid compact">
+                  <article><strong>{checklist.stages.filter((stage) => stage.completed).length}/{checklist.stages.length}</strong><span>Stages</span></article>
+                  <article><strong>{checklist.quizSections.filter((section) => section.passed).length}/{checklist.quizSections.length}</strong><span>Quizzes</span></article>
+                  <article><strong>{checklist.signedPolicyCount}/{checklist.policies.length}</strong><span>Policies</span></article>
+                </div>
+                <div className="staff-hub-inline-actions">
+                  <button
+                    className="secondary-button small"
+                    disabled={practicalComplete || savingHubAction === `onboarding-practical-${invitation.id}`}
+                    onClick={() => completePracticalCertification(invitation)}
+                    type="button"
+                  >
+                    Approve practical
+                  </button>
+                  <button
+                    className="primary-button small"
+                    disabled={invitation.status !== 'submitted' || savingHubAction === `onboarding-approve-${invitation.id}`}
+                    onClick={() => approveOnboarding(invitation)}
+                    type="button"
+                  >
+                    Approve full access
+                  </button>
+                  {certificate ? (
+                    <button
+                      className="secondary-button small"
+                      disabled={savingHubAction === `onboarding-certificate-${certificate.id}`}
+                      onClick={() => downloadCertificate(certificate)}
+                      type="button"
+                    >
+                      Certificate
+                    </button>
+                  ) : null}
+                </div>
+                {reviews.length ? (
+                  <div className="probation-review-grid">
+                    {reviews.map((review) => {
+                      const draft = probationDrafts[review.id] || {};
+                      return (
+                        <details className="probation-review-card" key={review.id}>
+                          <summary>
+                            <span>
+                              <strong>Day {review.review_day}</strong>
+                              <small>{probationReviewDueLabel(review)}</small>
+                            </span>
+                            <StatusBadge tone={review.status === 'completed' ? 'success' : 'warning'}>
+                              {formatCategory(review.status)}
+                            </StatusBadge>
+                          </summary>
+                          <div className="form-grid compact">
+                            {['attendance', 'professionalism', 'service_quality', 'client_experience', 'policy_compliance'].map((field) => (
+                              <label className="field" key={field}>
+                                <span>{formatCategory(field)}</span>
+                                <input
+                                  max="100"
+                                  min="0"
+                                  onChange={(event) => updateProbationDraft(review.id, field, event.target.value)}
+                                  type="number"
+                                  value={draft[field] || review.staff_kpis?.[field] || ''}
+                                />
+                              </label>
+                            ))}
+                            {['training_sessions_provided', 'bookings_offered', 'content_exposure_count', 'qualified_leads_shared'].map((field) => (
+                              <label className="field" key={field}>
+                                <span>{formatCategory(field)}</span>
+                                <input
+                                  min="0"
+                                  onChange={(event) => updateProbationDraft(review.id, field, event.target.value)}
+                                  type="number"
+                                  value={draft[field] || review.rtb_support_kpis?.[field] || ''}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                          <label className="field">
+                            <span>Manager notes</span>
+                            <textarea
+                              onChange={(event) => updateProbationDraft(review.id, 'manager_notes', event.target.value)}
+                              value={draft.manager_notes || review.manager_notes || ''}
+                            />
+                          </label>
+                          <label className="field">
+                            <span>Recommendation</span>
+                            <select
+                              onChange={(event) => updateProbationDraft(review.id, 'recommendation', event.target.value)}
+                              value={draft.recommendation || review.recommendation || 'continue'}
+                            >
+                              {['advance', 'continue', 'improvement_plan', 'exit'].map((option) => (
+                                <option key={option} value={option}>{formatCategory(option)}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <button
+                            className="secondary-button small"
+                            disabled={savingHubAction === `probation-review-${review.id}`}
+                            onClick={() => saveProbationReview(review)}
+                            type="button"
+                          >
+                            Save review
+                          </button>
+                        </details>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  if (restrictedOnboarding) {
+    return (
+      <div className={`page-grid staff-hub-page onboarding-only-page ${businessThemeClass} ${profileThemeClass}`}>
+        <section className="hero-panel full-span staff-hub-hero">
+          <div className="staff-hub-brand-lockup">
+            <div className="staff-hub-logo-stack">
+              <div className="staff-hub-logo">
+                <img src={businessProfile.logo_url} alt="" />
+              </div>
+              <div className="staff-hub-avatar" aria-label={profileName}>
+                {profilePhoto ? <img src={profilePhoto} alt="" /> : <span>{initials(profileName)}</span>}
+              </div>
+            </div>
+            <div>
+              <span className="eyebrow">Onboarding — Restricted</span>
+              <h2>Welcome to RTB, {firstName}</h2>
+              <p>Complete onboarding before scheduling, payment, client, or admin access is opened.</p>
+            </div>
+          </div>
+          <div className="staff-hub-account-card">
+            <div className="staff-hub-account-card__top">
+              <UserRound size={18} />
+              <StatusBadge tone="warning">Restricted</StatusBadge>
+            </div>
+            <strong>{accessProfile?.role_title || 'Onboarding'}</strong>
+            <span>{businessUnit?.name || 'Assigned business'}</span>
+          </div>
+        </section>
+        {hubError || hubMessage ? (
+          <section className="panel full-span staff-hub-alert-panel">
+            <div className={`alert ${hubError ? 'danger' : 'success'}`}>
+              {hubError || hubMessage}
+            </div>
+          </section>
+        ) : null}
+        {renderOnboardingWorkspace(myOnboardingInvitation, myOnboardingChecklist, myOnboardingCertificate)}
+      </div>
+    );
+  }
+
   return (
     <div className={`page-grid staff-hub-page ${businessThemeClass} ${profileThemeClass}`}>
       <section className="hero-panel full-span staff-hub-hero">
@@ -1587,6 +2267,8 @@ export default function StaffHubPage({
         </div>
         <small>Professionalism today -- checklist, tasks, and shift standards</small>
       </section>
+
+      {renderManagerOnboarding()}
 
       {!staffProfile && !ownerView ? (
         <section className="panel full-span staff-hub-alert-panel">
