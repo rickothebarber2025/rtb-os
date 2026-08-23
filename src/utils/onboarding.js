@@ -41,10 +41,62 @@ export const ONBOARDING_STAGES = [
 ];
 
 export const ONBOARDING_QUIZ_SECTIONS = [
-  { id: 'rtb_standards', label: 'RTB standards', passingScore: 80 },
-  { id: 'operational_training', label: 'How to operate', passingScore: 80 },
-  { id: 'cash_payments', label: 'Cash, tips and payments', passingScore: 80 },
-  { id: 'conduct_confidentiality', label: 'Conduct and confidentiality', passingScore: 80 },
+  {
+    id: 'rtb_standards',
+    label: 'RTB standards',
+    passingScore: 100,
+    questions: [{
+      id: 'schedule_block',
+      prompt: 'What must happen before blocking time in your RTB schedule?',
+      options: [
+        { label: 'Request management approval first', value: 'request_approval' },
+        { label: 'Block it and explain later', value: 'block_without_approval' },
+        { label: 'Ask another staff member only', value: 'ask_staff_only' },
+      ],
+    }],
+  },
+  {
+    id: 'operational_training',
+    label: 'How to operate',
+    passingScore: 100,
+    questions: [{
+      id: 'manual_booking',
+      prompt: 'Before saving a manual booking, what information must be verified?',
+      options: [
+        { label: 'Client, service, staff, duration and price', value: 'verify_booking_details' },
+        { label: 'Only the client name', value: 'client_name_only' },
+        { label: 'Only the appointment time', value: 'appointment_time_only' },
+      ],
+    }],
+  },
+  {
+    id: 'cash_payments',
+    label: 'Cash, tips and payments',
+    passingScore: 100,
+    questions: [{
+      id: 'cash_handling',
+      prompt: 'What happens to cash received for an RTB service?',
+      options: [
+        { label: 'It is recorded and remains in the register', value: 'record_and_register' },
+        { label: 'The staff member keeps it immediately', value: 'keep_immediately' },
+        { label: 'It does not need to be entered', value: 'skip_checkout' },
+      ],
+    }],
+  },
+  {
+    id: 'conduct_confidentiality',
+    label: 'Conduct and confidentiality',
+    passingScore: 100,
+    questions: [{
+      id: 'client_privacy',
+      prompt: 'How should client information and private shop matters be handled?',
+      options: [
+        { label: 'Protect them and report concerns through management', value: 'protect_and_report' },
+        { label: 'Share them in personal group chats', value: 'share_personally' },
+        { label: 'Post them if no name is shown', value: 'post_without_name' },
+      ],
+    }],
+  },
 ];
 
 export const PROBATION_REVIEW_DAYS = [7, 30, 60, 90];
