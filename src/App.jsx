@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AgenticStaffWorkspace from './components/AgenticStaffWorkspace.jsx';
 import AppShell from './components/AppShell';
 import LoadingState from './components/LoadingState';
 import ModuleGate from './components/ModuleGate.jsx';
@@ -286,6 +287,18 @@ export default function App() {
       {isAllBusinessesId(selectedBusinessUnitId) && !isOperationsCleaningProfile(auth.profile) ? <div className="alert warning global-alert"><strong>All Businesses view</strong><span>Combined reporting. Choose one business before editing business-specific records.</span></div> : null}
       {probationBanner ? <div className="alert success global-alert">{probationBanner}</div> : null}
       {data.warnings.length ? <div className="alert warning global-alert"><strong>Some live data could not load.</strong><span>{data.warnings.join(' ')}</span><button className="ghost-button small" type="button" onClick={data.refresh}>Retry</button></div> : null}
+      {!data.loading ? (
+        <AgenticStaffWorkspace
+          activePage={activePage}
+          accessProfile={auth.profile}
+          businessUnit={data.selectedBusinessUnit}
+          businessUnits={data.businessUnits}
+          onRefresh={data.refresh}
+          staff={data.staff}
+          staffPortalSummary={data.staffPortalSummary}
+          user={auth.user}
+        />
+      ) : null}
       <Suspense fallback={<LoadingState label="Loading page" />}>{renderPage()}</Suspense>
     </AppShell>
   );
