@@ -1156,6 +1156,17 @@ export async function approveStaffOnboarding(invitationId, permissions, role = '
   );
 }
 
+export async function closeStaffOnboarding(invitationId, status, reason = '') {
+  const client = requireClient();
+  return requireData(
+    await client.rpc('close_staff_onboarding', {
+      p_invitation_id: invitationId,
+      p_reason: reason || null,
+      p_status: status,
+    }),
+  );
+}
+
 export async function saveStaffProbationReview(reviewId, staffKpis, rtbSupportKpis, managerNotes = '', recommendation = '', status = 'completed') {
   const client = requireClient();
   return requireData(
