@@ -260,7 +260,9 @@ async function resolveOnboardingStaff(
     .from("staff")
     .select("id")
     .eq("business_unit_id", businessUnitId)
+    .ilike("email", email.replace(/[\\%_]/g, "\\    .eq("business_unit_id", businessUnitId)
     .ilike("email", email)
+    .limit(1)"))
     .limit(1)
     .maybeSingle();
   if (findError) throw findError;
