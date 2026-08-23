@@ -889,6 +889,62 @@ begin
 end;
 $$;
 
+create or replace function public.close_staff_onboarding(
+  p_invitation_id uuid,
+  p_status text,
+  p_reason text default null
+)
+returns public.staff_onboarding_invitations
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  invitation public.staff_onboarding_invitations%rowtype;
+begin
+  if not private.can_module_admin('access') then
+    raise exception 'Access administrator permission is required.';
+  end if;
+
+  if p_status not in ('cancelled', 'archived') then
+    raise exception 'Onboarding can only be cancelled or archived.';
+  end if;
+
+  select *
+  into invitation
+  from public.staff_onboarding_invitations
+  where id = p_invitation_id
+  for update;
+
+  if invitation.id is null then
+    raise exception 'Onboarding invitation not found.';
+  end if;
+
+  if p_status = 'cancelled' and invitation.status = 'approved' then
+    raise exception 'Approved onboarding records must be archived, not cancelled.';
+  end if;
+
+  if p_status = 'archived' and invitation.status <> 'approved' then
+    raise exception 'Only approved onboarding records can be archived.';
+  end if;
+
+  update public.staff_onboarding_invitations
+  set status = p_status,
+      manager_note = coalesce(nullif(trim(p_reason), ''), manager_note)
+  where id = invitation.id
+  returning * into invitation;
+
+  if p_status = 'cancelled' and invitation.user_profile_id is not null then
+    update public.user_profiles
+    set active = false,
+        updated_at = now()
+    where id = invitation.user_profile_id;
+  end if;
+
+  return invitation;
+end;
+$$;
+
 create or replace function public.save_staff_probation_review(
   p_review_id uuid,
   p_staff_kpis jsonb,
@@ -938,6 +994,7 @@ revoke all on function public.submit_staff_onboarding_quiz(uuid,text,numeric,num
 revoke all on function public.sign_staff_onboarding_policy(uuid,uuid,text,text) from public, anon;
 revoke all on function public.submit_staff_onboarding_for_approval(uuid) from public, anon;
 revoke all on function public.approve_staff_onboarding(uuid,jsonb,text,text) from public, anon;
+revoke all on function public.close_staff_onboarding(uuid,text,text) from public, anon;
 revoke all on function public.save_staff_probation_review(uuid,jsonb,jsonb,text,text,text) from public, anon;
 
 grant execute on function public.submit_staff_onboarding_stage(uuid,text,jsonb,boolean) to authenticated;
@@ -945,6 +1002,7 @@ grant execute on function public.submit_staff_onboarding_quiz(uuid,text,numeric,
 grant execute on function public.sign_staff_onboarding_policy(uuid,uuid,text,text) to authenticated;
 grant execute on function public.submit_staff_onboarding_for_approval(uuid) to authenticated;
 grant execute on function public.approve_staff_onboarding(uuid,jsonb,text,text) to authenticated;
+grant execute on function public.close_staff_onboarding(uuid,text,text) to authenticated;
 grant execute on function public.save_staff_probation_review(uuid,jsonb,jsonb,text,text,text) to authenticated;
 
 commit;
