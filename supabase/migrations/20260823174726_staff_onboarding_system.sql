@@ -797,17 +797,21 @@ begin
     raise exception 'Onboarding invitation not found.';
   end if;
 
-  if not private.staff_hub_business_admin(invitation.business_unit_id, 'edit') then
-    raise exception 'Manager approval access required.';
+  if not private.can_module_admin('access') then
+    raise exception 'Access administrator approval is required to activate RTB OS permissions.';
   end if;
 
   if invitation.status <> 'submitted' then
     raise exception 'The staff member must submit onboarding before approval.';
   end if;
 
-  target_permissions := coalesce(p_permissions, invitation.target_permissions);
+  target_permissions := invitation.target_permissions;
   if target_permissions is null then
     raise exception 'Choose the role access to grant after approval.';
+  end if;
+
+  if p_permissions is not null and p_permissions <> target_permissions then
+    raise exception 'Approval permissions must match the access plan saved with the invitation.';
   end if;
 
   cert_number := coalesce(
