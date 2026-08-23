@@ -207,7 +207,6 @@ begin
   if exists (
     select 1
     from pg_policies
-    select 1 from pg_policies
     where schemaname = 'public'
       and tablename = p_table
       and policyname = p_policy
