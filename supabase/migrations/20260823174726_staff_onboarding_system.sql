@@ -487,6 +487,46 @@ begin
     raise exception 'Manager approval is required for practical certification.';
   end if;
 
+  if p_stage_id = 'personal_setup' then
+    update public.staff_onboarding_invitations
+    set position_title = coalesce(
+          nullif(trim(p_metadata ->> 'position_title'), ''),
+          position_title
+        ),
+        start_date = coalesce(
+          nullif(trim(p_metadata ->> 'start_date'), '')::date,
+          start_date
+        ),
+        availability_notes = coalesce(
+          nullif(trim(p_metadata ->> 'availability_notes'), ''),
+          availability_notes
+        ),
+        emergency_contact = case
+          when jsonb_typeof(p_metadata -> 'emergency_contact') = 'object'
+            then p_metadata -> 'emergency_contact'
+          else emergency_contact
+        end,
+        updated_at = now()
+    where id = invitation.id
+    returning * into invitation;
+
+    if invitation.staff_id is not null then
+      update public.staff
+      set role = coalesce(nullif(trim(invitation.position_title), ''), role),
+          start_date = coalesce(invitation.start_date, start_date),
+          probation_start_date = coalesce(invitation.start_date, probation_start_date),
+          updated_at = now()
+      where id = invitation.staff_id;
+
+      update public.staff_probation_reviews
+      set scheduled_date = invitation.start_date + review_day,
+          updated_at = now()
+      where invitation_id = invitation.id
+        and status = 'scheduled'
+        and invitation.start_date is not null;
+    end if;
+  end if;
+
   insert into public.staff_onboarding_stage_progress (
     invitation_id,
     business_unit_id,
