@@ -251,11 +251,6 @@ function recordBelongsToOnboarding(record, invitation) {
   return record?.invitation_id === invitation?.id;
 }
 
-function numberInputValue(value) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
-}
-
 function sum(rows, field) {
   return rows.reduce((total, row) => total + Number(row[field] || 0), 0);
 }
