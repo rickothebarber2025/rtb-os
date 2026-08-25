@@ -619,6 +619,10 @@ begin
     raise exception 'Onboarding access denied.';
   end if;
 
+  if invitation.status in ('approved', 'archived', 'cancelled') then
+    raise exception 'This onboarding record is closed.';
+  end if;
+
   answer_key := case p_section_id
     when 'rtb_standards' then '{"schedule_block":"request_approval"}'::jsonb
     when 'operational_training' then '{"manual_booking":"verify_booking_details"}'::jsonb
@@ -697,6 +701,10 @@ begin
     or invitation.staff_id = private.current_staff_id()
   ) then
     raise exception 'Only the onboarding staff member can sign policies.';
+  end if;
+
+  if invitation.status in ('approved', 'archived', 'cancelled') then
+    raise exception 'This onboarding record is closed.';
   end if;
 
   select *
