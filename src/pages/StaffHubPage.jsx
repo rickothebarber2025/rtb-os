@@ -251,6 +251,11 @@ function recordBelongsToOnboarding(record, invitation) {
   return record?.invitation_id === invitation?.id;
 }
 
+function numberInputValue(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 function sum(rows, field) {
   return rows.reduce((total, row) => total + Number(row[field] || 0), 0);
 }
@@ -662,11 +667,22 @@ export default function StaffHubPage({
   const managerOnboardingInvitations = useMemo(
     () =>
       canManageHub || canApproveOnboarding
-        ? hubRecords.onboardingInvitations.filter((invitation) =>
-            !['archived', 'cancelled'].includes(invitation.status),
-          )
+        ? hubRecords.onboardingInvitations.filter((invitation) => {
+            if (invitation.status === 'cancelled') return false;
+            if (invitation.status !== 'archived') return true;
+            return hubRecords.probationReviews.some(
+              (review) =>
+                review.invitation_id === invitation.id &&
+                ['scheduled', 'missed'].includes(review.status),
+            );
+          })
         : [],
-    [canApproveOnboarding, canManageHub, hubRecords.onboardingInvitations],
+    [
+      canApproveOnboarding,
+      canManageHub,
+      hubRecords.onboardingInvitations,
+      hubRecords.probationReviews,
+    ],
   );
   useEffect(() => {
     if (!myOnboardingInvitation) return;
