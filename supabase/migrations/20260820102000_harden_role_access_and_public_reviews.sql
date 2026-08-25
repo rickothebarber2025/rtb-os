@@ -57,13 +57,13 @@ end;
 $$;
 
 -- Public reviews stay public through RLS rather than a definer view.
-do $
+do $view_guard$
 begin
   if to_regclass('public.public_reviews_display') is not null then
     execute 'alter view public.public_reviews_display set (security_invoker = true)';
   end if;
 end;
-$;
+$view_guard$;
 
 drop policy if exists reviews_public_display on public.reviews;
 create policy reviews_public_display on public.reviews
@@ -75,7 +75,7 @@ using (
   and length(review_text) > 0
 );
 grant select on public.reviews to anon;
-do $
+do $grant_guard$
 begin
   if to_regclass('public.public_reviews_display') is not null then
     execute 'grant select on public.public_reviews_display to anon';
@@ -84,4 +84,4 @@ begin
     execute 'alter function public.rtb_disable_beauty_walkin_coverage_tasks() set search_path = public, private';
   end if;
 end;
-$;
+$grant_guard$;
