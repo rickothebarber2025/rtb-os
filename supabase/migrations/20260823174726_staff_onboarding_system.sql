@@ -220,6 +220,26 @@ $$;
 revoke all on function private.onboarding_business_unit_id(uuid) from public, anon, authenticated;
 revoke all on function private.can_access_onboarding_invitation(uuid) from public, anon, authenticated;
 
+drop policy if exists onboarding_required_global_policy_select
+on public.policy_documents;
+create policy onboarding_required_global_policy_select
+on public.policy_documents
+for select to authenticated
+using (
+  active
+  and requires_acknowledgement
+  and business_unit_id is null
+  and exists (
+    select 1
+    from public.staff_onboarding_invitations invitation
+    where (
+      invitation.user_profile_id = (select auth.uid())
+      or invitation.staff_id = private.current_staff_id()
+    )
+      and invitation.status not in ('cancelled', 'archived')
+  )
+);
+
 create policy staff_onboarding_invitations_select
 on public.staff_onboarding_invitations
 for select to authenticated
@@ -763,6 +783,10 @@ begin
     or invitation.staff_id = private.current_staff_id()
   ) then
     raise exception 'Only the onboarding staff member can submit this record.';
+  end if;
+
+  if invitation.status not in ('invited', 'in_progress', 'needs_changes') then
+    raise exception 'Only an open onboarding record can be submitted.';
   end if;
 
   select count(*)
