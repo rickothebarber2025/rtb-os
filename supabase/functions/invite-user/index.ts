@@ -358,6 +358,30 @@ Deno.serve(async (req) => {
       throw new Error("Supabase did not return an invited user.");
     }
 
+    let existingOnboarding: { id: string; status: string } | null = null;
+    if (onboardingRequired) {
+      const { data, error } = await admin
+        .from("staff_onboarding_invitations")
+        .select("id,status")
+        .eq("user_profile_id", targetUser.id)
+        .maybeSingle();
+      if (error) throw error;
+      existingOnboarding = data;
+
+      if (
+        existingOnboarding &&
+        ["submitted", "approved", "archived", "cancelled"].includes(existingOnboarding.status)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "This account already has a submitted or closed onboarding cycle. Review that record instead of sending a new restricted invitation.",
+          },
+          409,
+        );
+      }
+    }
+
     const { data: profile, error: profileError } = await admin
       .from("user_profiles")
       .upsert(
@@ -386,25 +410,29 @@ Deno.serve(async (req) => {
 
     if (onboardingRequired && businessUnitId) {
       const onboardingStaffId = await resolveOnboardingStaff(admin, body, email, fullName, businessUnitId);
-      const { error: onboardingError } = await admin
-        .from("staff_onboarding_invitations")
-        .upsert(
-          {
-            availability_notes: String(body.availability_notes || ""),
-            business_unit_id: businessUnitId,
-            email,
-            full_name: fullName || email,
-            position_title: body.position_title ? String(body.position_title) : null,
-            required_documents: Array.isArray(body.required_documents) ? body.required_documents : [],
-            staff_id: onboardingStaffId,
-            start_date: body.start_date || null,
-            status: "invited",
-            target_permissions: onboardingTargetPermissions,
-            target_role_template: onboardingTargetPermissions.role_template || "staff_portal",
-            user_profile_id: targetUser.id,
-          },
-          { onConflict: "user_profile_id" },
-        );
+      const onboardingPayload = {
+        availability_notes: String(body.availability_notes || ""),
+        business_unit_id: businessUnitId,
+        email,
+        full_name: fullName || email,
+        position_title: body.position_title ? String(body.position_title) : null,
+        required_documents: Array.isArray(body.required_documents) ? body.required_documents : [],
+        staff_id: onboardingStaffId,
+        start_date: body.start_date || null,
+        target_permissions: onboardingTargetPermissions,
+        target_role_template: onboardingTargetPermissions.role_template || "staff_portal",
+        user_profile_id: targetUser.id,
+      };
+
+      const onboardingRequest = existingOnboarding
+        ? admin
+            .from("staff_onboarding_invitations")
+            .update(onboardingPayload)
+            .eq("id", existingOnboarding.id)
+        : admin
+            .from("staff_onboarding_invitations")
+            .insert({ ...onboardingPayload, status: "invited" });
+      const { error: onboardingError } = await onboardingRequest;
 
       if (onboardingError) throw onboardingError;
     }
