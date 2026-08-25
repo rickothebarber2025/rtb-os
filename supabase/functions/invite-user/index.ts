@@ -256,13 +256,12 @@ async function resolveOnboardingStaff(
 ) {
   if (body.staff_id) return String(body.staff_id);
 
+  const escapedEmail = email.replace(/[\\%_]/g, (character) => `\\${character}`);
   const { data: existing, error: findError } = await admin
     .from("staff")
     .select("id")
     .eq("business_unit_id", businessUnitId)
-    .ilike("email", email.replace(/[\\%_]/g, "\\    .eq("business_unit_id", businessUnitId)
-    .ilike("email", email)
-    .limit(1)"))
+    .ilike("email", escapedEmail)
     .limit(1)
     .maybeSingle();
   if (findError) throw findError;
