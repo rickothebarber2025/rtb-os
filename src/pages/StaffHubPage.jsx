@@ -1779,21 +1779,28 @@ export default function StaffHubPage({
       () => saveStaffProbationReview(
         review.id,
         {
-          attendance: numberInputValue(draft.attendance),
-          client_experience: numberInputValue(draft.client_experience),
-          policy_compliance: numberInputValue(draft.policy_compliance),
-          professionalism: numberInputValue(draft.professionalism),
-          service_quality: numberInputValue(draft.service_quality),
+          attendance: numberInputValue(draft.attendance ?? review.staff_kpis?.attendance),
+          client_experience: numberInputValue(draft.client_experience ?? review.staff_kpis?.client_experience),
+          policy_compliance: numberInputValue(draft.policy_compliance ?? review.staff_kpis?.policy_compliance),
+          professionalism: numberInputValue(draft.professionalism ?? review.staff_kpis?.professionalism),
+          service_quality: numberInputValue(draft.service_quality ?? review.staff_kpis?.service_quality),
         },
         {
-          bookings_offered: numberInputValue(draft.bookings_offered),
-          content_exposure_count: numberInputValue(draft.content_exposure_count),
-          manager_support_notes: draft.manager_support_notes || '',
-          qualified_leads_shared: numberInputValue(draft.qualified_leads_shared),
-          training_sessions_provided: numberInputValue(draft.training_sessions_provided),
+          bookings_offered: numberInputValue(draft.bookings_offered ?? review.business_support_kpis?.bookings_offered),
+          content_exposure_count: numberInputValue(
+            draft.content_exposure_count ?? review.business_support_kpis?.content_exposure_count,
+          ),
+          manager_support_notes:
+            draft.manager_support_notes ?? review.business_support_kpis?.manager_support_notes ?? '',
+          qualified_leads_shared: numberInputValue(
+            draft.qualified_leads_shared ?? review.business_support_kpis?.qualified_leads_shared,
+          ),
+          training_sessions_provided: numberInputValue(
+            draft.training_sessions_provided ?? review.business_support_kpis?.training_sessions_provided,
+          ),
         },
-        draft.manager_notes || '',
-        draft.recommendation || 'continue',
+        draft.manager_notes ?? review.manager_notes ?? '',
+        draft.recommendation ?? review.recommendation ?? 'continue',
       ),
       'Probation review saved.',
     );
