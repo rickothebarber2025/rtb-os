@@ -1026,11 +1026,19 @@ begin
   where id = invitation.id
   returning * into invitation;
 
-  if p_status = 'cancelled' and invitation.user_profile_id is not null then
-    update public.user_profiles
-    set active = false,
+  if p_status = 'cancelled' then
+    update public.staff_probation_reviews
+    set status = 'cancelled',
         updated_at = now()
-    where id = invitation.user_profile_id;
+    where invitation_id = invitation.id
+      and status in ('scheduled', 'missed');
+
+    if invitation.user_profile_id is not null then
+      update public.user_profiles
+      set active = false,
+          updated_at = now()
+      where id = invitation.user_profile_id;
+    end if;
   end if;
 
   return invitation;
