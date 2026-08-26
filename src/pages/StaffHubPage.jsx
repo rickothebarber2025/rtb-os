@@ -71,12 +71,12 @@ import {
 } from '../utils/staffHubInsights';
 
 const TABS = [
-  { icon: ClipboardCheck, id: 'daily', label: 'Daily Ops' },
-  { icon: Home, id: 'home', label: 'Today' },
-  { icon: CircleDollarSign, id: 'money', label: 'Earnings' },
-  { icon: TrendingUp, id: 'stats', label: 'Performance' },
-  { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
-  { icon: MoreHorizontal, id: 'more', label: 'More' },
+  { description: 'Clock in, checklists, shop status, tasks and daily operations.', icon: ClipboardCheck, id: 'daily', label: 'Work' },
+  { description: 'Your personal overview, priorities and what matters today.', icon: Home, id: 'home', label: 'Home' },
+  { description: 'Earnings, commission, tips and pay details.', icon: CircleDollarSign, id: 'money', label: 'Money' },
+  { description: 'Performance, goals, reviews and progress.', icon: TrendingUp, id: 'stats', label: 'Growth' },
+  { description: 'Appointments, availability and time-off requests.', icon: CalendarDays, id: 'schedule', label: 'Schedule' },
+  { description: 'Updates, policies, spotlight, profile and team resources.', icon: MoreHorizontal, id: 'more', label: 'Team' },
 ];
 
 // Updates, Spotlight, and Tips are still real destinations (activeTab can
@@ -514,9 +514,10 @@ export default function StaffHubPage({
     () => summaryStaffProfile || findStaffProfile({ accessProfile, staff, user }),
     [accessProfile, staff, summaryStaffProfile, user],
   );
+  const accessPayload = getEffectivePermissionsPayload(accessProfile);
   const ownerView = isOwnerProfile(accessProfile);
   const staffOnlyPortal =
-    !ownerView && getEffectivePermissionsPayload(accessProfile).role_template === 'staff_portal';
+    !ownerView && accessPayload.role_template === 'staff_portal';
   const canManageHub = ownerView || canManageOperations(accessProfile);
   const allBusinessesView = isAllBusinessesUnit(businessUnit);
   const businessProfile = getBusinessProfile(businessUnit);
@@ -1122,7 +1123,11 @@ export default function StaffHubPage({
   );
   const canOpen = (pageId) => allowedPageIds.has(pageId);
   const profileName = staffProfile?.full_name || accessProfile?.full_name || user?.email || 'My Staff Account';
-  const portalMode = staffProfile ? 'My staff portal' : ownerView ? 'Staff portal preview' : 'Staff access setup needed';
+  const roleTitle = staffProfile?.role || accessProfile?.role_title || accessPayload.role_title || 'Staff';
+  const roleTemplate = accessPayload.role_template || 'staff_portal';
+  const portalMode = staffProfile
+    ? roleTemplate === 'staff_portal' ? 'My staff portal' : `${roleTitle} workspace`
+    : ownerView ? 'Staff portal preview' : 'Staff access setup needed';
   const profilePhoto = getProfilePhoto(staffProfile, user);
   const firstName = String(profileName).split(/\s+/)[0] || 'there';
   const businessThemeClass = businessProfile.portal_theme || 'theme-combined';
@@ -1572,7 +1577,7 @@ export default function StaffHubPage({
               {staffProfile?.active ? 'Active' : ownerView ? 'Owner preview' : 'Needs match'}
             </StatusBadge>
           </div>
-          <strong>{staffProfile?.role || accessProfile?.role_title || 'Staff'}</strong>
+          <strong>{roleTitle}</strong>
           <span>{businessUnit?.name || staffProfile?.primary_business_name || 'Assigned business'}</span>
         </div>
       </section>
@@ -1629,7 +1634,7 @@ export default function StaffHubPage({
           <div className="staff-hub-pro-profile">
             <div>
               <strong>{firstName}</strong>
-              <span>{staffProfile?.role || accessProfile?.role_title || 'Staff'}</span>
+              <span>{roleTitle}</span>
             </div>
             <div className="staff-hub-pro-avatar">
               {profilePhoto ? <img src={profilePhoto} alt="" /> : <span>{initials(profileName)}</span>}
@@ -1788,20 +1793,33 @@ export default function StaffHubPage({
       </section>
 
       <section className="panel full-span staff-hub-tabs-panel">
+        <div className="staff-hub-human-nav-heading">
+          <div>
+            <strong>Staff Hub</strong>
+            <span>Choose what you need to do.</span>
+          </div>
+          <small>{roleTitle} · {TABS.find((tab) => tab.id === (TAB_PARENT[activeTab] || activeTab))?.description || 'Choose what you need to do.'}</small>
+        </div>
         <div className="staff-hub-tabs" role="tablist" aria-label="Staff Hub sections">
           {TABS.map((tab) => {
             const TabIcon = tab.icon;
             const isActive = (TAB_PARENT[activeTab] || activeTab) === tab.id;
             return (
               <button
+                aria-label={`${tab.label}. ${tab.description}`}
                 aria-selected={isActive}
                 className={isActive ? 'active' : ''}
+                data-human-nav="true"
+                data-nav-description={tab.description}
+                id={`staff-hub-tab-${tab.id}`}
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                role="tab"
+                title={tab.description}
                 type="button"
               >
                 <TabIcon size={16} />
-                {tab.label}
+                <span>{tab.label}</span>
               </button>
             );
           })}
@@ -1814,10 +1832,16 @@ export default function StaffHubPage({
           const isActive = (TAB_PARENT[activeTab] || activeTab) === tab.id;
           return (
             <button
+              aria-label={`${tab.label}. ${tab.description}`}
               aria-selected={isActive}
               className={isActive ? 'active' : ''}
+              data-human-nav="true"
+              data-nav-description={tab.description}
+              id={`staff-hub-sticky-tab-${tab.id}`}
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              role="tab"
+              title={tab.description}
               type="button"
             >
               <TabIcon size={18} />
