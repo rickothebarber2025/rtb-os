@@ -15272,3 +15272,440 @@ textarea {
   color: var(--faint);
   font-size: 0.72rem;
 }
+
+/* RTB OS shop-app mode: make the product feel like a working shop console. */
+.app-shell {
+  background:
+    linear-gradient(180deg, rgba(248, 244, 236, 0.025), transparent 10rem),
+    var(--app-bg-deep);
+}
+
+.app-ambient,
+.hero-panel::after,
+.sidebar::before {
+  display: none;
+}
+
+.topbar {
+  min-height: 54px;
+  padding: 0.55rem 0.75rem;
+}
+
+.topbar__title h1 {
+  font-size: clamp(1.02rem, 1.2vw, 1.28rem);
+}
+
+.topbar__title span,
+.topbar__status,
+.role-pill,
+.user-chip,
+.status-badge {
+  font-size: 0.72rem;
+}
+
+.topbar__actions {
+  gap: 0.45rem;
+}
+
+.content {
+  height: calc(100dvh - 54px);
+  padding: 0.72rem 0.8rem 0.95rem;
+}
+
+.page-grid {
+  gap: 0.58rem;
+}
+
+.panel,
+.hero-panel,
+.metric-card,
+.workspace-card,
+.dashboard-action-item,
+.operation-check,
+.staff-hub-pro-dashboard,
+.staff-hub-pro-score-card,
+.staff-hub-pro-metric,
+.staff-hub-ops-score-strip,
+.daily-ops-card {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.panel,
+.metric-card,
+.workspace-card,
+.daily-ops-card {
+  padding: 0.68rem;
+}
+
+.section-header {
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.section-header h2 {
+  font-size: clamp(0.98rem, 1.2vw, 1.18rem);
+}
+
+.section-header span,
+.eyebrow {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+.hero-panel,
+.dashboard-hero,
+.staff-hub-page .hero-panel {
+  min-height: 0;
+  padding: 0.72rem 0.82rem;
+}
+
+.hero-panel h2,
+.dashboard-hero h2,
+.staff-hub-brand-lockup h2 {
+  font-size: clamp(1.14rem, 1.7vw, 1.55rem);
+  line-height: 1.08;
+}
+
+.hero-panel p,
+.dashboard-hero p,
+.staff-hub-brand-lockup p {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  margin-top: 0.28rem;
+}
+
+.dashboard-hero .hero-brand-logo,
+.staff-hub-logo,
+.staff-hub-avatar {
+  height: 42px;
+  width: 42px;
+}
+
+.dashboard-page {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.dashboard-hero,
+.dashboard-shop-status-strip,
+.dashboard-mobile-tabs,
+.workspace-panel,
+.priority-board,
+.stat-strip {
+  grid-column: 1 / -1;
+}
+
+.workspace-grid,
+.metrics-grid,
+.snapshot-grid,
+.operations-grid {
+  gap: 0.5rem;
+}
+
+.dashboard-page .workspace-card,
+.metric-card,
+.operation-check,
+.snapshot-grid > div,
+.stat-list > div {
+  min-height: 0;
+  padding: 0.62rem;
+}
+
+.workspace-card > span,
+.metric-card span,
+.snapshot-grid span,
+.stat-list span {
+  font-size: 0.66rem;
+}
+
+.metric-card strong,
+.snapshot-grid strong,
+.stat-list strong,
+.workspace-card strong {
+  font-size: clamp(0.98rem, 1.45vw, 1.24rem);
+}
+
+.priority-board__layout {
+  gap: 0.55rem;
+  grid-template-columns: minmax(16rem, 0.75fr) minmax(0, 1.25fr);
+}
+
+.priority-board__summary {
+  gap: 0.55rem;
+}
+
+.priority-board__summary p,
+.workspace-mini-list,
+.operation-check small,
+.dashboard-action-item small,
+.empty-state p {
+  font-size: 0.75rem;
+  line-height: 1.32;
+}
+
+.staff-hub-pro-dashboard {
+  border-radius: 12px;
+  gap: 0.55rem;
+  grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 1.2fr);
+  padding: 0.72rem;
+}
+
+.staff-hub-pro-topbar,
+.staff-hub-pro-range {
+  grid-column: 1 / -1;
+}
+
+.staff-hub-pro-score-card {
+  min-height: 0;
+  padding: 0.62rem;
+}
+
+.staff-hub-pro-score-copy strong {
+  font-size: 2rem;
+}
+
+.staff-hub-pro-score-ring {
+  width: 58px;
+}
+
+.staff-hub-pro-metrics {
+  gap: 0.45rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.staff-hub-pro-metric {
+  border-radius: 10px;
+  gap: 0.16rem;
+  padding: 0.55rem;
+}
+
+.staff-hub-pro-metric strong {
+  font-size: 0.98rem;
+}
+
+.staff-hub-pro-section-heading,
+.staff-hub-pro-insight-list,
+.staff-hub-pro-signal-card {
+  display: none;
+}
+
+.staff-hub-ops-score-strip {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  min-height: 0;
+  padding: 0.58rem 0.68rem;
+}
+
+.staff-hub-ops-score-strip__body {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+}
+
+.staff-hub-ops-score-strip__body strong {
+  font-size: 1rem;
+}
+
+.staff-hub-ops-score-strip small {
+  font-size: 0.72rem;
+  margin-left: auto;
+}
+
+.staff-hub-sticky-tabs {
+  margin-bottom: 0.55rem;
+  padding: 0.25rem;
+}
+
+.staff-hub-sticky-tabs button {
+  min-height: 30px;
+  padding: 0 0.62rem;
+}
+
+.daily-ops-hero {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .content {
+    height: 100dvh;
+    padding:
+      0.62rem
+      0.68rem
+      calc(0.9rem + env(safe-area-inset-bottom))
+      calc(4rem + env(safe-area-inset-left));
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  .dashboard-page,
+  .page-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .priority-board__layout,
+  .staff-hub-pro-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-pro-metrics {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .staff-hub-pro-metrics::-webkit-scrollbar {
+    display: none;
+  }
+
+  .staff-hub-pro-metric {
+    flex: 0 0 min(9rem, 68vw);
+  }
+}
+
+@media (max-width: 700px) {
+  .content {
+    padding:
+      0.52rem
+      0.55rem
+      calc(0.85rem + env(safe-area-inset-bottom))
+      calc(3.55rem + env(safe-area-inset-left));
+  }
+
+  .panel,
+  .metric-card,
+  .workspace-card,
+  .daily-ops-card {
+    padding: 0.58rem;
+  }
+
+  .staff-hub-pro-dashboard {
+    padding: 0.58rem;
+  }
+
+  .staff-hub-ops-score-strip {
+    align-items: flex-start;
+    display: grid;
+  }
+
+  .staff-hub-ops-score-strip small {
+    margin-left: 0;
+  }
+}
+
+.auth-page {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgba(248, 244, 236, 0.035), transparent 10rem),
+    #070d15;
+  display: flex;
+  min-height: 100dvh;
+  padding: 1rem;
+}
+
+.auth-panel {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0 auto;
+  max-width: 390px;
+  width: min(100%, 390px);
+}
+
+.auth-brand,
+.auth-card {
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.auth-brand {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgba(248, 244, 236, 0.05), rgba(248, 244, 236, 0.018)),
+    #0b1624;
+  border: 1px solid var(--line);
+  display: flex;
+  gap: 0.72rem;
+  min-height: 78px;
+  padding: 0.72rem;
+}
+
+.auth-brand .brand-mark.large {
+  height: 48px;
+  width: 48px;
+}
+
+.auth-brand span {
+  color: var(--gold-strong);
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-brand h1 {
+  font-family: var(--font-display);
+  font-size: clamp(1.28rem, 4vw, 1.65rem);
+  letter-spacing: 0;
+  line-height: 1.02;
+  margin: 0.1rem 0 0;
+}
+
+.auth-card {
+  padding: 0.8rem;
+}
+
+.auth-card h2,
+.auth-card__header h2 {
+  font-size: 1.12rem;
+}
+
+.auth-card__header {
+  margin-bottom: 0.62rem;
+}
+
+.auth-card__header p,
+.auth-card p {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.auth-card .segmented-control {
+  border-radius: 10px;
+  margin-bottom: 0.7rem;
+  padding: 0.2rem;
+}
+
+.auth-card .segmented-control button {
+  border-radius: 8px;
+  min-height: 34px;
+}
+
+.auth-card .stack {
+  gap: 0.62rem;
+}
+
+.auth-card .google-button,
+.auth-card .primary-button,
+.auth-card .input-shell input {
+  min-height: 40px;
+}
+
+.auth-card .field > span {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 520px) {
+  .auth-page {
+    align-items: flex-start;
+    padding: 0.72rem;
+  }
+
+  .auth-panel {
+    max-width: none;
+    width: 100%;
+  }
+}

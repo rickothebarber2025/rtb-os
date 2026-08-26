@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export const DEFAULT_USER_PREFERENCES = {
-  density: 'comfortable',
+  density: 'compact',
   displayName: '',
   navigationStyle: 'simple',
   reduceMotion: false,
