@@ -1,0 +1,106 @@
+.role-access-chooser {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.8rem;
+}
+
+.role-access-chooser .section-header {
+  align-items: flex-start;
+}
+
+.role-access-chooser .section-header p {
+  color: var(--muted);
+  margin: 0.25rem 0 0;
+  max-width: 68ch;
+}
+
+.role-access-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.role-access-grid.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.role-access-card {
+  align-content: start;
+  background: rgba(248, 244, 236, 0.025);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.8rem;
+}
+
+.role-access-card.is-shared {
+  background: rgba(248, 244, 236, 0.045);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.role-access-toggle {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.role-access-toggle span {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.role-access-card > .subtle-text {
+  line-height: 1.45;
+  min-height: 2.2em;
+}
+
+.role-access-card .field {
+  margin: 0;
+}
+
+.role-access-card .business-chip-list {
+  margin-top: auto;
+}
+
+.onboarding-access-plan {
+  background: rgba(248, 244, 236, 0.025);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+}
+
+.access-card details[open] > summary {
+  margin-bottom: 0.85rem;
+}
+
+.access-card .template-preview {
+  margin-top: 0.75rem;
+}
+
+.access-card__controls {
+  align-items: end;
+}
+
+@media (max-width: 860px) {
+  .role-access-grid,
+  .role-access-grid.compact {
+    grid-template-columns: 1fr;
+  }
+
+  .role-access-card > .subtle-text {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .role-access-card {
+    padding: 0.72rem;
+  }
+
+  .role-access-chooser .section-header {
+    gap: 0.6rem;
+  }
+}
