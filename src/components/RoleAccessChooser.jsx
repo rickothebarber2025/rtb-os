@@ -3,15 +3,15 @@ import StatusBadge from './StatusBadge';
 import { MODULE_IDS, MODULE_LABELS, normalizePermissionsPayload } from '../lib/permissions.js';
 
 const MODULE_HELP = {
-  staff_hub: 'Their personal RTB workspace, updates, tasks, schedule and role information.',
-  dashboard: 'Business dashboard and owner-style overview data.',
+  staff_hub: 'Personal RTB workspace, updates, tasks, schedule and role information.',
+  dashboard: 'Business overview and dashboard reporting.',
   roster: 'Staff profiles, roster details and talent records.',
   payroll: 'Payroll runs, commission and payout information.',
   performance: 'Staff performance, KPIs and business reporting.',
   appointments: 'Booking and appointment information.',
   booth_rent: 'Booth-rent records and follow-up.',
-  operations: 'Tasks, checklists, issues and shop operations.',
-  access: 'User roles and permissions. Give this only to trusted administrators.',
+  operations: 'Tasks, checklists, incidents and shop operations.',
+  access: 'User roles and permissions. Reserve this for trusted administrators.',
   settings: 'Connections, system tools and business settings.',
 };
 
@@ -22,7 +22,6 @@ const LEVEL_COPY = {
 };
 
 export default function RoleAccessChooser({ disabled, permissions, onChange, compact = false }) {
-export default function RoleAccessChooser({ disabled, permissions, onChange }) {
   const payload = normalizePermissionsPayload(permissions);
   const sharedCount = MODULE_IDS.filter((moduleId) => payload.modules[moduleId] !== 'none').length;
 
@@ -36,23 +35,20 @@ export default function RoleAccessChooser({ disabled, permissions, onChange }) {
         <div>
           <span>Owner access setup</span>
           <h3>Choose exactly what they can access</h3>
-          <p>Start with the role template, then turn individual areas on or off before you save the promotion.</p>
+          <p>Start with the role template, then turn individual areas on or off before saving the promotion.</p>
         </div>
         <StatusBadge tone={sharedCount ? 'success' : 'warning'}>
           {sharedCount} of {MODULE_IDS.length} areas shared
         </StatusBadge>
       </div>
 
-      <div className={compact ? 'permission-matrix' : 'access-card-list'}>
-      <div className="permission-matrix role-access-grid">
+      <div className={compact ? 'permission-matrix role-access-grid compact' : 'permission-matrix role-access-grid'}>
         {MODULE_IDS.map((moduleId) => {
           const level = payload.modules[moduleId];
           const shared = level !== 'none';
-          const sensitive = moduleId === 'access' || moduleId === 'payroll' || moduleId === 'settings';
+          const sensitive = ['access', 'payroll', 'settings'].includes(moduleId);
 
           return (
-            <div className="permission-cell" key={moduleId}>
-              <label className="check-row">
             <div className={`permission-cell role-access-card ${shared ? 'is-shared' : ''}`} key={moduleId}>
               <label className="check-row role-access-toggle">
                 <input
@@ -63,6 +59,7 @@ export default function RoleAccessChooser({ disabled, permissions, onChange }) {
                 />
                 <span>{MODULE_LABELS[moduleId]}</span>
               </label>
+
               <small className="subtle-text">{MODULE_HELP[moduleId]}</small>
 
               {shared ? (
