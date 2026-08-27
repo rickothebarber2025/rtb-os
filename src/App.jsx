@@ -233,12 +233,34 @@ export default function App() {
         return <ModuleGate module="finance"><FinancialBuddyPage {...pageProps} /></ModuleGate>;
       case 'marketing-calendar':
         return <ModuleGate module="performance"><MarketingCalendarPage {...pageProps} /></ModuleGate>;
+        return (
+          <ModuleGate module="operations">
+            <AiConsultantPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'messages':
+        return (
+          <ModuleGate module="messages">
+            <MessagesPage {...pageProps} />
+          </ModuleGate>
+        );
       case 'payroll':
         return <ModuleGate module="payroll"><PayrollPage {...pageProps} /></ModuleGate>;
       case 'staff':
         return <ModuleGate module="roster"><StaffPage {...pageProps} /></ModuleGate>;
       case 'talent-pipeline':
         return <ModuleGate module="roster" minimum="edit"><TalentPipelinePage {...pageProps} /></ModuleGate>;
+        return (
+          <ModuleGate module="roster">
+            <StaffPage {...pageProps} />
+          </ModuleGate>
+        );
+      case 'talent-pipeline':
+        return (
+          <ModuleGate module="roster" minimum="edit">
+            <TalentPipelinePage {...pageProps} />
+          </ModuleGate>
+        );
       case 'staff-hub':
         return <ModuleGate module="staff_hub"><StaffHubPage {...pageProps} /></ModuleGate>;
       case 'performance':
@@ -256,6 +278,11 @@ export default function App() {
       case 'dashboard':
       default:
         return <ModuleGate module="dashboard"><DashboardPage {...pageProps} /></ModuleGate>;
+        return (
+          <ModuleGate module="dashboard">
+            <DashboardPage {...pageProps} />
+          </ModuleGate>
+        );
     }
   }
 

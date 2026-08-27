@@ -22,6 +22,7 @@ const LEVEL_COPY = {
 };
 
 export default function RoleAccessChooser({ disabled, permissions, onChange, compact = false }) {
+export default function RoleAccessChooser({ disabled, permissions, onChange }) {
   const payload = normalizePermissionsPayload(permissions);
   const sharedCount = MODULE_IDS.filter((moduleId) => payload.modules[moduleId] !== 'none').length;
 
@@ -43,6 +44,7 @@ export default function RoleAccessChooser({ disabled, permissions, onChange, com
       </div>
 
       <div className={compact ? 'permission-matrix' : 'access-card-list'}>
+      <div className="permission-matrix role-access-grid">
         {MODULE_IDS.map((moduleId) => {
           const level = payload.modules[moduleId];
           const shared = level !== 'none';
@@ -51,6 +53,8 @@ export default function RoleAccessChooser({ disabled, permissions, onChange, com
           return (
             <div className="permission-cell" key={moduleId}>
               <label className="check-row">
+            <div className={`permission-cell role-access-card ${shared ? 'is-shared' : ''}`} key={moduleId}>
+              <label className="check-row role-access-toggle">
                 <input
                   checked={shared}
                   disabled={disabled}
