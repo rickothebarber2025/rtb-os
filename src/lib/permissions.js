@@ -23,6 +23,7 @@ export const MODULE_LABELS = {
 
 export const PAGE_MODULE_MAP = {
   access: 'access',
+  'role-access': 'access',
   'action-center': 'operations',
   'ai-consultant': 'operations',
   'booth-rent': 'booth_rent',
