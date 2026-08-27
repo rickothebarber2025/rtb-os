@@ -128,3 +128,176 @@
     padding:.4rem;
   }
 }
+
+.onboarding-workspace,
+.onboarding-manager-panel{
+  display:grid;
+  gap:1rem;
+}
+
+.onboarding-status-grid{
+  display:grid;
+  gap:.65rem;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+
+.onboarding-status-grid article,
+.onboarding-stage-card,
+.onboarding-policy-row,
+.onboarding-manager-card,
+.probation-review-card,
+.onboarding-certificate-strip,
+.onboarding-submit-row{
+  background:rgba(248,244,236,.035);
+  border:1px solid var(--line);
+  border-radius:8px;
+}
+
+.onboarding-status-grid article{
+  display:grid;
+  gap:.12rem;
+  padding:.75rem;
+}
+
+.onboarding-status-grid strong{
+  font-size:1.25rem;
+}
+
+.onboarding-status-grid span,
+.onboarding-stage-card li,
+.probation-review-card small,
+.onboarding-policy-row small,
+.onboarding-certificate-strip small,
+.onboarding-submit-row small{
+  color:var(--muted);
+  font-size:.76rem;
+  line-height:1.4;
+}
+
+.onboarding-personal-form,
+.onboarding-stage-grid,
+.onboarding-quiz-grid,
+.onboarding-policy-list,
+.onboarding-manager-list,
+.probation-review-grid{
+  display:grid;
+  gap:.75rem;
+}
+
+.onboarding-stage-grid,
+.onboarding-quiz-grid,
+.probation-review-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+
+.onboarding-stage-card{
+  display:grid;
+  gap:.7rem;
+  padding:.85rem;
+}
+
+.onboarding-stage-card>div:first-child,
+.onboarding-policy-row,
+.onboarding-certificate-strip,
+.onboarding-submit-row,
+.onboarding-manager-card__header,
+.probation-review-card summary{
+  align-items:center;
+  display:flex;
+  gap:.75rem;
+  justify-content:space-between;
+}
+
+.onboarding-stage-card ul{
+  display:grid;
+  gap:.28rem;
+  margin:0;
+  padding-left:1.05rem;
+}
+
+.onboarding-stage-card.complete{
+  background:rgba(85,214,146,.06);
+  border-color:rgba(85,214,146,.28);
+}
+
+.onboarding-policy-row{
+  padding:.75rem;
+}
+
+.onboarding-policy-row>span,
+.onboarding-certificate-strip>span,
+.onboarding-submit-row>span,
+.onboarding-manager-card__header>span,
+.probation-review-card summary>span{
+  display:grid;
+  gap:.12rem;
+  min-width:0;
+}
+
+.onboarding-signature-controls{
+  display:grid;
+  gap:.45rem;
+  grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) auto;
+  min-width:min(100%,470px);
+}
+
+.onboarding-signature-controls input{
+  min-width:0;
+}
+
+.onboarding-certificate-strip,
+.onboarding-submit-row,
+.onboarding-manager-card{
+  padding:.85rem;
+}
+
+.onboarding-manager-card{
+  display:grid;
+  gap:.85rem;
+}
+
+.probation-review-card{
+  padding:.7rem;
+}
+
+.probation-review-card summary{
+  cursor:pointer;
+  list-style:none;
+}
+
+.probation-review-card summary::-webkit-details-marker{
+  display:none;
+}
+
+.probation-review-card[open]{
+  display:grid;
+  gap:.75rem;
+}
+
+@media(max-width:760px){
+  .onboarding-status-grid,
+  .onboarding-stage-grid,
+  .onboarding-quiz-grid,
+  .probation-review-grid{
+    grid-template-columns:1fr;
+  }
+
+  .onboarding-policy-row,
+  .onboarding-certificate-strip,
+  .onboarding-submit-row,
+  .onboarding-manager-card__header{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+
+  .onboarding-signature-controls{
+    grid-template-columns:1fr;
+    width:100%;
+  }
+
+  .onboarding-signature-controls .secondary-button,
+  .onboarding-submit-row .primary-button,
+  .onboarding-certificate-strip .secondary-button{
+    width:100%;
+  }
+}

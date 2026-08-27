@@ -80,10 +80,10 @@ create policy talent_candidates_select on public.talent_candidates
 -- talent_candidates: write operations limited to service role (server-side)
 drop policy if exists talent_candidates_write_service on public.talent_candidates;
 create policy talent_candidates_write_service on public.talent_candidates
-  for insert, update, delete
-  to authenticated
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  for all
+  to service_role
+  using (true)
+  with check (true);
 
 -- talent_reviews: SELECT allowed for authenticated users
 drop policy if exists talent_reviews_select on public.talent_reviews;
@@ -95,10 +95,10 @@ create policy talent_reviews_select on public.talent_reviews
 -- talent_reviews: write operations limited to service role (server-side)
 drop policy if exists talent_reviews_write_service on public.talent_reviews;
 create policy talent_reviews_write_service on public.talent_reviews
-  for insert, update, delete
-  to authenticated
-  using (auth.role() = 'service_role')
-  with check (auth.role() = 'service_role');
+  for all
+  to service_role
+  using (true)
+  with check (true);
 
 -- Guidance: If you want managers to write directly, replace the write policies above with a business-scoped
 -- policy such as:

@@ -40,14 +40,18 @@ import {
 import { canManageAccess, getRoleLabel, ROLE_OPTIONS } from '../utils/access';
 
 function makeBlankInvite() {
-  const defaultTemplate = 'staff_portal';
+  const defaultTemplate = 'onboarding_restricted';
   return {
     active: true,
     business_unit_id: '',
     email: '',
     full_name: '',
+    onboarding_required: true,
+    onboarding_target_permissions: buildPermissionsFromTemplate('staff_portal'),
     permissions: buildPermissionsFromTemplate(defaultTemplate),
+    position_title: '',
     role: getTemplateRoleValue(defaultTemplate),
+    start_date: '',
   };
 }
 
@@ -292,6 +296,11 @@ function RoleTemplatePreview({ permissions }) {
   );
 }
 
+function isOnboardingInvite(record) {
+  return Boolean(record.onboarding_required) ||
+    normalizePermissionsPayload(record.permissions).role_template === 'onboarding_restricted';
+}
+
 export default function AccessPage({ accessProfile, businessUnits, currentUserId }) {
   const accessAdmin = canManageAccess(accessProfile);
   const [expandedProfileId, setExpandedProfileId] = useState('');
@@ -374,7 +383,17 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
   }, []);
 
   function setInvite(next) {
-    setInviteForm((current) => ({ ...current, ...next }));
+    setInviteForm((current) => {
+      const merged = { ...current, ...next };
+      if (next.permissions && merged.onboarding_target_permissions) {
+        merged.onboarding_target_permissions = preserveBusinessAccess(
+          merged,
+          merged.onboarding_target_permissions,
+          businessUnits,
+        );
+      }
+      return merged;
+    });
   }
 
   function updateInvite(field, value) {
@@ -386,13 +405,28 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
   }
 
   function applyInviteTemplate(templateId) {
+    const onboarding = templateId === 'onboarding_restricted';
     setInvite({
+      onboarding_required: onboarding,
+      onboarding_target_permissions: onboarding
+        ? inviteForm.onboarding_target_permissions || buildPermissionsFromTemplate('staff_portal')
+        : inviteForm.onboarding_target_permissions,
       permissions: preserveBusinessAccess(
         inviteForm,
         buildPermissionsFromTemplate(templateId),
         businessUnits,
       ),
       role: getTemplateRoleValue(templateId),
+    });
+  }
+
+  function applyInviteTargetTemplate(templateId) {
+    setInvite({
+      onboarding_target_permissions: preserveBusinessAccess(
+        inviteForm,
+        buildPermissionsFromTemplate(templateId),
+        businessUnits,
+      ),
     });
   }
 
@@ -407,11 +441,34 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
     });
   }
 
+  function updateInviteTargetModule(moduleId, permission) {
+    const payload = normalizePermissionsPayload(inviteForm.onboarding_target_permissions);
+    setInvite({
+      onboarding_target_permissions: {
+        ...payload,
+        modules: {
+          ...payload.modules,
+          [moduleId]: permission,
+        },
+      },
+    });
+  }
+
   function updateInviteList(field, value) {
     const payload = normalizePermissionsPayload(inviteForm.permissions);
     updateInvitePermissions({
       ...payload,
       [field]: value,
+    });
+  }
+
+  function updateInviteTargetList(field, value) {
+    const payload = normalizePermissionsPayload(inviteForm.onboarding_target_permissions);
+    setInvite({
+      onboarding_target_permissions: {
+        ...payload,
+        [field]: value,
+      },
     });
   }
 
@@ -708,6 +765,28 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                     ))}
                   </select>
                 </label>
+                {isOnboardingInvite(inviteForm) ? (
+                  <>
+                    <label className="field">
+                      <span>Position</span>
+                      <input
+                        disabled={!accessAdmin}
+                        onChange={(event) => updateInvite('position_title', event.target.value)}
+                        placeholder="Barber, esthetician, front desk..."
+                        value={inviteForm.position_title}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Start date</span>
+                      <input
+                        disabled={!accessAdmin}
+                        onChange={(event) => updateInvite('start_date', event.target.value)}
+                        type="date"
+                        value={inviteForm.start_date}
+                      />
+                    </label>
+                  </>
+                ) : null}
                 <label className="field">
                   <span>System role label</span>
                   <select
@@ -743,10 +822,54 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
 
               <RoleAccessChooser
                 compact
-                disabled={!accessAdmin}
+                disabled={!accessAdmin || isOnboardingInvite(inviteForm)}
                 onChange={updateInviteModule}
                 permissions={inviteForm.permissions}
               />
+
+              {isOnboardingInvite(inviteForm) ? (
+                <section className="role-access-chooser onboarding-access-plan">
+                  <div className="section-header">
+                    <div>
+                      <span>After onboarding approval</span>
+                      <h3>Choose the access they can receive later</h3>
+                      <p>This stays locked until every stage is complete and a manager approves the certificate.</p>
+                    </div>
+                    <StatusBadge tone="warning">Restricted now</StatusBadge>
+                  </div>
+                  <label className="field">
+                    <span>Post-approval role</span>
+                    <select
+                      disabled={!accessAdmin}
+                      onChange={(event) => applyInviteTargetTemplate(event.target.value)}
+                      value={normalizePermissionsPayload(inviteForm.onboarding_target_permissions).role_template}
+                    >
+                      {ROLE_TEMPLATES.filter((template) => template.id !== 'onboarding_restricted').map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <RoleAccessChooser
+                    compact
+                    disabled={!accessAdmin}
+                    onChange={updateInviteTargetModule}
+                    permissions={inviteForm.onboarding_target_permissions}
+                  />
+                  <details className="access-details">
+                    <summary>
+                      <span>Post-approval responsibilities and restrictions</span>
+                      <StatusBadge tone="muted">Optional</StatusBadge>
+                    </summary>
+                    <ResponsibilitiesEditor
+                      disabled={!accessAdmin}
+                      onChange={updateInviteTargetList}
+                      permissions={inviteForm.onboarding_target_permissions}
+                    />
+                  </details>
+                </section>
+              ) : null}
 
               <details className="access-details">
                 <summary>

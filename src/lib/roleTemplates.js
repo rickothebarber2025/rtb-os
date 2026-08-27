@@ -25,6 +25,28 @@ export const ROLE_TEMPLATES = [
     title: 'Custom Role',
   },
   {
+    description: 'New-hire onboarding access with no scheduling, payment, admin, or operational control until manager approval.',
+    expectations: 'Complete every onboarding stage, policy signature, knowledge check, and practical certification before full shop access is granted.',
+    id: 'onboarding_restricted',
+    permissions: permissions({ staff_hub: 'view' }),
+    responsibilities: [
+      'Complete personal setup and required documents',
+      'Review RTB standards and operating procedures',
+      'Pass each knowledge check',
+      'Complete practical shop certification with a manager',
+      'Sign every required policy before approval',
+    ],
+    restrictions: [
+      'Onboarding only.',
+      'No scheduling access.',
+      'No payment, payroll, tips, or commission controls.',
+      'No administrative access.',
+      'No client, booking, refund, or checkout access until manager approval.',
+    ],
+    roleValue: 'staff',
+    title: 'Onboarding — Restricted',
+  },
+  {
     description: 'Staff-only login for Staff Hub with personal payroll and performance history.',
     expectations: 'Use Staff Hub to review role details, assigned business information, staff profile updates, earnings, and performance.',
     id: 'staff_portal',
