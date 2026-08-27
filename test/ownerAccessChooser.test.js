@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { getRoleTemplate } from '../src/lib/roleTemplates.js';
 
 const chooser = fs.readFileSync(new URL('../src/components/RoleAccessChooser.jsx', import.meta.url), 'utf8');
 const accessPage = fs.readFileSync(new URL('../src/pages/AccessPage.jsx', import.meta.url), 'utf8');
@@ -31,4 +32,13 @@ test('onboarding can define future access without granting it immediately', () =
 test('owner access is managed in AccessPage rather than a duplicate global modal', () => {
   assert.doesNotMatch(main, /OwnerRoleAccessSetup/);
   assert.match(main, /accessControl\.css/);
+});
+
+test('non-admin promotion templates keep sensitive modules off by default', () => {
+  for (const id of ['beauty_manager', 'barbershop_manager', 'operations_assistant', 'appointment_coordinator', 'content_marketing', 'view_only']) {
+    const template = getRoleTemplate(id);
+    assert.equal(template.permissions.access, 'none', `${id} should not get Access by default`);
+    assert.equal(template.permissions.payroll, 'none', `${id} should not get Payroll by default`);
+    assert.equal(template.permissions.settings, 'none', `${id} should not get Settings by default`);
+  }
 });
