@@ -4,7 +4,7 @@ import { MODULE_IDS, MODULE_LABELS, normalizePermissionsPayload } from '../lib/p
 
 const MODULE_HELP = {
   staff_hub: 'Their personal RTB workspace, updates, tasks, schedule and role information.',
-  dashboard: 'Business dashboard and owner-style overview data.',
+  dashboard: 'Business dashboard and owner-level overview data.',
   roster: 'Staff profiles, roster details and talent records.',
   payroll: 'Payroll runs, commission and payout information.',
   performance: 'Staff performance, KPIs and business reporting.',
@@ -17,11 +17,10 @@ const MODULE_HELP = {
 
 const LEVEL_COPY = {
   view: 'Can see it',
-  edit: 'Can use & update it',
+  edit: 'Can use and update it',
   admin: 'Full control',
 };
 
-export default function RoleAccessChooser({ disabled, permissions, onChange, compact = false }) {
 export default function RoleAccessChooser({ disabled, permissions, onChange }) {
   const payload = normalizePermissionsPayload(permissions);
   const sharedCount = MODULE_IDS.filter((moduleId) => payload.modules[moduleId] !== 'none').length;
@@ -35,35 +34,36 @@ export default function RoleAccessChooser({ disabled, permissions, onChange }) {
       <div className="section-header">
         <div>
           <span>Owner access setup</span>
-          <h3>Choose exactly what they can access</h3>
-          <p>Start with the role template, then turn individual areas on or off before you save the promotion.</p>
+          <h3>Choose exactly what this role can access</h3>
+          <p>Start with the role preset, then turn areas on or off before you save the promotion.</p>
         </div>
         <StatusBadge tone={sharedCount ? 'success' : 'warning'}>
           {sharedCount} of {MODULE_IDS.length} areas shared
         </StatusBadge>
       </div>
 
-      <div className={compact ? 'permission-matrix' : 'access-card-list'}>
-      <div className="permission-matrix role-access-grid">
+      <div className="role-access-grid">
         {MODULE_IDS.map((moduleId) => {
           const level = payload.modules[moduleId];
           const shared = level !== 'none';
           const sensitive = moduleId === 'access' || moduleId === 'payroll' || moduleId === 'settings';
 
           return (
-            <div className="permission-cell" key={moduleId}>
-              <label className="check-row">
-            <div className={`permission-cell role-access-card ${shared ? 'is-shared' : ''}`} key={moduleId}>
-              <label className="check-row role-access-toggle">
-                <input
-                  checked={shared}
-                  disabled={disabled}
-                  onChange={(event) => toggleModule(moduleId, event.target.checked)}
-                  type="checkbox"
-                />
-                <span>{MODULE_LABELS[moduleId]}</span>
-              </label>
-              <small className="subtle-text">{MODULE_HELP[moduleId]}</small>
+            <article className={`role-access-card ${shared ? 'shared' : ''}`} key={moduleId}>
+              <div className="role-access-card__top">
+                <label className="check-row">
+                  <input
+                    checked={shared}
+                    disabled={disabled}
+                    onChange={(event) => toggleModule(moduleId, event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>{MODULE_LABELS[moduleId]}</span>
+                </label>
+                {sensitive ? <StatusBadge tone="warning">Sensitive</StatusBadge> : null}
+              </div>
+
+              <p>{MODULE_HELP[moduleId]}</p>
 
               {shared ? (
                 <label className="field">
@@ -78,22 +78,19 @@ export default function RoleAccessChooser({ disabled, permissions, onChange }) {
                     <option value="admin">Admin — {LEVEL_COPY.admin}</option>
                   </select>
                 </label>
-              ) : (
-                <div className="business-chip-list">
-                  <StatusBadge tone="muted"><EyeOff size={12} /> Not shared</StatusBadge>
-                </div>
-              )}
+              ) : null}
 
-              {shared ? (
-                <div className="business-chip-list">
+              <div className="business-chip-list">
+                {shared ? (
                   <StatusBadge tone={level === 'admin' ? 'gold' : 'muted'}>
                     {level === 'admin' ? <ShieldCheck size={12} /> : <Eye size={12} />}
                     {LEVEL_COPY[level]}
                   </StatusBadge>
-                  {sensitive ? <StatusBadge tone="warning">Sensitive</StatusBadge> : null}
-                </div>
-              ) : null}
-            </div>
+                ) : (
+                  <StatusBadge tone="muted"><EyeOff size={12} /> Not shared</StatusBadge>
+                )}
+              </div>
+            </article>
           );
         })}
       </div>
