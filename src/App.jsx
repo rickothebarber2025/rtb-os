@@ -23,6 +23,7 @@ import {
 } from './utils/smartDefaults.js';
 
 const AccessPage = lazy(() => import('./pages/AccessPage'));
+const RoleAccessPage = lazy(() => import('./pages/RoleAccessPage'));
 const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
 const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
 const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
@@ -225,6 +226,8 @@ export default function App() {
     switch (activePage) {
       case 'access':
         return <ModuleGate module="access"><AccessPage accessProfile={auth.profile} businessUnits={data.businessUnits} currentUserId={auth.user?.id} /></ModuleGate>;
+      case 'role-access':
+        return <ModuleGate module="access" minimum="admin"><RoleAccessPage businessUnits={data.businessUnits} /></ModuleGate>;
       case 'action-center':
         return <ModuleGate module="operations"><ActionCenterPage {...pageProps} /></ModuleGate>;
       case 'ai-consultant':
@@ -233,34 +236,12 @@ export default function App() {
         return <ModuleGate module="finance"><FinancialBuddyPage {...pageProps} /></ModuleGate>;
       case 'marketing-calendar':
         return <ModuleGate module="performance"><MarketingCalendarPage {...pageProps} /></ModuleGate>;
-        return (
-          <ModuleGate module="operations">
-            <AiConsultantPage {...pageProps} />
-          </ModuleGate>
-        );
-      case 'messages':
-        return (
-          <ModuleGate module="messages">
-            <MessagesPage {...pageProps} />
-          </ModuleGate>
-        );
       case 'payroll':
         return <ModuleGate module="payroll"><PayrollPage {...pageProps} /></ModuleGate>;
       case 'staff':
         return <ModuleGate module="roster"><StaffPage {...pageProps} /></ModuleGate>;
       case 'talent-pipeline':
         return <ModuleGate module="roster" minimum="edit"><TalentPipelinePage {...pageProps} /></ModuleGate>;
-        return (
-          <ModuleGate module="roster">
-            <StaffPage {...pageProps} />
-          </ModuleGate>
-        );
-      case 'talent-pipeline':
-        return (
-          <ModuleGate module="roster" minimum="edit">
-            <TalentPipelinePage {...pageProps} />
-          </ModuleGate>
-        );
       case 'staff-hub':
         return <ModuleGate module="staff_hub"><StaffHubPage {...pageProps} /></ModuleGate>;
       case 'performance':
@@ -278,11 +259,6 @@ export default function App() {
       case 'dashboard':
       default:
         return <ModuleGate module="dashboard"><DashboardPage {...pageProps} /></ModuleGate>;
-        return (
-          <ModuleGate module="dashboard">
-            <DashboardPage {...pageProps} />
-          </ModuleGate>
-        );
     }
   }
 
