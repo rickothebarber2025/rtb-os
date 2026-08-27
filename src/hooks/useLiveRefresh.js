@@ -1,26 +1,31 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { onAppEvent } from '../lib/appEvents';
 import { supabase } from '../lib/supabaseClient';
 import { syncSquareAppointments } from '../services/rtbService';
 import { isAllBusinessesUnit, usesSquareAppointments } from '../utils/businessProfiles';
 
 const CORE_REFRESH_TABLES = [
-  'app_settings',
-  'booth_rent',
   'business_units',
-  'payroll_entries',
+  'integration_connections',
+  'operation_checklist_runs',
+  'owner_activity_events',
   'payroll_runs',
-  'performance_history',
   'staff',
   'staff_announcements',
-  'staff_content_submissions',
+  'staff_operation_notifications',
+  'staff_operations_requests',
+  'staff_shift_records',
   'staff_tasks',
   'staff_time_off_requests',
+  'staff_warnings',
+  'talent_candidates',
   'user_profiles',
 ];
 
 const DEFAULT_INTERVAL_MS = 2 * 60 * 1000;
 const FOCUS_COOLDOWN_MS = 25 * 1000;
-const REALTIME_COOLDOWN_MS = 6 * 1000;
+const REALTIME_COOLDOWN_MS = 4 * 1000;
+const APP_EVENT_COOLDOWN_MS = 750;
 const SQUARE_AUTO_ATTEMPT_COOLDOWN_MS = 5 * 60 * 1000;
 
 function isPageVisible() {
@@ -120,6 +125,19 @@ export function useLiveRefresh({
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [enabled, intervalMs, runRefresh]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+
+    return onAppEvent((event) => {
+      if (!event?.type) return;
+      if (event.type === 'data.changed' || event.type === 'access.changed' || event.type === 'notifications.changed') {
+        runRefresh(`app-event:${event.type}:${event.detail?.source || 'unknown'}`, {
+          cooldownMs: APP_EVENT_COOLDOWN_MS,
+        });
+      }
+    });
+  }, [enabled, runRefresh]);
 
   useEffect(() => {
     if (!enabled || !supabase) return undefined;

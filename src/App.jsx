@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AgenticStaffWorkspace from './components/AgenticStaffWorkspace.jsx';
 import AppShell from './components/AppShell';
 import LoadingState from './components/LoadingState';
 import ModuleGate from './components/ModuleGate.jsx';
@@ -9,6 +10,7 @@ import { useAuth } from './hooks/useAuth';
 import { useLiveRefresh, useSquareAutoSync } from './hooks/useLiveRefresh';
 import { useRtbData } from './hooks/useRtbData';
 import { useUserPreferences } from './hooks/useUserPreferences';
+import { onAppEvent } from './lib/appEvents';
 import { saveStaff } from './services/rtbService';
 import { canAccessPage, canManageAppointments, canManageStaff, canUseApp, getAllowedNavItems } from './utils/access';
 import { getBusinessSelectionOptions, isAllBusinessesId, isAllBusinessesUnit } from './utils/businessProfiles';
@@ -26,7 +28,8 @@ const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
 const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
 const PublicPromotionsPage = lazy(() => import('./pages/PublicPromotionsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const FinancialBuddyPage = lazy(() => import('./pages/FinancialBuddyPage'));
+const MarketingCalendarPage = lazy(() => import('./pages/MarketingCalendarPage'));
 const OperationsPage = lazy(() => import('./pages/OperationsPage'));
 const MyRolePage = lazy(() => import('./pages/MyRolePage'));
 const PayrollPage = lazy(() => import('./pages/PayrollPage'));
@@ -111,6 +114,27 @@ export default function App() {
   const navBadges = useMemo(() => ({ 'staff-hub': unreadAnnouncementCount }), [unreadAnnouncementCount]);
 
   useEffect(() => { smartLandingAppliedRef.current = false; }, [auth.user?.id]);
+
+  useEffect(() => {
+    if (!appEnabled) return undefined;
+    return onAppEvent((event) => {
+      if (event?.type !== 'navigation.request') return;
+      const page = String(event.detail?.page || '');
+      if (!page || !canAccessPage(auth.profile, page)) return;
+
+      const businessUnitId = String(event.detail?.businessUnitId || '');
+      if (businessUnitId && businessOptions.some((option) => option.id === businessUnitId)) {
+        setSelectedBusinessUnitId(businessUnitId);
+      }
+
+      if (page === 'staff-hub' && event.detail?.staffHubTab) {
+        setStaffHubTab(String(event.detail.staffHubTab));
+      }
+
+      setActivePage(page);
+      setPageTarget(event.detail?.target ?? null);
+    });
+  }, [appEnabled, auth.profile, businessOptions]);
 
   useEffect(() => {
     if (!data.businessUnits.length || !businessOptions.length || !auth.profile) return;
@@ -200,22 +224,15 @@ export default function App() {
 
     switch (activePage) {
       case 'access':
-        return (
-          <ModuleGate module="access">
-            <AccessPage
-              accessProfile={auth.profile}
-              businessUnits={data.businessUnits}
-              currentUserId={auth.user?.id}
-            />
-          </ModuleGate>
-        );
+        return <ModuleGate module="access"><AccessPage accessProfile={auth.profile} businessUnits={data.businessUnits} currentUserId={auth.user?.id} /></ModuleGate>;
       case 'action-center':
-        return (
-          <ModuleGate module="operations">
-            <ActionCenterPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="operations"><ActionCenterPage {...pageProps} /></ModuleGate>;
       case 'ai-consultant':
+        return <ModuleGate module="operations"><AiConsultantPage {...pageProps} /></ModuleGate>;
+      case 'finance':
+        return <ModuleGate module="finance"><FinancialBuddyPage {...pageProps} /></ModuleGate>;
+      case 'marketing-calendar':
+        return <ModuleGate module="performance"><MarketingCalendarPage {...pageProps} /></ModuleGate>;
         return (
           <ModuleGate module="operations">
             <AiConsultantPage {...pageProps} />
@@ -228,12 +245,11 @@ export default function App() {
           </ModuleGate>
         );
       case 'payroll':
-        return (
-          <ModuleGate module="payroll">
-            <PayrollPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="payroll"><PayrollPage {...pageProps} /></ModuleGate>;
       case 'staff':
+        return <ModuleGate module="roster"><StaffPage {...pageProps} /></ModuleGate>;
+      case 'talent-pipeline':
+        return <ModuleGate module="roster" minimum="edit"><TalentPipelinePage {...pageProps} /></ModuleGate>;
         return (
           <ModuleGate module="roster">
             <StaffPage {...pageProps} />
@@ -246,45 +262,22 @@ export default function App() {
           </ModuleGate>
         );
       case 'staff-hub':
-        return (
-          <ModuleGate module="staff_hub">
-            <StaffHubPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="staff_hub"><StaffHubPage {...pageProps} /></ModuleGate>;
       case 'performance':
-        return (
-          <ModuleGate module="performance">
-            <PerformancePage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="performance"><PerformancePage {...pageProps} /></ModuleGate>;
       case 'customer-intelligence':
-        return (
-          <ModuleGate module="performance">
-            <CustomerIntelligencePage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="performance"><CustomerIntelligencePage {...pageProps} /></ModuleGate>;
       case 'operations':
-        return (
-          <ModuleGate module="operations">
-            <OperationsPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="operations"><OperationsPage {...pageProps} /></ModuleGate>;
       case 'integrations':
-        return (
-          <ModuleGate module="settings">
-            <IntegrationsPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="settings"><IntegrationsPage {...pageProps} /></ModuleGate>;
       case 'system':
-        return (
-          <ModuleGate module="settings">
-            <SystemPage {...pageProps} />
-          </ModuleGate>
-        );
+        return <ModuleGate module="settings"><SystemPage {...pageProps} /></ModuleGate>;
       case 'my-role':
         return <MyRolePage {...pageProps} />;
       case 'dashboard':
       default:
+        return <ModuleGate module="dashboard"><DashboardPage {...pageProps} /></ModuleGate>;
         return (
           <ModuleGate module="dashboard">
             <DashboardPage {...pageProps} />
@@ -321,6 +314,18 @@ export default function App() {
       {isAllBusinessesId(selectedBusinessUnitId) && !isOperationsCleaningProfile(auth.profile) ? <div className="alert warning global-alert"><strong>All Businesses view</strong><span>Combined reporting. Choose one business before editing business-specific records.</span></div> : null}
       {probationBanner ? <div className="alert success global-alert">{probationBanner}</div> : null}
       {data.warnings.length ? <div className="alert warning global-alert"><strong>Some live data could not load.</strong><span>{data.warnings.join(' ')}</span><button className="ghost-button small" type="button" onClick={data.refresh}>Retry</button></div> : null}
+      {!data.loading ? (
+        <AgenticStaffWorkspace
+          activePage={activePage}
+          accessProfile={auth.profile}
+          businessUnit={data.selectedBusinessUnit}
+          businessUnits={data.businessUnits}
+          onRefresh={data.refresh}
+          staff={data.staff}
+          staffPortalSummary={data.staffPortalSummary}
+          user={auth.user}
+        />
+      ) : null}
       <Suspense fallback={<LoadingState label="Loading page" />}>{renderPage()}</Suspense>
     </AppShell>
   );

@@ -14,12 +14,12 @@ export function roundMoney(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
-export function calculateEntryValues({
-  baseCommissionRate,
-  fixedRate,
-  netSales,
-  tips,
-}) {
+export function calculateEntryValues(input = {}) {
+  const baseCommissionRate = input.baseCommissionRate ?? input.base_commission_rate;
+  const fixedRate = input.fixedRate ?? input.fixed_rate_snapshot;
+  const netSales = input.netSales ?? input.net_sales;
+  const tips = input.tips;
+
   const net = toMoneyNumber(netSales);
   const tipAmount = toMoneyNumber(tips);
   const baseRate = toMoneyNumber(baseCommissionRate || 60);
@@ -38,12 +38,22 @@ export function calculateEntryValues({
   const deduction = roundMoney(Math.min(ENTRY_DEDUCTION, Math.max(0, grossPay)));
   const takeHome = roundMoney(grossPay - deduction);
 
+  // Preserve the original payroll row. savePayrollDraft recalculates rows before
+  // sending them to Supabase; dropping the original snake_case fields here made
+  // valid sales, tips, staff ids and names silently save as zeros / "Staff".
   return {
+    ...input,
     adjusted,
     appliedCommissionRate: appliedRate,
+    applied_commission_rate: appliedRate,
+    base_commission_rate: baseRate,
     commissionAmount,
     deduction,
+    fixed_rate_snapshot: Boolean(fixedRate),
+    net_sales: net,
     takeHome,
+    take_home: takeHome,
+    tips: tipAmount,
   };
 }
 
@@ -138,10 +148,10 @@ export function getPayrollReplacementMap(runs) {
 
 export function recalculateEntry(entry) {
   const calculated = calculateEntryValues({
+    ...entry,
     baseCommissionRate: entry.base_commission_rate,
     fixedRate: entry.fixed_rate_snapshot,
     netSales: entry.net_sales,
-    tips: entry.tips,
   });
 
   return {

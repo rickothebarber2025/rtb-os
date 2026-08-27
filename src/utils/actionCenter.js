@@ -128,12 +128,18 @@ function buildDocumentItems(documents, now) {
   });
 }
 
+function isSquareManagedCoverageTask(task) {
+  return String(task?.details || '').includes('[WALKIN_COVERAGE]');
+}
+
 export function buildStaffTaskItems(tasks, staffById, now) {
-  return tasks.filter((task) => task.status !== 'completed').map((task) => {
-    const staffName = staffNameFor(task, staffById); const priority = priorityForDueDate(task.due_date, now); const daysLeft = task.due_date ? daysBetween(now, task.due_date) : null;
-    const dueText = task.due_date ? (daysLeft < 0 ? `overdue since ${task.due_date}` : `due ${task.due_date}`) : 'no due date set';
-    return buildItem({ actionLabel: 'Open Staff Hub', category: 'task', detail: `${staffName} has "${task.title || 'an assigned task'}" ${dueText}.`, id: `task-${task.id}`, page: 'staff-hub', priority, source: 'Staff Hub', title: priority === 'urgent' ? `Overdue task for ${staffName}` : `Task needs attention for ${staffName}` });
-  });
+  return tasks
+    .filter((task) => task.status !== 'completed' && !isSquareManagedCoverageTask(task))
+    .map((task) => {
+      const staffName = staffNameFor(task, staffById); const priority = priorityForDueDate(task.due_date, now); const daysLeft = task.due_date ? daysBetween(now, task.due_date) : null;
+      const dueText = task.due_date ? (daysLeft < 0 ? `overdue since ${task.due_date}` : `due ${task.due_date}`) : 'no due date set';
+      return buildItem({ actionLabel: 'Open Staff Hub', category: 'task', detail: `${staffName} has "${task.title || 'an assigned task'}" ${dueText}.`, id: `task-${task.id}`, page: 'staff-hub', priority, source: 'Staff Hub', title: priority === 'urgent' ? `Overdue task for ${staffName}` : `Task needs attention for ${staffName}` });
+    });
 }
 
 export function buildTimeOffItems(timeOffRequests, staffById, now) {

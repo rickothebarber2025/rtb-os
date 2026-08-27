@@ -3,6 +3,7 @@ import AccessibilityRuntime from './AccessibilityRuntime';
 import BehavioralMomentumBar from './BehavioralMomentumBar';
 import GeminiOpsBrief from './GeminiOpsBrief';
 import MobileTabBar from './MobileTabBar';
+import PageErrorBoundary from './PageErrorBoundary';
 import PushNotificationsManager from './PushNotificationsManager';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
@@ -92,8 +93,10 @@ export default function AppShell({
             setStaffHubTab={setStaffHubTab}
             signals={behavioralSignals}
           />
-          <GeminiOpsBrief activePage={activePage} businessUnitId={selectedBusinessUnitId} />
-          {children}
+          <PageErrorBoundary resetKey={`${activePage}:${selectedBusinessUnitId || 'none'}`} onRetry={onRefresh}>
+            <GeminiOpsBrief activePage={activePage} businessUnitId={selectedBusinessUnitId} />
+            {children}
+          </PageErrorBoundary>
         </main>
         <MobileTabBar
           activePage={activePage}

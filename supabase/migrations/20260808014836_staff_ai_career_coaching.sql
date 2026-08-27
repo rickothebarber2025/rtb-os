@@ -72,7 +72,25 @@ begin
  return jsonb_build_object('created',v_created,'ran_at',now());
 end;$function$;
 
-do $do$ begin perform cron.unschedule(jobid) from cron.job where jobname='rtb-staff-app-reminders'; exception when others then null; end $do$;
-select cron.schedule('rtb-staff-app-reminders','0 13 * * *',$$select public.generate_staff_app_reminders();$$);
+do $do$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    execute $unschedule$
+      select cron.unschedule(jobid)
+      from cron.job
+      where jobname = 'rtb-staff-app-reminders'
+    $unschedule$;
+    execute $schedule$
+      select cron.schedule(
+        'rtb-staff-app-reminders',
+        '0 13 * * *',
+        'select public.generate_staff_app_reminders();'
+      )
+    $schedule$;
+  end if;
+exception when others then
+  null;
+end
+$do$;
 
 commit;

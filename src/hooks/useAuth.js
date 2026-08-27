@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
+import { onAppEvent } from '../lib/appEvents';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 import {
   createPendingUserProfile,
@@ -223,6 +224,36 @@ export function useAuth() {
     loadProfile();
     return () => { active = false; };
   }, [session?.user?.email, session?.user?.id]);
+
+  useEffect(() => {
+    if (!supabase || !session?.user?.id) return undefined;
+    const userId = session.user.id;
+    const channel = supabase
+      .channel(`user-profile-access-${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_profiles',
+        filter: `id=eq.${userId}`,
+      }, () => {
+        window.setTimeout(() => refreshProfile(), 50);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [refreshProfile, session?.user?.id]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return undefined;
+    const userId = session.user.id;
+    return onAppEvent((event) => {
+      if (event?.type !== 'access.changed') return;
+      const changedUserId = String(event.detail?.userId || '');
+      if (!changedUserId || changedUserId === userId) {
+        window.setTimeout(() => refreshProfile(), 30);
+      }
+    });
+  }, [refreshProfile, session?.user?.id]);
 
   const signInWithPassword = useCallback(async ({ email, password }) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });

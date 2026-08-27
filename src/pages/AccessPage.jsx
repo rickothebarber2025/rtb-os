@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
+import RoleAccessChooser from '../components/RoleAccessChooser';
+import RolePromotionSummary from '../components/RolePromotionSummary';
 import StatusBadge from '../components/StatusBadge';
 import { getUserProfiles, inviteUserProfile, linkUserProfile, updateUserProfile } from '../services/rtbService';
 import {
@@ -38,14 +40,18 @@ import {
 import { canManageAccess, getRoleLabel, ROLE_OPTIONS } from '../utils/access';
 
 function makeBlankInvite() {
-  const defaultTemplate = 'staff_portal';
+  const defaultTemplate = 'onboarding_restricted';
   return {
     active: true,
     business_unit_id: '',
     email: '',
     full_name: '',
+    onboarding_required: true,
+    onboarding_target_permissions: buildPermissionsFromTemplate('staff_portal'),
     permissions: buildPermissionsFromTemplate(defaultTemplate),
+    position_title: '',
     role: getTemplateRoleValue(defaultTemplate),
+    start_date: '',
   };
 }
 
@@ -215,30 +221,6 @@ function BusinessAccessPicker({ businessUnits, disabled, owner, record, onChange
   );
 }
 
-function PermissionMatrix({ disabled, permissions, onChange }) {
-  const payload = normalizePermissionsPayload(permissions);
-
-  return (
-    <div className="permission-matrix">
-      {MODULE_IDS.map((moduleId) => (
-        <label className="permission-cell" key={moduleId}>
-          <span>{MODULE_LABELS[moduleId]}</span>
-          <select
-            disabled={disabled}
-            onChange={(event) => onChange(moduleId, event.target.value)}
-            value={payload.modules[moduleId]}
-          >
-            <option value="none">None</option>
-            <option value="view">View</option>
-            <option value="edit">Edit</option>
-            <option value="admin">Admin</option>
-          </select>
-        </label>
-      ))}
-    </div>
-  );
-}
-
 function ResponsibilitiesEditor({ disabled, permissions, onChange }) {
   const payload = normalizePermissionsPayload(permissions);
 
@@ -312,6 +294,11 @@ function RoleTemplatePreview({ permissions }) {
       </div>
     </div>
   );
+}
+
+function isOnboardingInvite(record) {
+  return Boolean(record.onboarding_required) ||
+    normalizePermissionsPayload(record.permissions).role_template === 'onboarding_restricted';
 }
 
 export default function AccessPage({ accessProfile, businessUnits, currentUserId }) {
@@ -396,7 +383,17 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
   }, []);
 
   function setInvite(next) {
-    setInviteForm((current) => ({ ...current, ...next }));
+    setInviteForm((current) => {
+      const merged = { ...current, ...next };
+      if (next.permissions && merged.onboarding_target_permissions) {
+        merged.onboarding_target_permissions = preserveBusinessAccess(
+          merged,
+          merged.onboarding_target_permissions,
+          businessUnits,
+        );
+      }
+      return merged;
+    });
   }
 
   function updateInvite(field, value) {
@@ -408,13 +405,28 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
   }
 
   function applyInviteTemplate(templateId) {
+    const onboarding = templateId === 'onboarding_restricted';
     setInvite({
+      onboarding_required: onboarding,
+      onboarding_target_permissions: onboarding
+        ? inviteForm.onboarding_target_permissions || buildPermissionsFromTemplate('staff_portal')
+        : inviteForm.onboarding_target_permissions,
       permissions: preserveBusinessAccess(
         inviteForm,
         buildPermissionsFromTemplate(templateId),
         businessUnits,
       ),
       role: getTemplateRoleValue(templateId),
+    });
+  }
+
+  function applyInviteTargetTemplate(templateId) {
+    setInvite({
+      onboarding_target_permissions: preserveBusinessAccess(
+        inviteForm,
+        buildPermissionsFromTemplate(templateId),
+        businessUnits,
+      ),
     });
   }
 
@@ -429,11 +441,34 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
     });
   }
 
+  function updateInviteTargetModule(moduleId, permission) {
+    const payload = normalizePermissionsPayload(inviteForm.onboarding_target_permissions);
+    setInvite({
+      onboarding_target_permissions: {
+        ...payload,
+        modules: {
+          ...payload.modules,
+          [moduleId]: permission,
+        },
+      },
+    });
+  }
+
   function updateInviteList(field, value) {
     const payload = normalizePermissionsPayload(inviteForm.permissions);
     updateInvitePermissions({
       ...payload,
       [field]: value,
+    });
+  }
+
+  function updateInviteTargetList(field, value) {
+    const payload = normalizePermissionsPayload(inviteForm.onboarding_target_permissions);
+    setInvite({
+      onboarding_target_permissions: {
+        ...payload,
+        [field]: value,
+      },
     });
   }
 
@@ -657,8 +692,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
           <span className="eyebrow">Access control</span>
           <h2>Team logins</h2>
           <p>
-            Assign the right business, role template, and module access without opening every
-            permission at once.
+            Pick a role as the starting point, then choose exactly what that person can see or control before you promote them.
           </p>
         </div>
         <div className="access-command-stats">
@@ -718,7 +752,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                   />
                 </label>
                 <label className="field">
-                  <span>Choose role template</span>
+                  <span>Starting role</span>
                   <select
                     disabled={!accessAdmin}
                     onChange={(event) => applyInviteTemplate(event.target.value)}
@@ -731,8 +765,30 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                     ))}
                   </select>
                 </label>
+                {isOnboardingInvite(inviteForm) ? (
+                  <>
+                    <label className="field">
+                      <span>Position</span>
+                      <input
+                        disabled={!accessAdmin}
+                        onChange={(event) => updateInvite('position_title', event.target.value)}
+                        placeholder="Barber, esthetician, front desk..."
+                        value={inviteForm.position_title}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Start date</span>
+                      <input
+                        disabled={!accessAdmin}
+                        onChange={(event) => updateInvite('start_date', event.target.value)}
+                        type="date"
+                        value={inviteForm.start_date}
+                      />
+                    </label>
+                  </>
+                ) : null}
                 <label className="field">
-                  <span>Role label</span>
+                  <span>System role label</span>
                   <select
                     disabled={!accessAdmin}
                     onChange={(event) => updateInvite('role', event.target.value)}
@@ -764,16 +820,62 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                 record={inviteForm}
               />
 
+              <RoleAccessChooser
+                compact
+                disabled={!accessAdmin || isOnboardingInvite(inviteForm)}
+                onChange={updateInviteModule}
+                permissions={inviteForm.permissions}
+              />
+
+              {isOnboardingInvite(inviteForm) ? (
+                <section className="role-access-chooser onboarding-access-plan">
+                  <div className="section-header">
+                    <div>
+                      <span>After onboarding approval</span>
+                      <h3>Choose the access they can receive later</h3>
+                      <p>This stays locked until every stage is complete and a manager approves the certificate.</p>
+                    </div>
+                    <StatusBadge tone="warning">Restricted now</StatusBadge>
+                  </div>
+                  <label className="field">
+                    <span>Post-approval role</span>
+                    <select
+                      disabled={!accessAdmin}
+                      onChange={(event) => applyInviteTargetTemplate(event.target.value)}
+                      value={normalizePermissionsPayload(inviteForm.onboarding_target_permissions).role_template}
+                    >
+                      {ROLE_TEMPLATES.filter((template) => template.id !== 'onboarding_restricted').map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <RoleAccessChooser
+                    compact
+                    disabled={!accessAdmin}
+                    onChange={updateInviteTargetModule}
+                    permissions={inviteForm.onboarding_target_permissions}
+                  />
+                  <details className="access-details">
+                    <summary>
+                      <span>Post-approval responsibilities and restrictions</span>
+                      <StatusBadge tone="muted">Optional</StatusBadge>
+                    </summary>
+                    <ResponsibilitiesEditor
+                      disabled={!accessAdmin}
+                      onChange={updateInviteTargetList}
+                      permissions={inviteForm.onboarding_target_permissions}
+                    />
+                  </details>
+                </section>
+              ) : null}
+
               <details className="access-details">
                 <summary>
-                  <span>Advanced permissions and role notes</span>
+                  <span>Responsibilities, restrictions, and role notes</span>
                   <StatusBadge tone="muted">Optional</StatusBadge>
                 </summary>
-                <PermissionMatrix
-                  disabled={!accessAdmin}
-                  onChange={updateInviteModule}
-                  permissions={inviteForm.permissions}
-                />
                 <ResponsibilitiesEditor
                   disabled={!accessAdmin}
                   onChange={updateInviteList}
@@ -788,7 +890,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                   ) : (
                     <>
                       <MailPlus size={17} />
-                      Send invite
+                      Send invite with this access
                     </>
                   )}
                 </button>
@@ -799,17 +901,21 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
               <div className="invite-side-card__header">
                 <span className="eyebrow">What they’ll get</span>
                 <h3>Preview before you send</h3>
-                <p>Keep the invite experience clear by reviewing role scope, permissions, and business access together.</p>
+                <p>Role templates are starting points. Your choices below are the access they actually receive.</p>
               </div>
+              <RolePromotionSummary
+                businessLabel={businessAccessLabel(businessUnits, inviteForm, isOwnerEmail(inviteForm.email))}
+                permissions={inviteForm.permissions}
+              />
               <RoleTemplatePreview permissions={inviteForm.permissions} />
               <div className="help-list">
                 <div>
-                  <strong>Fast onboarding</strong>
-                  <span>Start with a preset and fine-tune it instead of building from scratch.</span>
+                  <strong>You stay in control</strong>
+                  <span>Promoting someone does not automatically give them every management area.</span>
                 </div>
                 <div>
-                  <strong>Business-first access</strong>
-                  <span>Choose the right scope before saving so the user sees the right data.</span>
+                  <strong>Sensitive access is obvious</strong>
+                  <span>Payroll, Access and Settings are flagged so you can review them before sharing.</span>
                 </div>
               </div>
             </aside>
@@ -905,7 +1011,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
 
                   <div className="access-card__controls">
                     <label className="field">
-                      <span>Choose role template</span>
+                      <span>Promote / assign role</span>
                       <select
                         disabled={disabled}
                         onChange={(event) => applyDraftTemplate(profile, event.target.value)}
@@ -919,7 +1025,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       </select>
                     </label>
                     <label className="field">
-                      <span>Role label</span>
+                      <span>System role label</span>
                       <select
                         disabled={disabled}
                         onChange={(event) => updateDraft(profile, 'role', event.target.value)}
@@ -955,9 +1061,9 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                     open={expandedProfileId === profile.id || isDirty}
                   >
                     <summary>
-                      <span>Business, permissions, and role notes</span>
+                      <span>Review promotion access before saving</span>
                       <StatusBadge tone={isDirty ? 'warning' : 'muted'}>
-                        {isDirty ? 'Unsaved' : 'Open'}
+                        {isDirty ? 'Review changes' : 'Open access setup'}
                       </StatusBadge>
                     </summary>
 
@@ -967,6 +1073,11 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       onChange={(nextRecord) => updateDraftBusinessAccess(profile, nextRecord)}
                       owner={owner}
                       record={draft}
+                    />
+
+                    <RolePromotionSummary
+                      businessLabel={businessAccessLabel(businessUnits, draft, owner)}
+                      permissions={payload}
                     />
 
                     <div className="template-preview">
@@ -979,18 +1090,25 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       </StatusBadge>
                     </div>
 
-                    <PermissionMatrix
+                    <RoleAccessChooser
+                      compact
                       disabled={disabled}
                       onChange={(moduleId, permission) =>
                         updateDraftModule(profile, moduleId, permission)
                       }
                       permissions={payload}
                     />
-                    <ResponsibilitiesEditor
-                      disabled={disabled}
-                      onChange={(field, value) => updateDraftList(profile, field, value)}
-                      permissions={payload}
-                    />
+                    <details className="access-details">
+                      <summary>
+                        <span>Responsibilities, restrictions, and role notes</span>
+                        <StatusBadge tone="muted">Optional</StatusBadge>
+                      </summary>
+                      <ResponsibilitiesEditor
+                        disabled={disabled}
+                        onChange={(field, value) => updateDraftList(profile, field, value)}
+                        permissions={payload}
+                      />
+                    </details>
                   </details>
 
                   <div className="row-actions">
@@ -1016,7 +1134,7 @@ export default function AccessPage({ accessProfile, businessUnits, currentUserId
                       ) : (
                         <>
                           <Check size={15} />
-                          Save changes
+                          Apply role & access
                         </>
                       )}
                     </button>

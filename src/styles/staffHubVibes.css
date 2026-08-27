@@ -1,0 +1,303 @@
+/* Staff Hub portal vibes: make the saved selection visibly change the portal, not just the button state. */
+.staff-hub-page{
+  transition:background .22s ease,color .22s ease;
+}
+
+.staff-hub-page.tone-business{
+  --hub-accent:var(--shell-accent,#fff);
+  --hub-accent-strong:var(--shell-accent-strong,#fff);
+  --hub-accent-soft:var(--shell-accent-soft,rgba(255,255,255,.1));
+}
+
+.staff-hub-page.tone-rose{
+  --hub-accent:#7fb3dd;
+  --hub-accent-strong:#b9dcf7;
+  --hub-accent-soft:rgba(127,179,221,.18);
+  --hub-vibe-bg:linear-gradient(145deg,#0a1725 0%,#14283a 50%,#0b1d2e 100%);
+  --hub-vibe-card:rgba(24,46,66,.82);
+  --hub-vibe-line:rgba(127,179,221,.28);
+}
+
+.staff-hub-page.tone-gold{
+  --hub-accent:#ffffff;
+  --hub-accent-strong:#ffffff;
+  --hub-accent-soft:rgba(255,255,255,.18);
+  --hub-vibe-bg:linear-gradient(145deg,#f4f6f8 0%,#ffffff 52%,#e8edf2 100%);
+  --hub-vibe-card:rgba(255,255,255,.9);
+  --hub-vibe-line:rgba(23,40,54,.16);
+  --text:#172836;
+  --muted:#526575;
+  --faint:#718392;
+}
+
+.staff-hub-page.tone-sage{
+  --hub-accent:#6fcf97;
+  --hub-accent-strong:#9de0b8;
+  --hub-accent-soft:rgba(111,207,151,.17);
+  --hub-vibe-bg:linear-gradient(145deg,#10231d 0%,#173129 54%,#0e211b 100%);
+  --hub-vibe-card:rgba(25,53,44,.84);
+  --hub-vibe-line:rgba(111,207,151,.25);
+}
+
+.staff-hub-page.tone-sky{
+  --hub-accent:#d3b56f;
+  --hub-accent-strong:#f0d89c;
+  --hub-accent-soft:rgba(211,181,111,.18);
+  --hub-vibe-bg:linear-gradient(145deg,#f5f0e6 0%,#fffdf8 50%,#eee4d1 100%);
+  --hub-vibe-card:rgba(255,253,248,.92);
+  --hub-vibe-line:rgba(120,91,38,.18);
+  --text:#2d2a25;
+  --muted:#6d665b;
+  --faint:#857b6d;
+}
+
+.staff-hub-page.tone-rose,
+.staff-hub-page.tone-gold,
+.staff-hub-page.tone-sage,
+.staff-hub-page.tone-sky{
+  background:var(--hub-vibe-bg);
+  border-radius:14px;
+  padding:.55rem;
+}
+
+.staff-hub-page.tone-rose .panel,
+.staff-hub-page.tone-rose .hero-panel,
+.staff-hub-page.tone-gold .panel,
+.staff-hub-page.tone-gold .hero-panel,
+.staff-hub-page.tone-sage .panel,
+.staff-hub-page.tone-sage .hero-panel,
+.staff-hub-page.tone-sky .panel,
+.staff-hub-page.tone-sky .hero-panel{
+  background:var(--hub-vibe-card);
+  border-color:var(--hub-vibe-line);
+}
+
+.staff-hub-page.tone-gold .panel,
+.staff-hub-page.tone-gold .hero-panel,
+.staff-hub-page.tone-sky .panel,
+.staff-hub-page.tone-sky .hero-panel{
+  box-shadow:0 14px 36px rgba(23,40,54,.1);
+}
+
+.staff-hub-page.tone-gold input,
+.staff-hub-page.tone-gold select,
+.staff-hub-page.tone-gold textarea,
+.staff-hub-page.tone-sky input,
+.staff-hub-page.tone-sky select,
+.staff-hub-page.tone-sky textarea{
+  background:rgba(23,40,54,.045);
+  border-color:rgba(23,40,54,.16);
+  color:var(--text);
+}
+
+.staff-hub-theme-options button{
+  position:relative;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease;
+}
+
+.staff-hub-theme-options button:hover{
+  transform:translateY(-1px);
+}
+
+.staff-hub-theme-options button.active{
+  border-color:var(--hub-accent-strong)!important;
+  box-shadow:0 0 0 3px var(--hub-accent-soft),0 8px 20px rgba(0,0,0,.14);
+}
+
+.staff-hub-theme-options button.active::after{
+  content:'Active';
+  background:var(--hub-accent-soft);
+  border:1px solid color-mix(in srgb,var(--hub-accent-strong) 35%,transparent);
+  border-radius:999px;
+  color:var(--hub-accent-strong);
+  font-size:.6rem;
+  font-weight:800;
+  padding:.18rem .38rem;
+  position:absolute;
+  right:.45rem;
+  top:.4rem;
+}
+
+@media(max-width:760px){
+  .staff-hub-page.tone-rose,
+  .staff-hub-page.tone-gold,
+  .staff-hub-page.tone-sage,
+  .staff-hub-page.tone-sky{
+    border-radius:0;
+    margin:-.4rem;
+    padding:.4rem;
+  }
+}
+
+.onboarding-workspace,
+.onboarding-manager-panel{
+  display:grid;
+  gap:1rem;
+}
+
+.onboarding-status-grid{
+  display:grid;
+  gap:.65rem;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+
+.onboarding-status-grid article,
+.onboarding-stage-card,
+.onboarding-policy-row,
+.onboarding-manager-card,
+.probation-review-card,
+.onboarding-certificate-strip,
+.onboarding-submit-row{
+  background:rgba(248,244,236,.035);
+  border:1px solid var(--line);
+  border-radius:8px;
+}
+
+.onboarding-status-grid article{
+  display:grid;
+  gap:.12rem;
+  padding:.75rem;
+}
+
+.onboarding-status-grid strong{
+  font-size:1.25rem;
+}
+
+.onboarding-status-grid span,
+.onboarding-stage-card li,
+.probation-review-card small,
+.onboarding-policy-row small,
+.onboarding-certificate-strip small,
+.onboarding-submit-row small{
+  color:var(--muted);
+  font-size:.76rem;
+  line-height:1.4;
+}
+
+.onboarding-personal-form,
+.onboarding-stage-grid,
+.onboarding-quiz-grid,
+.onboarding-policy-list,
+.onboarding-manager-list,
+.probation-review-grid{
+  display:grid;
+  gap:.75rem;
+}
+
+.onboarding-stage-grid,
+.onboarding-quiz-grid,
+.probation-review-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+
+.onboarding-stage-card{
+  display:grid;
+  gap:.7rem;
+  padding:.85rem;
+}
+
+.onboarding-stage-card>div:first-child,
+.onboarding-policy-row,
+.onboarding-certificate-strip,
+.onboarding-submit-row,
+.onboarding-manager-card__header,
+.probation-review-card summary{
+  align-items:center;
+  display:flex;
+  gap:.75rem;
+  justify-content:space-between;
+}
+
+.onboarding-stage-card ul{
+  display:grid;
+  gap:.28rem;
+  margin:0;
+  padding-left:1.05rem;
+}
+
+.onboarding-stage-card.complete{
+  background:rgba(85,214,146,.06);
+  border-color:rgba(85,214,146,.28);
+}
+
+.onboarding-policy-row{
+  padding:.75rem;
+}
+
+.onboarding-policy-row>span,
+.onboarding-certificate-strip>span,
+.onboarding-submit-row>span,
+.onboarding-manager-card__header>span,
+.probation-review-card summary>span{
+  display:grid;
+  gap:.12rem;
+  min-width:0;
+}
+
+.onboarding-signature-controls{
+  display:grid;
+  gap:.45rem;
+  grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) auto;
+  min-width:min(100%,470px);
+}
+
+.onboarding-signature-controls input{
+  min-width:0;
+}
+
+.onboarding-certificate-strip,
+.onboarding-submit-row,
+.onboarding-manager-card{
+  padding:.85rem;
+}
+
+.onboarding-manager-card{
+  display:grid;
+  gap:.85rem;
+}
+
+.probation-review-card{
+  padding:.7rem;
+}
+
+.probation-review-card summary{
+  cursor:pointer;
+  list-style:none;
+}
+
+.probation-review-card summary::-webkit-details-marker{
+  display:none;
+}
+
+.probation-review-card[open]{
+  display:grid;
+  gap:.75rem;
+}
+
+@media(max-width:760px){
+  .onboarding-status-grid,
+  .onboarding-stage-grid,
+  .onboarding-quiz-grid,
+  .probation-review-grid{
+    grid-template-columns:1fr;
+  }
+
+  .onboarding-policy-row,
+  .onboarding-certificate-strip,
+  .onboarding-submit-row,
+  .onboarding-manager-card__header{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+
+  .onboarding-signature-controls{
+    grid-template-columns:1fr;
+    width:100%;
+  }
+
+  .onboarding-signature-controls .secondary-button,
+  .onboarding-submit-row .primary-button,
+  .onboarding-certificate-strip .secondary-button{
+    width:100%;
+  }
+}

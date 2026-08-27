@@ -1,0 +1,28 @@
+create table if not exists public.finance_payment_confirmations (
+  id uuid primary key default gen_random_uuid(), business_unit_id uuid not null references public.business_units(id) on delete cascade,
+  provider text not null default 'interac', source_message_id text not null, source_thread_id text, sender text, subject text,
+  recipient_name text not null, recipient_key text not null, amount numeric(12,2) not null check(amount>=0), currency text not null default 'CAD',
+  deposited_at timestamptz, payment_status text not null default 'deposited', payroll_entry_id uuid references public.payroll_entries(id) on delete set null,
+  payroll_run_id uuid references public.payroll_runs(id) on delete set null, bank_transaction_id uuid references public.finance_transactions(id) on delete set null,
+  match_confidence integer not null default 0 check(match_confidence between 0 and 100),
+  match_status text not null default 'unmatched' check(match_status in('unmatched','suggested','confirmed','conflict','ignored')),
+  evidence jsonb not null default '{}'::jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(provider,source_message_id)
+);
+create index if not exists finance_payment_confirmations_business_date_idx on public.finance_payment_confirmations(business_unit_id,deposited_at desc);
+alter table public.finance_payment_confirmations enable row level security;
+create policy finance_payment_confirmations_select on public.finance_payment_confirmations for select to authenticated using(private.permission_rank(private.module_permission('finance'))>=private.permission_rank('view') and private.finance_business_allowed(business_unit_id));
+grant select on public.finance_payment_confirmations to authenticated;
+
+create or replace function private.refresh_email_payroll_matches(p_business_unit_id uuid) returns void language plpgsql security definer set search_path=public,pg_temp as $$ begin
+with candidates as (
+ select c.id confirmation_id,e.id payroll_entry_id,r.id payroll_run_id,t.id bank_transaction_id,
+ (case when lower(c.recipient_key)=lower(regexp_replace(e.staff_name_snapshot,'[^a-z0-9]+','','gi')) then 45 when lower(regexp_replace(e.staff_name_snapshot,'[^a-z0-9]+','','gi')) like '%'||lower(c.recipient_key)||'%' or lower(c.recipient_key) like '%'||lower(regexp_replace(split_part(e.staff_name_snapshot,' ',1),'[^a-z0-9]+','','gi'))||'%' then 30 else 0 end + case when abs(c.amount-e.take_home)<=0.01 then 40 when abs(c.amount-e.take_home)<=greatest(2,e.take_home*0.01) then 30 else 0 end + case when c.deposited_at is not null and abs((c.deposited_at::date)-coalesce(r.week_end,r.week_start))<=3 then 15 when c.deposited_at is not null and abs((c.deposited_at::date)-coalesce(r.week_end,r.week_start))<=10 then 8 else 0 end)::int score,
+ row_number() over(partition by c.id order by abs(c.amount-e.take_home),case when c.deposited_at is null then 999 else abs((c.deposited_at::date)-coalesce(r.week_end,r.week_start)) end) rn
+ from public.finance_payment_confirmations c join public.payroll_runs r on r.business_unit_id=c.business_unit_id and r.status='locked' join public.payroll_entries e on e.payroll_run_id=r.id
+ left join lateral(select ft.id from public.finance_transactions ft where ft.business_unit_id=c.business_unit_id and ft.source='csv' and ft.direction='expense' and abs(ft.amount-c.amount)<=greatest(2,c.amount*0.01) and c.deposited_at is not null and abs(ft.transaction_date-c.deposited_at::date)<=5 order by abs(ft.amount-c.amount),abs(ft.transaction_date-c.deposited_at::date) limit 1)t on true
+ where c.business_unit_id=p_business_unit_id and c.match_status in('unmatched','suggested','conflict') and abs(c.amount-e.take_home)<=greatest(3,e.take_home*0.02) and(c.deposited_at is null or abs((c.deposited_at::date)-coalesce(r.week_end,r.week_start))<=14)
+) update public.finance_payment_confirmations c set payroll_entry_id=x.payroll_entry_id,payroll_run_id=x.payroll_run_id,bank_transaction_id=x.bank_transaction_id,match_confidence=least(100,x.score),match_status=case when x.score>=95 and x.bank_transaction_id is not null then 'confirmed' when x.score>=70 then 'suggested' else 'conflict' end,evidence=coalesce(c.evidence,'{}'::jsonb)||jsonb_build_object('matcher','gmail_payroll_v1','three_way_verified',x.score>=95 and x.bank_transaction_id is not null),updated_at=now() from candidates x where x.confirmation_id=c.id and x.rn=1;
+insert into public.finance_reconciliations(business_unit_id,bank_transaction_id,match_type,matched_id,match_label,expected_amount,actual_amount,confidence,status,reason)
+select c.business_unit_id,c.bank_transaction_id,'payroll_entry',c.payroll_entry_id,'Gmail verified payroll · '||c.recipient_name,e.take_home,c.amount,c.match_confidence,case when c.match_status='confirmed' then 'confirmed' else 'suggested' end,jsonb_build_object('gmail_confirmation_id',c.id,'source','interac_email','recipient',c.recipient_name,'three_way_verified',coalesce((c.evidence->>'three_way_verified')::boolean,false)) from public.finance_payment_confirmations c join public.payroll_entries e on e.id=c.payroll_entry_id where c.business_unit_id=p_business_unit_id and c.bank_transaction_id is not null and c.payroll_entry_id is not null and c.match_confidence>=70
+on conflict(bank_transaction_id,match_type,matched_id) do update set confidence=greatest(public.finance_reconciliations.confidence,excluded.confidence),status=case when excluded.status='confirmed' then 'confirmed' else public.finance_reconciliations.status end,reason=public.finance_reconciliations.reason||excluded.reason,updated_at=now(); end; $$;
+revoke all on function private.refresh_email_payroll_matches(uuid) from public,anon,authenticated;

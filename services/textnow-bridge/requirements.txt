@@ -1,6 +1,0 @@
-fastapi==0.116.1
-uvicorn[standard]==0.35.0
-requests~=2.25.1
-python-dateutil~=2.8.1
-cloudscraper~=1.2.58
-setuptools>=57

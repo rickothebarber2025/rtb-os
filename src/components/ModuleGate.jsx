@@ -12,7 +12,9 @@ export default function ModuleGate({
   const { loading, profile } = useAuthProfile();
 
   if (loading) return <LoadingState label="Checking access" />;
-  if (hasModulePermission(profile, module, minimum)) return <>{children}</>;
+  const allowed = hasModulePermission(profile, module, minimum)
+    || (module === 'roster' && minimum === 'edit' && hasModulePermission(profile, 'operations', 'edit'));
+  if (allowed) return <>{children}</>;
 
   if (fallback) return <>{fallback}</>;
 

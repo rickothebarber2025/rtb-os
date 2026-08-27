@@ -1,6 +1,9 @@
 -- RTB Beauty role-specific Personal Service Setting checklist model.
 -- Production migration 20260812212348. Keeps preview/CI migration history aligned.
 
+alter table public.operation_checklist_items add column if not exists scope text not null default 'shared';
+alter table public.operation_checklist_items add column if not exists required boolean not null default true;
+alter table public.operation_checklist_runs add column if not exists scope text not null default 'shared';
 alter table public.operation_checklist_items add column if not exists category text not null default 'General';
 alter table public.operation_checklist_items add column if not exists audience text not null default 'all';
 

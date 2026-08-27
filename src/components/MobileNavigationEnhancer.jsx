@@ -63,8 +63,8 @@ function enhanceDashboard() {
   const originalNav = page?.querySelector('.dashboard-mobile-tabs');
   if (!page || !originalNav || originalNav.dataset.enhanced === 'true') return null;
 
-  // DashboardPage now owns its tab state in React. Do not replace its dynamic,
-  // permission-aware buttons or duplicate keyboard/history listeners.
+  // DashboardPage owns its tab state in React when this marker is present.
+  // Never attach duplicate listeners to a React-managed tab bar.
   if (originalNav.dataset.managed === 'react') return null;
 
   originalNav.dataset.enhanced = 'true';
@@ -127,11 +127,10 @@ function enhanceDashboard() {
   });
 
   const requestedSection = readSection();
-  let activeId = availableIds.includes(requestedSection) ? requestedSection : availableIds[0];
+  const activeId = availableIds.includes(requestedSection) ? requestedSection : availableIds[0];
 
   const selectTab = (id, shouldScroll = true) => {
     if (!availableIds.includes(id)) return;
-    activeId = id;
     groupedSections.forEach((section) => {
       section.classList.toggle('is-active-mobile-tab', section.dataset.mobileGroup === id);
     });
@@ -155,115 +154,31 @@ function enhanceDashboard() {
   };
 }
 
-function enhanceStaffHub() {
-  const page = document.querySelector('.staff-hub-page');
-  const stickyNav = page?.querySelector('.staff-hub-sticky-tabs');
-  const legacyPanel = page?.querySelector('.staff-hub-tabs-panel');
-  if (!page || !stickyNav || stickyNav.dataset.enhanced === 'true') return null;
-
-  stickyNav.dataset.enhanced = 'true';
-  stickyNav.setAttribute('role', 'tablist');
-  stickyNav.setAttribute('aria-label', 'Staff Hub sections');
-  legacyPanel?.setAttribute('aria-hidden', 'true');
-  legacyPanel?.setAttribute('inert', '');
-
-  const buttons = Array.from(stickyNav.querySelectorAll('button'));
-  const validIds = [];
-
-  buttons.forEach((button, index) => {
-    const id = button.textContent?.trim().toLowerCase().replace(/\s+/g, '-') || `section-${index}`;
-    const mappedId = {
-      'daily-ops': 'daily',
-      today: 'home',
-      updates: 'updates',
-      earnings: 'money',
-      tips: 'tips',
-      performance: 'stats',
-      schedule: 'schedule',
-      more: 'more',
-    }[id] || id;
-
-    button.dataset.tabId = mappedId;
-    button.setAttribute('role', 'tab');
-    button.setAttribute('aria-controls', `staff-hub-panel-${mappedId}`);
-    validIds.push(mappedId);
-  });
-
-  const requestedSection = readSection();
-  let activeId = validIds.includes(requestedSection)
-    ? requestedSection
-    : buttons.find((button) => button.classList.contains('active'))?.dataset.tabId || validIds[0];
-
-  const markPanels = () => {
-    Array.from(page.querySelectorAll('[data-tab], [data-tab-panel], .staff-hub-tab-content')).forEach((panel, index) => {
-      const panelId = panel.dataset.tab || panel.dataset.tabPanel || panel.dataset.section;
-      if (!panelId) return;
-      panel.setAttribute('role', 'tabpanel');
-      panel.id ||= `staff-hub-panel-${panelId}-${index}`;
-    });
-  };
-
-  const selectTab = (id, shouldScroll = true) => {
-    const button = buttons.find((item) => item.dataset.tabId === id);
-    if (!button) return;
-    activeId = id;
-    setRovingTabState(buttons, id);
-    writeSection(id);
-    button.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    if (shouldScroll) scrollToNavigation(stickyNav);
-  };
-
-  const listeners = buttons.map((button) => {
-    const onClick = () => {
-      window.requestAnimationFrame(() => selectTab(button.dataset.tabId));
-    };
-    button.addEventListener('click', onClick);
-    return () => button.removeEventListener('click', onClick);
-  });
-
-  const detachKeys = attachArrowNavigation(stickyNav, buttons, (id) => {
-    buttons.find((button) => button.dataset.tabId === id)?.click();
-    selectTab(id, false);
-  });
-
-  markPanels();
-  const initialButton = buttons.find((button) => button.dataset.tabId === activeId);
-  if (initialButton && !initialButton.classList.contains('active')) initialButton.click();
-  selectTab(activeId, false);
-
-  return () => {
-    listeners.forEach((detach) => detach());
-    detachKeys();
-  };
-}
-
 export default function MobileNavigationEnhancer() {
   useEffect(() => {
-    const cleanups = [];
+    let cleanup = null;
     let scheduled = false;
 
-    const applyEnhancements = () => {
+    const applyEnhancement = () => {
       scheduled = false;
-      const dashboardCleanup = enhanceDashboard();
-      const staffHubCleanup = enhanceStaffHub();
-      if (dashboardCleanup) cleanups.push(dashboardCleanup);
-      if (staffHubCleanup) cleanups.push(staffHubCleanup);
+      cleanup?.();
+      cleanup = enhanceDashboard();
     };
 
-    const scheduleEnhancements = () => {
+    const scheduleEnhancement = () => {
       if (scheduled) return;
       scheduled = true;
-      window.requestAnimationFrame(applyEnhancements);
+      window.requestAnimationFrame(applyEnhancement);
     };
 
-    scheduleEnhancements();
-    const observer = new MutationObserver(scheduleEnhancements);
+    scheduleEnhancement();
+    const observer = new MutationObserver(scheduleEnhancement);
     const root = document.getElementById('root');
     if (root) observer.observe(root, { childList: true, subtree: true });
 
     return () => {
       observer.disconnect();
-      cleanups.forEach((cleanup) => cleanup());
+      cleanup?.();
     };
   }, []);
 

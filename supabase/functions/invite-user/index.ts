@@ -16,6 +16,7 @@ const MODULE_IDS = [
   "roster",
   "payroll",
   "performance",
+  "finance",
   "appointments",
   "booth_rent",
   "operations",
@@ -246,6 +247,47 @@ async function findUserByEmail(admin: ReturnType<typeof createClient>, email: st
   return null;
 }
 
+async function resolveOnboardingStaff(
+  admin: ReturnType<typeof createClient>,
+  body: Record<string, unknown>,
+  email: string,
+  fullName: string,
+  businessUnitId: string,
+) {
+  if (body.staff_id) return String(body.staff_id);
+
+  const escapedEmail = email.replace(/[\\%_]/g, (character) => `\\${character}`);
+  const { data: existing, error: findError } = await admin
+    .from("staff")
+    .select("id")
+    .eq("business_unit_id", businessUnitId)
+    .ilike("email", escapedEmail)
+    .limit(1)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (existing?.id) return existing.id;
+
+  const startDate = body.start_date ? String(body.start_date) : new Date().toISOString().slice(0, 10);
+  const { data: created, error: createError } = await admin
+    .from("staff")
+    .insert({
+      active: true,
+      business_unit_id: businessUnitId,
+      commission_rate: 50,
+      email,
+      fixed_rate: false,
+      full_name: fullName,
+      probation_start_date: startDate,
+      role: body.position_title ? String(body.position_title) : "Staff",
+      start_date: startDate,
+      tier: "probation",
+    })
+    .select("id")
+    .single();
+  if (createError) throw createError;
+  return created.id;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -268,10 +310,17 @@ Deno.serve(async (req) => {
     const role = String(body.role || "staff").trim().toLowerCase();
     const businessUnitId = body.business_unit_id ? String(body.business_unit_id) : null;
     let permissions = normalizePermissionsPayload(body.permissions);
+    const onboardingRequired =
+      Boolean(body.onboarding_required) || permissions.role_template === "onboarding_restricted";
+    let onboardingTargetPermissions = normalizePermissionsPayload(body.onboarding_target_permissions);
     const redirectTo = cleanRedirectTo(body.redirectTo, req.headers.get("Origin"));
 
     if (role === "staff" && !hasAssignedModuleAccess(permissions)) {
       permissions = applyStaffPortalDefaults(permissions, businessUnitId);
+    }
+
+    if (!hasAssignedModuleAccess(onboardingTargetPermissions)) {
+      onboardingTargetPermissions = applyStaffPortalDefaults(onboardingTargetPermissions, businessUnitId);
     }
 
     if (!email || !email.includes("@")) {
@@ -284,6 +333,10 @@ Deno.serve(async (req) => {
 
     if (email !== OWNER_EMAIL && !hasAssignedBusiness(permissions, businessUnitId)) {
       return jsonResponse({ error: "Choose at least one business for this user." }, 400);
+    }
+
+    if (onboardingRequired && !businessUnitId) {
+      return jsonResponse({ error: "Choose one primary business for onboarding." }, 400);
     }
 
     let invited = false;
@@ -302,6 +355,30 @@ Deno.serve(async (req) => {
 
     if (!targetUser?.id) {
       throw new Error("Supabase did not return an invited user.");
+    }
+
+    let existingOnboarding: { id: string; status: string } | null = null;
+    if (onboardingRequired) {
+      const { data, error } = await admin
+        .from("staff_onboarding_invitations")
+        .select("id,status")
+        .eq("user_profile_id", targetUser.id)
+        .maybeSingle();
+      if (error) throw error;
+      existingOnboarding = data;
+
+      if (
+        existingOnboarding &&
+        ["submitted", "approved", "archived", "cancelled"].includes(existingOnboarding.status)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "This account already has a submitted or closed onboarding cycle. Review that record instead of sending a new restricted invitation.",
+          },
+          409,
+        );
+      }
     }
 
     const { data: profile, error: profileError } = await admin
@@ -329,6 +406,35 @@ Deno.serve(async (req) => {
       .single();
 
     if (profileError) throw profileError;
+
+    if (onboardingRequired && businessUnitId) {
+      const onboardingStaffId = await resolveOnboardingStaff(admin, body, email, fullName, businessUnitId);
+      const onboardingPayload = {
+        availability_notes: String(body.availability_notes || ""),
+        business_unit_id: businessUnitId,
+        email,
+        full_name: fullName || email,
+        position_title: body.position_title ? String(body.position_title) : null,
+        required_documents: Array.isArray(body.required_documents) ? body.required_documents : [],
+        staff_id: onboardingStaffId,
+        start_date: body.start_date || null,
+        target_permissions: onboardingTargetPermissions,
+        target_role_template: onboardingTargetPermissions.role_template || "staff_portal",
+        user_profile_id: targetUser.id,
+      };
+
+      const onboardingRequest = existingOnboarding
+        ? admin
+            .from("staff_onboarding_invitations")
+            .update(onboardingPayload)
+            .eq("id", existingOnboarding.id)
+        : admin
+            .from("staff_onboarding_invitations")
+            .insert({ ...onboardingPayload, status: "invited" });
+      const { error: onboardingError } = await onboardingRequest;
+
+      if (onboardingError) throw onboardingError;
+    }
 
     return jsonResponse({ invited, profile });
   } catch (err) {
