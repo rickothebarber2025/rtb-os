@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
+const notificationMigration = new URL(
+  '../supabase/migrations/20260814022906_unify_staff_notifications_and_push.sql',
+  import.meta.url,
+);
+
 test('auth explicitly signals notification token sync when a session is ready', () => {
   const source = fs.readFileSync(new URL('../src/hooks/useAuth.js', import.meta.url), 'utf8');
   assert.match(source, /rtb:auth-session-ready/);
@@ -27,7 +32,7 @@ test('native push preserves Staff Hub route and tab across cold start', () => {
 });
 
 test('staff notifications bridge to push queue idempotently', () => {
-  const migration = fs.readFileSync(new URL('../supabase/migrations/20260814023000_unify_staff_notifications_and_push.sql', import.meta.url), 'utf8');
+  const migration = fs.readFileSync(notificationMigration, 'utf8');
   assert.match(migration, /enqueue_staff_operation_notification_push/);
   assert.match(migration, /push_notification_queue/);
   assert.match(migration, /on conflict \(user_id, source_table, source_id, title\)/i);
@@ -35,7 +40,7 @@ test('staff notifications bridge to push queue idempotently', () => {
 });
 
 test('meaningful staff events create notifications without notifying on every checklist click', () => {
-  const migration = fs.readFileSync(new URL('../supabase/migrations/20260814023000_unify_staff_notifications_and_push.sql', import.meta.url), 'utf8');
+  const migration = fs.readFileSync(notificationMigration, 'utf8');
   assert.match(migration, /notify_staff_task_assignment/);
   assert.match(migration, /notify_staff_announcement/);
   assert.match(migration, /notify_staff_shop_status/);
