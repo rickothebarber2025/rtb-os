@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const chooser = fs.readFileSync(new URL('../src/components/RoleAccessChooser.jsx', import.meta.url), 'utf8');
 const accessPage = fs.readFileSync(new URL('../src/pages/AccessPage.jsx', import.meta.url), 'utf8');
+const main = fs.readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
 
 test('owner can choose module access before a promotion is saved', () => {
   assert.match(accessPage, /RoleAccessChooser/);
@@ -25,4 +26,9 @@ test('onboarding can define future access without granting it immediately', () =
   assert.match(accessPage, /After onboarding approval/);
   assert.match(accessPage, /Restricted now/);
   assert.match(accessPage, /Post-approval role/);
+});
+
+test('owner access is managed in AccessPage rather than a duplicate global modal', () => {
+  assert.doesNotMatch(main, /OwnerRoleAccessSetup/);
+  assert.match(main, /accessControl\.css/);
 });
