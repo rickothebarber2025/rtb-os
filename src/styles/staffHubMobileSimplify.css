@@ -297,3 +297,16 @@
     width: 100%;
   }
 }
+
+
+/* The Hub now has four primary destinations; Schedule and Performance live in More. */
+.staff-hub-tabs button,
+.staff-hub-sticky-tabs button {
+  order: initial;
+}
+
+@media (max-width: 1024px) {
+  .page-staff-hub + .mobile-app-nav .mobile-tabbar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
