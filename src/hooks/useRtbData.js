@@ -87,6 +87,54 @@ function sortByCreatedAtDesc(rows) {
   );
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
+function errorMessage(error) {
+  if (!error) return 'Unknown error';
+  if (typeof error === 'string') {
+    try {
+      const parsed = JSON.parse(error);
+      return parsed?.message || parsed?.error || error;
+    } catch (_err) {
+      return error;
+    }
+  }
+
+  return error.message || error.error_description || error.error || 'Unknown error';
+}
+
+function isGatewayTimeout(error) {
+  const message = errorMessage(error).toLowerCase();
+  return message.includes('gateway timeout') || message.includes('504');
+}
+
+function staffFriendlyError(error) {
+  if (isGatewayTimeout(error)) {
+    return 'RTB OS reached Supabase, but the shop data took too long to answer. Refresh in a minute; no data was changed.';
+  }
+
+  return errorMessage(error);
+}
+
+async function retryGatewayTimeout(loader, attempts = 2) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await loader();
+    } catch (error) {
+      lastError = error;
+      if (!isGatewayTimeout(error) || attempt === attempts - 1) break;
+      await sleep(350 * (attempt + 1));
+    }
+  }
+
+  throw lastError;
+}
+
 function normalize(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -144,8 +192,8 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
 
     try {
       const [rawBusinessUnits, businessProfilesRecord] = await Promise.all([
-        getBusinessUnits(),
-        getAppSettingRecord(BUSINESS_PROFILES_KEY).catch(() => null),
+        retryGatewayTimeout(() => getBusinessUnits()),
+        retryGatewayTimeout(() => getAppSettingRecord(BUSINESS_PROFILES_KEY)).catch(() => null),
       ]);
       const allBusinessUnits = hydrateBusinessUnits(rawBusinessUnits, businessProfilesRecord?.value);
       const businessUnits = getAccessibleBusinessUnits(allBusinessUnits, accessProfile);
@@ -188,46 +236,48 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
         hasModulePermission(accessProfile, 'settings', 'admin');
       const requests = {
         actionCenterRecord: canViewActionCenter
-          ? getAppSettingRecord(ACTION_CENTER_SETTING_KEY)
-          : Promise.resolve(null),
+          ? () => getAppSettingRecord(ACTION_CENTER_SETTING_KEY)
+          : () => Promise.resolve(null),
         masterDashboardRecord: isAllBusinesses || !canViewAppointments
-          ? Promise.resolve(null)
-          : getAppSettingRecord(getAppointmentSettingKey(activeUnit)),
+          ? () => Promise.resolve(null)
+          : () => getAppSettingRecord(getAppointmentSettingKey(activeUnit)),
         instagramInsights: isAllBusinesses || !canViewOperations
-          ? Promise.resolve(null)
-          : getInstagramInsights(activeUnit.id).catch(() => null),
+          ? () => Promise.resolve(null)
+          : () => getInstagramInsights(activeUnit.id).catch(() => null),
         monthlyPerformanceSummary: canViewPerformance
-          ? getMonthlyPerformanceSummary(isAllBusinesses ? null : activeUnit.id)
-          : Promise.resolve([]),
+          ? () => getMonthlyPerformanceSummary(isAllBusinesses ? null : activeUnit.id)
+          : () => Promise.resolve([]),
         payrollRuns: shouldLoadPayroll
           ? isAllBusinesses
-            ? loadAcrossBusinessUnits(businessUnits, (unit) =>
+            ? () => loadAcrossBusinessUnits(businessUnits, (unit) =>
                 getPayrollRuns(unit.id).then((rows) =>
                   rows.map((row) => ({ ...row, business_name: unit.name })),
                 ),
               )
-            : getPayrollRuns(activeUnit.id)
-          : Promise.resolve([]),
+            : () => getPayrollRuns(activeUnit.id)
+          : () => Promise.resolve([]),
         performanceSummary: canViewPerformance
-          ? getPerformanceSummary(isAllBusinesses ? null : activeUnit.id)
-          : Promise.resolve([]),
+          ? () => getPerformanceSummary(isAllBusinesses ? null : activeUnit.id)
+          : () => Promise.resolve([]),
         squareStatus: canViewAppointments && !isAllBusinesses && usesSquareAppointments(activeUnit)
-          ? getSquareStatus(activeUnit.id)
-          : Promise.resolve(null),
+          ? () => getSquareStatus(activeUnit.id)
+          : () => Promise.resolve(null),
         staff: canViewRoster
-          ? loadAcrossBusinessUnits(businessUnits, (unit) => getStaff(unit.id, true))
-          : Promise.resolve([]),
+          ? () => loadAcrossBusinessUnits(businessUnits, (unit) => getStaff(unit.id, true))
+          : () => Promise.resolve([]),
         staffActivityReviewSummary:
           canViewPerformance || canViewAppointments || canViewStaffHub
-            ? getStaffActivityReviewSummary(isAllBusinesses ? null : activeUnit.id)
-            : Promise.resolve([]),
+            ? () => getStaffActivityReviewSummary(isAllBusinesses ? null : activeUnit.id)
+            : () => Promise.resolve([]),
         staffBusinessMetadataRecord: canViewStaffMetadata
-          ? getAppSettingRecord(STAFF_BUSINESS_METADATA_KEY)
-          : Promise.resolve(null),
-        staffPortalSummary: canViewStaffHub ? getMyStaffPortalSummary() : Promise.resolve(null),
+          ? () => getAppSettingRecord(STAFF_BUSINESS_METADATA_KEY)
+          : () => Promise.resolve(null),
+        staffPortalSummary: canViewStaffHub ? () => getMyStaffPortalSummary() : () => Promise.resolve(null),
       };
       const entries = Object.entries(requests);
-      const results = await Promise.allSettled(entries.map(([, request]) => request));
+      const results = await Promise.allSettled(
+        entries.map(([, request]) => retryGatewayTimeout(request)),
+      );
       const loaded = {};
       const warnings = [];
 
@@ -247,7 +297,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
             ? null
             : [];
         warnings.push(
-          `${LOAD_LABELS[key]} could not load: ${result.reason?.message || 'Unknown error'}`,
+          `${LOAD_LABELS[key]} could not load: ${staffFriendlyError(result.reason)}`,
         );
       });
 
@@ -268,12 +318,12 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
       let staffHub = EMPTY_STATE.staffHub;
 
       try {
-        staffHub = await getStaffHubRecords({
+        staffHub = await retryGatewayTimeout(() => getStaffHubRecords({
           businessUnitId: isAllBusinesses ? null : activeUnit.id,
           staffId: linkedStaffProfile?.id || null,
-        });
+        }));
       } catch (err) {
-        warnings.push(`${LOAD_LABELS.staffHub} could not load: ${err.message || 'Unknown error'}`);
+        warnings.push(`${LOAD_LABELS.staffHub} could not load: ${staffFriendlyError(err)}`);
       }
 
       setData({
@@ -298,7 +348,7 @@ export function useRtbData(selectedBusinessUnitId, enabled = true, accessProfile
       if (silent) {
         console.warn('RTB OS background refresh failed:', err);
       } else {
-        setError(err.message || 'Unable to load RTB OS data.');
+        setError(staffFriendlyError(err) || 'Unable to load RTB OS data.');
       }
     } finally {
       if (!silent) setLoading(false);

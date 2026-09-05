@@ -91,3 +91,12 @@ test('staff reward board UI is wired as clickable app navigation, not decorative
   assert.match(css, /\.staff-hub-reward-grid/);
   assert.match(css, /\.staff-hub-reward-spotlight/);
 });
+
+test('RTB data loader retries gateway timeouts and hides raw JSON timeout errors', () => {
+  const hook = fs.readFileSync(new URL('../src/hooks/useRtbData.js', import.meta.url), 'utf8');
+
+  assert.match(hook, /retryGatewayTimeout/);
+  assert.match(hook, /message\.includes\('gateway timeout'\)/);
+  assert.match(hook, /shop data took too long to answer/);
+  assert.doesNotMatch(hook, /setError\(err\.message \|\| 'Unable to load RTB OS data\.'\)/);
+});
