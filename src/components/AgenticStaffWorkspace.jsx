@@ -184,6 +184,7 @@ function StaffWarningManager({ businessUnit, onRefresh, staff }) {
 function StaffFrontDesk({ businessUnit, onRefresh, staffProfile }) {
   const [warnings, setWarnings] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [requestOpen, setRequestOpen] = useState(false);
   const [mode, setMode] = useState('one');
   const [startDate, setStartDate] = useState(earliestAllowedDate());
   const [endDate, setEndDate] = useState(earliestAllowedDate());
@@ -196,9 +197,15 @@ function StaffFrontDesk({ businessUnit, onRefresh, staffProfile }) {
   const load = useCallback(async () => {
     if (!staffProfile?.id) return;
     try {
-      const [warningRows, requestRows] = await Promise.all([listStaffWarnings({ staffId: staffProfile.id }), listMyTimeOffRequests(staffProfile.id)]);
-      setWarnings(warningRows); setRequests(requestRows);
-    } catch (err) { setError(err.message || 'Unable to load staff updates.'); }
+      const [warningRows, requestRows] = await Promise.all([
+        listStaffWarnings({ staffId: staffProfile.id }),
+        listMyTimeOffRequests(staffProfile.id),
+      ]);
+      setWarnings(warningRows);
+      setRequests(requestRows);
+    } catch (err) {
+      setError(err.message || 'Unable to load staff updates.');
+    }
   }, [staffProfile?.id]);
 
   useEffect(() => { load(); }, [load]);
@@ -216,13 +223,21 @@ function StaffFrontDesk({ businessUnit, onRefresh, staffProfile }) {
     const first = startDate || earliestAllowedDate();
     setStartDate(first);
     if (next === 'one') setEndDate(first);
-    if (next === 'two') { const date = new Date(`${first}T12:00:00`); date.setDate(date.getDate()+1); setEndDate(dateKey(date)); }
+    if (next === 'two') {
+      const date = new Date(`${first}T12:00:00`);
+      date.setDate(date.getDate() + 1);
+      setEndDate(dateKey(date));
+    }
   }
 
   function changeStart(value) {
     setStartDate(value);
     if (mode === 'one') setEndDate(value);
-    if (mode === 'two') { const date = new Date(`${value}T12:00:00`); date.setDate(date.getDate()+1); setEndDate(dateKey(date)); }
+    if (mode === 'two') {
+      const date = new Date(`${value}T12:00:00`);
+      date.setDate(date.getDate() + 1);
+      setEndDate(dateKey(date));
+    }
     if (mode === 'custom' && (!endDate || endDate < value)) setEndDate(value);
   }
 
@@ -230,10 +245,13 @@ function StaffFrontDesk({ businessUnit, onRefresh, staffProfile }) {
   const policyOkay = Number(hours) >= 48;
   const activeWarnings = warnings.filter(activeWarning);
   const unacknowledged = activeWarnings.filter((warning) => !warning.acknowledged_at);
+  const latestRequest = requests[0] || null;
 
   async function sendRequest() {
     if (!policyOkay || !staffProfile?.id) return;
-    setBusy(true); setError(''); setMessage('');
+    setBusy(true);
+    setError('');
+    setMessage('');
     try {
       await submitStaffTimeOffRequest({
         business_unit_id: staffProfile.business_unit_id || businessUnit?.id,
@@ -242,39 +260,180 @@ function StaffFrontDesk({ businessUnit, onRefresh, staffProfile }) {
         staff_id: staffProfile.id,
         start_date: startDate,
       });
-      setMessage('Your request is with management now. You’ll see the decision here automatically.');
-      await load(); await onRefresh?.();
-    } catch (err) { setError(err.message || 'Unable to send time-off request.'); }
-    finally { setBusy(false); }
+      setMessage('Request sent. Management will review it and the decision will appear here.');
+      setRequestOpen(false);
+      await load();
+      await onRefresh?.();
+    } catch (err) {
+      setError(err.message || 'Unable to send time-off request.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function acknowledge(warningId) {
-    setBusy(true); setError('');
-    try { await acknowledgeMyStaffWarning(warningId); await load(); await onRefresh?.(); }
-    catch (err) { setError(err.message || 'Unable to acknowledge warning.'); }
-    finally { setBusy(false); }
+    setBusy(true);
+    setError('');
+    try {
+      await acknowledgeMyStaffWarning(warningId);
+      await load();
+      await onRefresh?.();
+    } catch (err) {
+      setError(err.message || 'Unable to acknowledge warning.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <section className="panel full-span ax-workspace ax-front-desk">
-      <div className="ax-header"><div><span className="eyebrow">RTB front desk</span><h2>What do you need today?</h2><p>No paperwork maze. Choose the task and RTB OS handles the policy, routing and status in the background.</p></div><Sparkles size={24}/></div>
-
-      {activeWarnings.length ? <div className="ax-warning-stack"><div className="ax-card-title"><div><span>Your profile</span><h3>{activeWarnings.length} active warning{activeWarnings.length === 1 ? '' : 's'}</h3></div><StatusBadge tone={unacknowledged.length ? 'warning' : 'muted'}>{unacknowledged.length ? `${unacknowledged.length} needs acknowledgement` : 'Acknowledged'}</StatusBadge></div>{activeWarnings.map((warning) => <article key={warning.id}><AlertTriangle size={18}/><span><strong>{warningLevelLabel(warning.level)} · {warning.title}</strong><small>{warning.details}</small></span>{warning.acknowledged_at ? <StatusBadge tone="success">Acknowledged</StatusBadge> : <button className="secondary-button small" disabled={busy} onClick={() => acknowledge(warning.id)} type="button">I’ve read this</button>}</article>)}</div> : null}
-
-      <div className="ax-card">
-        <div className="ax-card-title"><div><span>Time off</span><h3>Request it like you’re speaking to a manager</h3></div><StatusBadge tone="gold">48-hour notice</StatusBadge></div>
-        <div className="ax-step"><span>1</span><strong>How much time?</strong></div>
-        <div className="ax-segmented"><button className={mode==='one'?'active':''} onClick={() => setRequestMode('one')} type="button">One day</button><button className={mode==='two'?'active':''} onClick={() => setRequestMode('two')} type="button">Two days</button><button className={mode==='custom'?'active':''} onClick={() => setRequestMode('custom')} type="button">Custom</button></div>
-        <div className="ax-date-row"><label><span>Starting</span><input min={earliestAllowedDate()} type="date" value={startDate} onChange={(event) => changeStart(event.target.value)} /></label>{mode==='custom' ? <label><span>Until</span><input min={startDate || earliestAllowedDate()} type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label> : <div className="ax-date-summary"><CalendarCheck size={20}/><span><strong>{formatDay(startDate)}{endDate !== startDate ? ` → ${formatDay(endDate)}` : ''}</strong><small>{mode === 'two' ? 'Two-day request' : 'One-day request'}</small></span></div>}</div>
-        <div className="ax-step"><span>2</span><strong>What’s it for?</strong></div>
-        <div className="ax-chip-row">{TIME_OFF_REASONS.map((item) => <button className={reason===item?'active':''} key={item} onClick={() => setReason(item)} type="button">{item}</button>)}</div>
-        {reason === 'Other' ? <label className="field"><span>Short reason</span><input value={otherReason} onChange={(event) => setOtherReason(event.target.value)} placeholder="A few words is enough" /></label> : null}
-        <div className={policyOkay ? 'ax-policy success' : 'ax-policy danger'}><Clock3 size={18}/><span><strong>{policyOkay ? 'Notice requirement met' : 'Too soon for the standard request flow'}</strong><small>{policyOkay ? `${hours} hours notice. Management will receive this as a pending request.` : 'Requests need at least 48 hours before the requested day. For an emergency, contact management directly.'}</small></span></div>
-        <div className="ax-confirm-line"><UserRoundCheck size={18}/><span><strong>{formatDay(startDate)}{endDate !== startDate ? ` through ${formatDay(endDate)}` : ''}</strong><small>{reason === 'Other' ? otherReason || 'Other' : reason} · You’ll get the decision automatically.</small></span><button className="primary-button" disabled={busy || !policyOkay || !startDate || !endDate} onClick={sendRequest} type="button">Send request <ChevronRight size={15}/></button></div>
+    <section className="panel full-span ax-workspace ax-front-desk ax-front-desk--compact">
+      <div className="ax-header ax-front-desk__header">
+        <div>
+          <span className="eyebrow">Staff tools</span>
+          <h2>What do you need?</h2>
+          <p>Choose one action. RTB OS guides you through it.</p>
+        </div>
+        <Sparkles aria-hidden="true" size={20} />
       </div>
 
-      {requests.length ? <div className="ax-request-strip">{requests.slice(0,4).map((request) => <article key={request.id}><span><strong>{formatDay(request.start_date)}{request.end_date !== request.start_date ? ` → ${formatDay(request.end_date)}` : ''}</strong><small>{request.reason || 'Time off'}{request.admin_note ? ` · ${request.admin_note}` : ''}</small></span><StatusBadge tone={request.status === 'approved' ? 'success' : request.status === 'denied' ? 'danger' : 'warning'}>{request.status}</StatusBadge></article>)}</div> : null}
-      {error ? <div className="alert danger">{error}</div> : null}{message ? <div className="alert success">{message}</div> : null}
+      {activeWarnings.length ? (
+        <div className="ax-warning-stack">
+          <div className="ax-card-title">
+            <div>
+              <span>Your profile</span>
+              <h3>{activeWarnings.length} active warning{activeWarnings.length === 1 ? '' : 's'}</h3>
+            </div>
+            <StatusBadge tone={unacknowledged.length ? 'warning' : 'muted'}>
+              {unacknowledged.length ? `${unacknowledged.length} unread` : 'Read'}
+            </StatusBadge>
+          </div>
+          {activeWarnings.map((warning) => (
+            <article key={warning.id}>
+              <AlertTriangle aria-hidden="true" size={18} />
+              <span>
+                <strong>{warningLevelLabel(warning.level)} · {warning.title}</strong>
+                <small>{warning.details}</small>
+              </span>
+              {warning.acknowledged_at ? (
+                <StatusBadge tone="success">Read</StatusBadge>
+              ) : (
+                <button className="secondary-button small" disabled={busy} onClick={() => acknowledge(warning.id)} type="button">
+                  Mark as read
+                </button>
+              )}
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="ax-action-grid">
+        <button className="ax-action-tile" onClick={() => { setError(''); setRequestOpen(true); }} type="button">
+          <span className="ax-action-tile__icon"><CalendarCheck aria-hidden="true" size={22} /></span>
+          <span className="ax-action-tile__copy">
+            <strong>Request time off</strong>
+            <small>Choose dates and send it to management</small>
+          </span>
+          <span className="ax-action-tile__meta">48-hour notice</span>
+          <ChevronRight aria-hidden="true" size={19} />
+        </button>
+      </div>
+
+      {latestRequest ? (
+        <div className="ax-latest-request">
+          <span>
+            <small>Latest request</small>
+            <strong>
+              {formatDay(latestRequest.start_date)}
+              {latestRequest.end_date !== latestRequest.start_date ? ` → ${formatDay(latestRequest.end_date)}` : ''}
+            </strong>
+          </span>
+          <StatusBadge tone={latestRequest.status === 'approved' ? 'success' : latestRequest.status === 'denied' ? 'danger' : 'warning'}>
+            {latestRequest.status}
+          </StatusBadge>
+        </div>
+      ) : null}
+
+      {error ? <div className="alert danger">{error}</div> : null}
+      {message ? <div className="alert success">{message}</div> : null}
+
+      {requestOpen ? (
+        <div className="ax-sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setRequestOpen(false); }}>
+          <section aria-labelledby="time-off-title" aria-modal="true" className="ax-sheet" role="dialog">
+            <header className="ax-sheet__header">
+              <div>
+                <span className="eyebrow">Time off</span>
+                <h2 id="time-off-title">Request time off</h2>
+              </div>
+              <button aria-label="Close time-off request" className="icon-button" disabled={busy} onClick={() => setRequestOpen(false)} type="button">
+                <X aria-hidden="true" size={20} />
+              </button>
+            </header>
+
+            <div className="ax-sheet__body">
+              <div className="ax-step"><span>1</span><strong>How much time?</strong></div>
+              <div className="ax-segmented">
+                <button className={mode === 'one' ? 'active' : ''} onClick={() => setRequestMode('one')} type="button">One day</button>
+                <button className={mode === 'two' ? 'active' : ''} onClick={() => setRequestMode('two')} type="button">Two days</button>
+                <button className={mode === 'custom' ? 'active' : ''} onClick={() => setRequestMode('custom')} type="button">Custom</button>
+              </div>
+
+              <div className="ax-date-row">
+                <label>
+                  <span>Starting</span>
+                  <input min={earliestAllowedDate()} type="date" value={startDate} onChange={(event) => changeStart(event.target.value)} />
+                </label>
+                {mode === 'custom' ? (
+                  <label>
+                    <span>Until</span>
+                    <input min={startDate || earliestAllowedDate()} type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+                  </label>
+                ) : (
+                  <div className="ax-date-summary">
+                    <CalendarCheck aria-hidden="true" size={20} />
+                    <span>
+                      <strong>{formatDay(startDate)}{endDate !== startDate ? ` → ${formatDay(endDate)}` : ''}</strong>
+                      <small>{mode === 'two' ? 'Two-day request' : 'One-day request'}</small>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="ax-step"><span>2</span><strong>What’s it for?</strong></div>
+              <div className="ax-chip-row">
+                {TIME_OFF_REASONS.map((item) => (
+                  <button className={reason === item ? 'active' : ''} key={item} onClick={() => setReason(item)} type="button">
+                    {item}
+                  </button>
+                ))}
+              </div>
+              {reason === 'Other' ? (
+                <label className="field">
+                  <span>Short reason</span>
+                  <input value={otherReason} onChange={(event) => setOtherReason(event.target.value)} placeholder="A few words is enough" />
+                </label>
+              ) : null}
+
+              <div className={policyOkay ? 'ax-policy success' : 'ax-policy danger'}>
+                <Clock3 aria-hidden="true" size={18} />
+                <span>
+                  <strong>{policyOkay ? 'Ready to send' : 'This date is too soon'}</strong>
+                  <small>{policyOkay ? 'The request meets the 48-hour notice policy.' : 'For an emergency within 48 hours, contact management directly.'}</small>
+                </span>
+              </div>
+            </div>
+
+            <footer className="ax-sheet__footer">
+              <span>
+                <strong>{formatDay(startDate)}{endDate !== startDate ? ` through ${formatDay(endDate)}` : ''}</strong>
+                <small>{reason === 'Other' ? otherReason || 'Other' : reason}</small>
+              </span>
+              <button className="primary-button" disabled={busy || !policyOkay || !startDate || !endDate} onClick={sendRequest} type="button">
+                {busy ? 'Sending…' : 'Send request'}
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
