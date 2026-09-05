@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { CalendarDays, CircleDollarSign, ClipboardCheck, Home, Menu } from 'lucide-react';
+import { CircleDollarSign, ClipboardCheck, Home, Menu } from 'lucide-react';
 import { getEffectivePermissionsPayload } from '../lib/permissions.js';
 
 const QUICK_NAV_IDS = ['dashboard', 'action-center', 'payroll', 'staff', 'performance', 'staff-hub'];
@@ -16,7 +16,6 @@ const SHORT_LABELS = {
 const STAFF_HUB_QUICK_TABS = [
   { icon: Home, id: 'home', label: 'Home' },
   { icon: ClipboardCheck, id: 'daily', label: 'Work' },
-  { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
   { icon: CircleDollarSign, id: 'money', label: 'Money' },
 ];
 

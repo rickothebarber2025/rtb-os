@@ -1,0 +1,312 @@
+/* Staff Hub mobile simplification.
+   One navigation, one task at a time, and no stacked desktop dashboards. */
+
+.ax-front-desk--compact {
+  align-content: start;
+}
+
+.ax-front-desk__header p {
+  margin-bottom: 0;
+}
+
+.ax-action-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ax-action-tile {
+  align-items: center;
+  background: rgba(248, 244, 236, 0.035);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  min-height: 72px;
+  padding: 0.8rem;
+  text-align: left;
+  width: 100%;
+}
+
+.ax-action-tile:hover,
+.ax-action-tile:focus-visible {
+  background: var(--gold-soft);
+  border-color: rgba(241, 199, 104, 0.42);
+}
+
+.ax-action-tile__icon {
+  align-items: center;
+  background: var(--gold-soft);
+  border-radius: 13px;
+  color: var(--gold-strong);
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.ax-action-tile__copy {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.ax-action-tile__copy strong {
+  font-size: 0.96rem;
+}
+
+.ax-action-tile__copy small,
+.ax-latest-request small,
+.ax-sheet__footer small {
+  color: var(--muted);
+}
+
+.ax-action-tile__meta {
+  color: var(--gold-strong);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ax-latest-request {
+  align-items: center;
+  background: rgba(248, 244, 236, 0.025);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  gap: 0.8rem;
+  justify-content: space-between;
+  padding: 0.7rem 0.8rem;
+}
+
+.ax-latest-request > span,
+.ax-sheet__footer > span {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.ax-sheet-backdrop {
+  align-items: center;
+  background: rgba(3, 7, 13, 0.72);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 200;
+}
+
+.ax-sheet {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: min(760px, calc(100dvh - 2rem));
+  max-width: 560px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.ax-sheet__header,
+.ax-sheet__footer {
+  align-items: center;
+  display: flex;
+  gap: 0.8rem;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+}
+
+.ax-sheet__header {
+  border-bottom: 1px solid var(--line);
+}
+
+.ax-sheet__header h2 {
+  font-size: 1.25rem;
+  margin: 0.1rem 0 0;
+}
+
+.ax-sheet__body {
+  display: grid;
+  gap: 1rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem;
+}
+
+.ax-sheet__footer {
+  background: rgba(248, 244, 236, 0.025);
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 760px) {
+  .content.page-staff-hub {
+    padding: 0.65rem 0.72rem calc(5.9rem + env(safe-area-inset-bottom));
+  }
+
+  .page-staff-hub .behavioral-momentum {
+    gap: 0.65rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    margin-bottom: 0.65rem;
+    padding: 0.72rem;
+  }
+
+  .page-staff-hub .behavioral-momentum__copy p,
+  .page-staff-hub .behavioral-momentum__meta small {
+    display: none;
+  }
+
+  .page-staff-hub .behavioral-momentum__copy strong {
+    font-size: 0.9rem;
+  }
+
+  .page-staff-hub .behavioral-momentum__action {
+    grid-column: 1 / -1;
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .page-staff-hub > .ax-front-desk--compact {
+    border-radius: 18px;
+    gap: 0.65rem;
+    margin-bottom: 0.65rem;
+    padding: 0.8rem;
+  }
+
+  .ax-front-desk__header {
+    align-items: center;
+  }
+
+  .ax-front-desk__header .eyebrow {
+    font-size: 0.65rem;
+  }
+
+  .ax-front-desk__header h2 {
+    font-size: 1.15rem;
+  }
+
+  .ax-front-desk__header p {
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .ax-action-tile {
+    gap: 0.6rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 66px;
+    padding: 0.68rem;
+  }
+
+  .ax-action-tile__meta {
+    display: none;
+  }
+
+  .ax-action-tile__copy strong {
+    font-size: 0.9rem;
+  }
+
+  .ax-action-tile__copy small {
+    font-size: 0.72rem;
+    line-height: 1.3;
+  }
+
+  .page-staff-hub .staff-hub-page > .staff-hub-hero,
+  .page-staff-hub .staff-hub-page > .staff-hub-ops-score-strip,
+  .page-staff-hub .staff-hub-page > .staff-hub-pro-dashboard,
+  .page-staff-hub .staff-hub-page > .staff-hub-daily-strip,
+  .page-staff-hub .staff-hub-page > .staff-hub-tabs-panel,
+  .page-staff-hub .staff-hub-page > .staff-hub-sticky-tabs,
+  .page-staff-hub .staff-hub-page > .daily-ops-hero {
+    display: none !important;
+  }
+
+  .page-staff-hub .staff-hub-page {
+    display: block;
+  }
+
+  .page-staff-hub .staff-hub-page > * {
+    margin-bottom: 0.65rem;
+  }
+
+  .page-staff-hub .staff-hub-subnav {
+    gap: 0.4rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .page-staff-hub .staff-hub-subnav__link {
+    flex: 1;
+    justify-content: center;
+    min-height: 42px;
+  }
+
+  .page-staff-hub .staff-hub-focus-card,
+  .page-staff-hub .staff-hub-score-card {
+    min-height: 0;
+  }
+
+  .page-staff-hub .panel,
+  .page-staff-hub .staff-hub-app-card,
+  .page-staff-hub .daily-ops-card {
+    border-radius: 16px;
+    padding: 0.8rem;
+  }
+
+  .page-staff-hub .staff-hub-performance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page-staff-hub .staff-hub-performance-grid > div {
+    min-height: 86px;
+    padding: 0.72rem;
+  }
+
+  .page-staff-hub .staff-hub-performance-grid strong {
+    font-size: 1.1rem;
+  }
+
+  .ax-sheet-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .ax-sheet {
+    border-bottom: 0;
+    border-radius: 22px 22px 0 0;
+    max-height: min(88dvh, 720px);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .ax-sheet__body {
+    padding: 0.85rem;
+  }
+
+  .ax-sheet__footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 0.75rem 0.85rem;
+  }
+
+  .ax-sheet__footer .primary-button {
+    min-height: 48px;
+    width: 100%;
+  }
+}
+
+
+/* The Hub now has four primary destinations; Schedule and Performance live in More. */
+.staff-hub-tabs button,
+.staff-hub-sticky-tabs button {
+  order: initial;
+}
+
+@media (max-width: 1024px) {
+  .page-staff-hub + .mobile-app-nav .mobile-tabbar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
