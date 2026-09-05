@@ -46,6 +46,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
             className="mobile-tabbar__item active"
             title="Cleaning"
             type="button"
+            data-nav-target="staff-hub:daily"
             onClick={() => setStaffHubTab('daily')}
           >
             <span className="mobile-tabbar__icon-wrap"><ClipboardCheck size={20} /></span>
@@ -76,6 +77,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
                 key={tab.id}
                 title={tab.label}
                 type="button"
+                data-nav-target={`staff-hub:${tab.id}`}
                 onClick={() => setStaffHubTab(tab.id)}
               >
                 <span className="mobile-tabbar__icon-wrap"><Icon size={20} /></span>
@@ -89,6 +91,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
             className={`mobile-tabbar__item ${moreActive ? 'active' : ''}`}
             title="More"
             type="button"
+            data-nav-target="staff-hub:more"
             onClick={() => setStaffHubTab('more')}
           >
             <span className="mobile-tabbar__icon-wrap"><Menu size={20} /></span>
@@ -125,6 +128,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
               key={item.id}
               title={item.label}
               type="button"
+              data-nav-target={item.id}
               onClick={() => setActivePage(item.id)}
             >
               <span className="mobile-tabbar__icon-wrap">
@@ -141,6 +145,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
           className={`mobile-tabbar__item ${moreActive ? 'active' : ''}`}
           title="More"
           type="button"
+          data-nav-target="navigation-drawer"
           onClick={onMoreClick}
         >
           <span className="mobile-tabbar__icon-wrap">
