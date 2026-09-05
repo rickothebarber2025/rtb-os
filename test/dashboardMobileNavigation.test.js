@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const dashboard = fs.readFileSync(new URL('../src/pages/DashboardPage.jsx', import.meta.url), 'utf8');
-const enhancer = fs.readFileSync(new URL('../src/components/MobileNavigationEnhancer.jsx', import.meta.url), 'utf8');
+const main = fs.readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/mobileNavigation.css', import.meta.url), 'utf8');
+const staffHub = fs.readFileSync(new URL('../src/pages/StaffHubPage.jsx', import.meta.url), 'utf8');
 
 test('mobile dashboard tabs are dynamic instead of fixed', () => {
   assert.match(dashboard, /tabs = \[\{ id: 'overview', label: 'Overview' \}\]/);
@@ -58,13 +59,25 @@ test('Actions tab has live count badge and mobile tab changes scroll navigation 
   assert.match(dashboard, /max-width: 900px/);
 });
 
-test('legacy dashboard enhancer leaves React-managed tabs alone', () => {
+test('dashboard navigation is React-managed without a global DOM enhancer', () => {
   assert.match(dashboard, /data-managed="react"/);
-  assert.match(enhancer, /originalNav\.dataset\.managed === 'react'/);
+  assert.doesNotMatch(main, /MobileNavigationEnhancer/);
+  assert.doesNotMatch(main, /StaffHubNavigationEnhancer/);
 });
 
 test('mobile hides inactive groups without changing desktop rendering', () => {
   assert.match(css, /@media \(max-width: 900px\)/);
   assert.match(css, /\[data-mobile-group\]:not\(\.is-active-mobile-tab\)/);
   assert.match(css, /display: none !important/);
+});
+
+test('Staff Hub human navigation is native React state, not DOM mutation', () => {
+  assert.match(staffHub, /description: 'Clock in, checklists, shop status, tasks and daily operations\.'/);
+  assert.match(staffHub, /staff-hub-human-nav-heading/);
+  assert.match(staffHub, /data-nav-description=\{tab\.description\}/);
+  assert.match(staffHub, /role="tab"/);
+  assert.match(staffHub, /aria-label=\{`\$\{tab\.label\}\. \$\{tab\.description\}`\}/);
+  assert.doesNotMatch(staffHub, /querySelector/);
+  assert.doesNotMatch(staffHub, /MutationObserver/);
+  assert.doesNotMatch(staffHub, /innerHTML/);
 });

@@ -6,10 +6,42 @@ function requireSupabase() {
   return supabase;
 }
 
+function isPermissionError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('permission denied for function') || message.includes('jwt') || message.includes('not authorized');
+}
+
+async function rpcWithSessionRecovery(client, name, args) {
+  let result = await client.rpc(name, args);
+  if (!result.error || !isPermissionError(result.error)) return result;
+
+  // Staff commonly keep RTB OS open for long shifts. If their token was stale
+  // when permissions changed, refresh once and retry instead of showing a raw
+  // database permission error in the Hub.
+  const { error: refreshError } = await client.auth.refreshSession();
+  if (refreshError) return result;
+  result = await client.rpc(name, args);
+  return result;
+}
+
+function friendlyOperationError(error) {
+  const message = String(error?.message || error || '');
+  if (/permission denied for function/i.test(message)) {
+    return new Error('Your RTB access changed while this page was open. Refresh the Staff Hub and try again.');
+  }
+  if (/No staff profile is linked/i.test(message)) {
+    return new Error('Your login is not linked to your staff profile yet. Ask management to link the account in Access.');
+  }
+  if (/do not have access to this business/i.test(message)) {
+    return new Error('This business is not included in your current RTB access. Ask management to update your role or business access.');
+  }
+  return error instanceof Error ? error : new Error(message || 'This action could not be completed.');
+}
+
 async function call(name, args) {
   const client = requireSupabase();
-  const { data, error } = await client.rpc(name, args);
-  if (error) throw error;
+  const { data, error } = await rpcWithSessionRecovery(client, name, args);
+  if (error) throw friendlyOperationError(error);
   if (data === null || data === undefined) {
     throw new Error(`${name} did not return a saved result.`);
   }
@@ -18,8 +50,8 @@ async function call(name, args) {
 
 async function optionalCall(name, args = {}) {
   const client = requireSupabase();
-  const { data, error } = await client.rpc(name, args);
-  if (error) throw error;
+  const { data, error } = await rpcWithSessionRecovery(client, name, args);
+  if (error) throw friendlyOperationError(error);
   return data;
 }
 

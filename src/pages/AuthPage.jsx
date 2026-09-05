@@ -61,14 +61,14 @@ export default function AuthPage({
           </div>
           <div>
             <span>RTB OS</span>
-            <h1>Business command center</h1>
+            <h1>Shop Console</h1>
           </div>
         </div>
 
         <div className="auth-card">
           <div className="auth-card__header">
             <h2>Sign in</h2>
-            <p>RTB Lounge and RTB Beauty Lounge operations.</p>
+            <p>RTB Lounge and RTB Beauty Lounge daily operations.</p>
           </div>
 
           {!isConfigured ? (

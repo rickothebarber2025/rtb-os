@@ -70,6 +70,30 @@
     top: max(0px, env(safe-area-inset-top));
   }
 
+  .staff-hub-page {
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+  }
+
+  .staff-hub-page .panel,
+  .staff-hub-page .subpanel,
+  .staff-hub-page .hero-panel {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .staff-hub-page .section-header {
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .staff-hub-page .section-header > div:first-child {
+    min-width: 0;
+  }
+
+  .staff-hub-page .action-row {
+    max-width: 100%;
+  }
+
   .dashboard-mobile-tabs__item:focus-visible,
   .staff-hub-sticky-tabs button:focus-visible {
     outline: 2px solid currentColor;
@@ -80,5 +104,15 @@
 @media (max-width: 520px) {
   .dashboard-appointment-metrics {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .staff-hub-page .section-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .staff-hub-page .section-header .action-row {
+    justify-content: flex-start;
+    width: 100%;
   }
 }
