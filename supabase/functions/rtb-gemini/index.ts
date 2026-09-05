@@ -83,6 +83,47 @@ function cachedPayload(row: any) {
   };
 }
 
+function summarizeUsability(rows: any[]) {
+  const eventCounts: Record<string, number> = {};
+  const pageCounts: Record<string, number> = {};
+  const frictionByPage: Record<string, number> = {};
+  const durations: Record<string, number[]> = {};
+
+  for (const row of rows) {
+    const event = clean(row.event_name) || "unknown";
+    const page = clean(row.page) || "unknown";
+    eventCounts[event] = (eventCounts[event] || 0) + 1;
+    pageCounts[page] = (pageCounts[page] || 0) + 1;
+    if (event !== "navigation") frictionByPage[page] = (frictionByPage[page] || 0) + 1;
+    if (event === "navigation" && Number.isFinite(Number(row.duration_ms))) {
+      (durations[page] ||= []).push(Number(row.duration_ms));
+    }
+  }
+
+  const top = (values: Record<string, number>, limit = 8) =>
+    Object.entries(values)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([name, count]) => ({ name, count }));
+
+  const medianDurations = Object.fromEntries(
+    Object.entries(durations).map(([page, values]) => {
+      const sorted = [...values].sort((a, b) => a - b);
+      return [page, sorted[Math.floor(sorted.length / 2)] || 0];
+    }),
+  );
+
+  return {
+    anonymous_sessions: new Set(rows.map((row) => row.session_id)).size,
+    event_counts: eventCounts,
+    most_visited_pages: top(pageCounts),
+    friction_pages: top(frictionByPage),
+    median_page_duration_ms: medianDurations,
+    sample_size: rows.length,
+    privacy_scope: "No user ID, typed content, customer data, payroll values, photos, or messages.",
+  };
+}
+
 async function gatherLeanContext(
   admin: ReturnType<typeof createClient>,
   businessId: string,
@@ -90,10 +131,12 @@ async function gatherLeanContext(
     audience: "admin" | "staff_hub";
     currentStaffId?: string | null;
     includeFinancial: boolean;
+    includeUsability: boolean;
   },
 ) {
   const today = torontoDate();
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString();
   const adminAudience = options.audience === "admin";
   const ownStaffId = options.currentStaffId || null;
 
@@ -114,7 +157,7 @@ async function gatherLeanContext(
   const roster = staff as any[];
   const allowedStaffIds = adminAudience ? roster.map((row) => row.id) : ownStaffId ? [ownStaffId] : [];
 
-  const [checklists, tasks, requests, attendance, performance, payroll] = await Promise.all([
+  const [checklists, tasks, requests, attendance, performance, payroll, usability] = await Promise.all([
     safe(
       admin
         .from("operation_checklist_runs")
@@ -176,6 +219,18 @@ async function gatherLeanContext(
           [],
         )
       : Promise.resolve([]),
+    options.includeUsability
+      ? safe(
+          admin
+            .from("app_interaction_events")
+            .select("session_id,event_name,page,tab,target,duration_ms,created_at")
+            .eq("business_unit_id", businessId)
+            .gte("created_at", monthAgo)
+            .order("created_at", { ascending: false })
+            .limit(1000),
+          [],
+        )
+      : Promise.resolve([]),
   ]);
 
   const filterMine = (rows: any[]) =>
@@ -190,6 +245,7 @@ async function gatherLeanContext(
     attendance_last_7_days: filterMine(attendance as any[]),
     performance_snapshot: adminAudience ? performance : [],
     payroll_recent: options.includeFinancial ? filterMine(payroll as any[]) : [],
+    app_usability_last_30_days: options.includeUsability ? summarizeUsability(usability as any[]) : undefined,
     generated_at: new Date().toISOString(),
     timezone: "America/Toronto",
     audience: options.audience,
@@ -314,6 +370,7 @@ Deno.serve(async (req) => {
       audience,
       currentStaffId: currentStaff?.id || null,
       includeFinancial,
+      includeUsability: owner,
     });
     const model = Deno.env.get("GEMINI_MODEL") || "gemini-flash-latest";
 
@@ -323,6 +380,8 @@ Deno.serve(async (req) => {
           "Use only supplied RTB OS data. Never invent facts.",
           "Answer the user's immediate question directly and briefly.",
           "Prefer one to three useful priorities over a broad business analysis.",
+          "When anonymous app usability signals are supplied, identify navigation friction and recommend the smallest testable interface improvement.",
+          "Treat usability patterns as directional evidence, never as individual staff performance.",
           "Do not run actions or alter payroll, permissions, compensation, or staff records.",
           "Return JSON only.",
         ].join(" ")
