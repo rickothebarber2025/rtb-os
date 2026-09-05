@@ -66,6 +66,7 @@ import {
   buildIncomeOpportunity,
   buildMonthlyGoalProgress,
   buildRtbScore,
+  buildStaffHubRewards,
   buildTodayMoneyStats,
   getDefaultMonthlyGoal,
 } from '../utils/staffHubInsights';
@@ -90,6 +91,25 @@ const TAB_PARENT = {
   tips: 'money',
   updates: 'home',
 };
+
+const REWARD_ICON_MAP = {
+  leaderboard: Award,
+  'monthly-closer': Target,
+  'record-sales': Trophy,
+  'review-magnet': Star,
+  'role-appointments': CalendarDays,
+  'role-barber': TrendingUp,
+  'role-cleaning': ClipboardCheck,
+  'role-content': Camera,
+  'role-leadership': ShieldCheck,
+  'role-operations': ClipboardCheck,
+  'role-payroll': FileText,
+  'sales-floor': CircleDollarSign,
+};
+
+function getRewardIcon(rewardId) {
+  return REWARD_ICON_MAP[rewardId] || Trophy;
+}
 
 const EMPTY_STAFF_HUB = {
   announcementReads: [],
@@ -515,6 +535,8 @@ export default function StaffHubPage({
     [accessProfile, staff, summaryStaffProfile, user],
   );
   const accessPayload = getEffectivePermissionsPayload(accessProfile);
+  const roleTitle = staffProfile?.role || accessProfile?.role_title || accessPayload.role_title || 'Staff';
+  const roleTemplate = accessPayload.role_template || 'staff_portal';
   const ownerView = isOwnerProfile(accessProfile);
   const staffOnlyPortal =
     !ownerView && accessPayload.role_template === 'staff_portal';
@@ -897,38 +919,36 @@ export default function StaffHubPage({
 
     return items.slice(0, 4);
   }, [incomeOpportunity, latestEntry, nextTask, reviewGoal.remaining, scheduleRows.length]);
-  const achievementCards = useMemo(
-    () => [
-      {
-        detail: fiveStarReviews >= 5 ? 'Unlocked' : `${Math.max(0, 5 - fiveStarReviews)} more five-star reviews`,
-        icon: Star,
-        title: '5-star streak',
-        unlocked: fiveStarReviews >= 5,
-        value: `${formatNumber(fiveStarReviews)}/5`,
-      },
-      {
-        detail: latestEntry && Number(latestEntry.net_sales || 0) >= 1000 ? 'Strong sales week' : 'Hit $1k in a saved week',
-        icon: Trophy,
-        title: 'High performer',
-        unlocked: latestEntry && Number(latestEntry.net_sales || 0) >= 1000,
-        value: latestEntry ? formatCurrency(latestEntry.net_sales) : '$0',
-      },
-      {
-        detail: monthlyGoal.percentComplete >= 100 ? 'Monthly goal met' : `${monthlyGoal.percentComplete}% of monthly goal`,
-        icon: Target,
-        title: 'Goal closer',
-        unlocked: monthlyGoal.percentComplete >= 100,
-        value: `${monthlyGoal.percentComplete}%`,
-      },
-      {
-        detail: rank && rank <= 3 ? 'Top 3 in selected view' : 'Aim for top 3',
-        icon: Award,
-        title: 'Leaderboard',
-        unlocked: Boolean(rank && rank <= 3),
-        value: rank ? `#${rank}` : 'N/A',
-      },
+  const staffHubRewards = useMemo(
+    () =>
+      buildStaffHubRewards({
+        accessPayload,
+        contentSubmissions: hubRecords.contentSubmissions,
+        dailyOperations,
+        entries: ownEntries,
+        monthlyGoal,
+        ownActivityReviewSummary,
+        ownPerformance,
+        rank,
+        roleTemplate,
+        rtbScore,
+        scheduleRows,
+        tasks: hubRecords.tasks,
+      }),
+    [
+      accessPayload,
+      dailyOperations,
+      hubRecords.contentSubmissions,
+      hubRecords.tasks,
+      monthlyGoal,
+      ownActivityReviewSummary,
+      ownEntries,
+      ownPerformance,
+      rank,
+      roleTemplate,
+      rtbScore,
+      scheduleRows,
     ],
-    [fiveStarReviews, latestEntry, monthlyGoal.percentComplete, rank],
   );
   const activityFeed = useMemo(() => {
     const items = [];
@@ -1123,8 +1143,6 @@ export default function StaffHubPage({
   );
   const canOpen = (pageId) => allowedPageIds.has(pageId);
   const profileName = staffProfile?.full_name || accessProfile?.full_name || user?.email || 'My Staff Account';
-  const roleTitle = staffProfile?.role || accessProfile?.role_title || accessPayload.role_title || 'Staff';
-  const roleTemplate = accessPayload.role_template || 'staff_portal';
   const portalMode = staffProfile
     ? roleTemplate === 'staff_portal' ? 'My staff portal' : `${roleTitle} workspace`
     : ownerView ? 'Staff portal preview' : 'Staff access setup needed';
@@ -1678,6 +1696,22 @@ export default function StaffHubPage({
             );
           })}
         </div>
+
+        {staffHubRewards.headline ? (
+          <button
+            className={`staff-hub-reward-spotlight status-${staffHubRewards.headline.status}`}
+            onClick={() => setActiveTab(staffHubRewards.headline.tab)}
+            type="button"
+          >
+            <span>
+              <small>{staffHubRewards.roleTrack.label}</small>
+              <strong>{staffHubRewards.headline.title}</strong>
+              <em>{staffHubRewards.headline.detail}</em>
+            </span>
+            <b>{staffHubRewards.headline.valueLabel}</b>
+            <ChevronRight size={18} />
+          </button>
+        ) : null}
 
         <div className="staff-hub-pro-section-heading">
           <strong>Popular with your clients</strong>
@@ -2297,27 +2331,44 @@ export default function StaffHubPage({
               </button>
             </article>
 
-            <article className="staff-hub-app-card staff-hub-app-card--wide">
+            <article className="staff-hub-app-card staff-hub-app-card--wide staff-hub-rewards-panel">
               <div className="staff-hub-card-header">
                 <div>
-                  <span>Achievements</span>
-                  <h2>Progress badges</h2>
+                  <span>{staffHubRewards.roleTrack.label}</span>
+                  <h2>Reward Board</h2>
                 </div>
                 <Trophy size={22} />
               </div>
-              <div className="staff-hub-achievement-grid">
-                {achievementCards.map((achievement) => {
-                  const Icon = achievement.icon;
+              <div className="staff-hub-reward-summary">
+                <span>{formatNumber(staffHubRewards.earned.length)} earned</span>
+                <span>{formatNumber(staffHubRewards.inProgress.length)} in progress</span>
+                <span>{formatNumber(staffHubRewards.locked.length)} locked</span>
+              </div>
+              <div className="staff-hub-reward-grid">
+                {staffHubRewards.rewards.map((reward) => {
+                  const Icon = getRewardIcon(reward.id);
                   return (
-                    <div
-                      className={achievement.unlocked ? 'staff-hub-achievement unlocked' : 'staff-hub-achievement'}
-                      key={achievement.title}
+                    <button
+                      className={`staff-hub-reward-card status-${reward.status} tone-${reward.tone}`}
+                      key={reward.id}
+                      onClick={() => setActiveTab(reward.tab)}
+                      type="button"
                     >
-                      <Icon size={20} />
-                      <strong>{achievement.title}</strong>
-                      <span>{achievement.value}</span>
-                      <small>{achievement.detail}</small>
-                    </div>
+                      <span className="staff-hub-reward-card__top">
+                        <Icon size={18} />
+                        <em>{reward.status === 'earned' ? 'Earned' : reward.status === 'in_progress' ? 'In progress' : 'Locked'}</em>
+                      </span>
+                      <strong>{reward.title}</strong>
+                      <span>{reward.valueLabel}</span>
+                      <small>{reward.detail}</small>
+                      <div className="staff-hub-progress-track" aria-label={`${reward.title} progress ${reward.progress}%`}>
+                        <i style={{ width: `${reward.progress}%` }} />
+                      </div>
+                      <b>
+                        {reward.targetLabel}
+                        <ChevronRight size={14} />
+                      </b>
+                    </button>
                   );
                 })}
               </div>

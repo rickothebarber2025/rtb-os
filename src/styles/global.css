@@ -11499,6 +11499,147 @@ tbody tr:hover,
   font-weight: 950;
 }
 
+.staff-hub-rewards-panel {
+  gap: 0.85rem;
+}
+
+.staff-hub-reward-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.staff-hub-reward-summary span {
+  background: rgba(214, 173, 82, 0.1);
+  border: 1px solid rgba(214, 173, 82, 0.18);
+  border-radius: 999px;
+  color: var(--rtb-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  padding: 0.28rem 0.52rem;
+}
+
+.staff-hub-reward-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.staff-hub-reward-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(214, 173, 82, 0.11);
+  border-radius: 14px;
+  color: inherit;
+  display: grid;
+  gap: 0.36rem;
+  min-height: 12rem;
+  min-width: 0;
+  padding: 0.78rem;
+  text-align: left;
+  transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.staff-hub-reward-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(214, 173, 82, 0.3);
+  transform: translateY(-1px);
+}
+
+.staff-hub-reward-card.status-earned {
+  background:
+    linear-gradient(180deg, rgba(22, 163, 74, 0.14), rgba(255, 255, 255, 0.035));
+  border-color: rgba(22, 163, 74, 0.28);
+}
+
+.staff-hub-reward-card.status-in_progress {
+  border-color: rgba(214, 173, 82, 0.28);
+}
+
+.staff-hub-reward-card.status-locked {
+  opacity: 0.72;
+}
+
+.staff-hub-reward-card__top {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.staff-hub-reward-card__top svg {
+  color: var(--rtb-gold-strong);
+  flex: 0 0 auto;
+}
+
+.staff-hub-reward-card.status-earned .staff-hub-reward-card__top svg {
+  color: var(--staff-green);
+}
+
+.staff-hub-reward-card__top em {
+  background: rgba(255, 255, 255, 0.065);
+  border-radius: 999px;
+  color: var(--rtb-muted);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 900;
+  padding: 0.18rem 0.42rem;
+}
+
+.staff-hub-reward-card strong,
+.staff-hub-reward-card span,
+.staff-hub-reward-card b {
+  color: var(--rtb-text);
+}
+
+.staff-hub-reward-card strong {
+  font-size: 0.98rem;
+  line-height: 1.12;
+}
+
+.staff-hub-reward-card > span:not(.staff-hub-reward-card__top) {
+  font-size: 1.08rem;
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+.staff-hub-reward-card small {
+  color: var(--rtb-muted);
+  display: -webkit-box;
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.28;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.staff-hub-reward-card .staff-hub-progress-track {
+  height: 7px;
+  margin: 0.18rem 0 0;
+}
+
+.staff-hub-reward-card .staff-hub-progress-track i {
+  background: linear-gradient(90deg, var(--rtb-gold), var(--rtb-gold-strong));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  min-width: 4px;
+}
+
+.staff-hub-reward-card.status-earned .staff-hub-progress-track i {
+  background: linear-gradient(90deg, var(--staff-green), #86efac);
+}
+
+.staff-hub-reward-card b {
+  align-items: center;
+  display: flex;
+  font-size: 0.72rem;
+  font-weight: 900;
+  gap: 0.28rem;
+  justify-content: space-between;
+}
+
 .staff-hub-comparison-list > div {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
@@ -11569,6 +11710,10 @@ tbody tr:hover,
   .staff-hub-achievement-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .staff-hub-reward-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -11600,7 +11745,8 @@ tbody tr:hover,
   .staff-hub-daily-strip,
   .staff-hub-dashboard-grid,
   .staff-hub-card-metrics,
-  .staff-hub-achievement-grid {
+  .staff-hub-achievement-grid,
+  .staff-hub-reward-grid {
     grid-template-columns: 1fr;
   }
 
@@ -12484,6 +12630,70 @@ tbody tr:hover,
   color: var(--pro-red);
 }
 
+.staff-hub-reward-spotlight {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid var(--pro-line);
+  border-radius: 16px;
+  color: var(--pro-black);
+  display: grid;
+  gap: 0.62rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 4.25rem;
+  padding: 0.72rem 0.82rem;
+  text-align: left;
+}
+
+.staff-hub-reward-spotlight:hover {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(177, 126, 28, 0.26);
+}
+
+.staff-hub-reward-spotlight > span {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.staff-hub-reward-spotlight small {
+  color: var(--pro-gold-strong);
+  font-size: 0.66rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.staff-hub-reward-spotlight strong {
+  color: var(--pro-black);
+  font-size: 0.9rem;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-hub-reward-spotlight em {
+  color: var(--pro-muted);
+  display: -webkit-box;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 760;
+  line-height: 1.26;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.staff-hub-reward-spotlight b {
+  color: var(--pro-black);
+  font-size: 0.92rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.staff-hub-reward-spotlight > svg {
+  color: var(--pro-gold-strong);
+}
+
 .staff-hub-pro-section-heading {
   margin-top: 0.12rem;
 }
@@ -12672,6 +12882,14 @@ tbody tr:hover,
 
   .staff-hub-pro-metric {
     min-height: 6.1rem;
+  }
+
+  .staff-hub-reward-spotlight {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .staff-hub-reward-spotlight > svg {
+    display: none;
   }
 
   .staff-hub-pro-insight {
