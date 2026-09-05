@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import AccessibilityRuntime from './AccessibilityRuntime';
 import BehavioralMomentumBar from './BehavioralMomentumBar';
 import GeminiOpsBrief from './GeminiOpsBrief';
+import InteractionTelemetry from './InteractionTelemetry';
 import MobileTabBar from './MobileTabBar';
 import PageErrorBoundary from './PageErrorBoundary';
 import PushNotificationsManager from './PushNotificationsManager';
@@ -51,6 +52,12 @@ export default function AppShell({
   return (
     <div className={`app-shell ${preferredTheme} ${densityClass} ${navigationClass} ${motionClass} ${sidebarClass}`}>
       <AccessibilityRuntime pageTitle={pageTitle} />
+      <InteractionTelemetry
+        activePage={activePage}
+        businessUnitId={selectedBusinessUnitId}
+        enabled={Boolean(profile?.active && user?.id)}
+        staffHubTab={staffHubTab}
+      />
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <PushNotificationsManager
         enabled={Boolean(profile?.active && user?.id)}
