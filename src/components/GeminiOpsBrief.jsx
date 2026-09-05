@@ -8,6 +8,7 @@ const QUICK_PROMPTS = [
   'Who has unfinished responsibilities today?',
   'Summarize opening and closing activity.',
   'What should I follow up on before tomorrow?',
+  'Where are users getting stuck in RTB OS?',
 ];
 
 export default function GeminiOpsBrief({ activePage, businessUnitId }) {

@@ -50,6 +50,7 @@ export default function Sidebar({
                   className={`nav-item ${active ? 'active' : ''}`}
                   key={item.id}
                   type="button"
+                  data-nav-target={item.id}
                   onClick={() => {
                     setActivePage(item.id);
                     onClose();
