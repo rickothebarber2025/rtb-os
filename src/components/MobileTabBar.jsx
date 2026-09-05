@@ -16,7 +16,6 @@ const SHORT_LABELS = {
 const STAFF_HUB_QUICK_TABS = [
   { icon: Home, id: 'home', label: 'Home' },
   { icon: ClipboardCheck, id: 'daily', label: 'Work' },
-  { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
   { icon: CircleDollarSign, id: 'money', label: 'Money' },
 ];
 
