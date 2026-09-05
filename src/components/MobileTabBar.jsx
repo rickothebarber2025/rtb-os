@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { CalendarDays, CircleDollarSign, ClipboardCheck, Home, Menu } from 'lucide-react';
+import { CircleDollarSign, ClipboardCheck, Home, Menu } from 'lucide-react';
 import { getEffectivePermissionsPayload } from '../lib/permissions.js';
 
 const QUICK_NAV_IDS = ['dashboard', 'action-center', 'payroll', 'staff', 'performance', 'staff-hub'];
