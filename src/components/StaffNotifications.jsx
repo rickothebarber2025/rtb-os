@@ -21,7 +21,7 @@ function notificationDestination(notification) {
     return { page: 'staff-hub', tab: 'daily' };
   }
   if (/announcement|policy|update/.test(type)) return { page: 'staff-hub', tab: 'home' };
-  if (/performance|coaching|goal/.test(type)) return { page: 'staff-hub', tab: 'performance' };
+  if (/performance|coaching|goal/.test(type)) return { page: 'staff-hub', tab: 'stats' };
   return { page: 'staff-hub', tab: 'daily' };
 }
 

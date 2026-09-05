@@ -17,7 +17,7 @@ function normalizePushDestination(detail = {}) {
     return { page: 'staff-hub', tab: 'home' };
   }
   if (route === 'performance' || route === 'coaching') {
-    return { page: 'staff-hub', tab: 'performance' };
+    return { page: 'staff-hub', tab: 'stats' };
   }
   return { page: route || 'staff-hub', tab };
 }

@@ -104,6 +104,23 @@ const TAB_PARENT = {
   updates: 'home',
 };
 
+const STAFF_HUB_TAB_ALIASES = {
+  growth: 'stats',
+  performance: 'stats',
+  team: 'more',
+};
+
+const VALID_STAFF_HUB_TABS = new Set([
+  ...TABS.map((tab) => tab.id),
+  ...Object.keys(TAB_PARENT),
+]);
+
+function normalizeStaffHubTab(tab) {
+  const requested = String(tab || '').trim().toLowerCase();
+  const normalized = STAFF_HUB_TAB_ALIASES[requested] || requested;
+  return VALID_STAFF_HUB_TABS.has(normalized) ? normalized : 'home';
+}
+
 const EMPTY_STAFF_HUB = {
   announcementReads: [],
   announcements: [],
@@ -464,8 +481,9 @@ export default function StaffHubPage({
   // top-level pages). Falls back to local state if this page is ever
   // rendered without the lifted props (e.g. in isolation/tests).
   const [localActiveTab, setLocalActiveTab] = useState('daily');
-  const activeTab = staffHubTab ?? localActiveTab;
-  const setActiveTab = setStaffHubTab ?? setLocalActiveTab;
+  const activeTab = normalizeStaffHubTab(staffHubTab ?? localActiveTab);
+  const updateActiveTab = setStaffHubTab ?? setLocalActiveTab;
+  const setActiveTab = (tab) => updateActiveTab(normalizeStaffHubTab(tab));
   const [dailyOpsView, setDailyOpsView] = useState('checklist');
   const [hubMessage, setHubMessage] = useState('');
   const [hubError, setHubError] = useState('');
@@ -487,9 +505,7 @@ export default function StaffHubPage({
   // tab instead of the default Daily Ops -- otherwise the approve/decline
   // buttons are two tabs away with no indication of where to look.
   useEffect(() => {
-    if (pageTarget && (TABS.some((tab) => tab.id === pageTarget) || TAB_PARENT[pageTarget])) {
-      setActiveTab(pageTarget);
-    }
+    if (pageTarget) setActiveTab(pageTarget);
   }, [pageTarget]);
   const [announcementForm, setAnnouncementForm] = useState({
     body: '',
