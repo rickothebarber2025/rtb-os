@@ -136,7 +136,6 @@ async function gatherLeanContext(
 ) {
   const today = torontoDate();
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-  const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString();
   const adminAudience = options.audience === "admin";
   const ownStaffId = options.currentStaffId || null;
 
@@ -225,7 +224,7 @@ async function gatherLeanContext(
             .from("app_interaction_events")
             .select("session_id,event_name,page,tab,target,duration_ms,created_at")
             .eq("business_unit_id", businessId)
-            .gte("created_at", monthAgo)
+            .gte("created_at", weekAgo)
             .order("created_at", { ascending: false })
             .limit(1000),
           [],
@@ -245,7 +244,7 @@ async function gatherLeanContext(
     attendance_last_7_days: filterMine(attendance as any[]),
     performance_snapshot: adminAudience ? performance : [],
     payroll_recent: options.includeFinancial ? filterMine(payroll as any[]) : [],
-    app_usability_last_30_days: options.includeUsability ? summarizeUsability(usability as any[]) : undefined,
+    app_usability_last_7_days: options.includeUsability ? summarizeUsability(usability as any[]) : undefined,
     generated_at: new Date().toISOString(),
     timezone: "America/Toronto",
     audience: options.audience,
