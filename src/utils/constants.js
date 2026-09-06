@@ -31,6 +31,7 @@ export const NAV_ITEMS = [
   { group: 'Intelligence', id: 'finance', label: 'Financial Buddy', icon: WalletCards },
   { group: 'Intelligence', id: 'customer-intelligence', label: 'Customer IQ', icon: MessageSquareText },
   { group: 'Intelligence', id: 'ai-consultant', label: 'AI Consultant', icon: Brain },
+  { group: 'Admin', id: 'ada-control', label: 'Ada Control', icon: ShieldCheck },
   { group: 'Admin', id: 'access', label: 'Access', icon: ShieldCheck },
   { group: 'Admin', id: 'integrations', label: 'Connections', icon: Plug },
   { group: 'Admin', id: 'system', label: 'System Tools', icon: SlidersHorizontal },
