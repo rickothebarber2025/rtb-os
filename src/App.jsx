@@ -23,6 +23,7 @@ import {
 } from './utils/smartDefaults.js';
 
 const AccessPage = lazy(() => import('./pages/AccessPage'));
+const AdaControlPage = lazy(() => import('./pages/AdaControlPage'));
 const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
 const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
 const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
@@ -223,6 +224,8 @@ export default function App() {
     if (data.error) return <div className="panel full-span"><div className="alert danger">{data.error}</div><button className="secondary-button" type="button" onClick={data.refresh}>Retry</button></div>;
 
     switch (activePage) {
+      case 'ada-control':
+        return <ModuleGate module="settings"><AdaControlPage {...pageProps} /></ModuleGate>;
       case 'access':
         return <ModuleGate module="access"><AccessPage accessProfile={auth.profile} businessUnits={data.businessUnits} currentUserId={auth.user?.id} /></ModuleGate>;
       case 'action-center':

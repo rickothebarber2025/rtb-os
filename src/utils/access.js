@@ -27,6 +27,7 @@ export function canUseApp(profile) { return hasAnyModulePermission(profile, 'vie
 
 export function canAccessPage(profile, pageId) {
   if (!canUseApp(profile)) return false;
+  if (pageId === 'ada-control') return isOwnerProfile(profile);
   const payload = getEffectivePermissionsPayload(profile);
   if (pageId === 'talent-pipeline') return hasModulePermission(profile, 'operations', 'view') || hasModulePermission(profile, 'roster', 'view');
   const moduleId = PAGE_MODULE_MAP[pageId] || PAGE_MODULE_MAP.dashboard;
