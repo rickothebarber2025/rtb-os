@@ -1,14 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Bot, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles } from 'lucide-react';
+import { Bot, CheckCircle2, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles, X } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import '../styles/geminiOpsBrief.css';
 
 const QUICK_PROMPTS = [
   'What needs my attention right now?',
+  'What important staff texts still need action?',
   'What am I personally doing that should be delegated?',
   'Who has unfinished responsibilities today?',
   'What patterns should I address before they become problems?',
-  'What are the three highest-value actions for today?',
 ];
 
 export default function GeminiOpsBrief({ activePage, businessUnitId }) {
@@ -18,6 +18,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [asking, setAsking] = useState(false);
+  const [caseWorking, setCaseWorking] = useState('');
   const [error, setError] = useState('');
   const [briefLoaded, setBriefLoaded] = useState(false);
 
@@ -102,10 +103,26 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
     }
   }
 
+  async function updateCaseStatus(caseId, status) {
+    if (!caseId || caseWorking) return;
+    setCaseWorking(caseId);
+    setError('');
+    try {
+      await invokeAda({ action: 'case-status', businessId: businessUnitId, caseId, status });
+      await refreshBrief();
+    } catch (err) {
+      setError('Unable to update that communication item.');
+      console.warn('Ada communication case update failed', err);
+    } finally {
+      setCaseWorking('');
+    }
+  }
+
   if (!enabled) return null;
 
   const current = answer || brief;
   const audienceLabel = current?.audience === 'staff_hub' ? 'Staff copilot' : 'Owner copilot';
+  const communicationCases = current?.communication_cases || [];
 
   return (
     <section className={`gemini-ops-brief ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
@@ -115,7 +132,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
           <div>
             <span>Ada</span>
             <strong>{audienceLabel}</strong>
-            {!expanded ? <small>RTB-aware · evidence-first · action focused</small> : null}
+            {!expanded ? <small>RTB-aware · communications-aware · action focused</small> : null}
           </div>
         </div>
         <div className="gemini-ops-brief__controls">
@@ -139,6 +156,47 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
           ) : current ? (
             <>
               <p className="gemini-ops-brief__summary">{current.answer || current.summary}</p>
+
+              {communicationCases.length ? (
+                <div className="gemini-ops-brief__suggested-tasks">
+                  <strong>Important communications still open</strong>
+                  <ul>
+                    {communicationCases.slice(0, 6).map((item) => (
+                      <li key={item.id}>
+                        <b>{item.contact_name ? `${item.contact_name}: ` : ''}{item.title}</b>
+                        {item.summary ? <span>{item.summary}</span> : null}
+                        <small>
+                          {item.priority || 'normal'}
+                          {item.source_count > 1 ? ` · ${item.source_count} related messages` : ''}
+                          {item.approval_required ? ' · approval required' : ''}
+                          {item.due_hint ? ` · ${item.due_hint}` : ''}
+                        </small>
+                        {item.next_action ? <span><strong>Next:</strong> {item.next_action}</span> : null}
+                        <div className="action-row">
+                          <button
+                            className="ghost-button small success-action"
+                            disabled={caseWorking === item.id}
+                            onClick={() => updateCaseStatus(item.id, 'resolved')}
+                            type="button"
+                          >
+                            <CheckCircle2 size={14} />
+                            Resolved
+                          </button>
+                          <button
+                            className="ghost-button small"
+                            disabled={caseWorking === item.id}
+                            onClick={() => updateCaseStatus(item.id, 'ignored')}
+                            type="button"
+                          >
+                            <X size={14} />
+                            Ignore
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               {current.priorities?.length ? (
                 <div className="gemini-ops-brief__priorities">
@@ -187,7 +245,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
               ) : null}
             </>
           ) : (
-            <p className="gemini-ops-brief__summary">Ask Ada about the business, staff, unfinished work, patterns, or what you should do next.</p>
+            <p className="gemini-ops-brief__summary">Ask Ada about the business, staff, important messages, unfinished work, patterns, or what you should do next.</p>
           )}
 
           <div className="gemini-ops-brief__quick-prompts">
@@ -214,7 +272,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
               {asking ? 'Thinking…' : 'Ask Ada'}
             </button>
           </div>
-          <small className="gemini-ops-brief__usage-note">Ada reads permitted RTB OS data and separates evidence from recommendations.</small>
+          <small className="gemini-ops-brief__usage-note">Ada keeps important communication commitments visible until they are resolved or intentionally ignored.</small>
         </div>
       ) : null}
     </section>
