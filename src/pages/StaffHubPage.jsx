@@ -84,11 +84,9 @@ import {
 } from '../utils/onboarding';
 
 const TABS = [
-  { icon: ClipboardCheck, id: 'daily', label: 'Daily Ops' },
-  { icon: Home, id: 'home', label: 'Today' },
-  { icon: CircleDollarSign, id: 'money', label: 'Earnings' },
-  { icon: TrendingUp, id: 'stats', label: 'Performance' },
-  { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
+  { icon: Home, id: 'home', label: 'Home' },
+  { icon: ClipboardCheck, id: 'daily', label: 'Work' },
+  { icon: CircleDollarSign, id: 'money', label: 'Money' },
   { icon: MoreHorizontal, id: 'more', label: 'More' },
 ];
 
@@ -99,10 +97,29 @@ const TABS = [
 // was actually crowded. This map is only for which primary tab should
 // show as "active" while on one of these secondary pages.
 const TAB_PARENT = {
+  schedule: 'more',
   spotlight: 'home',
+  stats: 'more',
   tips: 'money',
   updates: 'home',
 };
+
+const STAFF_HUB_TAB_ALIASES = {
+  growth: 'stats',
+  performance: 'stats',
+  team: 'more',
+};
+
+const VALID_STAFF_HUB_TABS = new Set([
+  ...TABS.map((tab) => tab.id),
+  ...Object.keys(TAB_PARENT),
+]);
+
+function normalizeStaffHubTab(tab) {
+  const requested = String(tab || '').trim().toLowerCase();
+  const normalized = STAFF_HUB_TAB_ALIASES[requested] || requested;
+  return VALID_STAFF_HUB_TABS.has(normalized) ? normalized : 'home';
+}
 
 const EMPTY_STAFF_HUB = {
   announcementReads: [],
@@ -464,8 +481,9 @@ export default function StaffHubPage({
   // top-level pages). Falls back to local state if this page is ever
   // rendered without the lifted props (e.g. in isolation/tests).
   const [localActiveTab, setLocalActiveTab] = useState('daily');
-  const activeTab = staffHubTab ?? localActiveTab;
-  const setActiveTab = setStaffHubTab ?? setLocalActiveTab;
+  const activeTab = normalizeStaffHubTab(staffHubTab ?? localActiveTab);
+  const updateActiveTab = setStaffHubTab ?? setLocalActiveTab;
+  const setActiveTab = (tab) => updateActiveTab(normalizeStaffHubTab(tab));
   const [dailyOpsView, setDailyOpsView] = useState('checklist');
   const [hubMessage, setHubMessage] = useState('');
   const [hubError, setHubError] = useState('');
@@ -487,9 +505,7 @@ export default function StaffHubPage({
   // tab instead of the default Daily Ops -- otherwise the approve/decline
   // buttons are two tabs away with no indication of where to look.
   useEffect(() => {
-    if (pageTarget && (TABS.some((tab) => tab.id === pageTarget) || TAB_PARENT[pageTarget])) {
-      setActiveTab(pageTarget);
-    }
+    if (pageTarget) setActiveTab(pageTarget);
   }, [pageTarget]);
   const [announcementForm, setAnnouncementForm] = useState({
     body: '',
@@ -3842,6 +3858,22 @@ export default function StaffHubPage({
               <ClipboardCheck size={20} />
             </div>
             <div className="staff-hub-more-grid">
+              <button className="staff-hub-more-card" onClick={() => setActiveTab('schedule')} type="button">
+                <CalendarDays size={18} />
+                <span>
+                  <strong>Schedule & availability</strong>
+                  <small>Appointments, availability, and time-off history</small>
+                </span>
+                <ChevronRight size={16} />
+              </button>
+              <button className="staff-hub-more-card" onClick={() => setActiveTab('stats')} type="button">
+                <TrendingUp size={18} />
+                <span>
+                  <strong>Performance</strong>
+                  <small>Score, reviews, sales, and growth details</small>
+                </span>
+                <ChevronRight size={16} />
+              </button>
               {visibleMoreOptions.map((option) => {
                 const Icon = option.icon;
                 return (
