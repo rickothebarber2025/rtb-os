@@ -20,6 +20,8 @@ create table if not exists public.ada_communication_cases (
       'coverage_review','policy_decision','cash_review','payroll_review','maintenance_follow_up',
       'business_follow_up','none'
     )),
+  execution_mode text not null default 'owner_action'
+    check (execution_mode in ('automatic_capture','approval_required','owner_action','no_action')),
   priority text not null default 'normal'
     check (priority in ('low','normal','high','urgent')),
   status text not null default 'open'
