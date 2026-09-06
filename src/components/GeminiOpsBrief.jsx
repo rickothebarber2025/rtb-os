@@ -1,13 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Bot, CheckCircle2, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles, X } from 'lucide-react';
+import AdaTimeOffReview from './AdaTimeOffReview';
+import { invokeRtbFunction } from '../lib/invokeRtbFunction';
 import { supabase } from '../lib/supabaseClient';
 import '../styles/geminiOpsBrief.css';
 
 const QUICK_PROMPTS = [
   'What needs my attention right now?',
   'What important staff texts still need action?',
+  'What time-off requests need my decision?',
   'What am I personally doing that should be delegated?',
-  'Who has unfinished responsibilities today?',
   'What patterns should I address before they become problems?',
 ];
 
@@ -21,30 +23,17 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
   const [caseWorking, setCaseWorking] = useState('');
   const [error, setError] = useState('');
   const [briefLoaded, setBriefLoaded] = useState(false);
+  const [timeOffRefreshKey, setTimeOffRefreshKey] = useState(0);
 
   const enabled = useMemo(
     () => Boolean(businessUnitId && businessUnitId !== 'all-businesses' && ['dashboard', 'operations'].includes(activePage)),
     [activePage, businessUnitId],
   );
 
-  const invokeAda = useCallback(async (body) => {
-    if (!supabase) throw new Error('Supabase is not configured.');
-    const { data, error: functionError } = await supabase.functions.invoke('ada-agent', { body });
-    if (functionError) {
-      const response = functionError?.context;
-      if (response?.json) {
-        try {
-          const payload = await (response.clone ? response.clone() : response).json();
-          throw new Error(payload?.error || functionError.message);
-        } catch (readError) {
-          if (readError instanceof Error && readError.message !== functionError.message) throw readError;
-        }
-      }
-      throw new Error(functionError.message || 'Ada request failed.');
-    }
-    if (data?.error) throw new Error(data.error);
-    return data;
-  }, []);
+  const invokeAda = useCallback(
+    (body) => invokeRtbFunction('ada-agent', body),
+    [],
+  );
 
   const loadBrief = useCallback(async () => {
     if (!enabled || briefLoaded) return;
@@ -52,12 +41,10 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
     setError('');
     try {
       const [cachedResult, communicationsResult] = await Promise.all([
-        supabase.functions.invoke('rtb-gemini', {
-          body: { action: 'cached', businessId: businessUnitId },
-        }),
+        invokeRtbFunction('rtb-gemini', { action: 'cached', businessId: businessUnitId }).catch(() => null),
         invokeAda({ action: 'communications', businessId: businessUnitId }),
       ]);
-      const cached = cachedResult?.error ? null : cachedResult?.data;
+      const cached = cachedResult;
       const communicationCases = communicationsResult?.cases || [];
       if (cached?.summary || cached?.answer || communicationCases.length) {
         setBrief({
@@ -66,9 +53,10 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
           communication_cases: communicationCases,
         });
       }
+      setTimeOffRefreshKey((value) => value + 1);
       setBriefLoaded(true);
     } catch (err) {
-      setError('Ada is temporarily unavailable. The rest of RTB OS still works normally.');
+      setError(err?.message || 'Ada is temporarily unavailable. The rest of RTB OS still works normally.');
       console.warn('Ada brief unavailable', err);
     } finally {
       setLoading(false);
@@ -89,9 +77,10 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
       const result = await invokeAda({ action: 'summary', businessId: businessUnitId });
       setBrief(result);
       setAnswer(null);
+      setTimeOffRefreshKey((value) => value + 1);
       setBriefLoaded(true);
     } catch (err) {
-      setError('Ada is temporarily unavailable. The rest of RTB OS still works normally.');
+      setError(err?.message || 'Ada is temporarily unavailable. The rest of RTB OS still works normally.');
       console.warn('Ada brief unavailable', err);
     } finally {
       setLoading(false);
@@ -109,7 +98,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
       setQuestion('');
       setExpanded(true);
     } catch (err) {
-      setError('Ada is temporarily unavailable. Try again later; no other app features are affected.');
+      setError(err?.message || 'Ada is temporarily unavailable. Try again later; no other app features are affected.');
       console.warn('Ada question unavailable', err);
     } finally {
       setAsking(false);
@@ -124,11 +113,16 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
       await invokeAda({ action: 'case-status', businessId: businessUnitId, caseId, status });
       await refreshBrief();
     } catch (err) {
-      setError('Unable to update that communication item.');
+      setError(err?.message || 'Unable to update that communication item.');
       console.warn('Ada communication case update failed', err);
     } finally {
       setCaseWorking('');
     }
+  }
+
+  function handleTimeOffDecision() {
+    setTimeOffRefreshKey((value) => value + 1);
+    refreshBrief();
   }
 
   if (!enabled) return null;
@@ -163,6 +157,13 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
       {expanded ? (
         <div className="gemini-ops-brief__body">
           {error ? <div className="gemini-ops-brief__error" role="status">{error}</div> : null}
+
+          <AdaTimeOffReview
+            active={expanded}
+            businessUnitId={businessUnitId}
+            onDecision={handleTimeOffDecision}
+            refreshKey={timeOffRefreshKey}
+          />
 
           {loading && !current ? (
             <div className="gemini-ops-brief__loading"><Bot aria-hidden="true" size={18} /> Ada is reviewing saved RTB information…</div>
@@ -285,7 +286,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
               {asking ? 'Thinking…' : 'Ask Ada'}
             </button>
           </div>
-          <small className="gemini-ops-brief__usage-note">RTB AI does not run in the background. Ada loads saved intelligence and communication cases when opened, and uses AI only when you ask or refresh.</small>
+          <small className="gemini-ops-brief__usage-note">RTB AI does not run in the background. Ada uses your existing RTB OS session; there is no separate Ada login. It loads saved intelligence and decision queues when opened, and uses AI only when you ask or refresh.</small>
         </div>
       ) : null}
     </section>
