@@ -65,7 +65,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
         <div className="mobile-app-nav__handle">
           <span>{STAFF_HUB_QUICK_TABS.find((tab) => tab.id === staffHubTab)?.label || (staffHubTab === 'stats' ? 'Growth' : 'Team')}</span>
         </div>
-        <nav className="mobile-tabbar" aria-label="Staff Hub navigation">
+        <nav className="mobile-tabbar mobile-tabbar--hub" aria-label="Staff Hub navigation">
           {STAFF_HUB_QUICK_TABS.map((tab) => {
             const Icon = tab.icon;
             const active = staffHubTab === tab.id;
@@ -113,7 +113,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
   return (
     <div className="mobile-app-nav">
       <div className="mobile-app-nav__handle"><span>{activeItem?.label || 'RTB OS'}</span></div>
-      <nav className="mobile-tabbar" aria-label="Quick navigation">
+      <nav className="mobile-tabbar mobile-tabbar--main" aria-label="Quick navigation">
         {quickItems.map((item) => {
           const Icon = item.icon;
           const active = activePage === item.id;
