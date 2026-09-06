@@ -9,7 +9,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>"$HOME/Documents/rtb-os/integrations/ada-sync/run.sh"</string>
+    <string>/bin/zsh "$HOME/Documents/rtb-os/integrations/ada-sync/run.sh"</string>
   </array>
 
   <key>RunAtLoad</key>
