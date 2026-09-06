@@ -5,10 +5,10 @@ import '../styles/geminiOpsBrief.css';
 
 const QUICK_PROMPTS = [
   'What needs my attention right now?',
+  'What am I personally doing that should be delegated?',
   'Who has unfinished responsibilities today?',
-  'Summarize opening and closing activity.',
-  'What should I follow up on before tomorrow?',
-  'Where are users getting stuck in RTB OS?',
+  'What patterns should I address before they become problems?',
+  'What are the three highest-value actions for today?',
 ];
 
 export default function GeminiOpsBrief({ activePage, businessUnitId }) {
@@ -19,16 +19,16 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
   const [loading, setLoading] = useState(false);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState('');
-  const [cachedChecked, setCachedChecked] = useState(false);
+  const [briefLoaded, setBriefLoaded] = useState(false);
 
   const enabled = useMemo(
     () => Boolean(businessUnitId && businessUnitId !== 'all-businesses' && ['dashboard', 'operations'].includes(activePage)),
     [activePage, businessUnitId],
   );
 
-  const invokeGemini = useCallback(async (body) => {
+  const invokeAda = useCallback(async (body) => {
     if (!supabase) throw new Error('Supabase is not configured.');
-    const { data, error: functionError } = await supabase.functions.invoke('rtb-gemini', { body });
+    const { data, error: functionError } = await supabase.functions.invoke('ada-agent', { body });
     if (functionError) {
       const response = functionError?.context;
       if (response?.json) {
@@ -39,32 +39,32 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
           if (readError instanceof Error && readError.message !== functionError.message) throw readError;
         }
       }
-      throw new Error(functionError.message || 'RTB AI request failed.');
+      throw new Error(functionError.message || 'Ada request failed.');
     }
     if (data?.error) throw new Error(data.error);
     return data;
   }, []);
 
-  const loadCachedBrief = useCallback(async () => {
-    if (!enabled || cachedChecked) return;
+  const loadBrief = useCallback(async () => {
+    if (!enabled || briefLoaded) return;
     setLoading(true);
     setError('');
     try {
-      const result = await invokeGemini({ action: 'cached', businessId: businessUnitId });
-      if (result?.summary || result?.answer) setBrief(result);
-      setCachedChecked(true);
-    } catch (_err) {
-      // Cached help is optional. Never turn a passive AI widget into a page error.
-      setCachedChecked(true);
+      const result = await invokeAda({ action: 'summary', businessId: businessUnitId });
+      setBrief(result);
+      setBriefLoaded(true);
+    } catch (err) {
+      setError('Ada is temporarily unavailable. The rest of RTB OS still works normally.');
+      console.warn('Ada brief unavailable', err);
     } finally {
       setLoading(false);
     }
-  }, [businessUnitId, cachedChecked, enabled, invokeGemini]);
+  }, [briefLoaded, businessUnitId, enabled, invokeAda]);
 
   async function toggleExpanded() {
     const next = !expanded;
     setExpanded(next);
-    if (next && !cachedChecked) await loadCachedBrief();
+    if (next && !briefLoaded) await loadBrief();
   }
 
   async function refreshBrief() {
@@ -72,13 +72,13 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
     setLoading(true);
     setError('');
     try {
-      const result = await invokeGemini({ action: 'summary', businessId: businessUnitId });
+      const result = await invokeAda({ action: 'summary', businessId: businessUnitId });
       setBrief(result);
       setAnswer(null);
-      setCachedChecked(true);
+      setBriefLoaded(true);
     } catch (err) {
-      setError('AI is temporarily unavailable. The rest of RTB OS still works normally.');
-      console.warn('RTB AI brief unavailable', err);
+      setError('Ada is temporarily unavailable. The rest of RTB OS still works normally.');
+      console.warn('Ada brief unavailable', err);
     } finally {
       setLoading(false);
     }
@@ -90,13 +90,13 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
     setAsking(true);
     setError('');
     try {
-      const result = await invokeGemini({ action: 'ask', businessId: businessUnitId, question: text });
+      const result = await invokeAda({ action: 'ask', businessId: businessUnitId, question: text });
       setAnswer(result);
       setQuestion('');
       setExpanded(true);
     } catch (err) {
-      setError('AI is temporarily unavailable. Try again later; no other app features are affected.');
-      console.warn('RTB AI question unavailable', err);
+      setError('Ada is temporarily unavailable. Try again later; no other app features are affected.');
+      console.warn('Ada question unavailable', err);
     } finally {
       setAsking(false);
     }
@@ -105,7 +105,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
   if (!enabled) return null;
 
   const current = answer || brief;
-  const audienceLabel = current?.audience === 'staff_hub' ? 'AI helper' : 'Owner AI helper';
+  const audienceLabel = current?.audience === 'staff_hub' ? 'Staff copilot' : 'Owner copilot';
 
   return (
     <section className={`gemini-ops-brief ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
@@ -113,18 +113,18 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
         <div className="gemini-ops-brief__identity">
           <span className="gemini-ops-brief__icon" aria-hidden="true"><Sparkles size={17} /></span>
           <div>
-            <span>RTB AI</span>
+            <span>Ada</span>
             <strong>{audienceLabel}</strong>
-            {!expanded ? <small>On demand · uses AI only when you ask</small> : null}
+            {!expanded ? <small>RTB-aware · evidence-first · action focused</small> : null}
           </div>
         </div>
         <div className="gemini-ops-brief__controls">
           {expanded ? (
-            <button aria-label="Get a fresh AI brief" disabled={loading} onClick={refreshBrief} type="button">
+            <button aria-label="Get a fresh Ada brief" disabled={loading} onClick={refreshBrief} type="button">
               <RefreshCw aria-hidden="true" className={loading ? 'spin' : ''} size={16} />
             </button>
           ) : null}
-          <button aria-label={expanded ? 'Collapse AI helper' : 'Open AI helper'} onClick={toggleExpanded} type="button">
+          <button aria-label={expanded ? 'Collapse Ada' : 'Open Ada'} onClick={toggleExpanded} type="button">
             {expanded ? <ChevronUp aria-hidden="true" size={17} /> : <ChevronDown aria-hidden="true" size={17} />}
           </button>
         </div>
@@ -135,24 +135,59 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
           {error ? <div className="gemini-ops-brief__error" role="status">{error}</div> : null}
 
           {loading && !current ? (
-            <div className="gemini-ops-brief__loading"><Bot aria-hidden="true" size={18} /> Checking saved AI help…</div>
+            <div className="gemini-ops-brief__loading"><Bot aria-hidden="true" size={18} /> Ada is reviewing RTB OS…</div>
           ) : current ? (
             <>
               <p className="gemini-ops-brief__summary">{current.answer || current.summary}</p>
+
               {current.priorities?.length ? (
                 <div className="gemini-ops-brief__priorities">
-                  {current.priorities.slice(0, 3).map((item) => <span key={item}>{item}</span>)}
+                  {current.priorities.slice(0, 4).map((item) => <span key={item}>{item}</span>)}
                 </div>
               ) : null}
+
+              {current.suggested_tasks?.length ? (
+                <div className="gemini-ops-brief__suggested-tasks">
+                  <strong>Suggested actions</strong>
+                  <ul>
+                    {current.suggested_tasks.slice(0, 4).map((task, index) => (
+                      <li key={`${task.title}-${index}`}>
+                        <b>{task.title}</b>
+                        <span>{task.details}</span>
+                        <small>
+                          {task.suggested_staff_name ? `Owner: ${task.suggested_staff_name}` : 'Owner: unassigned'}
+                          {task.priority ? ` · ${task.priority}` : ''}
+                          {task.due_hint ? ` · ${task.due_hint}` : ''}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {current.risks?.length ? (
+                <details className="gemini-ops-brief__evidence">
+                  <summary>Risks Ada sees</summary>
+                  <ul>{current.risks.slice(0, 3).map((item) => <li key={item}>{item}</li>)}</ul>
+                </details>
+              ) : null}
+
+              {current.opportunities?.length ? (
+                <details className="gemini-ops-brief__evidence">
+                  <summary>Opportunities</summary>
+                  <ul>{current.opportunities.slice(0, 3).map((item) => <li key={item}>{item}</li>)}</ul>
+                </details>
+              ) : null}
+
               {current.evidence?.length ? (
                 <details className="gemini-ops-brief__evidence">
-                  <summary>Why AI is saying this</summary>
-                  <ul>{current.evidence.slice(0, 3).map((item) => <li key={item}>{item}</li>)}</ul>
+                  <summary>Why Ada is saying this</summary>
+                  <ul>{current.evidence.slice(0, 5).map((item) => <li key={item}>{item}</li>)}</ul>
                 </details>
               ) : null}
             </>
           ) : (
-            <p className="gemini-ops-brief__summary">Ask a quick question when you need help. RTB AI does not run in the background.</p>
+            <p className="gemini-ops-brief__summary">Ask Ada about the business, staff, unfinished work, patterns, or what you should do next.</p>
           )}
 
           <div className="gemini-ops-brief__quick-prompts">
@@ -163,7 +198,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
 
           <div className="gemini-ops-brief__ask">
             <input
-              aria-label="Ask RTB AI"
+              aria-label="Ask Ada"
               onChange={(event) => setQuestion(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -171,15 +206,15 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
                   ask();
                 }
               }}
-              placeholder="Ask only when you need help…"
+              placeholder="Ask Ada anything about this business…"
               value={question}
             />
             <button disabled={asking || !question.trim()} onClick={() => ask()} type="button">
               <Send aria-hidden="true" size={16} />
-              {asking ? 'Thinking…' : 'Ask'}
+              {asking ? 'Thinking…' : 'Ask Ada'}
             </button>
           </div>
-          <small className="gemini-ops-brief__usage-note">AI stays idle until you ask a question or request a fresh brief.</small>
+          <small className="gemini-ops-brief__usage-note">Ada reads permitted RTB OS data and separates evidence from recommendations.</small>
         </div>
       ) : null}
     </section>
