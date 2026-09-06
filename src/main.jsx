@@ -8,6 +8,7 @@ import './styles/global.css';
 import './styles/mobileNavigation.css';
 import './styles/mobileTopbar.css';
 import './styles/operationsChecklist.css';
+import './styles/staffMessageCenter.css';
 import './styles/contractorCleaning.css';
 import './styles/smartFlow.css';
 import './styles/behavioralUX.css';

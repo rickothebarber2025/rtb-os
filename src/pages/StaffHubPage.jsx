@@ -33,6 +33,8 @@ import EmptyState from '../components/EmptyState';
 import MyHoursWidget from '../components/MyHoursWidget';
 import OpeningClosingChecklist from '../components/OpeningClosingChecklist';
 import StaffSpotlightBoard from '../components/StaffSpotlightBoard';
+import StaffMessageCenter from '../components/StaffMessageCenter';
+import OwnerRequestInbox from '../components/OwnerRequestInbox';
 import StatusBadge from '../components/StatusBadge';
 import TipsBreakdown from '../components/TipsBreakdown';
 import WeeklyGoalProgress from '../components/WeeklyGoalProgress';
@@ -1341,16 +1343,19 @@ export default function StaffHubPage({
   const visibleQuickTools = quickTools.filter((tool) => Boolean(tool.tab) || canOpen(tool.id));
   const visibleMoreOptions = moreOptions.filter((option) => canOpen(option.id));
 
-  async function runHubAction(actionKey, action, successMessage) {
+  async function runHubAction(actionKey, action, successMessage, { rethrow = false } = {}) {
     setHubError('');
     setHubMessage('');
     setSavingHubAction(actionKey);
     try {
-      await action();
+      const result = await action();
       setHubMessage(successMessage);
       await onRefresh?.();
+      return result;
     } catch (err) {
       setHubError(err.message || 'Unable to save Staff Hub update.');
+      if (rethrow) throw err;
+      return null;
     } finally {
       setSavingHubAction('');
     }
@@ -1549,6 +1554,39 @@ export default function StaffHubPage({
     });
   }
 
+  // Message Center — one composer for everything staff send Ricko.
+  // Reuses the same save paths as the older per-form flows so nothing
+  // about storage or permissions changes; only the way staff get there.
+  async function sendMessageCenterOperations(fields) {
+    if (!operationsBusinessId) throw new Error('Choose one business first.');
+    return runHubAction(
+      'operations-request',
+      () =>
+        saveStaffOperationsRequest({
+          ...fields,
+          business_unit_id: operationsBusinessId,
+          staff_id: staffProfile?.id || null,
+        }),
+      'Sent to Ricko.',
+      { rethrow: true },
+    );
+  }
+
+  async function sendMessageCenterTimeOff(fields) {
+    if (!staffProfile?.id) throw new Error('Your login must be matched to a roster profile to request time off.');
+    return runHubAction(
+      'time-off',
+      () =>
+        saveTimeOffRequest({
+          ...fields,
+          business_unit_id: operationsBusinessId || null,
+          staff_id: staffProfile.id,
+        }),
+      'Time off request sent to Ricko.',
+      { rethrow: true },
+    );
+  }
+
   async function submitShiftNote(event) {
     event.preventDefault();
     if (!operationsBusinessId) {
@@ -1654,13 +1692,31 @@ export default function StaffHubPage({
     );
   }
 
-  async function decideTimeOff(recordId, status) {
+  async function decideTimeOff(recordId, status, adminNote = '') {
     await runHubAction(
       `time-off-${recordId}`,
-      () => decideTimeOffRequest(recordId, status),
+      () => decideTimeOffRequest(recordId, status, adminNote),
       `Time-off request ${status}.`,
+      { rethrow: true },
     );
   }
+
+  // Owner replies to a staff request. Writes manager_note, which is what the
+  // staff thread renders as "Ricko replied", and optionally moves status.
+  async function replyToOperationsRequest(record, { manager_note, status }) {
+    await runHubAction(
+      `ops-reply-${record.id}`,
+      () => saveStaffOperationsRequest({ ...record, manager_note, status: status || record.status }),
+      'Reply sent.',
+      { rethrow: true },
+    );
+  }
+
+  const staffById = useMemo(() => {
+    const map = {};
+    for (const person of Array.isArray(staff) ? staff : []) if (person?.id) map[person.id] = person;
+    return map;
+  }, [staff]);
 
   async function decideContent(recordId, status) {
     await runHubAction(
@@ -2856,6 +2912,27 @@ export default function StaffHubPage({
               <Trophy size={14} /> Staff of the Month
             </button>
           </div>
+
+          {ownerView || canManageOperations(accessProfile) ? (
+            <OwnerRequestInbox
+              operationsRequests={hubRecords.operationsRequests}
+              timeOffRequests={hubRecords.timeOffRequests}
+              staffById={staffById}
+              busy={Boolean(savingHubAction)}
+              onReplyOperations={replyToOperationsRequest}
+              onDecideTimeOff={decideTimeOff}
+            />
+          ) : null}
+
+          <StaffMessageCenter
+            staffId={staffProfile?.id || null}
+            businessId={operationsBusinessId}
+            operationsRequests={hubRecords.operationsRequests}
+            timeOffRequests={hubRecords.timeOffRequests}
+            busy={savingHubAction === 'operations-request' || savingHubAction === 'time-off'}
+            onSendOperations={sendMessageCenterOperations}
+            onSendTimeOff={sendMessageCenterTimeOff}
+          />
 
           <section className="panel full-span staff-hub-focus-band">
             <article className={`staff-hub-focus-card ${focusCard.value === 'Overdue' ? 'urgent' : ''}`}>
