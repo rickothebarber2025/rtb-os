@@ -6,6 +6,10 @@ const notificationMigration = new URL(
   '../supabase/migrations/20260814022906_unify_staff_notifications_and_push.sql',
   import.meta.url,
 );
+const ownerRequestNotificationMigration = new URL(
+  '../supabase/migrations/20260906024500_owner_request_notifications.sql',
+  import.meta.url,
+);
 
 test('auth explicitly signals notification token sync when a session is ready', () => {
   const source = fs.readFileSync(new URL('../src/hooks/useAuth.js', import.meta.url), 'utf8');
@@ -45,4 +49,16 @@ test('meaningful staff events create notifications without notifying on every ch
   assert.match(migration, /notify_staff_announcement/);
   assert.match(migration, /notify_staff_shop_status/);
   assert.doesNotMatch(migration, /create trigger .*operation_checklist_run_items[^]*staff_operation_notifications/i);
+});
+
+test('staff requests notify the owner and deep-link to the right workflow', () => {
+  const migration = fs.readFileSync(ownerRequestNotificationMigration, 'utf8');
+  assert.match(migration, /notify_owner_time_off_request/);
+  assert.match(migration, /notify_owner_operations_request/);
+  assert.match(migration, /owner_activity_events/);
+  assert.match(migration, /push_notification_queue/);
+  assert.match(migration, /'route','action-center'/);
+  assert.match(migration, /'tab','time_off'/);
+  assert.match(migration, /'staff_hub_tab','daily'/);
+  assert.match(migration, /on conflict \(user_id, source_table, source_id, title\)/i);
 });
