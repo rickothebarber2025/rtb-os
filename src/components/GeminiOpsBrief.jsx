@@ -51,8 +51,21 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
     setLoading(true);
     setError('');
     try {
-      const result = await invokeAda({ action: 'summary', businessId: businessUnitId });
-      setBrief(result);
+      const [cachedResult, communicationsResult] = await Promise.all([
+        supabase.functions.invoke('rtb-gemini', {
+          body: { action: 'cached', businessId: businessUnitId },
+        }),
+        invokeAda({ action: 'communications', businessId: businessUnitId }),
+      ]);
+      const cached = cachedResult?.error ? null : cachedResult?.data;
+      const communicationCases = communicationsResult?.cases || [];
+      if (cached?.summary || cached?.answer || communicationCases.length) {
+        setBrief({
+          ...(cached || {}),
+          audience: cached?.audience || 'admin',
+          communication_cases: communicationCases,
+        });
+      }
       setBriefLoaded(true);
     } catch (err) {
       setError('Ada is temporarily unavailable. The rest of RTB OS still works normally.');
@@ -152,7 +165,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
           {error ? <div className="gemini-ops-brief__error" role="status">{error}</div> : null}
 
           {loading && !current ? (
-            <div className="gemini-ops-brief__loading"><Bot aria-hidden="true" size={18} /> Ada is reviewing RTB OS…</div>
+            <div className="gemini-ops-brief__loading"><Bot aria-hidden="true" size={18} /> Ada is reviewing saved RTB information…</div>
           ) : current ? (
             <>
               <p className="gemini-ops-brief__summary">{current.answer || current.summary}</p>
@@ -272,7 +285,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
               {asking ? 'Thinking…' : 'Ask Ada'}
             </button>
           </div>
-          <small className="gemini-ops-brief__usage-note">Ada keeps important communication commitments visible until they are resolved or intentionally ignored.</small>
+          <small className="gemini-ops-brief__usage-note">RTB AI does not run in the background. Ada loads saved intelligence and communication cases when opened, and uses AI only when you ask or refresh.</small>
         </div>
       ) : null}
     </section>
