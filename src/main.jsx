@@ -17,6 +17,7 @@ import './styles/integrations.css';
 import './styles/staffHubHumanNav.css';
 import './styles/staffHubVibes.css';
 import './styles/accessControl.css';
+import './styles/adaControl.css';
 import './styles/staffHubMobileSimplify.css';
 
 const CACHE_CLEANUP_KEY = 'rtb-os-cache-cleanup-2026-07-12';
