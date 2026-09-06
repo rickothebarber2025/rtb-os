@@ -48,8 +48,10 @@ create table if not exists public.ada_communication_messages (
     check (source in ('imessage','sms','shortcut','mac_messages','manual','other')),
   direction text not null default 'incoming'
     check (direction in ('incoming','outgoing')),
-  sender_name text not null,
-  sender_handle text,
+  contact_name text not null,
+  sender_name text,
+  recipient_name text,
+  contact_handle text,
   conversation_id text,
   external_message_id text,
   body text not null,
@@ -73,6 +75,8 @@ create index if not exists ada_comm_cases_group_idx
   on public.ada_communication_cases (business_unit_id, staff_id, case_key, status);
 create index if not exists ada_comm_messages_business_date_idx
   on public.ada_communication_messages (business_unit_id, message_at desc);
+create index if not exists ada_comm_messages_contact_idx
+  on public.ada_communication_messages (business_unit_id, contact_name, message_at desc);
 create index if not exists ada_comm_messages_case_idx
   on public.ada_communication_messages (case_id, message_at asc);
 create unique index if not exists ada_comm_messages_external_unique_idx
