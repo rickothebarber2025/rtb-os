@@ -7,6 +7,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const OPEN_CASE_STATUSES = ["open", "waiting_approval", "in_progress"];
+const CASE_STATUSES = [...OPEN_CASE_STATUSES, "resolved", "ignored"];
+const PRIORITIES = ["low", "normal", "high", "urgent"];
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -53,6 +57,47 @@ function questionNeedsFinancialData(question: string) {
   return /\b(payroll|pay|earnings|sales|revenue|tips|take[- ]?home|commission|money|financial|profit|cost|wage)\b/i.test(question);
 }
 
+function normalizePersonName(value: unknown) {
+  return clean(value)
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeCaseKey(value: unknown, category: string, title: string) {
+  const raw = clean(value) || `${category}:${title}`;
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9:_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 140) || `${category}:general`;
+}
+
+function clampConfidence(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(0, Math.min(1, numeric));
+}
+
+function higherPriority(a: unknown, b: unknown) {
+  const rank = new Map(PRIORITIES.map((value, index) => [value, index]));
+  const left = clean(a).toLowerCase();
+  const right = clean(b).toLowerCase();
+  return (rank.get(right) ?? 1) > (rank.get(left) ?? 1) ? right : (rank.has(left) ? left : right || "normal");
+}
+
+function parseMessageAt(value: unknown) {
+  const date = value ? new Date(String(value)) : new Date();
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
+function parseFacts(value: unknown) {
+  return Array.isArray(value) ? value.map(clean).filter(Boolean).slice(0, 30) : [];
+}
+
 async function gatherContext(admin: ReturnType<typeof createClient>, businessId: string, options: {
   audience: "admin" | "staff_hub";
   currentStaffId?: string | null;
@@ -80,7 +125,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
   const roster = staff as any[];
   const allowedStaffIds = adminAudience ? roster.map((row) => row.id) : ownStaffId ? [ownStaffId] : [];
 
-  const [checklists, tasks, requests, attendance, performance, payroll, content, feedback] = await Promise.all([
+  const [checklists, tasks, requests, attendance, performance, payroll, content, feedback, communicationCases] = await Promise.all([
     safe(
       admin.from("operation_checklist_runs")
         .select("id,staff_id,run_date,checklist_type,scope,status,completion_percent,final_confirmed_at,items:operation_checklist_run_items(label,status,completed_at,completed_by_staff_id,note)")
@@ -149,12 +194,23 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
       : Promise.resolve([]),
     adminAudience
       ? safe(
-          admin.from("customer_feedback")
-            .select("rating,feedback_text,source,created_at")
-            .eq("business_unit_id", businessId)
-            .gte("created_at", monthAgo)
-            .order("created_at", { ascending: false })
+          admin.from("customer_feedback_enriched")
+            .select("rating,review_text,sentiment,main_category,priority,response_created_at")
+            .eq("business_id", businessId)
+            .gte("response_created_at", monthAgo)
+            .order("response_created_at", { ascending: false })
             .limit(30),
+          [],
+        )
+      : Promise.resolve([]),
+    adminAudience
+      ? safe(
+          admin.from("ada_communication_cases")
+            .select("id,staff_id,contact_name,case_key,category,title,summary,next_action,action_type,execution_mode,priority,status,approval_required,due_hint,confidence_score,source_count,extracted_data,first_message_at,last_message_at")
+            .eq("business_unit_id", businessId)
+            .in("status", OPEN_CASE_STATUSES)
+            .order("last_message_at", { ascending: false })
+            .limit(40),
           [],
         )
       : Promise.resolve([]),
@@ -174,6 +230,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
     payroll_last_30_days: options.includeFinancial ? filterMine(payroll as any[]) : [],
     recent_content_submissions: adminAudience ? content : [],
     recent_customer_feedback: adminAudience ? feedback : [],
+    open_communication_cases: adminAudience ? communicationCases : [],
     generated_at: new Date().toISOString(),
     timezone: "America/Toronto",
     audience: options.audience,
@@ -208,7 +265,53 @@ const responseSchema = {
   required: ["answer", "summary", "confidence_score", "evidence", "priorities", "suggested_tasks", "risks", "opportunities"],
 };
 
-async function askGemini(apiKey: string, model: string, prompt: string, payload: unknown) {
+const messageClassificationSchema = {
+  type: "object",
+  properties: {
+    classification: {
+      type: "string",
+      enum: ["actionable", "information", "acknowledgement", "resolution", "noise"],
+    },
+    category: {
+      type: "string",
+      enum: ["attendance", "availability", "time_off", "supplies", "cash", "payroll", "client", "policy", "maintenance", "opportunity", "follow_up", "coverage", "general"],
+    },
+    case_key: { type: "string" },
+    title: { type: "string" },
+    summary: { type: "string" },
+    next_action: { type: "string" },
+    action_type: {
+      type: "string",
+      enum: ["task", "reply", "calendar", "schedule_update", "time_off_review", "purchase_request", "coverage_review", "policy_decision", "cash_review", "payroll_review", "maintenance_follow_up", "business_follow_up", "none"],
+    },
+    execution_mode: {
+      type: "string",
+      enum: ["automatic_capture", "approval_required", "owner_action", "no_action"],
+    },
+    priority: { type: "string", enum: ["low", "normal", "high", "urgent"] },
+    requires_action: { type: "boolean" },
+    requires_reply: { type: "boolean" },
+    approval_required: { type: "boolean" },
+    due_hint: { type: "string" },
+    confidence_score: { type: "number" },
+    resolution_signal: { type: "string", enum: ["none", "possible", "strong"] },
+    extracted_facts: { type: "array", items: { type: "string" } },
+  },
+  required: [
+    "classification", "category", "case_key", "title", "summary", "next_action", "action_type",
+    "execution_mode", "priority", "requires_action", "requires_reply", "approval_required", "due_hint",
+    "confidence_score", "resolution_signal", "extracted_facts",
+  ],
+};
+
+async function askGeminiWithSchema(
+  apiKey: string,
+  model: string,
+  prompt: string,
+  payload: unknown,
+  schema: unknown,
+  maxOutputTokens = 1200,
+) {
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -216,10 +319,10 @@ async function askGemini(apiKey: string, model: string, prompt: string, payload:
       systemInstruction: { parts: [{ text: prompt }] },
       contents: [{ role: "user", parts: [{ text: JSON.stringify(payload) }] }],
       generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 1200,
+        temperature: 0.15,
+        maxOutputTokens,
         responseMimeType: "application/json",
-        responseSchema,
+        responseSchema: schema,
       },
     }),
   });
@@ -231,6 +334,278 @@ async function askGemini(apiKey: string, model: string, prompt: string, payload:
   return JSON.parse(text);
 }
 
+async function classifyCommunication(
+  apiKey: string,
+  model: string,
+  payload: unknown,
+) {
+  const system = [
+    "You are Ada's communications triage engine for RTB Lounge and RTB Beauty Lounge.",
+    "Your job is to prevent operational commitments from being lost inside ordinary text conversations.",
+    "Classify the message using only the supplied message, staff match, recent related messages, and open cases.",
+    "Actionable examples include lateness, absence, availability or schedule changes, time-off requests, supply requests, cash/payment discrepancies, payroll questions, client problems, policy decisions, maintenance, coverage, promises, meetings, and business follow-ups.",
+    "Greetings, thank-yous and acknowledgements are usually not new work. Do not create a case just because a person sent a message.",
+    "Group repeat issues using a stable case_key. Repeated lateness for the same person should reuse attendance:late-arrival rather than creating a new case each time.",
+    "If the current message explicitly completes or confirms completion of an existing issue, return resolution_signal=strong and reuse that case_key. Use possible when resolution is ambiguous.",
+    "For an existing case, summary must describe the current combined state, not only the newest message.",
+    "Schedule changes, time-off approvals, payroll/cash decisions, policy decisions, compensation, permissions, or staff-record changes require owner approval. Mark approval_required=true and execution_mode=approval_required.",
+    "Safe capture, grouping, extraction and follow-up tracking can use execution_mode=automatic_capture. Never treat disciplinary or compensation decisions as automatic.",
+    "Extract concrete facts such as dates, hours, amounts, requested supplies, promised follow-ups, and deadlines into extracted_facts.",
+    "Return JSON only.",
+  ].join(" ");
+
+  return askGeminiWithSchema(apiKey, model, system, payload, messageClassificationSchema, 900);
+}
+
+async function resolveStaffForContact(
+  admin: ReturnType<typeof createClient>,
+  businessId: string,
+  staffId: string,
+  contactName: string,
+) {
+  const roster = await safe(
+    admin.from("staff")
+      .select("id,full_name,business_unit_id,active")
+      .eq("business_unit_id", businessId)
+      .eq("active", true)
+      .limit(100),
+    [],
+  ) as any[];
+
+  if (staffId) return roster.find((row) => row.id === staffId) || null;
+  const contactKey = normalizePersonName(contactName);
+  if (!contactKey) return null;
+
+  const exact = roster.find((row) => normalizePersonName(row.full_name) === contactKey);
+  if (exact) return exact;
+
+  return roster.find((row) => {
+    const staffKey = normalizePersonName(row.full_name);
+    return Boolean(staffKey && (contactKey.startsWith(`${staffKey} `) || staffKey.startsWith(`${contactKey} `)));
+  }) || null;
+}
+
+async function getCommunicationContext(
+  admin: ReturnType<typeof createClient>,
+  businessId: string,
+  staffId: string | null,
+  contactName: string,
+) {
+  const [cases, recentMessages] = await Promise.all([
+    safe(
+      admin.from("ada_communication_cases")
+        .select("id,staff_id,contact_name,case_key,category,title,summary,next_action,action_type,execution_mode,priority,status,approval_required,due_hint,source_count,extracted_data,last_message_at")
+        .eq("business_unit_id", businessId)
+        .in("status", OPEN_CASE_STATUSES)
+        .order("last_message_at", { ascending: false })
+        .limit(30),
+      [],
+    ),
+    safe(
+      admin.from("ada_communication_messages")
+        .select("id,staff_id,contact_name,direction,body,message_at,classification,priority,requires_action,requires_reply,extracted_data,case_id")
+        .eq("business_unit_id", businessId)
+        .order("message_at", { ascending: false })
+        .limit(80),
+      [],
+    ),
+  ]);
+
+  const contactKey = normalizePersonName(contactName);
+  const belongs = (row: any) => staffId
+    ? row.staff_id === staffId
+    : normalizePersonName(row.contact_name) === contactKey;
+
+  return {
+    open_cases: (cases as any[]).filter(belongs).slice(0, 12),
+    recent_messages: (recentMessages as any[]).filter(belongs).slice(0, 20).reverse(),
+  };
+}
+
+async function ingestCommunication(
+  admin: ReturnType<typeof createClient>,
+  apiKey: string,
+  model: string,
+  businessId: string,
+  body: any,
+) {
+  const message = body.message && typeof body.message === "object" ? body.message : body;
+  const direction = clean(message.direction || "incoming").toLowerCase() === "outgoing" ? "outgoing" : "incoming";
+  const text = clean(message.body || message.text || message.message);
+  const senderName = clean(message.senderName || message.sender_name || (direction === "incoming" ? message.contactName : "Ricko"));
+  const recipientName = clean(message.recipientName || message.recipient_name || (direction === "outgoing" ? message.contactName : "Ricko"));
+  const contactName = clean(message.contactName || message.contact_name || (direction === "incoming" ? senderName : recipientName));
+  const contactHandle = clean(message.contactHandle || message.contact_handle || message.senderHandle || message.sender_handle);
+  const source = ["imessage", "sms", "shortcut", "mac_messages", "manual", "other"].includes(clean(message.source).toLowerCase())
+    ? clean(message.source).toLowerCase()
+    : "shortcut";
+  const externalMessageId = clean(message.externalMessageId || message.external_message_id) || null;
+  const conversationId = clean(message.conversationId || message.conversation_id) || null;
+  const messageAt = parseMessageAt(message.messageAt || message.message_at || message.date);
+  const requestedStaffId = clean(message.staffId || message.staff_id);
+
+  if (!text) throw new Error("Message text is required.");
+  if (!contactName) throw new Error("A contact name is required.");
+
+  if (externalMessageId) {
+    const duplicate = await safe(
+      admin.from("ada_communication_messages")
+        .select("id,case_id,processed_at")
+        .eq("source", source)
+        .eq("external_message_id", externalMessageId)
+        .maybeSingle(),
+      null as any,
+    );
+    if (duplicate) return { duplicate: true, message: duplicate };
+  }
+
+  const staff = await resolveStaffForContact(admin, businessId, requestedStaffId, contactName);
+  const related = await getCommunicationContext(admin, businessId, staff?.id || null, contactName);
+  const classification = await classifyCommunication(apiKey, model, {
+    business_id: businessId,
+    contact: {
+      name: contactName,
+      matched_staff: staff ? { id: staff.id, full_name: staff.full_name } : null,
+    },
+    current_message: {
+      direction,
+      sender_name: senderName || null,
+      recipient_name: recipientName || null,
+      text,
+      message_at: messageAt,
+    },
+    ...related,
+  });
+
+  const category = clean(classification.category) || "general";
+  const title = clean(classification.title) || `${contactName}: follow-up`;
+  const caseKey = normalizeCaseKey(classification.case_key, category, title);
+  const priority = PRIORITIES.includes(clean(classification.priority).toLowerCase())
+    ? clean(classification.priority).toLowerCase()
+    : "normal";
+  const extractedFacts = parseFacts(classification.extracted_facts);
+  const confidence = clampConfidence(classification.confidence_score);
+
+  const candidateCases = related.open_cases as any[];
+  let existingCase = candidateCases.find((item) => item.case_key === caseKey) || null;
+  if (!existingCase && classification.resolution_signal === "strong") {
+    const categoryMatches = candidateCases.filter((item) => item.category === category);
+    if (categoryMatches.length === 1) existingCase = categoryMatches[0];
+  }
+
+  const { data: insertedMessage, error: messageError } = await admin.from("ada_communication_messages")
+    .insert({
+      business_unit_id: businessId,
+      case_id: existingCase?.id || null,
+      staff_id: staff?.id || null,
+      source,
+      direction,
+      contact_name: contactName,
+      sender_name: senderName || null,
+      recipient_name: recipientName || null,
+      contact_handle: contactHandle || null,
+      conversation_id: conversationId,
+      external_message_id: externalMessageId,
+      body: text,
+      message_at: messageAt,
+      classification: clean(classification.classification) || null,
+      priority,
+      requires_action: Boolean(classification.requires_action),
+      requires_reply: Boolean(classification.requires_reply),
+      confidence_score: confidence,
+      extracted_data: { facts: extractedFacts },
+      processed_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+  if (messageError) throw messageError;
+
+  let communicationCase = existingCase;
+  const resolutionStrong = classification.resolution_signal === "strong";
+  const shouldTrack = Boolean(classification.requires_action) || Boolean(existingCase) || resolutionStrong;
+
+  if (shouldTrack) {
+    const sourceCount = existingCase ? Number(existingCase.source_count || 1) + 1 : 1;
+    const repeatedLate = category === "attendance" && caseKey.includes("late") && sourceCount >= 3;
+    const effectivePriority = repeatedLate ? higherPriority(existingCase?.priority, "high") : higherPriority(existingCase?.priority, priority);
+    const approvalRequired = Boolean(classification.approval_required);
+    const executionMode = resolutionStrong
+      ? "no_action"
+      : approvalRequired
+        ? "approval_required"
+        : clean(classification.execution_mode) || "owner_action";
+    const status = resolutionStrong
+      ? "resolved"
+      : approvalRequired
+        ? "waiting_approval"
+        : existingCase?.status === "in_progress"
+          ? "in_progress"
+          : "open";
+
+    const payload = {
+      business_unit_id: businessId,
+      staff_id: staff?.id || existingCase?.staff_id || null,
+      contact_name: contactName,
+      case_key: caseKey,
+      category,
+      title,
+      summary: clean(classification.summary) || text,
+      next_action: resolutionStrong ? "No further action unless the issue reopens." : clean(classification.next_action) || "Review message.",
+      action_type: resolutionStrong ? "none" : clean(classification.action_type) || "task",
+      execution_mode: executionMode,
+      priority: effectivePriority,
+      status,
+      approval_required: resolutionStrong ? false : approvalRequired,
+      due_hint: resolutionStrong ? null : clean(classification.due_hint) || null,
+      confidence_score: confidence,
+      source_count: sourceCount,
+      extracted_data: { facts: extractedFacts },
+      first_message_at: existingCase?.first_message_at || messageAt,
+      last_message_at: messageAt,
+      resolved_at: resolutionStrong ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existingCase) {
+      const { data, error } = await admin.from("ada_communication_cases")
+        .update(payload)
+        .eq("id", existingCase.id)
+        .eq("business_unit_id", businessId)
+        .select()
+        .single();
+      if (error) throw error;
+      communicationCase = data;
+    } else if (!resolutionStrong) {
+      const { data, error } = await admin.from("ada_communication_cases")
+        .insert(payload)
+        .select()
+        .single();
+      if (error) throw error;
+      communicationCase = data;
+    }
+
+    if (communicationCase?.id && insertedMessage?.case_id !== communicationCase.id) {
+      await admin.from("ada_communication_messages")
+        .update({ case_id: communicationCase.id })
+        .eq("id", insertedMessage.id);
+    }
+  }
+
+  return {
+    duplicate: false,
+    staff_match: staff ? { id: staff.id, full_name: staff.full_name } : null,
+    classification: {
+      ...classification,
+      case_key: caseKey,
+      priority,
+      confidence_score: confidence,
+      extracted_facts: extractedFacts,
+    },
+    message: insertedMessage,
+    case: communicationCase,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed." }, 405);
@@ -238,7 +613,6 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const key = serviceKey();
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
     if (!supabaseUrl || !key) return json({ error: "Supabase function secrets are missing." }, 500);
 
     const admin = createClient(supabaseUrl, key, { auth: { persistSession: false } });
@@ -281,8 +655,49 @@ Deno.serve(async (req) => {
       null as any,
     );
 
-    if (!geminiKey) return json({ error: "Ada is temporarily unavailable." }, 503);
-    if (action === "ask" && !question) return json({ error: "Ask Ada a question first." }, 400);
+    if (action === "communications") {
+      if (!manager) return json({ error: "Manager access is required to view communications intelligence." }, 403);
+      const [cases, messages] = await Promise.all([
+        safe(
+          admin.from("ada_communication_cases")
+            .select("*")
+            .eq("business_unit_id", businessId)
+            .in("status", OPEN_CASE_STATUSES)
+            .order("priority", { ascending: false })
+            .order("last_message_at", { ascending: false })
+            .limit(60),
+          [],
+        ),
+        safe(
+          admin.from("ada_communication_messages")
+            .select("id,case_id,staff_id,contact_name,direction,source,body,message_at,classification,priority,requires_action,requires_reply,extracted_data")
+            .eq("business_unit_id", businessId)
+            .order("message_at", { ascending: false })
+            .limit(80),
+          [],
+        ),
+      ]);
+      return json({ cases, messages });
+    }
+
+    if (action === "case-status") {
+      if (!manager) return json({ error: "Manager access is required to update communication cases." }, 403);
+      const caseId = clean(body.caseId || body.case_id);
+      const status = clean(body.status).toLowerCase();
+      if (!caseId || !CASE_STATUSES.includes(status)) return json({ error: "A valid case and status are required." }, 400);
+      const { data, error } = await admin.from("ada_communication_cases")
+        .update({
+          status,
+          resolved_at: status === "resolved" ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", caseId)
+        .eq("business_unit_id", businessId)
+        .select()
+        .single();
+      if (error) throw error;
+      return json({ case: data });
+    }
 
     if (action === "automation") {
       if (!manager) return json({ error: "Manager access is required to run automations." }, 403);
@@ -290,6 +705,17 @@ Deno.serve(async (req) => {
       if (error) throw error;
       return json({ automation: data });
     }
+
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiKey) return json({ error: "Ada is temporarily unavailable." }, 503);
+    const model = Deno.env.get("GEMINI_MODEL") || "gemini-flash-latest";
+
+    if (action === "ingest-message") {
+      if (!manager) return json({ error: "Manager access is required to ingest communications." }, 403);
+      return json(await ingestCommunication(admin, geminiKey, model, businessId, body));
+    }
+
+    if (action === "ask" && !question) return json({ error: "Ask Ada a question first." }, 400);
 
     const includeFinancial = Boolean(
       (owner || payrollLevel >= 1) && action === "ask" && questionNeedsFinancialData(question),
@@ -300,34 +726,35 @@ Deno.serve(async (req) => {
       includeFinancial,
     });
 
-    const model = Deno.env.get("GEMINI_MODEL") || "gemini-flash-latest";
     const system = audience === "admin"
       ? [
           "You are Ada, RTB's owner copilot for RTB Lounge and RTB Beauty Lounge.",
           "Use only supplied RTB OS data and never invent facts or fill missing values.",
-          "Think across operations, staffing, attendance, tasks, customer experience, content, performance, and financial data when permission allows.",
+          "Think across operations, staffing, attendance, tasks, communications, customer experience, content, performance, and financial data when permission allows.",
+          "Open communication cases are unresolved commitments extracted from owner/staff texts. Treat them as first-class operational work and consolidate repeated patterns rather than recommending duplicate tasks.",
           "Answer the owner's actual question first, then identify the most important decision or next action.",
           "Be critical: distinguish symptoms from root causes and call out weak processes, missed follow-up, repeated patterns, or unnecessary owner workload.",
-          "When evidence supports action, return concrete suggested_tasks with a clear owner, priority and due hint. Do not create or modify records yourself.",
+          "When evidence supports action, return concrete suggested_tasks with a clear owner, priority and due hint. Do not create or modify payroll, compensation, permissions, or disciplinary records yourself.",
           "Do not recommend disciplinary or compensation decisions from a single weak signal. Use patterns and explain uncertainty.",
           "Keep evidence traceable to the supplied context. Return JSON only.",
         ].join(" ")
       : [
           "You are Ada inside RTB Staff Hub.",
-          "Use only the permitted data supplied for this staff member. Never reveal other staff private, payroll, or owner-only information.",
+          "Use only the permitted data supplied for this staff member. Never reveal other staff private, payroll, communication, or owner-only information.",
           "Give practical next actions and explain what is due, incomplete, or blocking progress.",
           "Never invent facts and never alter records. Return JSON only.",
         ].join(" ");
 
     const effectiveQuestion = action === "summary"
       ? audience === "admin"
-        ? "Give me today's owner brief. Identify what requires my attention, what can be delegated, one risk, one opportunity, and up to three concrete suggested tasks."
+        ? "Give me today's owner brief. Start with unresolved communication commitments if any are urgent or high priority. Identify what requires my attention, what can be delegated, one risk, one opportunity, and up to three concrete suggested tasks without duplicating existing cases."
         : "Give me today's staff brief with what is due, what is incomplete, and the best next action."
       : question;
 
-    const parsed = await askGemini(geminiKey, model, system, { question: effectiveQuestion, context });
+    const parsed = await askGeminiWithSchema(geminiKey, model, system, { question: effectiveQuestion, context }, responseSchema, 1200);
     return json({
       ...parsed,
+      communication_cases: audience === "admin" ? (context.open_communication_cases || []).slice(0, 10) : [],
       model,
       audience,
       data_scope: audience === "admin" ? "rtb_os_ada_admin" : "rtb_os_ada_staff",
