@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Bot, CheckCircle2, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles, X } from 'lucide-react';
+import { Bot, CheckCircle2, ChevronDown, ChevronUp, RefreshCw, Send, Sparkles, Undo2, X } from 'lucide-react';
 import AdaTimeOffReview from './AdaTimeOffReview';
 import { invokeRtbFunction } from '../lib/invokeRtbFunction';
-import { supabase } from '../lib/supabaseClient';
+import { getStaff, saveStaffTask, updateStaffTaskStatus } from '../services/rtbService';
 import '../styles/geminiOpsBrief.css';
 
 const QUICK_PROMPTS = [
@@ -24,6 +24,18 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
   const [error, setError] = useState('');
   const [briefLoaded, setBriefLoaded] = useState(false);
   const [timeOffRefreshKey, setTimeOffRefreshKey] = useState(0);
+  const [staff, setStaff] = useState([]);
+  const [taskDrafts, setTaskDrafts] = useState({});
+  const [taskWorking, setTaskWorking] = useState('');
+
+  function prepareTaskDrafts(result, roster = staff) {
+    const drafts = {};
+    (result?.suggested_tasks || []).forEach((task, index) => {
+      const match = roster.find((member) => member.full_name?.toLowerCase() === task.suggested_staff_name?.toLowerCase());
+      drafts[index] = { staffId: match?.id || '' };
+    });
+    setTaskDrafts(drafts);
+  }
 
   const enabled = useMemo(
     () => Boolean(businessUnitId && businessUnitId !== 'all-businesses' && ['dashboard', 'operations'].includes(activePage)),
@@ -40,10 +52,12 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
     setLoading(true);
     setError('');
     try {
-      const [cachedResult, communicationsResult] = await Promise.all([
+      const [cachedResult, communicationsResult, roster] = await Promise.all([
         invokeRtbFunction('rtb-gemini', { action: 'cached', businessId: businessUnitId }).catch(() => null),
         invokeAda({ action: 'communications', businessId: businessUnitId }),
+        getStaff(businessUnitId, false).catch(() => []),
       ]);
+      setStaff(roster);
       const cached = cachedResult;
       const communicationCases = communicationsResult?.cases || [];
       if (cached?.summary || cached?.answer || communicationCases.length) {
@@ -51,7 +65,9 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
           ...(cached || {}),
           audience: cached?.audience || 'admin',
           communication_cases: communicationCases,
+          source_status: communicationsResult?.source_status || cached?.source_status,
         });
+        prepareTaskDrafts(cached, roster);
       }
       setTimeOffRefreshKey((value) => value + 1);
       setBriefLoaded(true);
@@ -76,6 +92,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
     try {
       const result = await invokeAda({ action: 'summary', businessId: businessUnitId });
       setBrief(result);
+      prepareTaskDrafts(result);
       setAnswer(null);
       setTimeOffRefreshKey((value) => value + 1);
       setBriefLoaded(true);
@@ -95,6 +112,7 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
     try {
       const result = await invokeAda({ action: 'ask', businessId: businessUnitId, question: text });
       setAnswer(result);
+      prepareTaskDrafts(result);
       setQuestion('');
       setExpanded(true);
     } catch (err) {
@@ -123,6 +141,43 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
   function handleTimeOffDecision() {
     setTimeOffRefreshKey((value) => value + 1);
     refreshBrief();
+  }
+
+  async function createSuggestedTask(task, index) {
+    const staffId = taskDrafts[index]?.staffId;
+    if (!staffId || taskWorking) return;
+    setTaskWorking(`create-${index}`);
+    setError('');
+    try {
+      const created = await saveStaffTask({
+        business_unit_id: businessUnitId,
+        staff_id: staffId,
+        title: task.title,
+        category: task.category || 'general',
+        details: [task.details, task.due_hint ? `Ada timing: ${task.due_hint}` : ''].filter(Boolean).join('\n'),
+        status: 'pending',
+      });
+      setTaskDrafts((current) => ({ ...current, [index]: { ...current[index], created } }));
+    } catch (err) {
+      setError(err?.message || 'Unable to create that task.');
+    } finally {
+      setTaskWorking('');
+    }
+  }
+
+  async function undoSuggestedTask(index) {
+    const created = taskDrafts[index]?.created;
+    if (!created?.id || taskWorking) return;
+    setTaskWorking(`undo-${index}`);
+    setError('');
+    try {
+      await updateStaffTaskStatus(created.id, 'completed');
+      setTaskDrafts((current) => ({ ...current, [index]: { ...current[index], created: null, undone: true } }));
+    } catch (err) {
+      setError(err?.message || 'Unable to undo that task.');
+    } finally {
+      setTaskWorking('');
+    }
   }
 
   if (!enabled) return null;
@@ -157,6 +212,11 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
       {expanded ? (
         <div className="gemini-ops-brief__body">
           {error ? <div className="gemini-ops-brief__error" role="status">{error}</div> : null}
+          {current?.source_status?.state === 'partial' ? (
+            <div className="gemini-ops-brief__error" role="status">
+              Ada has partial data. Unavailable: {current.source_status.unavailable.map((item) => item.source).join(', ')}.
+            </div>
+          ) : null}
 
           <AdaTimeOffReview
             active={expanded}
@@ -231,6 +291,27 @@ export default function GeminiOpsBrief({ activePage, businessUnitId }) {
                           {task.priority ? ` · ${task.priority}` : ''}
                           {task.due_hint ? ` · ${task.due_hint}` : ''}
                         </small>
+                        {current.audience === 'admin' ? (
+                          taskDrafts[index]?.created ? (
+                            <button className="ghost-button small" disabled={Boolean(taskWorking)} onClick={() => undoSuggestedTask(index)} type="button">
+                              <Undo2 size={14} /> Undo task
+                            </button>
+                          ) : (
+                            <div className="action-row">
+                              <select
+                                aria-label={`Assign ${task.title}`}
+                                onChange={(event) => setTaskDrafts((value) => ({ ...value, [index]: { ...value[index], staffId: event.target.value } }))}
+                                value={taskDrafts[index]?.staffId || ''}
+                              >
+                                <option value="">Choose owner</option>
+                                {staff.map((member) => <option key={member.id} value={member.id}>{member.full_name}</option>)}
+                              </select>
+                              <button className="secondary-button small" disabled={Boolean(taskWorking) || !taskDrafts[index]?.staffId} onClick={() => createSuggestedTask(task, index)} type="button">
+                                <CheckCircle2 size={14} /> {taskWorking === `create-${index}` ? 'Creating' : 'Create task'}
+                              </button>
+                            </div>
+                          )
+                        ) : null}
                       </li>
                     ))}
                   </ul>

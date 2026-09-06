@@ -128,6 +128,7 @@ Deno.serve(async (req) => {
       const decision = clean(body.decision || body.status).toLowerCase();
       const adminNote = clean(body.adminNote || body.admin_note);
       if (!requestId || !["approved", "denied"].includes(decision)) return json({ error: "Choose Approve or Deny." }, 400);
+      if (body.confirmed !== true) return json({ error: "Confirm the time-off decision before it is applied." }, 409);
 
       const existing = await safe(
         admin.from("staff_time_off_requests")
@@ -151,6 +152,21 @@ Deno.serve(async (req) => {
         .eq("id", requestId)
         .eq("business_unit_id", businessId)
         .eq("status", "pending")
+        .select()
+        .single();
+      if (error) throw error;
+      return json({ request: data });
+    }
+
+    if (action === "reopen") {
+      if (!owner && operationsLevel < 2) return json({ error: "Operations edit access is required to reopen time off." }, 403);
+      const requestId = clean(body.requestId || body.request_id);
+      if (!requestId || body.confirmed !== true) return json({ error: "Confirm which time-off decision to undo." }, 409);
+      const { data, error } = await admin.from("staff_time_off_requests")
+        .update({ status: "pending", decided_at: null, decided_by: null, updated_at: new Date().toISOString() })
+        .eq("id", requestId)
+        .eq("business_unit_id", businessId)
+        .in("status", ["approved", "denied"])
         .select()
         .single();
       if (error) throw error;

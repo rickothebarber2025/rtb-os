@@ -108,10 +108,24 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
   const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString();
   const adminAudience = options.audience === "admin";
   const ownStaffId = options.currentStaffId || null;
+  const unavailableSources: Array<{ source: string; error: string }> = [];
+  const read = async <T>(source: string, promise: PromiseLike<{ data: T | null; error: any }>, fallback: T): Promise<T> => {
+    try {
+      const result = await promise;
+      if (result.error) {
+        unavailableSources.push({ source, error: clean(result.error.message || result.error.code || "Query failed.") });
+        return fallback;
+      }
+      return result.data ?? fallback;
+    } catch (error) {
+      unavailableSources.push({ source, error: error instanceof Error ? error.message : "Query failed." });
+      return fallback;
+    }
+  };
 
   const [business, staff] = await Promise.all([
-    safe(admin.from("business_units").select("id,name,type").eq("id", businessId).maybeSingle(), null),
-    safe(
+    read("business", admin.from("business_units").select("id,name,type").eq("id", businessId).maybeSingle(), null),
+    read("staff_roster",
       admin.from("staff")
         .select("id,full_name,role,tier,active")
         .eq("business_unit_id", businessId)
@@ -126,7 +140,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
   const allowedStaffIds = adminAudience ? roster.map((row) => row.id) : ownStaffId ? [ownStaffId] : [];
 
   const [checklists, tasks, requests, attendance, performance, payroll, content, feedback, communicationCases] = await Promise.all([
-    safe(
+    read("checklists",
       admin.from("operation_checklist_runs")
         .select("id,staff_id,run_date,checklist_type,scope,status,completion_percent,final_confirmed_at,items:operation_checklist_run_items(label,status,completed_at,completed_by_staff_id,note)")
         .eq("business_unit_id", businessId)
@@ -135,7 +149,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
         .limit(30),
       [],
     ),
-    safe(
+    read("staff_tasks",
       admin.from("staff_tasks")
         .select("id,staff_id,title,category,details,due_date,status,completed_at,created_at")
         .eq("business_unit_id", businessId)
@@ -144,7 +158,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
         .limit(60),
       [],
     ),
-    safe(
+    read("operations_requests",
       admin.from("staff_operations_requests")
         .select("id,staff_id,request_type,category,title,priority,status,created_at")
         .eq("business_unit_id", businessId)
@@ -153,7 +167,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
         .limit(40),
       [],
     ),
-    safe(
+    read("attendance",
       admin.from("staff_attendance")
         .select("staff_id,clock_in,clock_out,status")
         .eq("business_unit_id", businessId)
@@ -163,7 +177,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
       [],
     ),
     adminAudience
-      ? safe(
+      ? read("performance",
           admin.from("staff_performance_summary")
             .select("staff_id,total_net_sales,transactions,average_ticket")
             .eq("business_unit_id", businessId)
@@ -172,7 +186,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
         )
       : Promise.resolve([]),
     options.includeFinancial && allowedStaffIds.length
-      ? safe(
+      ? read("payroll",
           admin.from("payroll_entries")
             .select("staff_id,staff_name_snapshot,net_sales,tips,take_home,created_at")
             .in("staff_id", allowedStaffIds)
@@ -183,7 +197,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
         )
       : Promise.resolve([]),
     adminAudience
-      ? safe(
+      ? read("content",
           admin.from("staff_content_submissions")
             .select("staff_id,status,content_type,created_at")
             .eq("business_unit_id", businessId)
@@ -193,7 +207,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
         )
       : Promise.resolve([]),
     adminAudience
-      ? safe(
+      ? read("customer_feedback",
           admin.from("customer_feedback_enriched")
             .select("rating,review_text,sentiment,main_category,priority,response_created_at")
             .eq("business_id", businessId)
@@ -204,7 +218,7 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
         )
       : Promise.resolve([]),
     adminAudience
-      ? safe(
+      ? read("communications",
           admin.from("ada_communication_cases")
             .select("id,staff_id,contact_name,case_key,category,title,summary,next_action,action_type,execution_mode,priority,status,approval_required,due_hint,confidence_score,source_count,extracted_data,first_message_at,last_message_at")
             .eq("business_unit_id", businessId)
@@ -234,6 +248,11 @@ async function gatherContext(admin: ReturnType<typeof createClient>, businessId:
     generated_at: new Date().toISOString(),
     timezone: "America/Toronto",
     audience: options.audience,
+    source_status: {
+      state: unavailableSources.length ? "partial" : "live",
+      unavailable: unavailableSources,
+      observed_at: new Date().toISOString(),
+    },
   };
 }
 
@@ -626,13 +645,11 @@ Deno.serve(async (req) => {
     const question = clean(body.question);
     if (!businessId) return json({ error: "Choose one business first." }, 400);
 
-    const profile = await safe(
-      admin.from("user_profiles")
+    const { data: profile, error: profileError } = await admin.from("user_profiles")
         .select("email,active,business_unit_id,permissions,role")
         .eq("id", authData.user.id)
-        .maybeSingle(),
-      null as any,
-    );
+        .maybeSingle();
+    if (profileError) throw profileError;
 
     const owner = clean(profile?.email).toLowerCase() === "rickothebarber@gmail.com";
     const permissions = profile?.permissions || {};
@@ -657,27 +674,33 @@ Deno.serve(async (req) => {
 
     if (action === "communications") {
       if (!manager) return json({ error: "Manager access is required to view communications intelligence." }, 403);
-      const [cases, messages] = await Promise.all([
-        safe(
-          admin.from("ada_communication_cases")
+      const [caseResult, messageResult] = await Promise.all([
+        admin.from("ada_communication_cases")
             .select("*")
             .eq("business_unit_id", businessId)
             .in("status", OPEN_CASE_STATUSES)
             .order("priority", { ascending: false })
             .order("last_message_at", { ascending: false })
             .limit(60),
-          [],
-        ),
-        safe(
-          admin.from("ada_communication_messages")
+        admin.from("ada_communication_messages")
             .select("id,case_id,staff_id,contact_name,direction,source,body,message_at,classification,priority,requires_action,requires_reply,extracted_data")
             .eq("business_unit_id", businessId)
             .order("message_at", { ascending: false })
             .limit(80),
-          [],
-        ),
       ]);
-      return json({ cases, messages });
+      const unavailable = [
+        caseResult.error ? { source: "communication_cases", error: clean(caseResult.error.message || caseResult.error.code) } : null,
+        messageResult.error ? { source: "communication_messages", error: clean(messageResult.error.message || messageResult.error.code) } : null,
+      ].filter(Boolean);
+      return json({
+        cases: caseResult.data || [],
+        messages: messageResult.data || [],
+        source_status: {
+          state: unavailable.length ? "partial" : "live",
+          unavailable,
+          observed_at: new Date().toISOString(),
+        },
+      }, unavailable.length === 2 ? 503 : 200);
     }
 
     if (action === "case-status") {
@@ -699,12 +722,7 @@ Deno.serve(async (req) => {
       return json({ case: data });
     }
 
-    if (action === "automation") {
-      if (!manager) return json({ error: "Manager access is required to run automations." }, 403);
-      const { data, error } = await admin.rpc("run_rtb_safe_automations");
-      if (error) throw error;
-      return json({ automation: data });
-    }
+    if (action === "automation") return json({ error: "Ada cannot execute RTB automations from this read-and-prepare endpoint." }, 403);
 
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiKey) return json({ error: "Ada is temporarily unavailable." }, 503);
@@ -737,6 +755,7 @@ Deno.serve(async (req) => {
           "When evidence supports action, return concrete suggested_tasks with a clear owner, priority and due hint. Do not create or modify payroll, compensation, permissions, or disciplinary records yourself.",
           "Do not recommend disciplinary or compensation decisions from a single weak signal. Use patterns and explain uncertainty.",
           "Keep evidence traceable to the supplied context. Return JSON only.",
+          "The context includes source_status. If it is partial, state which sources are unavailable and do not interpret missing rows as zero activity.",
         ].join(" ")
       : [
           "You are Ada inside RTB Staff Hub.",
@@ -758,6 +777,7 @@ Deno.serve(async (req) => {
       model,
       audience,
       data_scope: audience === "admin" ? "rtb_os_ada_admin" : "rtb_os_ada_staff",
+      source_status: context.source_status,
       generated_at: new Date().toISOString(),
       cached: false,
     });

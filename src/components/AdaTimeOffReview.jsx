@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Check, Clock3, ShieldAlert, X } from 'lucide-react';
+import { CalendarDays, Check, Clock3, ShieldAlert, Undo2, X } from 'lucide-react';
 import { invokeRtbFunction } from '../lib/invokeRtbFunction';
 
 function formatDate(value) {
@@ -21,6 +21,8 @@ export default function AdaTimeOffReview({ businessUnitId, active, refreshKey = 
   const [workingId, setWorkingId] = useState('');
   const [error, setError] = useState('');
   const [notes, setNotes] = useState({});
+  const [pendingDecision, setPendingDecision] = useState(null);
+  const [lastDecision, setLastDecision] = useState(null);
 
   const load = useCallback(async () => {
     if (!active || !businessUnitId) return;
@@ -50,12 +52,36 @@ export default function AdaTimeOffReview({ businessUnitId, active, refreshKey = 
         businessId: businessUnitId,
         requestId: record.id,
         decision,
+        confirmed: true,
         adminNote: notes[record.id] || '',
       });
       setRequests((current) => current.filter((item) => item.id !== record.id));
+      setLastDecision({ record, decision });
+      setPendingDecision(null);
       onDecision?.(record, decision);
     } catch (err) {
       setError(err?.message || 'Unable to update this time-off request.');
+    } finally {
+      setWorkingId('');
+    }
+  }
+
+  async function undoDecision() {
+    if (!lastDecision?.record?.id || workingId) return;
+    setWorkingId(lastDecision.record.id);
+    setError('');
+    try {
+      await invokeRtbFunction('ada-time-off', {
+        action: 'reopen',
+        businessId: businessUnitId,
+        requestId: lastDecision.record.id,
+        confirmed: true,
+      });
+      setRequests((current) => [...current, lastDecision.record].sort((a, b) => String(a.start_date).localeCompare(String(b.start_date))));
+      setLastDecision(null);
+      onDecision?.();
+    } catch (err) {
+      setError(err?.message || 'Unable to undo that decision.');
     } finally {
       setWorkingId('');
     }
@@ -75,6 +101,12 @@ export default function AdaTimeOffReview({ businessUnitId, active, refreshKey = 
       <strong>Time off waiting for your decision{requests.length ? ` (${requests.length})` : ''}</strong>
       {urgentCount ? <small>{urgentCount} request{urgentCount === 1 ? '' : 's'} need extra review because of notice or coverage.</small> : null}
       {error ? <div className="gemini-ops-brief__error" role="status">{error}</div> : null}
+      {lastDecision ? (
+        <div className="action-row">
+          <span>{lastDecision.record.staff_name}: {lastDecision.decision}.</span>
+          <button className="ghost-button small" disabled={Boolean(workingId)} onClick={undoDecision} type="button"><Undo2 size={14} /> Undo</button>
+        </div>
+      ) : null}
       <ul>
         {requests.map((record) => (
           <li key={record.id}>
@@ -96,22 +128,19 @@ export default function AdaTimeOffReview({ businessUnitId, active, refreshKey = 
               value={notes[record.id] || ''}
             />
             <div className="action-row">
-              <button
-                className="ghost-button small success-action"
-                disabled={workingId === record.id}
-                onClick={() => decide(record, 'approved')}
-                type="button"
-              >
-                <Check size={14} /> Approve
-              </button>
-              <button
-                className="ghost-button small"
-                disabled={workingId === record.id}
-                onClick={() => decide(record, 'denied')}
-                type="button"
-              >
-                <X size={14} /> Deny
-              </button>
+              {pendingDecision?.record.id === record.id ? (
+                <>
+                  <button className={pendingDecision.decision === 'approved' ? 'ghost-button small success-action' : 'ghost-button small'} disabled={workingId === record.id} onClick={() => decide(record, pendingDecision.decision)} type="button">
+                    <Check size={14} /> Confirm {pendingDecision.decision === 'approved' ? 'approval' : 'denial'}
+                  </button>
+                  <button className="ghost-button small" onClick={() => setPendingDecision(null)} type="button"><X size={14} /> Cancel</button>
+                </>
+              ) : (
+                <>
+                  <button className="ghost-button small success-action" disabled={workingId === record.id} onClick={() => setPendingDecision({ record, decision: 'approved' })} type="button"><Check size={14} /> Approve</button>
+                  <button className="ghost-button small" disabled={workingId === record.id} onClick={() => setPendingDecision({ record, decision: 'denied' })} type="button"><X size={14} /> Deny</button>
+                </>
+              )}
             </div>
           </li>
         ))}
