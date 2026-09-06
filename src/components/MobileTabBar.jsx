@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { CircleDollarSign, ClipboardCheck, Home, Menu } from 'lucide-react';
-import { getEffectivePermissionsPayload } from '../lib/permissions.js';
+import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions.js';
 
 const QUICK_NAV_IDS = ['dashboard', 'action-center', 'payroll', 'staff', 'staff-hub'];
+const OWNER_QUICK_NAV_IDS = ['dashboard', 'action-center', 'ada-control', 'staff', 'staff-hub'];
 
 const SHORT_LABELS = {
   'action-center': 'Actions',
@@ -73,7 +74,8 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
     );
   }
 
-  const quickItems = QUICK_NAV_IDS.map((id) => navItems.find((item) => item.id === id)).filter(Boolean);
+  const quickNavIds = isOwnerProfile(profile) ? OWNER_QUICK_NAV_IDS : QUICK_NAV_IDS;
+  const quickItems = quickNavIds.map((id) => navItems.find((item) => item.id === id)).filter(Boolean);
   const quickIds = new Set(quickItems.map((item) => item.id));
   const moreActive = !quickIds.has(activePage);
   const activeItem = navItems.find((item) => item.id === activePage);
