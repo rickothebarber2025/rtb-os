@@ -6,7 +6,10 @@ const ENDPOINT_KEY = 'rtb-ada-control-endpoint';
 const TOKEN_KEY = 'rtb-ada-control-token';
 
 function normalizeEndpoint(value) {
-  return String(value || '').trim().replace(/\/+$/, '');
+  const raw = String(value || '').trim().replace(/\/+$/, '');
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw}`;
 }
 
 function StatusPill({ ok, children }) {
@@ -15,7 +18,7 @@ function StatusPill({ ok, children }) {
 
 export default function AdaControlPage({ accessProfile }) {
   const owner = isOwnerProfile(accessProfile);
-  const [endpoint, setEndpoint] = useState(() => window.localStorage.getItem(ENDPOINT_KEY) || '');
+  const [endpoint, setEndpoint] = useState(() => normalizeEndpoint(window.localStorage.getItem(ENDPOINT_KEY) || ''));
   const [token, setToken] = useState(() => window.localStorage.getItem(TOKEN_KEY) || '');
   const [health, setHealth] = useState(null);
   const [status, setStatus] = useState(null);
