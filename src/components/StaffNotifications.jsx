@@ -107,7 +107,7 @@ export default function StaffNotifications({ setActivePage, setStaffHubTab }) {
       </button>
 
       {open ? (
-        <div className="staff-notifications__popover">
+        <div className="staff-notifications__popover" role="dialog" aria-modal="true" aria-label="Notifications">
           <div className="staff-notifications__header">
             <div>
               <strong>Notifications</strong>

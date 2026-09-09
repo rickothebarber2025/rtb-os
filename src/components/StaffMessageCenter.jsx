@@ -38,7 +38,8 @@ export default function StaffMessageCenter({
 
     let announcementQuery = supabase
       .from('staff_announcements')
-      .select('id,business_unit_id,title,body,category,pinned,created_at,updated_at')
+      .select('id,business_unit_id,title,body,category,pinned,created_by,created_at,updated_at')
+      .is('archived_at', null)
       .order('pinned', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(20);

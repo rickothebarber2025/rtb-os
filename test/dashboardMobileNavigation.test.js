@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const dashboard = fs.readFileSync(new URL('../src/pages/DashboardPage.jsx', import.meta.url), 'utf8');
-const enhancer = fs.readFileSync(new URL('../src/components/MobileNavigationEnhancer.jsx', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/mobileNavigation.css', import.meta.url), 'utf8');
+const main = fs.readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
 
 test('mobile dashboard tabs are dynamic instead of fixed', () => {
   assert.match(dashboard, /tabs = \[\{ id: 'overview', label: 'Overview' \}\]/);
@@ -58,9 +58,9 @@ test('Actions tab has live count badge and mobile tab changes scroll navigation 
   assert.match(dashboard, /max-width: 900px/);
 });
 
-test('legacy dashboard enhancer leaves React-managed tabs alone', () => {
+test('dashboard mobile navigation is React-owned without the legacy DOM enhancer', () => {
   assert.match(dashboard, /data-managed="react"/);
-  assert.match(enhancer, /originalNav\.dataset\.managed === 'react'/);
+  assert.doesNotMatch(main, /MobileNavigationEnhancer/);
 });
 
 test('mobile hides inactive groups without changing desktop rendering', () => {

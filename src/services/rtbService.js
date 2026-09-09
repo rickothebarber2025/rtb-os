@@ -4,6 +4,7 @@ import {
   mergeProfilePermissionFields,
   normalizePermissionsPayload,
 } from '../lib/permissions.js';
+import { emitDataChanged } from '../lib/appEvents.js';
 import { buildPermissionsFromTemplate } from '../lib/roleTemplates.js';
 import { calculateEntryValues } from '../utils/payroll';
 import { PROBATION_RATE, toDateKey } from '../utils/probation';
@@ -809,6 +810,7 @@ export async function getStaffHubRecords({ businessUnitId = null, staffId = null
         client
           .from('staff_announcements')
           .select('*')
+          .is('archived_at', null)
           .order('pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(80),
@@ -1335,13 +1337,14 @@ export async function saveStaffAnnouncement(record) {
     body: record.body,
     business_unit_id: record.business_unit_id || null,
     category: record.category || 'reminder',
+    created_by: record.id ? undefined : record.created_by || undefined,
     pinned: Boolean(record.pinned),
     title: record.title,
     updated_at: new Date().toISOString(),
   });
 
   if (record.id) {
-    return requireData(
+    const saved = requireData(
       await client
         .from('staff_announcements')
         .update(payload)
@@ -1349,9 +1352,32 @@ export async function saveStaffAnnouncement(record) {
         .select()
         .single(),
     );
+    emitDataChanged('staff-announcement-updated', { announcementId: saved.id, businessUnitId: saved.business_unit_id });
+    return saved;
   }
 
-  return requireData(await client.from('staff_announcements').insert(payload).select().single());
+  const saved = requireData(await client.from('staff_announcements').insert(payload).select().single());
+  emitDataChanged('staff-announcement-created', { announcementId: saved.id, businessUnitId: saved.business_unit_id });
+  return saved;
+}
+
+export async function archiveStaffAnnouncement(announcementId, userId = null) {
+  const client = requireClient();
+  const payload = cleanObject({
+    archived_at: new Date().toISOString(),
+    archived_by: userId || undefined,
+    updated_at: new Date().toISOString(),
+  });
+  const saved = requireData(
+    await client
+      .from('staff_announcements')
+      .update(payload)
+      .eq('id', announcementId)
+      .select()
+      .single(),
+  );
+  emitDataChanged('staff-announcement-archived', { announcementId, businessUnitId: saved.business_unit_id });
+  return saved;
 }
 
 export async function markStaffAnnouncementRead(announcementId, staffId) {

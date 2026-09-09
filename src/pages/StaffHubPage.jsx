@@ -41,6 +41,7 @@ import WeeklyGoalProgress from '../components/WeeklyGoalProgress';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
 import {
   acknowledgePolicyDocument,
+  archiveStaffAnnouncement,
   approveStaffOnboarding,
   closeStaffOnboarding,
   decideContentSubmission,
@@ -512,9 +513,11 @@ export default function StaffHubPage({
   const [announcementForm, setAnnouncementForm] = useState({
     body: '',
     category: 'reminder',
+    id: '',
     pinned: false,
     title: '',
   });
+  const [announcementComposerOpen, setAnnouncementComposerOpen] = useState(false);
   const [availabilityForm, setAvailabilityForm] = useState({
     day_of_week: 1,
     end_time: '17:00',
@@ -1428,18 +1431,50 @@ export default function StaffHubPage({
   async function submitAnnouncement(event) {
     event.preventDefault();
     const saved = await runHubAction(
-      'announcement',
+      announcementForm.id ? `announcement-edit-${announcementForm.id}` : 'announcement',
       () =>
         saveStaffAnnouncement({
           ...announcementForm,
           business_unit_id: allBusinessesView ? null : businessUnit?.id,
+          created_by: user?.id,
         }),
-      'Update posted and sent to staff.',
+      announcementForm.id ? 'Update saved.' : 'Update posted and sent to staff.',
     );
 
     if (saved) {
-      setAnnouncementForm({ body: '', category: 'reminder', pinned: false, title: '' });
+      setAnnouncementForm({ body: '', category: 'reminder', id: '', pinned: false, title: '' });
+      setAnnouncementComposerOpen(false);
     }
+  }
+
+  function editAnnouncement(announcement) {
+    setAnnouncementComposerOpen(true);
+    setAnnouncementForm({
+      body: announcement.body || '',
+      category: announcement.category || 'reminder',
+      id: announcement.id,
+      pinned: Boolean(announcement.pinned),
+      title: announcement.title || '',
+    });
+  }
+
+  function cancelAnnouncementEdit() {
+    setAnnouncementForm({ body: '', category: 'reminder', id: '', pinned: false, title: '' });
+    setAnnouncementComposerOpen(false);
+  }
+
+  function canManageAnnouncement(announcement) {
+    return ownerView || canManageHub || Boolean(announcement.created_by && announcement.created_by === user?.id);
+  }
+
+  async function archiveAnnouncement(announcement) {
+    if (!canManageAnnouncement(announcement)) return;
+    const archived = await runHubAction(
+      `announcement-archive-${announcement.id}`,
+      () => archiveStaffAnnouncement(announcement.id, user?.id),
+      'Update archived.',
+    );
+    if (archived && announcementForm.id === announcement.id) cancelAnnouncementEdit();
   }
 
   async function markAnnouncementRead(announcementId) {
@@ -3314,10 +3349,14 @@ export default function StaffHubPage({
               <span>{formatNumber(visibleAnnouncements.length)} updates</span>
             </div>
             {canManageHub ? (
-              <details className="staff-hub-composer">
+              <details
+                className="staff-hub-composer"
+                onToggle={(event) => setAnnouncementComposerOpen(event.currentTarget.open)}
+                open={announcementComposerOpen}
+              >
                 <summary>
                   <span>
-                    <strong>Post staff update</strong>
+                    <strong>{announcementForm.id ? 'Edit staff update' : 'Post staff update'}</strong>
                     <small>Share a reminder, policy note, event, or training update.</small>
                   </span>
                   <ChevronRight size={16} />
@@ -3365,9 +3404,14 @@ export default function StaffHubPage({
                     />
                     Pin this update
                   </label>
-                  <button className="primary-button" disabled={savingHubAction === 'announcement'} type="submit">
-                    Post update
+                  <button className="primary-button" disabled={savingHubAction === 'announcement' || savingHubAction === `announcement-edit-${announcementForm.id}`} type="submit">
+                    {announcementForm.id ? 'Save update' : 'Post update'}
                   </button>
+                  {announcementForm.id ? (
+                    <button className="ghost-button small" type="button" onClick={cancelAnnouncementEdit}>
+                      Cancel edit
+                    </button>
+                  ) : null}
                 </form>
               </details>
             ) : null}
@@ -3385,6 +3429,24 @@ export default function StaffHubPage({
                       </div>
                       <h3>{announcement.title}</h3>
                       <p>{announcement.body}</p>
+                      <small className="staff-hub-feed-card__byline">
+                        {announcement.created_by === user?.id ? 'Posted by you' : 'Posted by management'}
+                      </small>
+                      {canManageAnnouncement(announcement) ? (
+                        <div className="staff-hub-feed-card__actions">
+                          <button className="ghost-button small" type="button" onClick={() => editAnnouncement(announcement)}>
+                            Edit
+                          </button>
+                          <button
+                            className="ghost-button small"
+                            disabled={savingHubAction === `announcement-archive-${announcement.id}`}
+                            onClick={() => archiveAnnouncement(announcement)}
+                            type="button"
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      ) : null}
                       {staffProfile ? (
                         <button
                           className="ghost-button small"

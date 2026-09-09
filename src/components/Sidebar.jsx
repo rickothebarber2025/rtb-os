@@ -75,8 +75,8 @@ export default function Sidebar({
           <span className="status-dot" aria-hidden="true" />
           <strong>Live workspace</strong>
         </div>
-        <span>RTB Lounge</span>
-        <span>RTB Beauty Lounge</span>
+        <span>{selectedBusiness?.name || 'Assigned business'}</span>
+        <span>{businessOptions?.length > 1 ? `${businessOptions.length} accessible scopes` : 'Single-business view'}</span>
       </div>
     </aside>
   );
