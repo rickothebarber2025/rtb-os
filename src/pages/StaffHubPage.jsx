@@ -1427,16 +1427,19 @@ export default function StaffHubPage({
 
   async function submitAnnouncement(event) {
     event.preventDefault();
-    await runHubAction(
+    const saved = await runHubAction(
       'announcement',
       () =>
         saveStaffAnnouncement({
           ...announcementForm,
           business_unit_id: allBusinessesView ? null : businessUnit?.id,
         }),
-      'Announcement posted.',
+      'Update posted and sent to staff.',
     );
-    setAnnouncementForm({ body: '', category: 'reminder', pinned: false, title: '' });
+
+    if (saved) {
+      setAnnouncementForm({ body: '', category: 'reminder', pinned: false, title: '' });
+    }
   }
 
   async function markAnnouncementRead(announcementId) {
