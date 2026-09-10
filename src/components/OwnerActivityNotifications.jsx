@@ -151,11 +151,12 @@ function collapseRoutineActivity(events) {
     const key = `${event.metadata.run_id}:${event.actor_staff_id}`;
     const existing = grouped.get(key);
     if (!existing) {
-      const groupedEvent = { ...event, grouped_checklist_count: 1 };
+      const groupedEvent = { ...event, grouped_checklist_count: 1, grouped_event_ids: [event.id] };
       grouped.set(key, groupedEvent);
       result.push(groupedEvent);
     } else {
       existing.grouped_checklist_count += 1;
+      existing.grouped_event_ids.push(event.id);
       if (new Date(event.created_at) > new Date(existing.created_at)) {
         existing.created_at = event.created_at;
       }
@@ -210,10 +211,11 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
     setWorking(false);
   }
 
-  async function markOneRead(eventId) {
-    if (!supabase || !eventId) return;
+  async function markOneRead(eventIds) {
+    const ids = Array.isArray(eventIds) ? eventIds : [eventIds].filter(Boolean);
+    if (!supabase || !ids.length) return;
     setWorking(true);
-    const { error } = await supabase.rpc('mark_owner_activity_read', { p_event_ids: [eventId] });
+    const { error } = await supabase.rpc('mark_owner_activity_read', { p_event_ids: ids });
     if (!error) await load();
     setWorking(false);
   }
@@ -232,9 +234,9 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
   }
 
   if (!available) return null;
-  const unread = Number(feed.unread_count || 0);
   const rawEvents = Array.isArray(feed.events) ? feed.events : [];
   const events = collapseRoutineActivity(rawEvents);
+  const unread = events.filter((event) => !event.read).length;
   const visibleEvents = filterEvents(events, activeTab);
   const attention = rawEvents.filter((event) => priorityFor(event) === 'attention' && !event.read).length;
 
@@ -295,7 +297,7 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
               <small>{[event.actor_name && !eventText(event).startsWith(event.actor_name) ? event.actor_name : null, event.business_name, formatWhen(event.created_at)].filter(Boolean).join(' · ')}</small>
               <div className="owner-activity-event-actions">
                 <button onClick={() => openEvent(event)} type="button">{destination.label}<ChevronRight size={14} /></button>
-                {!event.read ? <button disabled={working} onClick={() => markOneRead(event.id)} type="button"><Check size={13} /> Mark read</button> : null}
+                {!event.read ? <button disabled={working} onClick={() => markOneRead(event.grouped_event_ids || event.id)} type="button"><Check size={13} /> Mark read</button> : null}
               </div>
             </div>
           </article>;
