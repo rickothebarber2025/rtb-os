@@ -11519,6 +11519,53 @@ tbody tr:hover,
   grid-template-columns: auto minmax(0, 1fr);
 }
 
+.staff-hub-secondary-card {
+  display: none;
+}
+
+.staff-hub-communication-zone {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.staff-hub-zone-header {
+  align-items: end;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.staff-hub-zone-header span {
+  color: var(--rtb-mid);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.staff-hub-zone-header h2 {
+  color: var(--rtb-text);
+  font-size: clamp(1.15rem, 2.4vw, 1.65rem);
+  line-height: 1.12;
+  margin: 0.18rem 0 0;
+}
+
+.staff-hub-communication-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.staff-hub-communication-grid > .full-span {
+  grid-column: auto;
+}
+
+.staff-hub-communication-grid > :only-child {
+  grid-column: 1 / -1;
+}
+
 .staff-hub-empty-compact {
   align-items: center;
   background: rgba(255, 255, 255, 0.035);
@@ -11647,6 +11694,15 @@ tbody tr:hover,
   .staff-hub-card-header,
   .staff-hub-motivation-panel {
     align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hub-zone-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .staff-hub-communication-grid {
     grid-template-columns: 1fr;
   }
 
@@ -13921,6 +13977,69 @@ body {
 .nav-item.active svg,
 .nav-item:hover svg {
   color: var(--shell-accent-strong);
+}
+
+.sidebar__more {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 0.35rem;
+  padding-top: 0.45rem;
+}
+
+.sidebar__more summary {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--rtb-muted);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.84rem;
+  font-weight: 850;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 40px;
+  padding: 0 0.72rem;
+}
+
+.sidebar__more summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar__more summary:hover {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--rtb-text);
+}
+
+.sidebar__more summary small {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: var(--rtb-faint);
+  display: inline-flex;
+  font-size: 0.68rem;
+  height: 22px;
+  justify-content: center;
+  min-width: 26px;
+}
+
+.sidebar__secondary-list {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 0.45rem;
+}
+
+.nav-group--secondary {
+  gap: 0.18rem;
+}
+
+.nav-item--secondary {
+  min-height: 38px;
+  opacity: 0.88;
+}
+
+.nav-item--secondary span:first-of-type {
+  font-size: 0.86rem;
 }
 
 .sidebar__footer {

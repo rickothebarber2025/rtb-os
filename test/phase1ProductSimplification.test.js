@@ -19,18 +19,30 @@ function profileFor(templateId, role = 'staff', businessUnitIds = ['lounge']) {
   };
 }
 
-test('owner navigation is grouped around command, team pay, operations, messages, and administration', () => {
+test('owner navigation is grouped around operating domains instead of old silos', () => {
   const nav = getAllowedNavItems(profileFor('owner', 'owner', [ALL_BUSINESSES_ID]));
   const groups = new Set(nav.map((item) => item.group));
 
-  for (const group of ['Command', 'Team & Pay', 'Operations', 'Messages', 'Administration']) {
+  for (const group of ['Today', 'Team & Pay', 'Team Comms', 'Daily Ops', 'Client Flow', 'Control Room']) {
     assert.equal(groups.has(group), true, `${group} should be visible for owner navigation`);
+  }
+
+  for (const retiredGroup of ['Workspace', 'Operations', 'Intelligence', 'Admin', 'Administration']) {
+    assert.equal(groups.has(retiredGroup), false, `${retiredGroup} should not return as a top-level sidebar silo`);
   }
 
   assert.equal(nav.find((item) => item.id === 'dashboard')?.label, 'Command Center');
   assert.equal(nav.find((item) => item.id === 'staff')?.group, 'Team & Pay');
   assert.equal(nav.find((item) => item.id === 'payroll')?.group, 'Team & Pay');
   assert.equal(nav.find((item) => item.id === 'staff-hub')?.label, 'Staff Messages');
+});
+
+test('owner sidebar condenses low-frequency tools behind More tools', () => {
+  const sidebar = fs.readFileSync(new URL('../src/components/Sidebar.jsx', import.meta.url), 'utf8');
+  assert.match(sidebar, /PRIMARY_NAV_IDS/);
+  assert.match(sidebar, /More tools/);
+  assert.match(sidebar, /secondaryItems/);
+  assert.match(sidebar, /activeInSecondary/);
 });
 
 test('staff portal navigation stays simple and hub-only', () => {
@@ -78,6 +90,20 @@ test('staff announcements have creator attribution, edit, and archive lifecycle 
   assert.match(migration, /archived_at timestamptz/);
   assert.match(migration, /archived_by uuid references auth\.users/);
   assert.match(migration, /created_by = \(select auth\.uid\(\)\)/);
+});
+
+test('Staff Hub home prioritizes daily action cards before communication', () => {
+  const hub = fs.readFileSync(new URL('../src/pages/StaffHubPage.jsx', import.meta.url), 'utf8');
+  assert.ok(
+    hub.indexOf('staff-hub-focus-band') < hub.indexOf('staff-hub-communication-zone'),
+    'focus band should render before communication on the Staff Hub home tab',
+  );
+  assert.ok(
+    hub.indexOf('staff-hub-dashboard-grid') < hub.indexOf('staff-hub-communication-zone'),
+    'daily dashboard should render before communication on the Staff Hub home tab',
+  );
+  assert.match(hub, /staff-hub-secondary-card/);
+  assert.doesNotMatch(hub.slice(hub.indexOf("activeTab === 'home'"), hub.indexOf("activeTab === 'updates'")), /Message management/);
 });
 
 test('mobile shell limits role quick navigation and uses a dialog notification drawer', () => {

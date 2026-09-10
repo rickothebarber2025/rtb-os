@@ -2942,36 +2942,6 @@ export default function StaffHubPage({
 
       {activeTab === 'home' ? (
         <>
-          <div className="staff-hub-subnav">
-            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('updates')} type="button">
-              <Megaphone size={14} /> Updates
-            </button>
-            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('spotlight')} type="button">
-              <Trophy size={14} /> Staff of the Month
-            </button>
-          </div>
-
-          {ownerView || canManageOperations(accessProfile) ? (
-            <OwnerRequestInbox
-              operationsRequests={hubRecords.operationsRequests}
-              timeOffRequests={hubRecords.timeOffRequests}
-              staffById={staffById}
-              busy={Boolean(savingHubAction)}
-              onReplyOperations={replyToOperationsRequest}
-              onDecideTimeOff={decideTimeOff}
-            />
-          ) : null}
-
-          <StaffMessageCenter
-            staffId={staffProfile?.id || null}
-            businessId={operationsBusinessId}
-            operationsRequests={hubRecords.operationsRequests}
-            timeOffRequests={hubRecords.timeOffRequests}
-            busy={savingHubAction === 'operations-request' || savingHubAction === 'time-off'}
-            onSendOperations={sendMessageCenterOperations}
-            onSendTimeOff={sendMessageCenterTimeOff}
-          />
-
           <section className="panel full-span staff-hub-focus-band">
             <article className={`staff-hub-focus-card ${focusCard.value === 'Overdue' ? 'urgent' : ''}`}>
               <div className="staff-hub-priority-icon">
@@ -3148,7 +3118,7 @@ export default function StaffHubPage({
               </button>
             </article>
 
-            <article className="staff-hub-app-card staff-hub-app-card--wide">
+            <article className="staff-hub-app-card staff-hub-app-card--wide staff-hub-secondary-card">
               <div className="staff-hub-card-header">
                 <div>
                   <span>Achievements</span>
@@ -3174,7 +3144,7 @@ export default function StaffHubPage({
               </div>
             </article>
 
-            <article className="staff-hub-app-card">
+            <article className="staff-hub-app-card staff-hub-secondary-card">
               <div className="staff-hub-card-header">
                 <div>
                   <span>Week vs previous</span>
@@ -3196,7 +3166,7 @@ export default function StaffHubPage({
               </div>
             </article>
 
-            <article className="staff-hub-app-card">
+            <article className="staff-hub-app-card staff-hub-secondary-card">
               <div className="staff-hub-card-header">
                 <div>
                   <span>Activity feed</span>
@@ -3226,6 +3196,45 @@ export default function StaffHubPage({
                 </div>
               )}
             </article>
+          </section>
+
+          <section className="full-span staff-hub-communication-zone" aria-label="Team communication">
+            <div className="staff-hub-zone-header">
+              <div>
+                <span>Team communication</span>
+                <h2>Updates, requests, and quick messages</h2>
+              </div>
+              <div className="staff-hub-subnav">
+                <button className="staff-hub-subnav__link" onClick={() => setActiveTab('updates')} type="button">
+                  <Megaphone size={14} /> Updates
+                </button>
+                <button className="staff-hub-subnav__link" onClick={() => setActiveTab('spotlight')} type="button">
+                  <Trophy size={14} /> Staff of the Month
+                </button>
+              </div>
+            </div>
+            <div className="staff-hub-communication-grid">
+              {ownerView || canManageOperations(accessProfile) ? (
+                <OwnerRequestInbox
+                  operationsRequests={hubRecords.operationsRequests}
+                  timeOffRequests={hubRecords.timeOffRequests}
+                  staffById={staffById}
+                  busy={Boolean(savingHubAction)}
+                  onReplyOperations={replyToOperationsRequest}
+                  onDecideTimeOff={decideTimeOff}
+                />
+              ) : null}
+
+              <StaffMessageCenter
+                staffId={staffProfile?.id || null}
+                businessId={operationsBusinessId}
+                operationsRequests={hubRecords.operationsRequests}
+                timeOffRequests={hubRecords.timeOffRequests}
+                busy={savingHubAction === 'operations-request' || savingHubAction === 'time-off'}
+                onSendOperations={sendMessageCenterOperations}
+                onSendTimeOff={sendMessageCenterTimeOff}
+              />
+            </div>
           </section>
 
           <section className="panel full-span staff-hub-nav-panel">

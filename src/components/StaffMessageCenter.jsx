@@ -222,7 +222,7 @@ export default function StaffMessageCenter({
       </div>
 
       <form className="smc-composer" onSubmit={send}>
-        <h3 className="smc-thread-title">Message management</h3>
+        <h3 className="smc-thread-title">Quick message</h3>
         <div className="smc-chips" role="group" aria-label="Quick starts">
           {QUICK_STARTS.map((chip) => (
             <button key={chip.label} type="button" className="smc-chip" onClick={() => seed(chip.seed)}>
@@ -235,8 +235,8 @@ export default function StaffMessageCenter({
           <span className="sr-only">Message management</span>
           <textarea
             value={text}
-            rows={3}
-            placeholder="Tell management anything — running late, need Friday off, out of blades, chair’s broken…"
+            rows={2}
+            placeholder="Running late, need Friday off, out of blades, chair needs attention..."
             onChange={(event) => setText(event.target.value)}
             onKeyDown={(event) => {
               if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') send(event);
