@@ -805,6 +805,24 @@ export async function getShopPresenceHistory(businessUnitId, days = 14) {
   );
 }
 
+export async function recordGoogleHomeSetupTestEvent(businessUnitId) {
+  if (!businessUnitId) {
+    throw new Error('Choose one business before sending a Google Home test event.');
+  }
+
+  const eventId = globalThis.crypto?.randomUUID?.() || `google-home-setup-${Date.now()}`;
+  return invokeFunction('google-home-shop-event', {
+    businessUnitId,
+    eventType: 'manual',
+    externalEventId: eventId,
+    source: 'google_home_setup',
+    metadata: {
+      setup_test: true,
+      purpose: 'google_home_ios_authorization_check',
+    },
+  });
+}
+
 export async function getStaffHubRecords({ businessUnitId = null, staffId = null } = {}) {
   const client = requireClient();
   const [

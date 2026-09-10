@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Camera, CheckCircle2, Clock3, Link2, RefreshCw, Store, Users } from 'lucide-react';
-import { getChecklistHistory, getShopPresenceHistory } from '../services/rtbService';
+import { getChecklistHistory, getShopPresenceHistory, recordGoogleHomeSetupTestEvent } from '../services/rtbService';
 import { connectGoogleHome, getGoogleHomeBridgeStatus } from '../native/googleHomeBridge';
 import { formatDate, formatDateTime } from '../utils/formatters';
 
@@ -85,6 +85,7 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
   const [connectingHome, setConnectingHome] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [connectionNote, setConnectionNote] = useState('');
 
   async function loadBridgeStatus() {
     const status = await getGoogleHomeBridgeStatus();
@@ -95,9 +96,17 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
   async function connectHome() {
     setConnectingHome(true);
     setError('');
+    setConnectionNote('');
     try {
       const result = await connectGoogleHome();
       setBridgeStatus((current) => ({ ...current, ...result, connected: Boolean(result?.connected) }));
+      if (businessUnitId) {
+        await recordGoogleHomeSetupTestEvent(businessUnitId);
+        setConnectionNote('Google Home authorization was accepted and a setup test event reached RTB OS.');
+        await load();
+      } else {
+        setConnectionNote('Google Home authorization was accepted. Select one business to send the setup test event.');
+      }
     } catch (err) {
       setError(err?.message || 'Unable to authorize Google Home.');
       await loadBridgeStatus();
@@ -190,7 +199,7 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
             <h3><Camera size={17} /> Google Home opening & closing</h3>
           </div>
           <span className={`status-badge ${cameraConnected ? 'success' : 'neutral'}`}>
-            {cameraConnected ? 'Camera activity connected' : 'Waiting for camera events'}
+            {cameraConnected ? 'Shop activity connected' : 'Waiting for camera events'}
           </span>
         </div>
 
@@ -199,7 +208,7 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
             <strong>{bridgeLabel(bridgeStatus)}</strong>
             <small>
               {cameraConnected
-                ? 'RTB OS is receiving physical shop activity.'
+                ? 'RTB OS is receiving shop activity records.'
                 : 'Authorize the RTB OS iPhone app, then camera/door events can be forwarded into this tracker.'}
             </small>
           </div>
@@ -217,6 +226,7 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
             <span className="status-badge neutral">iPhone setup</span>
           )}
         </div>
+        {connectionNote ? <div className="alert success">{connectionNote}</div> : null}
 
         {businessUnitId ? (
           presenceDays.length ? (
@@ -225,7 +235,7 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
                 <article className="shop-presence-day" key={day.business_date}>
                   <div className="shop-presence-day__date">
                     <strong>{formatDate(day.business_date)}</strong>
-                    <small>{day.activity_count || 0} camera event{Number(day.activity_count || 0) === 1 ? '' : 's'}</small>
+                    <small>{day.activity_count || 0} activity record{Number(day.activity_count || 0) === 1 ? '' : 's'}</small>
                   </div>
                   <div>
                     <span>First activity</span>
