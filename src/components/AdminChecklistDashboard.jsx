@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Camera, CheckCircle2, Clock3, Link2, RefreshCw, Store, Users } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, Clock3, Link2, RefreshCw, Store, Unlink, Users } from 'lucide-react';
 import { getChecklistHistory, getShopPresenceHistory, recordGoogleHomeSetupTestEvent } from '../services/rtbService';
-import { connectGoogleHome, getGoogleHomeBridgeStatus } from '../native/googleHomeBridge';
+import { connectGoogleHome, disconnectGoogleHome, getGoogleHomeBridgeStatus } from '../native/googleHomeBridge';
 import { formatDate, formatDateTime } from '../utils/formatters';
 
 const RANGE_OPTIONS = [
@@ -115,6 +115,22 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
     }
   }
 
+  async function disconnectHome() {
+    setConnectingHome(true);
+    setError('');
+    setConnectionNote('');
+    try {
+      const result = await disconnectGoogleHome();
+      setBridgeStatus((current) => ({ ...current, ...result, connected: false }));
+      setConnectionNote('Google Home was disconnected on this iPhone. Revoke full account access in Google Home or your Google Account if needed.');
+    } catch (err) {
+      setError(err?.message || 'Unable to disconnect Google Home.');
+      await loadBridgeStatus();
+    } finally {
+      setConnectingHome(false);
+    }
+  }
+
   async function load() {
     setLoading(true);
     setError('');
@@ -213,6 +229,17 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
             </small>
           </div>
           {bridgeStatus?.native ? (
+            bridgeStatus?.connected ? (
+              <button
+                className="ghost-button small"
+                disabled={connectingHome}
+                type="button"
+                onClick={disconnectHome}
+              >
+                <Unlink size={15} />
+                {connectingHome ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            ) : (
             <button
               className="secondary-button small"
               disabled={connectingHome || !bridgeReady || bridgeStatus?.connected}
@@ -222,6 +249,7 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
               <Link2 size={15} />
               {bridgeStatus?.connected ? 'Connected' : connectingHome ? 'Connecting…' : 'Connect Google Home'}
             </button>
+            )
           ) : (
             <span className="status-badge neutral">iPhone setup</span>
           )}

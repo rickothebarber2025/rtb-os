@@ -36,3 +36,10 @@ export async function connectGoogleHome() {
   }
   return GoogleHomeBridge.connect();
 }
+
+export async function disconnectGoogleHome() {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
+    throw new Error('Open RTB OS on your iPhone to disconnect Google Home.');
+  }
+  return GoogleHomeBridge.disconnect();
+}
