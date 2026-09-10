@@ -53,7 +53,7 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
     return (
       <div className="mobile-app-nav mobile-app-nav--cleaning">
         <div className="mobile-app-nav__handle"><span>Operations Cleaning</span></div>
-        <nav className="mobile-tabbar mobile-tabbar--cleaning" aria-label="Operations Cleaning navigation">
+        <nav className="mobile-tabbar mobile-tabbar--cleaning" aria-label="Operations Cleaning navigation" style={{ '--mobile-tab-count': 1 }}>
           <button aria-current="page" aria-label="Cleaning workspace" className="mobile-tabbar__item active" title="Cleaning" type="button" data-nav-target="staff-hub:daily" onClick={() => setStaffHubTab('daily')}>
             <span className="mobile-tabbar__icon-wrap"><ClipboardCheck size={20} /></span>
             <span>Cleaning</span>

@@ -357,10 +357,16 @@ function manualRecordBelongsToStaff(record, staffProfile) {
 }
 
 function getStaffActionItems(actionCenter, staffProfile, ownerView) {
+  // The Staff Hub is a staff-dedicated portal: once a login is matched to a
+  // staff profile it must only ever surface that staff member's own warnings
+  // and documents, never every staff member's, even when the viewer is the
+  // owner. The unscoped "show everything" fallback only applies to the true
+  // owner-preview state, i.e. no staff profile has been matched yet.
+  const showAll = ownerView && !staffProfile;
   const state = normalizeActionCenterState(actionCenter);
   const warnings = state.warnings
     .filter((warning) => !warning.resolved_at)
-    .filter((warning) => ownerView || manualRecordBelongsToStaff(warning, staffProfile))
+    .filter((warning) => showAll || manualRecordBelongsToStaff(warning, staffProfile))
     .map((warning) => ({
       date: warning.date || warning.created_at,
       detail: warning.notes || warning.warning_type || 'Staff warning needs review.',
@@ -370,7 +376,7 @@ function getStaffActionItems(actionCenter, staffProfile, ownerView) {
     }));
   const documents = state.documents
     .filter((document) => !document.resolved_at)
-    .filter((document) => ownerView || manualRecordBelongsToStaff(document, staffProfile))
+    .filter((document) => showAll || manualRecordBelongsToStaff(document, staffProfile))
     .map((document) => ({
       date: document.due_date || document.created_at,
       detail: `${document.document_name || 'Document'}${document.staff_name ? ` for ${document.staff_name}` : ''}`,
@@ -634,7 +640,11 @@ export default function StaffHubPage({
   const scheduleRows = useMemo(
     () =>
       getDashboardScheduleRows(masterDashboard)
-        .filter((row) => ownerView || scheduleBelongsToStaff(row, staffProfile))
+        // Same rule as getStaffActionItems: a matched staff profile always
+        // scopes the schedule to that person's own shifts, even for the
+        // owner. Shop-wide schedule only shows in the true owner-preview
+        // state (no staff profile matched).
+        .filter((row) => (ownerView && !staffProfile) || scheduleBelongsToStaff(row, staffProfile))
         .slice(0, 8),
     [masterDashboard, ownerView, staffProfile],
   );
@@ -646,6 +656,14 @@ export default function StaffHubPage({
     ...EMPTY_STAFF_HUB,
     ...(staffHub || {}),
   };
+  // Time-off requests carry another staff member's private reason for the
+  // absence — the Hub must only ever list the logged-in staff member's own
+  // requests here, never the whole team's. (Managers still review and
+  // decide every request from the dedicated OwnerRequestInbox above.)
+  const myTimeOffRequests = useMemo(
+    () => hubRecords.timeOffRequests.filter((request) => entryBelongsToStaff(request, staffProfile)),
+    [hubRecords.timeOffRequests, staffProfile],
+  );
   const restrictedOnboarding = isOnboardingRestrictedProfile(accessProfile);
   const myOnboardingInvitation = useMemo(
     () =>
@@ -2191,6 +2209,12 @@ export default function StaffHubPage({
   }
 
   function renderManagerOnboarding() {
+    // Onboarding approvals are an owner/manager oversight tool, not part of
+    // an individual staff member's own portal. Once a login is matched to a
+    // staff profile, the Hub is that person's own daily view (even if they
+    // are also the owner) and should not surface every new-hire's approval
+    // queue on top of it — that belongs in the dedicated Access/Roster area.
+    if (staffProfile) return null;
     if (!(canManageHub || canApproveOnboarding) || !managerOnboardingInvitations.length) return null;
 
     return (
@@ -3179,7 +3203,12 @@ export default function StaffHubPage({
               </div>
             </div>
             <div className="staff-hub-communication-grid">
-              {ownerView || canManageOperations(accessProfile) ? (
+              {/* Approving other staff's requests is an owner/manager
+                  oversight tool. Once a staff profile is matched, this is
+                  that person's own Hub and should stick to their own
+                  messages (see StaffMessageCenter below) rather than mixing
+                  in every staff member's requests. */}
+              {!staffProfile && (ownerView || canManageOperations(accessProfile)) ? (
                 <OwnerRequestInbox
                   operationsRequests={hubRecords.operationsRequests}
                   timeOffRequests={hubRecords.timeOffRequests}
@@ -3891,12 +3920,12 @@ export default function StaffHubPage({
 
           <div className="staff-hub-section-stack">
             <div className="staff-hub-preview-list__header">
-              <strong>Time-off requests</strong>
-              <span>{formatNumber(hubRecords.timeOffRequests.length)} total</span>
+              <strong>My time-off requests</strong>
+              <span>{formatNumber(myTimeOffRequests.length)} total</span>
             </div>
-            {hubRecords.timeOffRequests.length ? (
+            {myTimeOffRequests.length ? (
               <div className="staff-hub-list">
-                {hubRecords.timeOffRequests.slice(0, 8).map((request) => (
+                {myTimeOffRequests.slice(0, 8).map((request) => (
                   <article className="staff-hub-list-row" key={request.id}>
                     <div>
                       <strong>
@@ -3907,16 +3936,6 @@ export default function StaffHubPage({
                     <StatusBadge tone={request.status === 'approved' ? 'success' : request.status === 'denied' ? 'danger' : 'warning'}>
                       {request.status}
                     </StatusBadge>
-                    {canManageHub && request.status === 'pending' ? (
-                      <div className="staff-hub-inline-actions">
-                        <button className="ghost-button small" type="button" onClick={() => decideTimeOff(request.id, 'approved')}>
-                          <Check size={14} /> Approve
-                        </button>
-                        <button className="ghost-button small danger" type="button" onClick={() => decideTimeOff(request.id, 'denied')}>
-                          <X size={14} /> Deny
-                        </button>
-                      </div>
-                    ) : null}
                   </article>
                 ))}
               </div>
