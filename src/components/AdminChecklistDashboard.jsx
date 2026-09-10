@@ -147,7 +147,7 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
             <span>Physical verification</span>
             <h3><Camera size={17} /> Google Home opening & closing</h3>
           </div>
-          <span className={\`status-badge \${presenceDays.some((day) => day.activity_count > 0) ? 'success' : 'neutral'}\`}>
+          <span className={`status-badge ${presenceDays.some((day) => day.activity_count > 0) ? 'success' : 'neutral'}`}>
             {presenceDays.some((day) => day.activity_count > 0) ? 'Camera activity connected' : 'Waiting for camera events'}
           </span>
         </div>
@@ -171,10 +171,10 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
                     <small>{deltaText(day.closing_delta_minutes, 'close')}</small>
                   </div>
                   <div className="shop-presence-day__status">
-                    <span className={\`status-badge \${presenceTone(day.opening_status)}\`}>
+                    <span className={`status-badge ${presenceTone(day.opening_status)}`}>
                       Open: {presenceStatusLabel(day.opening_status)}
                     </span>
-                    <span className={\`status-badge \${presenceTone(day.closing_status)}\`}>
+                    <span className={`status-badge ${presenceTone(day.closing_status)}`}>
                       Close: {presenceStatusLabel(day.closing_status)}
                     </span>
                   </div>
