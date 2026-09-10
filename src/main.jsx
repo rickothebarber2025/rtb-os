@@ -18,6 +18,7 @@ import './styles/staffHubVibes.css';
 import './styles/accessControl.css';
 import './styles/adaControl.css';
 import './styles/staffHubMobileSimplify.css';
+import './styles/googleHomeBridge.css';
 
 const CACHE_CLEANUP_KEY = 'rtb-os-cache-cleanup-2026-07-12';
 
