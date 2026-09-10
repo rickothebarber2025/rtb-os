@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Bell,
   Check,
@@ -203,6 +204,25 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
     return () => supabase.removeChannel(channel);
   }, [businessId, load]);
 
+  // The panel is portaled to document.body (see the render below) so it always
+  // stacks above the app shell, including inside mobile Safari, where a
+  // `display:contents` or transformed ancestor can otherwise trap a
+  // position:fixed element and make it render behind page content instead of
+  // above it. While open, lock page scroll so the dashboard underneath can't
+  // scroll behind the panel and compete with its own internal scroll area.
+  useEffect(() => {
+    if (!open) return undefined;
+    const { style } = document.body;
+    const previousOverflow = style.overflow;
+    const previousOverscroll = style.overscrollBehavior;
+    style.overflow = 'hidden';
+    style.overscrollBehavior = 'contain';
+    return () => {
+      style.overflow = previousOverflow;
+      style.overscrollBehavior = previousOverscroll;
+    };
+  }, [open]);
+
   async function markAllRead() {
     if (!supabase || !feed.unread_count) return;
     setWorking(true);
@@ -246,7 +266,7 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
       {unread > 0 ? <span className="owner-activity-badge">{unread > 99 ? '99+' : unread}</span> : null}
     </button>
 
-    {open ? <>
+    {open ? createPortal(<>
     <button
       aria-label="Close owner notifications"
       className="owner-activity-scrim"
@@ -313,6 +333,6 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
         {unread ? <button className="owner-activity-read" disabled={working} onClick={markAllRead} type="button"><CheckCheck size={15} /> Mark all read</button> : null}
       </div>
     </div>
-    </> : null}
+    </>, document.body) : null}
   </div>;
 }
