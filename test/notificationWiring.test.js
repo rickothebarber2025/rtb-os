@@ -62,3 +62,23 @@ test('staff requests notify the owner and deep-link to the right workflow', () =
   assert.match(migration, /'staff_hub_tab','daily'/);
   assert.match(migration, /on conflict \(user_id, source_table, source_id, title\)/i);
 });
+
+test('owner notification center uses a mobile-safe sheet with compact tabs', () => {
+  const component = fs.readFileSync(new URL('../src/components/OwnerActivityNotifications.jsx', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../src/styles/ownerActivityNotifications.css', import.meta.url), 'utf8');
+  assert.match(component, /owner-activity-scrim/);
+  assert.match(component, /aria-modal="true"/);
+  assert.match(css, /\.owner-activity-scrim/);
+  assert.match(css, /max-width: 430px/);
+  assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+});
+
+test('staff notification center keeps header actions usable on iPhone widths', () => {
+  const css = fs.readFileSync(new URL('../src/styles/staffNotifications.css', import.meta.url), 'utf8');
+  assert.match(css, /max-width: 430px/);
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\) auto/);
+  assert.match(css, /max-width: 132px/);
+  assert.match(css, /white-space: normal/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+});

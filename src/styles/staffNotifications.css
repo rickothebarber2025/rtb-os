@@ -53,3 +53,41 @@
     width: calc(100% - 16px);
   }
 }
+
+@media (max-width: 430px) {
+  .staff-notifications__popover {
+    bottom: calc(5.35rem + env(safe-area-inset-bottom));
+    left: max(6px, env(safe-area-inset-left));
+    right: max(6px, env(safe-area-inset-right));
+    max-height: min(78dvh, 640px);
+  }
+
+  .staff-notifications__header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .staff-notifications__header > div:first-child,
+  .staff-notifications__header strong,
+  .staff-notifications__header small {
+    min-width: 0;
+  }
+
+  .staff-notifications__actions {
+    display: grid;
+    gap: 0.35rem;
+    justify-items: end;
+  }
+
+  .staff-notifications__actions button {
+    min-height: 38px;
+    max-width: 132px;
+    padding: 0 0.55rem;
+    white-space: normal;
+  }
+
+  .staff-notifications__item {
+    grid-template-columns: 8px minmax(0, 1fr);
+    padding: 12px;
+  }
+}

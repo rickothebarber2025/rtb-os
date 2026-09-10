@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const dashboard = fs.readFileSync(new URL('../src/pages/DashboardPage.jsx', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/mobileNavigation.css', import.meta.url), 'utf8');
+const globalCss = fs.readFileSync(new URL('../src/styles/global.css', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
 
 test('mobile dashboard tabs are dynamic instead of fixed', () => {
@@ -67,4 +68,17 @@ test('mobile hides inactive groups without changing desktop rendering', () => {
   assert.match(css, /@media \(max-width: 900px\)/);
   assert.match(css, /\[data-mobile-group\]:not\(\.is-active-mobile-tab\)/);
   assert.match(css, /display: none !important/);
+});
+
+test('dashboard has an exploration strip that connects summary cards to work areas', () => {
+  assert.match(dashboard, /explorationItems/);
+  assert.match(dashboard, /Explore RTB OS/);
+  assert.match(dashboard, /Jump to the work behind the numbers/);
+  assert.match(dashboard, /exploreDashboard\(item\)/);
+  assert.match(dashboard, /setActivePage\(item\.page\)/);
+  assert.match(dashboard, /page: 'staff-hub'/);
+  assert.match(dashboard, /label: 'Team & Pay'/);
+  assert.match(globalCss, /\.dashboard-explore-strip/);
+  assert.match(globalCss, /\.dashboard-explore-actions/);
+  assert.match(globalCss, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });

@@ -189,7 +189,14 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
       {unread > 0 ? <span className="owner-activity-badge">{unread > 99 ? '99+' : unread}</span> : null}
     </button>
 
-    {open ? <div className="owner-activity-popover" role="dialog" aria-label="Owner notifications">
+    {open ? <>
+    <button
+      aria-label="Close owner notifications"
+      className="owner-activity-scrim"
+      onClick={() => setOpen(false)}
+      type="button"
+    />
+    <div className="owner-activity-popover" role="dialog" aria-modal="true" aria-label="Owner notifications">
       <div className="owner-activity-header">
         <div>
           <strong>Notifications</strong>
@@ -245,6 +252,7 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
         <button className="owner-activity-review" onClick={reviewActivity} type="button">Open Staff Hub <ChevronRight size={16} /></button>
         {unread ? <button className="owner-activity-read" disabled={working} onClick={markAllRead} type="button"><CheckCheck size={15} /> Mark all read</button> : null}
       </div>
-    </div> : null}
+    </div>
+    </> : null}
   </div>;
 }
