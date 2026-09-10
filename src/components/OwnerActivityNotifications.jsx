@@ -15,11 +15,9 @@ import { supabase } from '../lib/supabaseClient';
 import '../styles/ownerActivityNotifications.css';
 
 const NOTIFICATION_TABS = [
-  { id: 'for-you', label: 'For You' },
+  { id: 'attention', label: 'Attention' },
+  { id: 'activity', label: 'Activity' },
   { id: 'requests', label: 'Requests' },
-  { id: 'staff', label: 'Staff' },
-  { id: 'operations', label: 'Operations' },
-  { id: 'all', label: 'All' },
 ];
 
 function formatWhen(value) {
@@ -36,16 +34,39 @@ function formatWhen(value) {
 }
 
 function eventText(event) {
-  const actor = event.actor_name || 'A staff member';
-  const title = String(event.title || '').toLowerCase();
+  if (event.grouped_checklist_count) {
+    const actor = event.actor_name || 'Staff';
+    const type = String(event.metadata?.checklist_type || 'checklist').replace(/_/g, ' ');
+    return `${actor} completed ${event.grouped_checklist_count} ${type} checklist steps.`;
+  }
+
+  const actor = event.actor_name || '';
+  const title = String(event.title || '').trim();
+  const titleLower = title.toLowerCase();
   const body = String(event.body || '').trim();
-  if (title.includes('checklist started')) return `${actor} started the ${body.replace(/^.*?·\s*/, '') || 'shop checklist'}.`;
-  if (title.includes('checklist step completed')) return `${actor} completed ${body.replace(/^.*?·\s*/, '') || 'a checklist task'}.`;
-  if (title.includes('checklist') && title.includes('completed')) return `${actor} finished the ${body.replace(/^.*?·\s*/, '') || 'checklist'}.`;
-  if (title.includes('clock') || title.includes('shift')) return body ? `${actor}: ${body}` : `${actor} updated their shift.`;
-  if (title.includes('time off')) return body ? `${actor} requested time off: ${body}` : `${actor} submitted a time-off request.`;
-  if (title.includes('incident') || title.includes('issue') || title.includes('failed')) return body ? `${actor} reported: ${body}` : `${actor} reported an issue that needs attention.`;
-  return body || event.title || `${actor} recorded a staff activity update.`;
+
+  if (titleLower.includes('checklist started')) {
+    const type = String(event.metadata?.checklist_type || 'checklist').replace(/_/g, ' ');
+    return actor ? `${actor} started the ${type} checklist.` : title;
+  }
+  if (titleLower.includes('checklist step completed')) {
+    const label = String(event.metadata?.label || '').trim();
+    return actor ? `${actor} completed ${label || 'a checklist step'}.` : (label || title);
+  }
+  if (titleLower.includes('checklist') && titleLower.includes('completed')) {
+    return actor ? `${actor} finished a checklist.` : title;
+  }
+  if (titleLower.includes('time off')) {
+    return actor ? `${actor} submitted a time-off request.` : title;
+  }
+  if (titleLower.includes('clock') || titleLower.includes('shift')) {
+    return actor ? `${actor} updated their shift.` : title;
+  }
+  if (actor && (titleLower.includes('incident') || titleLower.includes('issue') || titleLower.includes('failed'))) {
+    return `${actor} reported an issue.`;
+  }
+
+  return title || body || (actor ? `${actor} recorded an activity.` : 'RTB OS recorded an activity.');
 }
 
 function eventSearchText(event) {
@@ -112,10 +133,43 @@ function iconFor(event) {
   return ClipboardCheck;
 }
 
+function collapseRoutineActivity(events) {
+  const result = [];
+  const grouped = new Map();
+
+  for (const event of events) {
+    const isChecklistStep =
+      String(event.title || '').toLowerCase().includes('checklist step completed') &&
+      event.metadata?.run_id &&
+      event.actor_staff_id;
+
+    if (!isChecklistStep) {
+      result.push(event);
+      continue;
+    }
+
+    const key = `${event.metadata.run_id}:${event.actor_staff_id}`;
+    const existing = grouped.get(key);
+    if (!existing) {
+      const groupedEvent = { ...event, grouped_checklist_count: 1 };
+      grouped.set(key, groupedEvent);
+      result.push(groupedEvent);
+    } else {
+      existing.grouped_checklist_count += 1;
+      if (new Date(event.created_at) > new Date(existing.created_at)) {
+        existing.created_at = event.created_at;
+      }
+      existing.read = existing.read && event.read;
+    }
+  }
+
+  return result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
 function filterEvents(events, tab) {
-  if (tab === 'all') return events;
-  if (tab === 'for-you') return events.filter((event) => !event.read && priorityFor(event) === 'attention');
-  return events.filter((event) => categoryFor(event) === tab);
+  if (tab === 'attention') return events.filter((event) => !event.read && priorityFor(event) === 'attention');
+  if (tab === 'requests') return events.filter((event) => categoryFor(event) === 'requests');
+  return events;
 }
 
 function tabCount(events, tab) {
@@ -127,7 +181,7 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
   const [open, setOpen] = useState(false);
   const [available, setAvailable] = useState(true);
   const [working, setWorking] = useState(false);
-  const [activeTab, setActiveTab] = useState('for-you');
+  const [activeTab, setActiveTab] = useState('attention');
   const businessId = useMemo(() => (selectedBusinessUnitId === 'all-businesses' ? null : selectedBusinessUnitId || null), [selectedBusinessUnitId]);
 
   const load = useCallback(async () => {
@@ -179,9 +233,10 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
 
   if (!available) return null;
   const unread = Number(feed.unread_count || 0);
-  const events = Array.isArray(feed.events) ? feed.events : [];
+  const rawEvents = Array.isArray(feed.events) ? feed.events : [];
+  const events = collapseRoutineActivity(rawEvents);
   const visibleEvents = filterEvents(events, activeTab);
-  const attention = events.filter((event) => priorityFor(event) === 'attention' && !event.read).length;
+  const attention = rawEvents.filter((event) => priorityFor(event) === 'attention' && !event.read).length;
 
   return <div className="owner-activity-notifications">
     <button aria-label={`${unread} unread staff updates`} className="owner-activity-button" onClick={() => setOpen((current) => !current)} type="button">
@@ -221,9 +276,9 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
         })}
       </nav>
 
-      {activeTab === 'for-you' && attention ? <div className="owner-activity-summary">
-        <strong>{attention} item{attention === 1 ? '' : 's'} worth checking</strong>
-        <span>Only exceptions, requests and problems that may need a decision are shown here.</span>
+      {activeTab === 'attention' && attention ? <div className="owner-activity-summary">
+        <strong>{attention} item{attention === 1 ? '' : 's'} need attention</strong>
+        <span>Requests, exceptions and problems that may need a decision.</span>
       </div> : null}
 
       <div className="owner-activity-list">
@@ -234,7 +289,10 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
             <div className="owner-activity-event-icon"><EventIcon size={15} /></div>
             <div className="owner-activity-event-body">
               <strong>{eventText(event)}</strong>
-              <small>{[event.business_name, formatWhen(event.created_at)].filter(Boolean).join(' · ')}</small>
+              {event.body && !event.grouped_checklist_count && eventText(event) !== event.body ? (
+                <span className="owner-activity-event-detail">{event.body}</span>
+              ) : null}
+              <small>{[event.actor_name && !eventText(event).startsWith(event.actor_name) ? event.actor_name : null, event.business_name, formatWhen(event.created_at)].filter(Boolean).join(' · ')}</small>
               <div className="owner-activity-event-actions">
                 <button onClick={() => openEvent(event)} type="button">{destination.label}<ChevronRight size={14} /></button>
                 {!event.read ? <button disabled={working} onClick={() => markOneRead(event.id)} type="button"><Check size={13} /> Mark read</button> : null}
@@ -243,8 +301,8 @@ export default function OwnerActivityNotifications({ selectedBusinessUnitId, set
           </article>;
         }) : <div className="owner-activity-empty">
           <ListFilter size={24} />
-          <strong>{activeTab === 'for-you' ? 'Nothing needs you right now' : `No ${NOTIFICATION_TABS.find((tab) => tab.id === activeTab)?.label.toLowerCase()} updates`}</strong>
-          <span>{activeTab === 'for-you' ? 'Routine updates stay out of the way until something needs a decision.' : 'New activity will appear here automatically.'}</span>
+          <strong>{activeTab === 'attention' ? 'Nothing needs you right now' : `No ${NOTIFICATION_TABS.find((tab) => tab.id === activeTab)?.label.toLowerCase()} yet`}</strong>
+          <span>{activeTab === 'attention' ? 'Routine activity stays in the Activity tab.' : 'New activity will appear here automatically.'}</span>
         </div>}
       </div>
 
