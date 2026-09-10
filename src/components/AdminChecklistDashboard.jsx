@@ -240,15 +240,15 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
                 {connectingHome ? 'Disconnecting…' : 'Disconnect'}
               </button>
             ) : (
-            <button
-              className="secondary-button small"
-              disabled={connectingHome || !bridgeReady || bridgeStatus?.connected}
-              type="button"
-              onClick={connectHome}
-            >
-              <Link2 size={15} />
-              {bridgeStatus?.connected ? 'Connected' : connectingHome ? 'Connecting…' : 'Connect Google Home'}
-            </button>
+              <button
+                className="secondary-button small"
+                disabled={connectingHome || !bridgeReady || bridgeStatus?.connected}
+                type="button"
+                onClick={connectHome}
+              >
+                <Link2 size={15} />
+                {bridgeStatus?.connected ? 'Connected' : connectingHome ? 'Connecting…' : 'Connect Google Home'}
+              </button>
             )
           ) : (
             <span className="status-badge neutral">iPhone setup</span>
