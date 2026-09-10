@@ -103,7 +103,11 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
   return (
     <div className="mobile-app-nav">
       <div className="mobile-app-nav__handle"><span>{activeItem?.label || 'RTB OS'}</span></div>
-      <nav className="mobile-tabbar mobile-tabbar--main" aria-label="Quick navigation">
+      <nav
+        className="mobile-tabbar mobile-tabbar--main"
+        aria-label="Quick navigation"
+        style={{ '--mobile-tab-count': quickItems.length + 1 }}
+      >
         {quickItems.map((item) => {
           const Icon = item.icon;
           const active = activePage === item.id;

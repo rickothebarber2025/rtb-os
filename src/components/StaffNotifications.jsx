@@ -107,7 +107,14 @@ export default function StaffNotifications({ setActivePage, setStaffHubTab }) {
       </button>
 
       {open ? (
-        <div className="staff-notifications__popover" role="dialog" aria-modal="true" aria-label="Notifications">
+        <>
+          <button
+            aria-label="Close notifications"
+            className="staff-notifications__scrim"
+            onClick={() => setOpen(false)}
+            type="button"
+          />
+          <div className="staff-notifications__popover" role="dialog" aria-modal="true" aria-label="Notifications">
           <div className="staff-notifications__header">
             <div>
               <strong>Notifications</strong>
@@ -140,7 +147,8 @@ export default function StaffNotifications({ setActivePage, setStaffHubTab }) {
               </button>
             )) : <p className="staff-notifications__empty">No notifications yet.</p>}
           </div>
-        </div>
+          </div>
+        </>
       ) : null}
     </div>
   );

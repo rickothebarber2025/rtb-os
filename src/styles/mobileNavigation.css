@@ -29,7 +29,7 @@
 
   .mobile-tabbar--main {
     display: grid !important;
-    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(var(--mobile-tab-count, 5), minmax(0, 1fr)) !important;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
     gap: 0.1rem !important;
@@ -117,5 +117,22 @@
 @media (max-width: 520px) {
   .dashboard-appointment-metrics {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+
+@media (max-width: 900px) {
+  .mobile-app-nav {
+    padding-left: max(6px, env(safe-area-inset-left));
+    padding-right: max(6px, env(safe-area-inset-right));
+  }
+
+  .mobile-tabbar__item {
+    min-height: 52px;
+  }
+
+  .mobile-tabbar__item > span:last-child {
+    font-size: 0.68rem;
+    line-height: 1.1;
   }
 }
