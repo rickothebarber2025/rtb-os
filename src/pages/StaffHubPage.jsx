@@ -2474,16 +2474,113 @@ export default function StaffHubPage({
         </section>
       ) : null}
 
-      <section className="panel full-span staff-hub-command-intro">
-        <div>
-          <span className="eyebrow">Today</span>
-          <h2>Your RTB workspace</h2>
-          <p>Check what matters first, then jump into money, schedule, growth, or team communication.</p>
+      {activeTab === 'home' ? (
+      <section className="full-span staff-hub-pro-dashboard">
+        <div className="staff-hub-pro-topbar">
+          <div className="staff-hub-pro-title">
+            <span>Professional dashboard</span>
+            <strong>Insights</strong>
+          </div>
+          <div className="staff-hub-pro-profile">
+            <div>
+              <strong>{firstName}</strong>
+              <span>{staffProfile?.role || accessProfile?.role_title || 'Staff'}</span>
+            </div>
+            <div className="staff-hub-pro-avatar">
+              {profilePhoto ? <img src={profilePhoto} alt="" /> : <span>{initials(profileName)}</span>}
+            </div>
+          </div>
         </div>
-        <button className="secondary-button small" type="button" onClick={() => setActiveTab('daily')}>
-          Open today
-        </button>
+
+        <div className="staff-hub-pro-range">
+          <span className="staff-hub-pro-pill">Last 28 days</span>
+          <span>{recentRangeLabel(28)}</span>
+        </div>
+
+        <div className="staff-hub-pro-score-card">
+          <div className="staff-hub-pro-score-copy">
+            <span>RTB Score</span>
+            <strong>{rtbScore.score || '--'}</strong>
+            <small>{rtbScore.focus}</small>
+          </div>
+          <div
+            aria-label={`RTB Score ${rtbScore.score} out of 100`}
+            className="staff-hub-pro-score-ring"
+            style={{ '--score-progress': `${Math.min(100, Number(rtbScore.score || 0))}%` }}
+          >
+            <span>{rtbScore.score || 0}</span>
+          </div>
+        </div>
+
+        <div className="staff-hub-pro-metrics" aria-label="Staff Hub quick metrics">
+          {dailyCards.slice(0, 4).map((card) => {
+            const Icon = card.icon;
+            return (
+              <article
+                className={`staff-hub-pro-metric tone-${card.tone}`}
+                key={card.label}
+              >
+                <Icon size={17} />
+                <span>{card.label}</span>
+                <strong>{card.value}</strong>
+                <small>{card.change}</small>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="staff-hub-pro-section-heading">
+          <strong>Popular with your clients</strong>
+          <button type="button" onClick={() => setActiveTab('stats')}>
+            See all
+          </button>
+        </div>
+
+        <div className="staff-hub-pro-insight-list">
+          {professionalInsightRows.map((row) => {
+            const Icon = row.icon;
+            return (
+              <button
+                className={`staff-hub-pro-insight tone-${row.tone}`}
+                key={`${row.label}-${row.title}`}
+                onClick={() => setActiveTab(row.action)}
+                type="button"
+              >
+                <div className="staff-hub-pro-insight-icon">
+                  <Icon size={18} />
+                </div>
+                <span>
+                  <strong>{row.title}</strong>
+                  <small>{row.detail}</small>
+                  <em>{row.meta}</em>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="staff-hub-pro-signal-card">
+          <div className="staff-hub-pro-section-heading">
+            <strong>Client activity</strong>
+            <span>{recentRangeLabel(28)}</span>
+          </div>
+          <div className="staff-hub-pro-signal-list">
+            {clientSignalRows.map((row) => (
+              <div key={row.label}>
+                <span>
+                  <strong>{row.label}</strong>
+                  <em>{formatNumber(row.value)}</em>
+                </span>
+                <div>
+                  <i style={{ width: `${row.percent}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
+      ) : null}
 
       {activeTab !== 'home' ? (
       <section className="panel full-span staff-hub-command-panel">
