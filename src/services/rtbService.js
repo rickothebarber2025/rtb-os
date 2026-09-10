@@ -793,6 +793,18 @@ export async function getChecklistHistory(businessUnitId, days = 14) {
   return requireData(await query);
 }
 
+export async function getShopPresenceHistory(businessUnitId, days = 14) {
+  const client = requireClient();
+  if (!businessUnitId) return [];
+
+  return requireData(
+    await client.rpc('get_shop_presence_history', {
+      p_business_unit_id: businessUnitId,
+      p_days: Math.max(1, Math.min(Number(days || 14), 120)),
+    }),
+  );
+}
+
 export async function getStaffHubRecords({ businessUnitId = null, staffId = null } = {}) {
   const client = requireClient();
   const [

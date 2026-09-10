@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Store, Users } from 'lucide-react';
-import { getChecklistHistory } from '../services/rtbService';
+import { AlertTriangle, Camera, CheckCircle2, Clock3, RefreshCw, Store, Users } from 'lucide-react';
+import { getChecklistHistory, getShopPresenceHistory } from '../services/rtbService';
 import { formatDate, formatDateTime } from '../utils/formatters';
 
 const RANGE_OPTIONS = [
@@ -23,11 +23,51 @@ function staffName(run) {
   return run?.owner?.full_name || run?.staff_name_snapshot || 'Unassigned';
 }
 
+function presenceStatusLabel(value) {
+  const labels = {
+    verified: 'Verified',
+    late_signal: 'Late signal',
+    early_signal: 'Early signal',
+    after_hours: 'After hours',
+    no_signal: 'No camera signal',
+  };
+  return labels[value] || 'Unknown';
+}
+
+function presenceTone(value) {
+  if (value === 'verified') return 'success';
+  if (value === 'no_signal') return 'neutral';
+  return 'warning';
+}
+
+function shortTime(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('en-CA', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/Toronto',
+  }).format(new Date(value));
+}
+
+function deltaText(value, mode) {
+  if (value === null || value === undefined) return '';
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes)) return '';
+  if (mode === 'open') {
+    if (minutes <= 0) return `${Math.abs(minutes)} min before public open`;
+    return `${minutes} min after public open`;
+  }
+  if (minutes === 0) return 'at scheduled close';
+  if (minutes < 0) return `${Math.abs(minutes)} min before close`;
+  return `${minutes} min after close`;
+}
+
 export default function AdminChecklistDashboard({ businessUnitId }) {
   const [days, setDays] = useState(30);
   const [type, setType] = useState('all');
   const [staff, setStaff] = useState('all');
   const [runs, setRuns] = useState([]);
+  const [presenceDays, setPresenceDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -35,7 +75,12 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
     setLoading(true);
     setError('');
     try {
-      setRuns((await getChecklistHistory(businessUnitId, days)) || []);
+      const [history, cameraHistory] = await Promise.all([
+        getChecklistHistory(businessUnitId, days),
+        getShopPresenceHistory(businessUnitId, days),
+      ]);
+      setRuns(history || []);
+      setPresenceDays(cameraHistory || []);
     } catch (err) {
       setError(err.message || 'Unable to load opening and closing history.');
     } finally {
@@ -94,6 +139,60 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
             {option.label}
           </button>
         ))}
+      </div>
+
+      <div className="shop-presence-verification" style={{ marginTop: '1rem' }}>
+        <div className="section-header">
+          <div>
+            <span>Physical verification</span>
+            <h3><Camera size={17} /> Google Home opening & closing</h3>
+          </div>
+          <span className={`status-badge ${presenceDays.some((day) => day.activity_count > 0) ? 'success' : 'neutral'}`}>
+            {presenceDays.some((day) => day.activity_count > 0) ? 'Camera activity connected' : 'Waiting for camera events'}
+          </span>
+        </div>
+        {businessUnitId ? (
+          presenceDays.length ? (
+            <div className="shop-presence-days">
+              {presenceDays.slice(0, 7).map((day) => (
+                <article className="shop-presence-day" key={day.business_date}>
+                  <div className="shop-presence-day__date">
+                    <strong>{formatDate(day.business_date)}</strong>
+                    <small>{day.activity_count || 0} camera event{Number(day.activity_count || 0) === 1 ? '' : 's'}</small>
+                  </div>
+                  <div>
+                    <span>First activity</span>
+                    <strong>{shortTime(day.first_activity_at)}</strong>
+                    <small>{deltaText(day.opening_delta_minutes, 'open')}</small>
+                  </div>
+                  <div>
+                    <span>Last activity</span>
+                    <strong>{shortTime(day.last_activity_at)}</strong>
+                    <small>{deltaText(day.closing_delta_minutes, 'close')}</small>
+                  </div>
+                  <div className="shop-presence-day__status">
+                    <span className={`status-badge ${presenceTone(day.opening_status)}`}>
+                      Open: {presenceStatusLabel(day.opening_status)}
+                    </span>
+                    <span className={`status-badge ${presenceTone(day.closing_status)}`}>
+                      Close: {presenceStatusLabel(day.closing_status)}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state compact">
+              <h3>No Google Home activity yet</h3>
+              <p>RTB OS is ready to store camera person/door events. Once the Google Home bridge is authorized, first and last activity will appear here automatically.</p>
+            </div>
+          )
+        ) : (
+          <div className="empty-state compact">
+            <h3>Select one business</h3>
+            <p>Camera verification is shown per business so opening and closing records stay properly separated.</p>
+          </div>
+        )}
       </div>
 
       <div className="form-grid" style={{ marginTop: '1rem' }}>
