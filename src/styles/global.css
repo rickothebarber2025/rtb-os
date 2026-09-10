@@ -15391,3 +15391,211 @@ textarea {
   color: var(--faint);
   font-size: 0.72rem;
 }
+
+
+/* 2026-09 interface cohesion pass */
+.staff-hub-command-intro {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  min-height: 86px;
+}
+
+.staff-hub-command-intro h2,
+.staff-hub-command-intro p {
+  margin: 0;
+}
+
+.staff-hub-command-intro h2 {
+  font-size: 1.1rem;
+}
+
+.staff-hub-command-intro p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  margin-top: 0.3rem;
+}
+
+@media (max-width: 900px) {
+  .content {
+    padding: 0.8rem 0.75rem calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .topbar {
+    gap: 0.55rem;
+    min-height: auto;
+    padding:
+      max(0.55rem, env(safe-area-inset-top))
+      max(0.65rem, env(safe-area-inset-right))
+      0.55rem
+      max(0.65rem, env(safe-area-inset-left));
+  }
+
+  .topbar__title {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .topbar__title h1 {
+    font-size: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar__kicker,
+  .topbar__status,
+  .topbar .role-pill,
+  .topbar .user-chip {
+    display: none;
+  }
+
+  .topbar__actions {
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .topbar__business {
+    min-width: 0;
+  }
+
+  .business-selector {
+    min-width: 0;
+    width: min(42vw, 170px);
+  }
+
+  .business-selector select {
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .topbar__user-controls {
+    display: flex;
+    gap: 0.3rem;
+  }
+
+  .topbar__user-controls .icon-button,
+  .staff-notifications__button {
+    height: 40px;
+    min-height: 40px;
+    width: 40px;
+  }
+
+  .staff-hub-hero {
+    min-height: 0;
+  }
+
+  .staff-hub-hero .staff-hub-account-card {
+    display: none;
+  }
+
+  .staff-hub-brand-lockup {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .staff-hub-logo {
+    height: 54px;
+    width: 54px;
+  }
+
+  .staff-hub-brand-lockup h2 {
+    font-size: 1.35rem;
+  }
+
+  .staff-hub-brand-lockup p {
+    display: none;
+  }
+
+  .staff-hub-ops-score-strip {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .staff-hub-ops-score-strip small {
+    display: none;
+  }
+
+  .staff-hub-command-intro {
+    align-items: flex-start;
+    padding: 0.8rem;
+  }
+
+  .staff-hub-command-intro p {
+    max-width: 26rem;
+  }
+
+  .staff-hub-command-panel {
+    padding: 0.82rem;
+  }
+
+  .staff-hub-command-header {
+    gap: 0.75rem;
+  }
+
+  .staff-hub-command-profile p {
+    display: none;
+  }
+
+  .staff-hub-daily-strip {
+    gap: 0.5rem;
+  }
+
+  .staff-hub-daily-card {
+    min-height: 82px;
+    padding: 0.65rem;
+  }
+
+  .sidebar {
+    width: min(88vw, 340px);
+  }
+
+  .sidebar__nav {
+    gap: 0.55rem;
+  }
+
+  .nav-group {
+    display: grid;
+    gap: 0.18rem;
+  }
+
+  .nav-item {
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 520px) {
+  .topbar__business {
+    max-width: 145px;
+  }
+
+  .business-selector {
+    width: 132px;
+    padding: 0 0.55rem;
+  }
+
+  .business-selector svg {
+    display: none;
+  }
+
+  .topbar__user-controls > .icon-button[aria-label="Refresh data"] {
+    display: none;
+  }
+
+  .staff-hub-command-intro {
+    display: grid;
+  }
+
+  .staff-hub-command-intro .secondary-button {
+    justify-self: start;
+  }
+
+  .staff-hub-command-badges {
+    gap: 0.35rem;
+  }
+
+  .staff-hub-command-badges .badge:nth-child(n+3) {
+    display: none;
+  }
+}
