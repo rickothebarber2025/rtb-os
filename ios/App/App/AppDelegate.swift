@@ -67,6 +67,7 @@ public class GoogleHomeBridgePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     #if canImport(GoogleHomeSDK)
+    @MainActor
     private func configureHome(clientID: String, teamID: String) {
         Home.configure {
             $0.teamID = teamID
@@ -83,11 +84,11 @@ public class GoogleHomeBridgePlugin: CAPPlugin, CAPBridgedPlugin {
         let cloudProjectNumber = configValue("GoogleHomeCloudProjectNumber")
 
         #if canImport(GoogleHomeSDK)
-        if let clientID, let teamID {
-            configureHome(clientID: clientID, teamID: teamID)
-        }
-
         Task { @MainActor in
+            if let clientID, let teamID {
+                configureHome(clientID: clientID, teamID: teamID)
+            }
+
             let restoredHome = await Home.restoreSession()
             if let restoredHome {
                 self.home = restoredHome
@@ -144,7 +145,13 @@ public class GoogleHomeBridgePlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func disconnect(_ call: CAPPluginCall) {
         #if canImport(GoogleHomeSDK)
         Task { @MainActor in
-            let activeHome = self.home ?? await Home.restoreSession()
+            let activeHome: Home?
+            if let existingHome = self.home {
+                activeHome = existingHome
+            } else {
+                activeHome = await Home.restoreSession()
+            }
+
             await activeHome?.disconnect()
             self.home = nil
             call.resolve(["connected": false])

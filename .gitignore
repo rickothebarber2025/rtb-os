@@ -11,3 +11,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Google Home iOS SDK - installed locally
+/ios/ThirdParty/GoogleHomeSDK/

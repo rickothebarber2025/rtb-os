@@ -15,6 +15,8 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		5A0C8D001B2C4D5E6F708190 /* GoogleHomeSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0C8D021B2C4D5E6F708190 /* GoogleHomeSDK */; };
+		5A0C8D011B2C4D5E6F708190 /* GoogleHomeTypes in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0C8D031B2C4D5E6F708190 /* GoogleHomeTypes */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +38,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+				5A0C8D001B2C4D5E6F708190 /* GoogleHomeSDK in Frameworks */,
+				5A0C8D011B2C4D5E6F708190 /* GoogleHomeTypes in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,6 +88,7 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				9448849F3053614A00A5CCC8 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -92,6 +97,8 @@
 			name = App;
 			packageProductDependencies = (
 				4D22ABE82AF431CB00220026 /* CapApp-SPM */,
+				5A0C8D021B2C4D5E6F708190 /* GoogleHomeSDK */,
+				5A0C8D031B2C4D5E6F708190 /* GoogleHomeTypes */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -125,6 +132,7 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
+				5A0C8D041B2C4D5E6F708190 /* XCLocalSwiftPackageReference "../ThirdParty/GoogleHomeSDK" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
@@ -150,6 +158,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		9448849F3053614A00A5CCC8 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"Removing wrongly embedded static framework...\"\nrm -rf \"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/GoogleHomeTypes.framework\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		504EC3001FED79650016851F /* Sources */ = {
@@ -221,7 +250,7 @@
 				DEVELOPMENT_TEAM = N6HF9ZX8D9;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -236,7 +265,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -284,7 +313,7 @@
 				DEVELOPMENT_TEAM = N6HF9ZX8D9;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -293,7 +322,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -307,17 +336,18 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
+				APP_ATTEST_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-					APP_ATTEST_ENVIRONMENT = development;
-					CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
-					CODE_SIGN_STYLE = Automatic;
-					CURRENT_PROJECT_VERSION = 1;
-					GOOGLE_HOME_CLIENT_ID = "419889158615-e6v2v0o3aa0se4bmcg4s3en7d3dnu9nc.apps.googleusercontent.com";
-					GOOGLE_HOME_CLOUD_PROJECT_NUMBER = 419889158615;
-					INFOPLIST_FILE = App/Info.plist;
-					INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
-					IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GOOGLE_HOME_CLIENT_ID = "419889158615-e6v2v0o3aa0se4bmcg4s3en7d3dnu9nc.apps.googleusercontent.com";
+				GOOGLE_HOME_CLOUD_PROJECT_NUMBER = 419889158615;
+				GOOGLE_HOME_SERVER_CLIENT_ID = "419889158615-8i69vuphh8solpgdcik83vsa801mj3eg.apps.googleusercontent.com";
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -335,17 +365,18 @@
 		504EC3181FED79650016851F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_ATTEST_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-					APP_ATTEST_ENVIRONMENT = production;
-					CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
-					CODE_SIGN_STYLE = Automatic;
-					CURRENT_PROJECT_VERSION = 1;
-					GOOGLE_HOME_CLIENT_ID = "419889158615-e6v2v0o3aa0se4bmcg4s3en7d3dnu9nc.apps.googleusercontent.com";
-					GOOGLE_HOME_CLOUD_PROJECT_NUMBER = 419889158615;
-					INFOPLIST_FILE = App/Info.plist;
-					INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
-					IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GOOGLE_HOME_CLIENT_ID = "419889158615-e6v2v0o3aa0se4bmcg4s3en7d3dnu9nc.apps.googleusercontent.com";
+				GOOGLE_HOME_CLOUD_PROJECT_NUMBER = 419889158615;
+				GOOGLE_HOME_SERVER_CLIENT_ID = "419889158615-8i69vuphh8solpgdcik83vsa801mj3eg.apps.googleusercontent.com";
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -383,6 +414,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		5A0C8D041B2C4D5E6F708190 /* XCLocalSwiftPackageReference "../ThirdParty/GoogleHomeSDK" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../ThirdParty/GoogleHomeSDK;
+		};
 		D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "CapApp-SPM";
@@ -394,6 +429,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
+		};
+		5A0C8D021B2C4D5E6F708190 /* GoogleHomeSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A0C8D041B2C4D5E6F708190 /* XCLocalSwiftPackageReference "../ThirdParty/GoogleHomeSDK" */;
+			productName = GoogleHomeSDK;
+		};
+		5A0C8D031B2C4D5E6F708190 /* GoogleHomeTypes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A0C8D041B2C4D5E6F708190 /* XCLocalSwiftPackageReference "../ThirdParty/GoogleHomeSDK" */;
+			productName = GoogleHomeTypes;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

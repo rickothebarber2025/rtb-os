@@ -1,4 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import AgenticStaffWorkspace from './components/AgenticStaffWorkspace.jsx';
 import AppShell from './components/AppShell';
 import LoadingState from './components/LoadingState';
@@ -53,6 +55,19 @@ function getSurveyTokenFromLocation() {
 
 function isPublicPromotionsRoute() {
   return /^\/(promotions|deals|specials)\/?$/.test(window.location.pathname);
+}
+
+function readNativeRoute(url) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const page = parsed.hostname || parsed.pathname.split('/').filter(Boolean)[0] || '';
+    const section = parsed.searchParams.get('section') || parsed.searchParams.get('tab') || '';
+    if (!page) return null;
+    return { page, target: section ? { section } : null };
+  } catch {
+    return null;
+  }
 }
 
 function lastPageStorageKey(userId) {
@@ -136,6 +151,37 @@ export default function App() {
       setPageTarget(event.detail?.target ?? null);
     });
   }, [appEnabled, auth.profile, businessOptions]);
+
+  useEffect(() => {
+    if (!appEnabled || !Capacitor.isNativePlatform()) return undefined;
+    let active = true;
+    let listener = null;
+
+    function openNativeRoute(url) {
+      const route = readNativeRoute(url);
+      if (!route || !canAccessPage(auth.profile, route.page)) return;
+
+      if (route.target?.section) {
+        const browserUrl = new URL(window.location.href);
+        browserUrl.searchParams.set('section', route.target.section);
+        window.history.replaceState({ ...window.history.state, nativeRoute: route }, '', browserUrl);
+      }
+
+      setActivePage(route.page);
+      setPageTarget(route.target);
+    }
+
+    CapacitorApp.addListener('appUrlOpen', ({ url }) => { if (active) openNativeRoute(url); }).then((nextListener) => {
+      if (active) listener = nextListener;
+      else nextListener.remove();
+    });
+    CapacitorApp.getLaunchUrl().then(({ url }) => { if (active && url) openNativeRoute(url); });
+
+    return () => {
+      active = false;
+      listener?.remove();
+    };
+  }, [appEnabled, auth.profile]);
 
   useEffect(() => {
     if (!data.businessUnits.length || !businessOptions.length || !auth.profile) return;
