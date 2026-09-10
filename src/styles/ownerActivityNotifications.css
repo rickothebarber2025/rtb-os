@@ -134,8 +134,15 @@
   }
 
   .owner-activity-tabs {
-    flex-wrap: wrap;
+    display: grid;
+    gap: .4rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
     padding: .55rem .65rem;
+  }
+
+  .owner-activity-tabs button {
+    flex: 1 1 auto;
   }
 
   .owner-activity-list article {
