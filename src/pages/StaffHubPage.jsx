@@ -2478,8 +2478,8 @@ export default function StaffHubPage({
       <section className="full-span staff-hub-pro-dashboard">
         <div className="staff-hub-pro-topbar">
           <div className="staff-hub-pro-title">
-            <span>Professional dashboard</span>
-            <strong>Insights</strong>
+            <span>My RTB</span>
+            <strong>Overview</strong>
           </div>
           <div className="staff-hub-pro-profile">
             <div>
@@ -2495,6 +2495,9 @@ export default function StaffHubPage({
         <div className="staff-hub-pro-range">
           <span className="staff-hub-pro-pill">Last 28 days</span>
           <span>{recentRangeLabel(28)}</span>
+          <button className="staff-hub-pro-range-action" type="button" onClick={() => setActiveTab('daily')}>
+            Today <ChevronRight size={15} />
+          </button>
         </div>
 
         <div className="staff-hub-pro-score-card">
@@ -2530,7 +2533,7 @@ export default function StaffHubPage({
         </div>
 
         <div className="staff-hub-pro-section-heading">
-          <strong>Popular with your clients</strong>
+          <strong>Your performance</strong>
           <button type="button" onClick={() => setActiveTab('stats')}>
             See all
           </button>
