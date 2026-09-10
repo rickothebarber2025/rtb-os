@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Camera, CheckCircle2, Clock3, RefreshCw, Store, Users } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, Clock3, Link2, RefreshCw, Store, Users } from 'lucide-react';
 import { getChecklistHistory, getShopPresenceHistory } from '../services/rtbService';
+import { connectGoogleHome, getGoogleHomeBridgeStatus } from '../native/googleHomeBridge';
 import { formatDate, formatDateTime } from '../utils/formatters';
 
 const RANGE_OPTIONS = [
@@ -62,14 +63,48 @@ function deltaText(value, mode) {
   return `${minutes} min after close`;
 }
 
+function bridgeLabel(status) {
+  if (!status) return 'Checking Google Home…';
+  if (status.connected) return 'Google Home authorized';
+  if (!status.native) return status.reason || 'Finish setup on iPhone';
+  if (!status.sdkAvailable) return 'Google Home SDK not installed';
+  if (!status.clientIDConfigured || !status.teamIDConfigured || !status.cloudProjectConfigured) {
+    return 'Google Home OAuth setup required';
+  }
+  if (status.ready) return 'Ready to connect Google Home';
+  return status.reason || 'Google Home setup incomplete';
+}
+
 export default function AdminChecklistDashboard({ businessUnitId }) {
   const [days, setDays] = useState(30);
   const [type, setType] = useState('all');
   const [staff, setStaff] = useState('all');
   const [runs, setRuns] = useState([]);
   const [presenceDays, setPresenceDays] = useState([]);
+  const [bridgeStatus, setBridgeStatus] = useState(null);
+  const [connectingHome, setConnectingHome] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  async function loadBridgeStatus() {
+    const status = await getGoogleHomeBridgeStatus();
+    setBridgeStatus(status);
+    return status;
+  }
+
+  async function connectHome() {
+    setConnectingHome(true);
+    setError('');
+    try {
+      const result = await connectGoogleHome();
+      setBridgeStatus((current) => ({ ...current, ...result, connected: Boolean(result?.connected) }));
+    } catch (err) {
+      setError(err?.message || 'Unable to authorize Google Home.');
+      await loadBridgeStatus();
+    } finally {
+      setConnectingHome(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -92,6 +127,10 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
     load();
   }, [businessUnitId, days]);
 
+  useEffect(() => {
+    loadBridgeStatus();
+  }, []);
+
   const staffOptions = useMemo(
     () => [...new Set(runs.map(staffName).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [runs],
@@ -113,6 +152,9 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
     const contributors = new Set(filteredRuns.map(staffName).filter((name) => name !== 'Unassigned')).size;
     return { completed, confirmed, contributors, incomplete, total: filteredRuns.length };
   }, [filteredRuns]);
+
+  const cameraConnected = presenceDays.some((day) => day.activity_count > 0);
+  const bridgeReady = Boolean(bridgeStatus?.native && bridgeStatus?.ready);
 
   return (
     <section className="panel full-span admin-checklist-dashboard">
@@ -147,10 +189,35 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
             <span>Physical verification</span>
             <h3><Camera size={17} /> Google Home opening & closing</h3>
           </div>
-          <span className={`status-badge ${presenceDays.some((day) => day.activity_count > 0) ? 'success' : 'neutral'}`}>
-            {presenceDays.some((day) => day.activity_count > 0) ? 'Camera activity connected' : 'Waiting for camera events'}
+          <span className={`status-badge ${cameraConnected ? 'success' : 'neutral'}`}>
+            {cameraConnected ? 'Camera activity connected' : 'Waiting for camera events'}
           </span>
         </div>
+
+        <div className="shop-presence-connection">
+          <div>
+            <strong>{bridgeLabel(bridgeStatus)}</strong>
+            <small>
+              {cameraConnected
+                ? 'RTB OS is receiving physical shop activity.'
+                : 'Authorize the RTB OS iPhone app, then camera/door events can be forwarded into this tracker.'}
+            </small>
+          </div>
+          {bridgeStatus?.native ? (
+            <button
+              className="secondary-button small"
+              disabled={connectingHome || !bridgeReady || bridgeStatus?.connected}
+              type="button"
+              onClick={connectHome}
+            >
+              <Link2 size={15} />
+              {bridgeStatus?.connected ? 'Connected' : connectingHome ? 'Connecting…' : 'Connect Google Home'}
+            </button>
+          ) : (
+            <span className="status-badge neutral">iPhone setup</span>
+          )}
+        </div>
+
         {businessUnitId ? (
           presenceDays.length ? (
             <div className="shop-presence-days">
@@ -184,7 +251,7 @@ export default function AdminChecklistDashboard({ businessUnitId }) {
           ) : (
             <div className="empty-state compact">
               <h3>No Google Home activity yet</h3>
-              <p>RTB OS is ready to store camera person/door events. Once the Google Home bridge is authorized, first and last activity will appear here automatically.</p>
+              <p>RTB OS is ready to store camera person/door events. Complete the Google Home authorization on the iPhone app to start the connection.</p>
             </div>
           )
         ) : (
