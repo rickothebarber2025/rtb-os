@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { CircleDollarSign, ClipboardCheck, Home, Menu } from 'lucide-react';
+import { CalendarDays, CircleDollarSign, ClipboardCheck, Home, Menu } from 'lucide-react';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions.js';
 
 const DEFAULT_QUICK_NAV_IDS = ['dashboard', 'staff-hub', 'action-center', 'operations'];
@@ -21,7 +21,8 @@ const SHORT_LABELS = {
 const STAFF_HUB_QUICK_TABS = [
   { icon: Home, id: 'home', label: 'Home' },
   { icon: ClipboardCheck, id: 'daily', label: 'Work' },
-  { icon: CircleDollarSign, id: 'money', label: 'Money' },
+  { icon: CircleDollarSign, id: 'money', label: 'Earnings' },
+  { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
 ];
 
 function isOperationsCleaning(profile) {
@@ -67,9 +68,9 @@ export default function MobileTabBar({ activePage, navBadges, navItems, onMoreCl
     return (
       <div className="mobile-app-nav">
         <div className="mobile-app-nav__handle">
-          <span>{STAFF_HUB_QUICK_TABS.find((tab) => tab.id === staffHubTab)?.label || (staffHubTab === 'stats' ? 'Growth' : 'Team')}</span>
+          <span>{STAFF_HUB_QUICK_TABS.find((tab) => tab.id === staffHubTab)?.label || (staffHubTab === 'stats' ? 'Performance' : staffHubTab === 'updates' ? 'Updates' : staffHubTab === 'spotlight' ? 'Spotlight' : staffHubTab === 'tips' ? 'Tips' : 'More')}</span>
         </div>
-        <nav className="mobile-tabbar mobile-tabbar--hub" aria-label="Staff Hub navigation">
+        <nav className="mobile-tabbar mobile-tabbar--hub" aria-label="Staff Hub navigation" style={{ '--mobile-tab-count': STAFF_HUB_QUICK_TABS.length + 1 }}>
           {STAFF_HUB_QUICK_TABS.map((tab) => {
             const Icon = tab.icon;
             const active = staffHubTab === tab.id;

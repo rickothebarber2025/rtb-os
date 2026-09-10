@@ -218,12 +218,35 @@
 
   .page-staff-hub .staff-hub-page > .staff-hub-hero,
   .page-staff-hub .staff-hub-page > .staff-hub-ops-score-strip,
-  .page-staff-hub .staff-hub-page > .staff-hub-pro-dashboard,
   .page-staff-hub .staff-hub-page > .staff-hub-daily-strip,
   .page-staff-hub .staff-hub-page > .staff-hub-tabs-panel,
-  .page-staff-hub .staff-hub-page > .staff-hub-sticky-tabs,
   .page-staff-hub .staff-hub-page > .daily-ops-hero {
     display: none !important;
+  }
+
+  /* Keep the real Staff Hub overview and navigation visible on phones.
+     These are core destinations, not decorative desktop chrome. */
+  .page-staff-hub .staff-hub-page > .staff-hub-pro-dashboard {
+    display: grid !important;
+  }
+
+  .page-staff-hub .staff-hub-page > .staff-hub-sticky-tabs {
+    display: flex !important;
+    gap: 0.35rem;
+    overflow-x: auto;
+    padding: 0.3rem 0.05rem 0.45rem;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .page-staff-hub .staff-hub-page > .staff-hub-sticky-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .page-staff-hub .staff-hub-page > .staff-hub-sticky-tabs button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    white-space: nowrap;
   }
 
   .page-staff-hub .staff-hub-page {
@@ -299,7 +322,7 @@
 }
 
 
-/* The Hub now has four primary destinations; Schedule and Performance live in More. */
+/* Keep important Staff Hub destinations visible while preserving a compact mobile layout. */
 .staff-hub-tabs button,
 .staff-hub-sticky-tabs button {
   order: initial;
@@ -307,6 +330,6 @@
 
 @media (max-width: 1024px) {
   .page-staff-hub + .mobile-app-nav .mobile-tabbar {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }

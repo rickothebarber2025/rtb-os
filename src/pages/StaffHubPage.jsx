@@ -89,7 +89,9 @@ import {
 const TABS = [
   { icon: Home, id: 'home', label: 'Home' },
   { icon: ClipboardCheck, id: 'daily', label: 'Work' },
-  { icon: CircleDollarSign, id: 'money', label: 'Money' },
+  { icon: CircleDollarSign, id: 'money', label: 'Earnings' },
+  { icon: TrendingUp, id: 'stats', label: 'Performance' },
+  { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
   { icon: MoreHorizontal, id: 'more', label: 'More' },
 ];
 
@@ -100,9 +102,7 @@ const TABS = [
 // was actually crowded. This map is only for which primary tab should
 // show as "active" while on one of these secondary pages.
 const TAB_PARENT = {
-  schedule: 'more',
   spotlight: 'home',
-  stats: 'more',
   tips: 'money',
   updates: 'home',
 };
