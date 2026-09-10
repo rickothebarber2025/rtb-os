@@ -2485,6 +2485,7 @@ export default function StaffHubPage({
         </button>
       </section>
 
+      {activeTab !== 'home' ? (
       <section className="panel full-span staff-hub-command-panel">
         <div className="staff-hub-command-header">
           <div className="staff-hub-command-profile">
@@ -2545,6 +2546,7 @@ export default function StaffHubPage({
           })}
         </div>
       </section>
+      ) : null}
 
       <section className="panel full-span staff-hub-tabs-panel">
         <div className="staff-hub-tabs" role="tablist" aria-label="Staff Hub sections">
@@ -2874,16 +2876,46 @@ export default function StaffHubPage({
             </article>
           </section>
 
-          <section className="staff-hub-dashboard-grid full-span" aria-label="Staff Hub daily dashboard">
-            <article className="staff-hub-app-card staff-hub-app-card--wide staff-hub-earnings-card">
-              <div className="staff-hub-card-header">
+          <section className="staff-hub-dashboard-grid staff-hub-operating-band full-span" aria-label="Staff Hub daily operating screen">
+            {!latestEntry && !scheduleRows.length && !reviewCount ? (
+              <article className="staff-hub-sync-banner">
                 <div>
-                  <span>Earnings overview</span>
-                  <h2>{latestEntry ? formatCurrency(latestEntry.take_home) : 'Waiting for payroll'}</h2>
-                  <p>{latestEntry?.week_label || 'Saved payroll entries will build this trend.'}</p>
+                  <span>Data sync</span>
+                  <strong>Sync Booksy, Square, or payroll to fill this daily screen.</strong>
                 </div>
-                <button className="ghost-button small" type="button" onClick={() => setActiveTab('money')}>
-                  Money
+                <button className="secondary-button small" type="button" onClick={() => openPage('integrations')}>
+                  Open Connections
+                </button>
+              </article>
+            ) : null}
+
+            <article className="staff-hub-performance-banner">
+              <div className="staff-hub-performance-banner__main">
+                <span>Today’s operating view</span>
+                <h2>{latestEntry ? formatCurrency(latestEntry.take_home) : 'Waiting for payroll'}</h2>
+                <p>{latestEntry?.week_label || 'Payroll, schedule, and review activity will appear here after sync.'}</p>
+              </div>
+              <div className="staff-hub-performance-steps">
+                <button type="button" onClick={() => setActiveTab('money')}>
+                  <WalletCards size={16} />
+                  <span>
+                    <strong>{formatCurrency(totalTakeHome)}</strong>
+                    <small>Total earned</small>
+                  </span>
+                </button>
+                <button type="button" onClick={() => setActiveTab('schedule')}>
+                  <CalendarDays size={16} />
+                  <span>
+                    <strong>{formatNumber(scheduleRows.length)}</strong>
+                    <small>Schedule rows</small>
+                  </span>
+                </button>
+                <button type="button" onClick={() => setActiveTab('stats')}>
+                  <Star size={16} />
+                  <span>
+                    <strong>{formatNumber(fiveStarReviews)}/{reviewGoal.target}</strong>
+                    <small>Review goal</small>
+                  </span>
                 </button>
               </div>
               {weeklyTrend.length ? (
@@ -2895,58 +2927,43 @@ export default function StaffHubPage({
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="staff-hub-empty-compact">
-                  <WalletCards size={22} />
-                  <span>Payroll history will show here after a saved run.</span>
-                </div>
-              )}
-              <div className="staff-hub-card-metrics">
-                <div>
-                  <span>Total earned</span>
-                  <strong>{formatCurrency(totalTakeHome)}</strong>
-                </div>
-                <div>
-                  <span>Total tips</span>
-                  <strong>{formatCurrency(totalTips)}</strong>
-                </div>
-                <div>
-                  <span>Recorded weeks</span>
-                  <strong>{formatNumber(ownEntries.length)}</strong>
-                </div>
-              </div>
+              ) : null}
             </article>
 
-            <article className="staff-hub-app-card staff-hub-goal-summary">
-              <div className="staff-hub-card-header">
-                <div>
-                  <span>Goal progress</span>
-                  <h2>{formatCurrency(monthlyGoal.currentRevenue)}</h2>
-                  <p>Monthly revenue goal: {formatCurrency(monthlyGoal.goal)}</p>
+            <article className="staff-hub-action-panel">
+              <div className="staff-hub-action-panel__metric">
+                <span>Monthly revenue</span>
+                <strong>{monthlyGoal.percentComplete}%</strong>
+                <div className="staff-hub-progress-track">
+                  <span style={{ width: `${monthlyGoal.percentComplete}%` }} />
                 </div>
-              </div>
-              <div className="staff-hub-progress-track">
-                <span style={{ width: `${monthlyGoal.percentComplete}%` }} />
-              </div>
-              <strong>{monthlyGoal.percentComplete}% complete</strong>
-              <small>Need {formatCurrency(monthlyGoal.remaining)} more this month.</small>
-              <button className="secondary-button" type="button" onClick={() => setActiveTab('money')}>
-                Adjust goal
-              </button>
-            </article>
-
-            <article className="staff-hub-app-card">
-              <div className="staff-hub-card-header">
-                <div>
-                  <span>Reminders</span>
-                  <h2>Today’s focus</h2>
-                </div>
-                <button className="ghost-button small" type="button" onClick={() => setActiveTab('more')}>
-                  Tasks
+                <small>{formatCurrency(monthlyGoal.remaining)} left to goal</small>
+                <button className="secondary-button small" type="button" onClick={() => setActiveTab('money')}>
+                  Adjust goal
                 </button>
               </div>
+              <div className="staff-hub-action-panel__metric">
+                <span>Review goal</span>
+                <strong>{reviewGoal.percent}%</strong>
+                <div className="staff-hub-progress-track">
+                  <span style={{ width: `${reviewGoal.percent}%` }} />
+                </div>
+                <small>{reviewGoal.remaining} more five-star review{reviewGoal.remaining === 1 ? '' : 's'} needed</small>
+                <button className="primary-button small" type="button" onClick={() => setActiveTab('stats')}>
+                  Open review flow
+                </button>
+              </div>
+            </article>
+
+            <article className="staff-hub-next-action-card">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Next actions</span>
+                  <h2>Move from numbers to work</h2>
+                </div>
+              </div>
               <div className="staff-hub-reminder-list">
-                {reminders.map((item) => {
+                {reminders.slice(0, 3).map((item) => {
                   const Icon = item.icon;
                   return (
                     <button
@@ -2964,63 +2981,6 @@ export default function StaffHubPage({
                   );
                 })}
               </div>
-            </article>
-
-            <article className="staff-hub-app-card">
-              <div className="staff-hub-card-header">
-                <div>
-                  <span>Schedule</span>
-                  <h2>Next appointments</h2>
-                </div>
-                <button className="ghost-button small" type="button" onClick={() => setActiveTab('schedule')}>
-                  View
-                </button>
-              </div>
-              {scheduleRows.length ? (
-                <div className="staff-hub-schedule-preview">
-                  {scheduleRows.slice(0, 4).map((row, index) => (
-                    <div key={`${row.date || row.created_at || index}-${row.client || row.service || index}`}>
-                      <time>{scheduleDisplayTime(row)}</time>
-                      <span>
-                        <strong>{row.service || row.item || 'Service'}</strong>
-                        <small>{row.client || row.customer || 'Client not listed'}</small>
-                      </span>
-                      <StatusBadge tone={row.schedule_type === 'Upcoming' ? 'gold' : 'muted'}>
-                        {row.schedule_type || 'Imported'}
-                      </StatusBadge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="staff-hub-empty-compact">
-                  <CalendarDays size={22} />
-                  <span>Imported Booksy or Square appointments will appear here.</span>
-                </div>
-              )}
-            </article>
-
-            <article className="staff-hub-app-card">
-              <div className="staff-hub-card-header">
-                <div>
-                  <span>Reviews</span>
-                  <h2>
-                    {ownActivityReviewSummary?.average_rating
-                      ? `${ownActivityReviewSummary.average_rating}/5`
-                      : 'Waiting'}
-                  </h2>
-                  <p>{formatNumber(reviewCount)} verified review{reviewCount === 1 ? '' : 's'}</p>
-                </div>
-                <MessageSquare size={22} />
-              </div>
-              <div className="staff-hub-progress-track">
-                <span style={{ width: `${reviewGoal.percent}%` }} />
-              </div>
-              <small>
-                {formatNumber(fiveStarReviews)} five-star reviews · {reviewGoal.remaining} left for the next goal.
-              </small>
-              <button className="secondary-button" type="button" onClick={() => setActiveTab('stats')}>
-                Review stats
-              </button>
             </article>
 
             <article className="staff-hub-app-card staff-hub-app-card--wide staff-hub-secondary-card">

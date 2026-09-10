@@ -45,6 +45,15 @@ test('owner sidebar condenses low-frequency tools behind More tools', () => {
   assert.match(sidebar, /activeInSecondary/);
 });
 
+test('topbar uses one contextual shell capsule for date business role and identity', () => {
+  const topbar = fs.readFileSync(new URL('../src/components/Topbar.jsx', import.meta.url), 'utf8');
+  const styles = fs.readFileSync(new URL('../src/styles/global.css', import.meta.url), 'utf8');
+
+  assert.match(topbar, /topbar__context-pill/);
+  assert.ok(topbar.indexOf('topbar__context-pill') < topbar.indexOf('topbar__user-controls'));
+  assert.match(styles, /\.topbar__context-pill/);
+});
+
 test('staff portal navigation stays simple and hub-only', () => {
   const nav = getAllowedNavItems(profileFor('staff_portal'));
   assert.deepEqual(nav.map((item) => item.id), ['staff-hub']);
@@ -104,6 +113,20 @@ test('Staff Hub home prioritizes daily action cards before communication', () =>
   );
   assert.match(hub, /staff-hub-secondary-card/);
   assert.doesNotMatch(hub.slice(hub.indexOf("activeTab === 'home'"), hub.indexOf("activeTab === 'updates'")), /Message management/);
+});
+
+test('Staff Hub home uses a unified operating band with action triggers and one sync empty state', () => {
+  const hub = fs.readFileSync(new URL('../src/pages/StaffHubPage.jsx', import.meta.url), 'utf8');
+  const home = hub.slice(hub.indexOf("activeTab === 'home'"), hub.indexOf("activeTab === 'updates'"));
+
+  assert.match(home, /staff-hub-operating-band/);
+  assert.match(home, /staff-hub-performance-banner/);
+  assert.match(home, /staff-hub-action-panel/);
+  assert.match(home, /Open review flow/);
+  assert.match(home, /setActiveTab\('stats'\)/);
+  assert.match(home, /staff-hub-sync-banner/);
+  assert.doesNotMatch(home, /Imported Booksy or Square appointments will appear here/);
+  assert.doesNotMatch(home, /0 % complete/);
 });
 
 test('mobile shell limits role quick navigation and uses a dialog notification drawer', () => {
