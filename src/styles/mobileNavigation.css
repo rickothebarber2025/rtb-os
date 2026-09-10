@@ -39,7 +39,7 @@
 
   .mobile-tabbar--hub {
     display: grid !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(var(--mobile-tab-count, 5), minmax(0, 1fr)) !important;
     gap: 0.2rem !important;
     width: 100% !important;
   }
