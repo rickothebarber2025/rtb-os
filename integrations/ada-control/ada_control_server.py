@@ -11,13 +11,12 @@ import os
 import subprocess
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("ADA_CONTROL_PORT", "8791"))
 TOKEN = os.environ.get("ADA_CONTROL_TOKEN", "").strip()
-REPO = Path(os.environ.get("RTB_OS_REPO", str(Path.home() / "Documents" / "rtb-os"))).resolve()
 ADA_ARCHIVE_URL = os.environ.get("ADA_ARCHIVE_URL", "http://127.0.0.1:8790/api/messages/archive?sort=priority")
+ADA_ARCHIVE_SYNC_URL = os.environ.get("ADA_ARCHIVE_SYNC_URL", "http://127.0.0.1:8790/api/messages/archive/sync")
 SYNC_LABEL = "com.rtb.ada-sync"
 
 CAPABILITIES = ["ada_sync_run", "ada_sync_restart", "messages_archive_check", "tailscale_status"]
@@ -31,6 +30,16 @@ def archive_check():
         with urllib.request.urlopen(ADA_ARCHIVE_URL, timeout=5) as response:
             body = response.read(4096)
             return {"ok": 200 <= response.status < 300, "status": response.status, "bytes_sampled": len(body)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+def archive_sync():
+    try:
+        request = urllib.request.Request(ADA_ARCHIVE_SYNC_URL, data=b"{}", headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(request, timeout=60) as response:
+            body = response.read(4096)
+            payload = json.loads(body or b"{}")
+            return {"ok": 200 <= response.status < 300, "status": response.status, "result": payload}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
 
@@ -53,10 +62,7 @@ def launchd_status():
 
 def command(name):
     if name == "ada_sync_run":
-        script = REPO / "integrations" / "ada-sync" / "run.sh"
-        if not script.exists():
-            return {"ok": False, "error": f"Missing {script}"}
-        return run(["/bin/zsh", str(script)], timeout=60)
+        return archive_sync()
     if name == "ada_sync_restart":
         uid = os.getuid()
         return run(["/bin/launchctl", "kickstart", "-k", f"gui/{uid}/{SYNC_LABEL}"], timeout=20)
