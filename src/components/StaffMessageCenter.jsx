@@ -232,7 +232,7 @@ export default function StaffMessageCenter({
         </div>
 
         <label className="smc-field">
-          <span className="sr-only">Message management</span>
+          <span className="sr-only">Quick message</span>
           <textarea
             value={text}
             rows={2}
