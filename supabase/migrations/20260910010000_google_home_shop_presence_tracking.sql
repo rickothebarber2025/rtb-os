@@ -87,7 +87,7 @@ grant insert, update, delete on public.shop_presence_settings to authenticated;
 insert into public.shop_presence_settings (business_unit_id, open_hours)
 values
 (
-  'c41fee76-63d4-42bc-b065-0584a1d41f4f'::uuid,
+  'c41fee76-63d4-42bc-b065-058a4f150f3f'::uuid,
   '{"0":{"open":"11:00","close":"19:00"},"1":{"open":"10:00","close":"20:00"},"2":{"open":"10:00","close":"20:00"},"3":{"open":"10:00","close":"20:00"},"4":{"open":"10:00","close":"20:00"},"5":{"open":"10:00","close":"20:00"},"6":{"open":"10:00","close":"20:00"}}'::jsonb
 ),
 (
