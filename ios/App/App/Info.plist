@@ -33,6 +33,12 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_HOME_CLIENT_ID)</string>
+	<key>GIDTeamID</key>
+	<string>$(DEVELOPMENT_TEAM)</string>
+	<key>GoogleHomeCloudProjectNumber</key>
+	<string>$(GOOGLE_HOME_CLOUD_PROJECT_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIBackgroundModes</key>
