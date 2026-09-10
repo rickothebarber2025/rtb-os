@@ -15,15 +15,6 @@ function setStatus(status, details = '') {
   const payload = { status, details, at: new Date().toISOString() };
   try { window.localStorage.setItem(PUSH_STATUS_KEY, JSON.stringify(payload)); } catch { /* best effort */ }
   console.info('[RTB Push]', status, details || '');
-  // TEMP DIAGNOSTIC (2026-09-10) - remove once push registration is confirmed working.
-  try {
-    if (supabase) {
-      supabase.from('app_client_errors').insert({
-        message: `[RTB Push] ${status}${details ? ': ' + String(details).slice(0, 500) : ''}`,
-        page: 'push-notifications-debug',
-      }).then(() => {}).catch(() => {});
-    }
-  } catch { /* never let diagnostics break push registration */ }
 }
 
 function readStoredToken() {
