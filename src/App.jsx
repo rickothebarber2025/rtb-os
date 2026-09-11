@@ -25,6 +25,7 @@ import {
 } from './utils/smartDefaults.js';
 
 const AccessPage = lazy(() => import('./pages/AccessPage'));
+const SupportPage = lazy(() => import('./pages/SupportPage'));
 const AdaControlPage = lazy(() => import('./pages/AdaControlPage'));
 const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
 const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
@@ -55,6 +56,10 @@ function getSurveyTokenFromLocation() {
 
 function isPublicPromotionsRoute() {
   return /^\/(promotions|deals|specials)\/?$/.test(window.location.pathname);
+}
+
+function isSupportRoute() {
+  return /^\/support\/?$/.test(window.location.pathname);
 }
 
 function readNativeRoute(url) {
@@ -282,34 +287,12 @@ export default function App() {
         return <ModuleGate module="finance"><FinancialBuddyPage {...pageProps} /></ModuleGate>;
       case 'marketing-calendar':
         return <ModuleGate module="performance"><MarketingCalendarPage {...pageProps} /></ModuleGate>;
-        return (
-          <ModuleGate module="operations">
-            <AiConsultantPage {...pageProps} />
-          </ModuleGate>
-        );
-      case 'messages':
-        return (
-          <ModuleGate module="messages">
-            <MessagesPage {...pageProps} />
-          </ModuleGate>
-        );
       case 'payroll':
         return <ModuleGate module="payroll"><PayrollPage {...pageProps} /></ModuleGate>;
       case 'staff':
         return <ModuleGate module="roster"><StaffPage {...pageProps} /></ModuleGate>;
       case 'talent-pipeline':
         return <ModuleGate module="roster" minimum="edit"><TalentPipelinePage {...pageProps} /></ModuleGate>;
-        return (
-          <ModuleGate module="roster">
-            <StaffPage {...pageProps} />
-          </ModuleGate>
-        );
-      case 'talent-pipeline':
-        return (
-          <ModuleGate module="roster" minimum="edit">
-            <TalentPipelinePage {...pageProps} />
-          </ModuleGate>
-        );
       case 'staff-hub':
         return <ModuleGate module="staff_hub"><StaffHubPage {...pageProps} /></ModuleGate>;
       case 'performance':
@@ -327,18 +310,14 @@ export default function App() {
       case 'dashboard':
       default:
         return <ModuleGate module="dashboard"><DashboardPage {...pageProps} /></ModuleGate>;
-        return (
-          <ModuleGate module="dashboard">
-            <DashboardPage {...pageProps} />
-          </ModuleGate>
-        );
     }
   }
 
+  if (isSupportRoute()) return <Suspense fallback={<LoadingState label="Loading support" />}><SupportPage /></Suspense>;
   if (auth.loading) return <LoadingState />;
   if (surveyToken) return <Suspense fallback={<LoadingState label="Loading feedback survey" />}><SurveyPage token={surveyToken} /></Suspense>;
   if (isPublicPromotionsRoute()) return <Suspense fallback={<LoadingState label="Loading promotions" />}><PublicPromotionsPage /></Suspense>;
-  if (!auth.session) return <AuthPage authError={auth.authError} isConfigured={auth.isConfigured} sendMagicLink={auth.sendMagicLink} signInWithGoogle={auth.signInWithGoogle} signInWithPassword={auth.signInWithPassword} signUp={auth.signUp} />;
+  if (!auth.session) return <AuthPage authError={auth.authError} isConfigured={auth.isConfigured} sendMagicLink={auth.sendMagicLink} signInWithApple={auth.signInWithApple} signInWithGoogle={auth.signInWithGoogle} signInWithPassword={auth.signInWithPassword} signUp={auth.signUp} />;
   if (!canUseApp(auth.profile)) return <AccessPendingPage error={auth.profileError} profile={auth.profile} refreshProfile={auth.refreshProfile} signOut={auth.signOut} />;
 
   return (

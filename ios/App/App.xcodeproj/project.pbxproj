@@ -16,7 +16,6 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		5A0C8D001B2C4D5E6F708190 /* GoogleHomeSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0C8D021B2C4D5E6F708190 /* GoogleHomeSDK */; };
-		5A0C8D011B2C4D5E6F708190 /* GoogleHomeTypes in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0C8D031B2C4D5E6F708190 /* GoogleHomeTypes */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,7 +38,6 @@
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
 				5A0C8D001B2C4D5E6F708190 /* GoogleHomeSDK in Frameworks */,
-				5A0C8D011B2C4D5E6F708190 /* GoogleHomeTypes in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -98,7 +96,6 @@
 			packageProductDependencies = (
 				4D22ABE82AF431CB00220026 /* CapApp-SPM */,
 				5A0C8D021B2C4D5E6F708190 /* GoogleHomeSDK */,
-				5A0C8D031B2C4D5E6F708190 /* GoogleHomeTypes */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -346,6 +343,7 @@
 				GOOGLE_HOME_CLOUD_PROJECT_NUMBER = 419889158615;
 				GOOGLE_HOME_SERVER_CLIENT_ID = "419889158615-8i69vuphh8solpgdcik83vsa801mj3eg.apps.googleusercontent.com";
 				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "RTB OS";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -375,6 +373,7 @@
 				GOOGLE_HOME_CLOUD_PROJECT_NUMBER = 419889158615;
 				GOOGLE_HOME_SERVER_CLIENT_ID = "419889158615-8i69vuphh8solpgdcik83vsa801mj3eg.apps.googleusercontent.com";
 				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "RTB OS";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -434,11 +433,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5A0C8D041B2C4D5E6F708190 /* XCLocalSwiftPackageReference "../ThirdParty/GoogleHomeSDK" */;
 			productName = GoogleHomeSDK;
-		};
-		5A0C8D031B2C4D5E6F708190 /* GoogleHomeTypes */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5A0C8D041B2C4D5E6F708190 /* XCLocalSwiftPackageReference "../ThirdParty/GoogleHomeSDK" */;
-			productName = GoogleHomeTypes;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
