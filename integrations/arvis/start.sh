@@ -36,8 +36,11 @@ if [[ -f "$LEGACY_WYZE_ENV" && -d "$WYZE_DIR" ]]; then
   echo "Wyze API configuration: linked from existing local assistant config"
 fi
 
-# Apply the idempotent parent/iframe live-data bridge before startup.
+# Apply the idempotent parent/iframe live-data and Main Brain bridge before startup.
 node "$REPO_DIR/integrations/arvis/patch-neural-workbench.mjs" "$WORKBENCH_DIR"
+
+# Apply RTB-owned Workbench component overrides so local AI Studio exports stay in sync.
+node "$REPO_DIR/integrations/arvis/apply-workbench-overrides.mjs" "$WORKBENCH_DIR"
 
 # Replace synthetic briefing/anomaly fallbacks with verified RTB OS-only behavior.
 node "$REPO_DIR/integrations/arvis/harden-neural-workbench.mjs" "$WORKBENCH_DIR"
@@ -83,6 +86,7 @@ fi
 echo "A.R.V.I.S. control bridge: http://127.0.0.1:8791"
 echo "Neural Workbench: $WORKBENCH_URL"
 echo "RTB OS live-data bridge: enabled"
+echo "RTB Workbench process views: synchronized"
 echo "Synthetic briefing/anomaly fallbacks: disabled"
 echo "Telemetry audit: $STATE_DIR/neural-workbench-audit.json"
 echo "Startup complete."
