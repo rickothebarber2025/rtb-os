@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, CheckCircle2, Play, RefreshCw, Server, ShieldCheck, Wifi, XCircle } from 'lucide-react';
+import { Activity, CheckCircle2, ExternalLink, MonitorCog, Play, RefreshCw, Server, ShieldCheck, Wifi, XCircle } from 'lucide-react';
 import { isOwnerProfile } from '../lib/permissions.js';
 
 const ENDPOINT_KEY = 'rtb-ada-control-endpoint';
 const TOKEN_KEY = 'rtb-ada-control-token';
+const WORKBENCH_URL_KEY = 'rtb-neural-workbench-url';
+const DEFAULT_WORKBENCH_URL = 'http://127.0.0.1:3000';
 
 function normalizeEndpoint(value) {
   const raw = String(value || '').trim().replace(/\/+$/, '');
   if (!raw) return '';
   if (/^https?:\/\//i.test(raw)) return raw;
   return `https://${raw}`;
+}
+
+function normalizeWorkbenchUrl(value) {
+  const raw = String(value || '').trim().replace(/\/+$/, '');
+  if (!raw) return DEFAULT_WORKBENCH_URL;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `http://${raw}`;
 }
 
 function StatusPill({ ok, children }) {
@@ -20,6 +29,7 @@ export default function AdaControlPage({ accessProfile }) {
   const owner = isOwnerProfile(accessProfile);
   const [endpoint, setEndpoint] = useState(() => normalizeEndpoint(window.localStorage.getItem(ENDPOINT_KEY) || ''));
   const [token, setToken] = useState(() => window.localStorage.getItem(TOKEN_KEY) || '');
+  const [workbenchUrl, setWorkbenchUrl] = useState(() => normalizeWorkbenchUrl(window.localStorage.getItem(WORKBENCH_URL_KEY) || import.meta.env.VITE_NEURAL_WORKBENCH_URL || DEFAULT_WORKBENCH_URL));
   const [health, setHealth] = useState(null);
   const [status, setStatus] = useState(null);
   const [capabilities, setCapabilities] = useState([]);
@@ -73,6 +83,12 @@ export default function AdaControlPage({ accessProfile }) {
     setTimeout(refresh, 0);
   }
 
+  function saveWorkbenchConnection() {
+    const normalized = normalizeWorkbenchUrl(workbenchUrl);
+    window.localStorage.setItem(WORKBENCH_URL_KEY, normalized);
+    setWorkbenchUrl(normalized);
+  }
+
   async function runCommand(command) {
     setBusy(command);
     setError('');
@@ -91,7 +107,7 @@ export default function AdaControlPage({ accessProfile }) {
   }
 
   if (!owner) {
-    return <section className="panel full-span"><div className="alert danger">Ada operational controls are owner-only.</div></section>;
+    return <section className="panel full-span"><div className="alert danger">A.R.V.I.S. operational controls are owner-only.</div></section>;
   }
 
   const actions = [
@@ -106,15 +122,34 @@ export default function AdaControlPage({ accessProfile }) {
       <section className="panel full-span ada-control-hero">
         <div>
           <span className="eyebrow">Owner control plane</span>
-          <h1>Ada Control</h1>
-          <p>Operate the Mac-side Ada bridge over your private Tailscale connection. No generic remote shell is exposed.</p>
+          <h1>A.R.V.I.S. Control</h1>
+          <p>One control room for the Mac-side Ada bridge and the Neural Operations Workbench. RTB OS remains the business source of truth while these systems are consolidated.</p>
         </div>
         <StatusPill ok={Boolean(health?.ok)}>{health?.ok ? 'Mac bridge online' : 'Bridge offline'}</StatusPill>
       </section>
 
       <section className="panel full-span">
         <div className="section-header">
-          <div><span>Connection</span><h2>Tailscale endpoint</h2></div>
+          <div><span>Neural operations</span><h2>Workbench bridge</h2></div>
+          <a className="ghost-button" href={workbenchUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Open separately</a>
+        </div>
+        <div className="ada-control-connection">
+          <label className="field wide"><span>Workbench URL</span><input value={workbenchUrl} onChange={(e) => setWorkbenchUrl(e.target.value)} placeholder={DEFAULT_WORKBENCH_URL} /></label>
+          <button className="primary-button" type="button" onClick={saveWorkbenchConnection}>Save workbench</button>
+        </div>
+        <div style={{ marginTop: 16, border: '1px solid var(--border-color, rgba(255,255,255,.08))', borderRadius: 16, overflow: 'hidden', background: '#050505' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border-color, rgba(255,255,255,.08))' }}>
+            <MonitorCog size={17} />
+            <strong>Neural Workbench</strong>
+            <span className="muted" style={{ marginLeft: 'auto' }}>{workbenchUrl}</span>
+          </div>
+          <iframe title="RTB Neural Workbench" src={workbenchUrl} style={{ width: '100%', minHeight: '68vh', border: 0, display: 'block', background: '#050505' }} />
+        </div>
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div><span>Device bridge</span><h2>Tailscale endpoint</h2></div>
           <button className="ghost-button" type="button" disabled={busy === 'refresh'} onClick={refresh}><RefreshCw size={16} /> Refresh</button>
         </div>
         <div className="ada-control-connection">
@@ -126,7 +161,7 @@ export default function AdaControlPage({ accessProfile }) {
       </section>
 
       <section className="panel full-span">
-        <div className="section-header"><div><span>Live status</span><h2>What Ada can actually control</h2></div></div>
+        <div className="section-header"><div><span>Live status</span><h2>What A.R.V.I.S. can actually control</h2></div></div>
         <div className="ada-control-status-grid">
           <article><Server size={20} /><strong>Local Ada</strong><span>{status?.ada_archive?.ok ? 'Reachable' : 'Unavailable'}</span></article>
           <article><Wifi size={20} /><strong>Tailscale</strong><span>{status?.tailscale?.online ? 'Connected' : 'Unknown / offline'}</span></article>
