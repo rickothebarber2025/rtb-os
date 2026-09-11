@@ -6,6 +6,8 @@ WORKBENCH_DIR="${NEURAL_WORKBENCH_DIR:-$HOME/Downloads/neural-workbench}"
 WORKBENCH_URL="${NEURAL_WORKBENCH_URL:-http://127.0.0.1:3000}"
 STATE_DIR="$HOME/.local/state/rtb"
 WORKBENCH_LOG="$STATE_DIR/neural-workbench.log"
+WYZE_DIR="$REPO_DIR/integrations/arvis/wyze"
+LEGACY_WYZE_ENV="$HOME/Documents/RTB DAtabase/local-assistant 2/.env.local"
 
 echo "A.R.V.I.S. local startup"
 echo "RTB OS: $REPO_DIR"
@@ -18,6 +20,20 @@ if [[ ! -f "$WORKBENCH_DIR/package.json" ]]; then
   echo "Neural Workbench not found at $WORKBENCH_DIR" >&2
   echo "Set NEURAL_WORKBENCH_DIR before running this launcher if the project was moved." >&2
   exit 1
+fi
+
+# Reuse the existing local Wyze configuration without copying secrets into Git.
+if [[ -f "$LEGACY_WYZE_ENV" && -d "$WYZE_DIR" ]]; then
+  set -a
+  source "$LEGACY_WYZE_ENV"
+  set +a
+  if [[ -n "${WYZE_API_KEY_ID:-}" ]]; then
+    export WYZE_API_ID="$WYZE_API_KEY_ID"
+  fi
+  if [[ ! -e "$WYZE_DIR/.env" ]]; then
+    ln -s "$LEGACY_WYZE_ENV" "$WYZE_DIR/.env"
+  fi
+  echo "Wyze API configuration: linked from existing local assistant config"
 fi
 
 # Apply the idempotent parent/iframe live-data bridge before startup.
