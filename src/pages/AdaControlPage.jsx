@@ -45,7 +45,7 @@ export default function AdaControlPage({ accessProfile }) {
     if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch(`${baseUrl}${path}`, { ...options, headers });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `Ada control request failed (${response.status}).`);
+    if (!response.ok) throw new Error(payload.error || `A.R.V.I.S. control request failed (${response.status}).`);
     return payload;
   }, [baseUrl, token]);
 
@@ -63,7 +63,7 @@ export default function AdaControlPage({ accessProfile }) {
       setStatus(statusPayload);
       setCapabilities(Array.isArray(capabilitiesPayload.capabilities) ? capabilitiesPayload.capabilities : []);
     } catch (err) {
-      setError(err.message || 'Could not reach Ada.');
+      setError(err.message || 'Could not reach A.R.V.I.S.');
       setHealth(null);
       setStatus(null);
       setCapabilities([]);
@@ -110,7 +110,10 @@ export default function AdaControlPage({ accessProfile }) {
     return <section className="panel full-span"><div className="alert danger">A.R.V.I.S. operational controls are owner-only.</div></section>;
   }
 
+  const workbenchOnline = Boolean(status?.neural_workbench?.running);
   const actions = [
+    { command: 'neural_workbench_status', label: 'Check Neural Workbench', detail: 'Verify the local Neural Workbench server and health endpoint.' },
+    { command: 'neural_workbench_start', label: 'Start Neural Workbench', detail: 'Start the approved local Neural Workbench project if it is offline.' },
     { command: 'ada_sync_run', label: 'Sync Ada now', detail: 'Run the Ada actionable-message sync immediately.' },
     { command: 'ada_sync_restart', label: 'Restart Ada sync', detail: 'Restart the Mac launch agent that keeps Ada sync running.' },
     { command: 'messages_archive_check', label: 'Check Messages feed', detail: 'Verify Ada can read the local staff-message archive.' },
@@ -131,11 +134,17 @@ export default function AdaControlPage({ accessProfile }) {
       <section className="panel full-span">
         <div className="section-header">
           <div><span>Neural operations</span><h2>Workbench bridge</h2></div>
-          <a className="ghost-button" href={workbenchUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Open separately</a>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <StatusPill ok={workbenchOnline}>{workbenchOnline ? 'Workbench online' : 'Workbench offline'}</StatusPill>
+            <a className="ghost-button" href={workbenchUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Open separately</a>
+          </div>
         </div>
         <div className="ada-control-connection">
           <label className="field wide"><span>Workbench URL</span><input value={workbenchUrl} onChange={(e) => setWorkbenchUrl(e.target.value)} placeholder={DEFAULT_WORKBENCH_URL} /></label>
           <button className="primary-button" type="button" onClick={saveWorkbenchConnection}>Save workbench</button>
+          <button className="secondary-button" type="button" disabled={!capabilities.includes('neural_workbench_start') || Boolean(busy) || workbenchOnline} onClick={() => runCommand('neural_workbench_start')}>
+            <Play size={15} /> {workbenchOnline ? 'Running' : busy === 'neural_workbench_start' ? 'Starting…' : 'Start'}
+          </button>
         </div>
         <div style={{ marginTop: 16, border: '1px solid var(--border-color, rgba(255,255,255,.08))', borderRadius: 16, overflow: 'hidden', background: '#050505' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border-color, rgba(255,255,255,.08))' }}>
@@ -163,6 +172,7 @@ export default function AdaControlPage({ accessProfile }) {
       <section className="panel full-span">
         <div className="section-header"><div><span>Live status</span><h2>What A.R.V.I.S. can actually control</h2></div></div>
         <div className="ada-control-status-grid">
+          <article><MonitorCog size={20} /><strong>Neural Workbench</strong><span>{workbenchOnline ? 'Running' : status?.neural_workbench?.directory_exists ? 'Ready to start' : 'Project not found'}</span></article>
           <article><Server size={20} /><strong>Local Ada</strong><span>{status?.ada_archive?.ok ? 'Reachable' : 'Unavailable'}</span></article>
           <article><Wifi size={20} /><strong>Tailscale</strong><span>{status?.tailscale?.online ? 'Connected' : 'Unknown / offline'}</span></article>
           <article><Activity size={20} /><strong>Ada sync</strong><span>{status?.ada_sync?.loaded ? 'Loaded' : 'Not loaded'}</span></article>
