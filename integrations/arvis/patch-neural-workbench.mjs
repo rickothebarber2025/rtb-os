@@ -19,7 +19,7 @@ const bridgeSource = `const OPERATIONS_KEY = 'rtb_real_operations_data';
 const STAFF_KEY = 'rtb_real_staff_data';
 const RAW_SNAPSHOT_KEY = 'rtb_os_snapshot_v1';
 
-function numberFrom(source: any, keys: string[]) {
+function optionalNumber(source: any, keys: string[]) {
   for (const key of keys) {
     const value = source?.[key];
     if (value !== undefined && value !== null && value !== '') {
@@ -27,7 +27,7 @@ function numberFrom(source: any, keys: string[]) {
       if (Number.isFinite(parsed)) return parsed;
     }
   }
-  return 0;
+  return null;
 }
 
 function findPerformanceRow(rows: any[], member: any) {
@@ -60,28 +60,30 @@ function toWorkbenchStaff(payload: any) {
       fullName: member.full_name || member.name || undefined,
       role: member.role || 'Staff',
       businessLocation: normalizeLocation(member, businessUnits, payload.businessUnit),
-      commissionRate: numberFrom(member, ['commission_rate', 'commissionRate']),
+      commissionRate: optionalNumber(member, ['commission_rate', 'commissionRate']),
       tier: member.tier || '',
       chair: member.chair || member.station || '',
       status,
-      sales14d: numberFrom(performanceRow, ['sales14d', 'total_net_sales_14d']),
-      orders14d: numberFrom(performanceRow, ['orders14d', 'orders_14d']),
-      openShifts: numberFrom(member, ['open_shifts', 'openShifts']),
-      appointmentsToday: numberFrom(member, ['appointments_today', 'appointmentsToday']),
-      revenueGenerated: numberFrom(performanceRow, ['today_net_sales', 'revenueGenerated']),
+      sales14d: optionalNumber(performanceRow, ['sales14d', 'total_net_sales_14d']),
+      orders14d: optionalNumber(performanceRow, ['orders14d', 'orders_14d']),
+      openShifts: optionalNumber(member, ['open_shifts', 'openShifts']),
+      appointmentsToday: optionalNumber(member, ['appointments_today', 'appointmentsToday']),
+      revenueGenerated: optionalNumber(performanceRow, ['today_net_sales', 'revenueGenerated']),
     };
   });
 }
 
 function toWorkbenchOperations(payload: any) {
-  const summary = payload.masterDashboard?.summary || {};
-  const businessName = payload.businessUnit?.name;
-  const netSales = numberFrom(summary, ['todayNetSales', 'netSalesToday', 'todayRevenue', 'netSales']);
-  const grossSales = numberFrom(summary, ['todayGrossSales', 'grossSalesToday', 'grossSales']);
-  const orders = numberFrom(summary, ['todayOrders', 'ordersToday', 'transactionsToday', 'appointmentsToday']);
-  const tips = numberFrom(summary, ['todayTips', 'tipsToday', 'tips']);
-  const lounge = { netSales: 0, grossSales: 0, orders: 0, tips: 0 };
-  const beauty = { netSales: 0, grossSales: 0, orders: 0, tips: 0 };
+  const summary = payload.masterDashboard?.summary || null;
+  const businessName = payload.businessUnit?.name || null;
+  const hasSummary = Boolean(summary && Object.keys(summary).length);
+  const netSales = hasSummary ? optionalNumber(summary, ['todayNetSales', 'netSalesToday', 'todayRevenue', 'netSales']) : null;
+  const grossSales = hasSummary ? optionalNumber(summary, ['todayGrossSales', 'grossSalesToday', 'grossSales']) : null;
+  const orders = hasSummary ? optionalNumber(summary, ['todayOrders', 'ordersToday', 'transactionsToday', 'appointmentsToday']) : null;
+  const tips = hasSummary ? optionalNumber(summary, ['todayTips', 'tipsToday', 'tips']) : null;
+  const emptyBusiness = { netSales: null, grossSales: null, orders: null, tips: null };
+  const lounge = { ...emptyBusiness };
+  const beauty = { ...emptyBusiness };
   if (businessName === 'RTB Lounge') Object.assign(lounge, { netSales, grossSales, orders, tips });
   if (businessName === 'RTB Beauty Lounge') Object.assign(beauty, { netSales, grossSales, orders, tips });
 
@@ -93,11 +95,13 @@ function toWorkbenchOperations(payload: any) {
     totalTodayNet: netSales,
     totalTodayGross: grossSales,
     totalTodayOrders: orders,
-    sales14d: 0,
-    orders14d: 0,
-    activeStaffCount: (Array.isArray(payload.staff) ? payload.staff : []).filter((member: any) => member.active !== false).length,
+    sales14d: null,
+    orders14d: null,
+    activeStaffCount: Array.isArray(payload.staff) ? payload.staff.filter((member: any) => member.active !== false).length : null,
     currency: 'CAD',
-    sourceTruth: 'rtb_os_bridge',
+    sourceTruth: 'RTB_OS_SUPABASE_BRIDGE',
+    dataAvailable: hasSummary,
+    unavailableReason: hasSummary ? null : 'RTB OS did not provide a current operational summary.',
     lastUpdated: new Date().toISOString(),
   };
 }
@@ -169,10 +173,10 @@ if (!serverSource.includes("app.post('/api/rtb-os/snapshot'")) {
     console.error('[A.R.V.I.S.] Expected Workbench health marker was not found. No server.ts changes made.');
     process.exit(1);
   }
-  const snapshotEndpoint = `// RTB OS owner-scoped live snapshot mirror\napp.post('/api/rtb-os/snapshot', (req, res) => {\n  try {\n    const { rawSnapshot, operations, staff } = req.body || {};\n    if (!rawSnapshot || rawSnapshot.type !== 'RTB_OS_SNAPSHOT' || rawSnapshot.version !== 1) {\n      return res.status(400).json({ error: 'Valid RTB_OS_SNAPSHOT v1 is required' });\n    }\n    if (!operations || !Array.isArray(staff)) {\n      return res.status(400).json({ error: 'Mapped operations and staff are required' });\n    }\n    saveOperationsData({ ...operations, sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', lastUpdated: new Date().toISOString() });\n    saveStaffData(staff);\n    fs.writeFileSync(path.join(DATA_DIR, 'rtb-os-snapshot.json'), JSON.stringify(rawSnapshot, null, 2), 'utf-8');\n    return res.json({ status: 'ok', sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', staffCount: staff.length, mirroredAt: new Date().toISOString() });\n  } catch (e: any) {\n    return res.status(500).json({ error: e.message || 'Failed to mirror RTB OS snapshot' });\n  }\n});\n\n`;
+  const snapshotEndpoint = `// RTB OS owner-scoped live snapshot mirror\napp.post('/api/rtb-os/snapshot', (req, res) => {\n  try {\n    const { rawSnapshot, operations, staff } = req.body || {};\n    if (!rawSnapshot || rawSnapshot.type !== 'RTB_OS_SNAPSHOT' || rawSnapshot.version !== 1) {\n      return res.status(400).json({ error: 'Valid RTB_OS_SNAPSHOT v1 is required' });\n    }\n    if (!operations || !Array.isArray(staff)) {\n      return res.status(400).json({ error: 'Mapped operations and staff are required' });\n    }\n    saveOperationsData({ ...operations, sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', lastUpdated: new Date().toISOString() });\n    saveStaffData(staff);\n    fs.writeFileSync(path.join(DATA_DIR, 'rtb-os-snapshot.json'), JSON.stringify(rawSnapshot, null, 2), 'utf-8');\n    return res.json({ status: 'ok', sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', dataAvailable: operations.dataAvailable === true, staffCount: staff.length, mirroredAt: new Date().toISOString() });\n  } catch (e: any) {\n    return res.status(500).json({ error: e.message || 'Failed to mirror RTB OS snapshot' });\n  }\n});\n\n`;
   serverSource = serverSource.replace(healthMarker, `${snapshotEndpoint}${healthMarker}`);
 }
 fs.writeFileSync(serverPath, serverSource, 'utf8');
 
 console.log(`[A.R.V.I.S.] RTB OS live-data bridge installed into ${workbenchDir}`);
-console.log('[A.R.V.I.S.] Browser widgets and server-side briefings now share the RTB OS snapshot mirror.');
+console.log('[A.R.V.I.S.] Missing operational metrics now remain unavailable instead of being converted into fake zeroes.');
