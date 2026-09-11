@@ -23,6 +23,9 @@ fi
 # Apply the idempotent parent/iframe live-data bridge before startup.
 node "$REPO_DIR/integrations/arvis/patch-neural-workbench.mjs" "$WORKBENCH_DIR"
 
+# Surface remaining legacy/fake telemetry and exposure risks on every launch.
+node "$REPO_DIR/integrations/arvis/audit-neural-workbench.mjs" "$WORKBENCH_DIR"
+
 # Refresh the protected localhost control runtime.
 /bin/zsh "$REPO_DIR/integrations/ada-control/install.sh"
 
@@ -61,4 +64,5 @@ fi
 echo "A.R.V.I.S. control bridge: http://127.0.0.1:8791"
 echo "Neural Workbench: $WORKBENCH_URL"
 echo "RTB OS live-data bridge: enabled"
+echo "Telemetry audit: $STATE_DIR/neural-workbench-audit.json"
 echo "Startup complete."
