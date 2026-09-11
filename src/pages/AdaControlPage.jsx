@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, CheckCircle2, ExternalLink, MonitorCog, Play, RefreshCw, Server, ShieldCheck, Wifi, XCircle } from 'lucide-react';
 import { isOwnerProfile } from '../lib/permissions.js';
 
@@ -25,8 +25,22 @@ function StatusPill({ ok, children }) {
   return <span className={`ada-control-pill ${ok ? 'is-ok' : 'is-bad'}`}>{ok ? <CheckCircle2 size={14} /> : <XCircle size={14} />}{children}</span>;
 }
 
-export default function AdaControlPage({ accessProfile }) {
+export default function AdaControlPage({
+  accessProfile,
+  businessUnit,
+  businessUnits,
+  masterDashboard,
+  monthlyPerformanceSummary,
+  payrollRuns,
+  performanceSummary,
+  squareStatus,
+  staff,
+  staffActivityReviewSummary,
+  staffPortalSummary,
+  warnings,
+}) {
   const owner = isOwnerProfile(accessProfile);
+  const workbenchFrameRef = useRef(null);
   const [endpoint, setEndpoint] = useState(() => normalizeEndpoint(window.localStorage.getItem(ENDPOINT_KEY) || ''));
   const [token, setToken] = useState(() => window.localStorage.getItem(TOKEN_KEY) || '');
   const [workbenchUrl, setWorkbenchUrl] = useState(() => normalizeWorkbenchUrl(window.localStorage.getItem(WORKBENCH_URL_KEY) || import.meta.env.VITE_NEURAL_WORKBENCH_URL || DEFAULT_WORKBENCH_URL));
@@ -38,6 +52,48 @@ export default function AdaControlPage({ accessProfile }) {
   const [lastResult, setLastResult] = useState(null);
 
   const baseUrl = useMemo(() => normalizeEndpoint(endpoint), [endpoint]);
+  const workbenchOrigin = useMemo(() => {
+    try { return new URL(workbenchUrl).origin; } catch { return '*'; }
+  }, [workbenchUrl]);
+
+  const rtbSnapshot = useMemo(() => ({
+    type: 'RTB_OS_SNAPSHOT',
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    source: 'RTB_OS_SUPABASE',
+    payload: {
+      businessUnit: businessUnit || null,
+      businessUnits: Array.isArray(businessUnits) ? businessUnits : [],
+      masterDashboard: masterDashboard || null,
+      monthlyPerformanceSummary: monthlyPerformanceSummary || null,
+      payrollRuns: Array.isArray(payrollRuns) ? payrollRuns : [],
+      performanceSummary: performanceSummary || null,
+      squareStatus: squareStatus || null,
+      staff: Array.isArray(staff) ? staff : [],
+      staffActivityReviewSummary: staffActivityReviewSummary || null,
+      staffPortalSummary: staffPortalSummary || null,
+      warnings: Array.isArray(warnings) ? warnings : [],
+    },
+  }), [businessUnit, businessUnits, masterDashboard, monthlyPerformanceSummary, payrollRuns, performanceSummary, squareStatus, staff, staffActivityReviewSummary, staffPortalSummary, warnings]);
+
+  const sendSnapshotToWorkbench = useCallback(() => {
+    const frame = workbenchFrameRef.current;
+    if (!frame?.contentWindow) return;
+    frame.contentWindow.postMessage(rtbSnapshot, workbenchOrigin);
+  }, [rtbSnapshot, workbenchOrigin]);
+
+  useEffect(() => {
+    sendSnapshotToWorkbench();
+  }, [sendSnapshotToWorkbench]);
+
+  useEffect(() => {
+    function handleWorkbenchMessage(event) {
+      if (workbenchOrigin !== '*' && event.origin !== workbenchOrigin) return;
+      if (event.data?.type === 'RTB_WORKBENCH_READY') sendSnapshotToWorkbench();
+    }
+    window.addEventListener('message', handleWorkbenchMessage);
+    return () => window.removeEventListener('message', handleWorkbenchMessage);
+  }, [sendSnapshotToWorkbench, workbenchOrigin]);
 
   const request = useCallback(async (path, options = {}) => {
     if (!baseUrl) throw new Error('Set the Ada Tailscale endpoint first.');
@@ -146,13 +202,14 @@ export default function AdaControlPage({ accessProfile }) {
             <Play size={15} /> {workbenchOnline ? 'Running' : busy === 'neural_workbench_start' ? 'Starting…' : 'Start'}
           </button>
         </div>
+        <div className="alert success" style={{ marginTop: 12 }}><strong>RTB OS live bridge enabled.</strong><span>Staff, business, Square, payroll and performance snapshots are pushed into the embedded Workbench without giving it separate Supabase credentials.</span></div>
         <div style={{ marginTop: 16, border: '1px solid var(--border-color, rgba(255,255,255,.08))', borderRadius: 16, overflow: 'hidden', background: '#050505' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border-color, rgba(255,255,255,.08))' }}>
             <MonitorCog size={17} />
             <strong>Neural Workbench</strong>
             <span className="muted" style={{ marginLeft: 'auto' }}>{workbenchUrl}</span>
           </div>
-          <iframe title="RTB Neural Workbench" src={workbenchUrl} style={{ width: '100%', minHeight: '68vh', border: 0, display: 'block', background: '#050505' }} />
+          <iframe ref={workbenchFrameRef} onLoad={sendSnapshotToWorkbench} title="RTB Neural Workbench" src={workbenchUrl} style={{ width: '100%', minHeight: '68vh', border: 0, display: 'block', background: '#050505' }} />
         </div>
       </section>
 
