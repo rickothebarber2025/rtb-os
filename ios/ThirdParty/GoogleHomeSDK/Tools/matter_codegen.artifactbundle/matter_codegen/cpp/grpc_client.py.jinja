@@ -1,0 +1,64 @@
+#
+# Copyright 2024 Google LLC
+#
+""" GHP D&S API trait.
+   {{file_comment}} 
+"""
+
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.client.core import client_context
+
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.client.core import trait
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.proto.traits.{{PACKAGE_PY_NAMESPACE}} import {{cluster.name | ToLowerSnakeCase}}_service_pb2 as {{cluster.name | ToLowerSnakeCase}}_service
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.proto.traits.{{PACKAGE_PY_NAMESPACE}} import {{cluster.name | ToLowerSnakeCase}}_service_pb2_grpc as {{cluster.name | ToLowerSnakeCase}}_service_grpc
+
+
+class {{cluster.name}}:
+  """GHP D&S API trait."""
+
+  TRAIT_ID = "{{cluster | ToTraitId}}"
+
+  Attributes = {{cluster.name | ToLowerSnakeCase}}_service.{{cluster.name}}.Attribute.Data
+
+  def __init__(self, context: client_context.ClientContext, object_handle: int):
+    self._context = context
+    self._object_handle = object_handle
+
+  def __del__(self):
+    self._context.delete_object(self.TRAIT_ID, self._object_handle)
+
+  def get_attributes(self) -> Attributes:
+    stub = {{cluster.name | ToLowerSnakeCase}}_service_grpc.{{cluster.name}}ServiceStub(self._context.get_channel())
+    request = {{cluster.name | ToLowerSnakeCase}}_service.{{cluster.name}}.Attribute.Get.Request(
+        object_handle=self._object_handle
+    )
+    response = stub.AttributeGet(request)
+    return response.value
+
+  def set_attributes(self, attributes: Attributes) -> None:
+    stub = {{cluster.name | ToLowerSnakeCase}}_service_grpc.{{cluster.name}}ServiceStub(self._context.get_channel())
+    request = {{cluster.name | ToLowerSnakeCase}}_service.{{cluster.name}}.Attribute.Set.Request(
+        object_handle=self._object_handle, value=attributes
+    )
+    response = stub.AttributeSet(request)
+
+
+{%   for cmd in cluster.commands -%}
+  {%- set input_struct = cmd | commandInputStruct %}
+  {%- set output_struct = cmd | commandOutputStruct %}
+  def {{cmd.name | ToLowerSnakeCase}}(self, {{input_struct.fields | ToFieldArgs}}) -> None:
+    stub = {{cluster.name | ToLowerSnakeCase}}_service_grpc.{{cluster.name}}ServiceStub(self._context.get_channel())
+    request = {{cluster.name | ToLowerSnakeCase}}_service.{{cluster.name}}.Command.{{cmd.name}}.Request(
+        object_handle=self._object_handle,
+    {%- if input_struct.fields %}
+        parameters = {{cluster.name | ToLowerSnakeCase}}_service.{{cluster.name}}.{{cmd.name}}Command(
+    {%- if input_struct.fields %}
+        {{input_struct.fields | ToFieldKeywordArgs}}
+    {%- endif -%}
+      )
+    {%- endif -%}
+    )
+    response = stub.Command{{cmd.name}}(request)
+
+{% endfor %}
+
+trait.register_trait({{cluster.name}})

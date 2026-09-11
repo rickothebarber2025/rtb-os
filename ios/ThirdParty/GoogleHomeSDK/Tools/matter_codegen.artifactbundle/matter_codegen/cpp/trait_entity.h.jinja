@@ -1,0 +1,142 @@
+/*
+ * Copyright 2025 Google LLC
+ */
+
+#ifndef GOOGLE_HOME_API_TRAITS_{{PACKAGE_DEFINE}}_{{cluster.name | ToUpperSnakeCase}}_H_
+#define GOOGLE_HOME_API_TRAITS_{{PACKAGE_DEFINE}}_{{cluster.name | ToUpperSnakeCase}}_H_
+
+#include <cstdint>  // IWYU pragma: keep
+#include <functional>
+#include <optional>  // IWYU pragma: keep
+#include <string>
+#include <vector>  // IWYU pragma: keep
+
+{% if cluster.commands -%}
+#include "google_home_api/encoding/command.h"  // IWYU pragma: keep
+{%- endif %}
+#include "google_home_api/core/source_connectivity.h"
+#include "google_home_api/encoding/types.h"
+#include "google_home_api/traits/{{PACKAGE_PATH}}/{{cluster.name | ToLowerSnakeCase}}_trait.h"
+#include "google_home_api/traits/trait_base.h"
+#include "google_home_api/traits/trait_client.h"
+#include "third_party/absl/log/log.h"
+#include "third_party/absl/strings/string_view.h"
+
+namespace google_home_api::traits::{{PACKAGE_NAMESPACE}} {
+
+{{ cluster.name | DocExcludeComment("cluster", "start") }}
+/**
+ * Provides a strongly typed Semantic API to control the {{cluster.name}} trait.
+ */
+class {{cluster.name}} : public TraitBase {
+ public:
+  {{ cluster.name | DocExcludeComment("inline", "start") }}
+  static constexpr absl::string_view kTraitId =
+      "{{cluster | ToTraitId}}";
+  {{ cluster.name | DocExcludeComment("inline", "end") }}
+
+  explicit {{cluster.name}}(const TraitClient& client)
+      : TraitBase(client), cluster_(), source_connectivity_() {}
+
+  {{cluster.name}}(const TraitClient& client, const ByteArray& bytes)
+      : TraitBase(client), cluster_(), source_connectivity_() {
+    auto reader = TraitBase::CreateCodecReader(bytes);
+    if (reader) cluster_.DecodeFrom(*reader);
+  }
+
+  {{cluster.name}}(TraitClient& client, const {{cluster.name}}Trait::Attributes& attributes,
+      const SourceConnectivity& source_connectivity)
+      : TraitBase(client), cluster_(attributes),
+      source_connectivity_(source_connectivity) {}
+  {{cluster.name}}(const {{cluster.name}}&) = default;
+
+{%   for cmd in cluster.commands -%}
+{%- set output_struct = cmd | commandOutputStruct %}
+{%- if output_struct %}
+  using {{cmd | ToCommandResponse}} = {{cluster.name}}Trait::{{cmd | ToCommandResponse}};
+{%- endif %}
+{%- endfor %}
+
+{%   for cmd in cluster.commands -%}
+  {%- set input_struct = cmd | commandInputStruct %}
+  {%- set output_struct = cmd | commandOutputStruct %}
+  {% for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) -%}
+  /**{% for d in cmd_doc.description %}
+   * {{d | FormatElementsForDoxygen(docs_enums_no_enum)}}
+   *{% endfor %}
+   * Use this command from the `ReadTrait&amp;lt;%{{cluster.name}}&amp;gt;()` method.
+   */{% endfor %}
+  void {{cmd | ToCommandName(cluster)}}(
+    {%-  for field in input_struct.fields %}
+       {{field | ToCommandParameter(cluster.name, typeLookup)}},
+    {%- endfor %}
+    TraitClient::Callback<{{cmd | ToCommandResponse}}> callback) {
+  {%- if input_struct.fields %}
+    {{cluster.name}}Trait::{{cmd.name}}Command::Parameters parameters = {
+        {%-  for field in input_struct.fields %}{{field.name | ToLowerSnakeCase}},{% endfor %}
+    };
+    auto writer = TraitBase::CreateCodecWriter();
+    if (!writer) {
+      LOG(ERROR) << "Failed to create CodecWriter.";
+      return;
+    }
+
+    {{cluster.name}}Trait::{{cmd.name}}Command(parameters).EncodeTo(*writer);
+    trait_client_.SendCommand{{ "Timed" if cmd.is_timed_invoke}}<{{cmd | ToCommandResponse}}>(
+        std::string({{cluster.name}}Trait::{{cmd.name}}Command::kCommandId),
+        writer->ToByteArray(), callback);
+  {%- else -%}
+    trait_client_.SendCommand{{ "Timed" if cmd.is_timed_invoke}}<{{cmd | ToCommandResponse}}>(
+        std::string({{cluster.name}}Trait::{{cmd.name}}Command::kCommandId),
+        TraitClient::kEmptyPayload, callback);
+  {%- endif %}
+  }
+{% endfor %}
+
+  /**
+   * Get a read-only copy of the attributes of this trait.
+   */
+  const {{cluster.name}}Trait::Attributes& GetAttributes() const { return cluster_.GetAttributes(); }
+
+  /**
+   * Alter the attributes of this trait within the given mutator functor.
+   *
+   * Example:
+   *   trait.SetAttributes([](Trait::Attributes& attrs) {
+   *      attrs.<attr_name> = <attr_value>;
+   *   });
+   */
+  void SetAttributes(
+      const std::function<void({{cluster.name}}Trait::Attributes::Writable&)>& mutator) {
+    auto writer = TraitBase::CreateCodecWriter();
+    if (!writer) {
+      LOG(ERROR) << "Failed to create CodecWriter.";
+      return;
+    }
+
+    auto cluster_copy = {{cluster.name}}Trait(cluster_.GetAttributes());
+    cluster_copy.SetAttributes(mutator);
+    cluster_copy.EncodeTo(*writer);
+    trait_client_.WriteTrait(std::string(kTraitId), writer->ToByteArray(),
+                             [](auto response) {
+                               if (!response.ok()) {
+                                 LOG(WARNING) << "Write error: " << response;
+                               }
+                             });
+  }
+
+  /**
+   * Get a copy of the SourceConnectivity of this trait.
+   */
+  SourceConnectivity GetSourceConnectivity() { return source_connectivity_; }
+
+
+ private:
+  {{cluster.name}}Trait cluster_;
+  SourceConnectivity source_connectivity_;
+};
+{{ cluster.name | DocExcludeComment("cluster", "end") }}
+
+}  // namespace google_home_api::traits::{{PACKAGE_NAMESPACE}}
+
+#endif  // GOOGLE_HOME_API_TRAITS_{{PACKAGE_DEFINE}}_{{cluster.name | ToUpperSnakeCase}}_H_

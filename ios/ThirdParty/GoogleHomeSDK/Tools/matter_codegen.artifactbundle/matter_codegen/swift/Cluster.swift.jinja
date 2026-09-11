@@ -1,0 +1,1032 @@
+{% set attribute_list_code = 65531 %}
+{% macro restricted_callout() %}
+{% if docs.restricted %}
+<aside class="warning">This trait is restricted and not available for general use.</aside>{% endif %}{% endmacro %}
+// {{file_comment}}
+
+{{ access_level }} import Foundation
+import GoogleHomeSDK
+private import SwiftProtobuf
+
+/*
+ * This file was machine generated via the code generator
+ * in `codegen.clusters.swift.CustomGenerator`
+ *
+ */
+
+extension {{package_name}} {
+  {% if not cluster.name | showClusterInDocs %}/// :nodoc:
+  {% elif not docs.description %}/// API for the {{ cluster.name }} trait.
+  {% endif %}
+  {% if docs.description and docs.restricted %}
+  ///
+  /// {{docs.description | FormatElementsForJazzy | wordwrap(96, break_long_words=False, wrapstring='\n/// ') }}{{restricted_callout() | FormatElementsForJazzy | wordwrap(96, break_long_words=False, wrapstring='\n/// ') }}
+  {% elif docs.description %}
+  ///
+  /// {{docs.description | FormatElementsForJazzy | wordwrap(96, break_long_words=False, wrapstring='\n/// ') }}
+  {% endif %}
+  {{ access_level }} struct {{ cluster.name }}Trait: MatterTrait {
+
+    {% if cluster.events %}
+    /// List of the event types that are supported by `{{ cluster.name }}Trait`.
+    {{ access_level }} static let supportedEventTypes: [Event.Type] = [
+    {% for event in cluster.events %}
+      {{event.name}}Event.self,
+    {% endfor %}
+    ]
+
+    {% else %}
+    /// No supported events for `{{ cluster.name }}Trait`.
+    {{ access_level }} static let supportedEventTypes: [Event.Type] = []
+
+    {% endif %}
+    {% if cluster.commands %}
+    /// List of the commands that are supported by `{{ cluster.name }}Trait`.
+    {{ access_level }} static let supportedCommandTypes: [Command.Type] = [
+    {% for command in cluster.commands %}
+      {{command.name}}Command.self,
+    {% endfor %}
+    ]
+
+    {% else %}
+    /// No supported commands for `{{ cluster.name }}Trait`.
+    {{ access_level }} static let supportedCommandTypes: [Command.Type] = []
+
+    {% endif %}
+    {{ access_level }} static let identifier = {{package_name}}.{{ cluster.name }}Trait.makeTraitID(for: {{ cluster.code }})
+
+    {{ access_level }} let metadata: TraitMetadata
+
+    /// List of attributes for the `{{ cluster.name }}Trait`.
+    {{ access_level }} let attributes: {{package_name}}.{{ cluster.name }}Trait.Attributes
+
+    private let interactionProxy: InteractionProxy
+
+    {{ access_level }} init(decoder: TraitDecoder, interactionProxy: InteractionProxy?, metadata: TraitMetadata) throws {
+      guard let interactionProxy = interactionProxy else {
+        throw HomeError.invalidArgument("InteractionProxy parameter required.")
+      }
+      let unwrappedDecoder = try decoder.unwrapPayload(namespace: Self.identifier.namespace)
+      self.interactionProxy = interactionProxy
+      self.attributes = try Attributes(decoder: unwrappedDecoder)
+      self.metadata = metadata
+    }
+
+    // Internal for testing.
+    internal init(attributes: {{package_name}}.{{ cluster.name }}Trait.Attributes = .init(), interactionProxy: InteractionProxy?, metadata: TraitMetadata = .init()) throws {
+      guard let interactionProxy = interactionProxy else {
+        throw HomeError.invalidArgument("InteractionProxy parameter required.")
+      }
+      self.interactionProxy = interactionProxy
+      self.attributes = attributes
+      self.metadata = metadata
+    }
+
+    {{ access_level }} func encode(with encoder: TraitEncoder) throws {
+      encoder.wrapPayload(namespace: Self.identifier.namespace)
+      try self.attributes.encode(with: encoder)
+    }
+  {% if cluster | HasWritableAttributes %}
+
+    {{ access_level }} func update(_ block: @Sendable (MutableAttributes) -> Void) async throws -> Self {
+      let mutable = MutableAttributes(attributes: self.attributes)
+      block(mutable)
+      if self.interactionProxy.strictOperationValidation {
+  {% for attr in cluster.attributes | select('IsAttributeWritableTest') %}
+  {%   set attr_name = attr.definition.name | ToCamelCase %}
+        guard self.attributes.${{ attr_name }}.isSupported || !mutable.{{ attr_name }}IsSet else {
+          throw HomeError.invalidArgument("{{ attr_name }} is not supported.")
+        }
+  {% endfor %}
+      }
+      let updatedTrait = try {{package_name}}.{{ cluster.name }}Trait(attributes: self.attributes.apply(mutable), interactionProxy: self.interactionProxy, metadata: self.metadata)
+      try await self.interactionProxy.update(trait: mutable, useTimedInteraction: {{ cluster | RequiresTimedWrite | lowercase }})
+      return updatedTrait
+    }
+  {% endif %}
+  }
+}
+
+// MARK: - ForceReadableTrait
+
+extension {{package_name}}.{{ cluster.name }}Trait: ForceReadableTrait {
+  {{ access_level }} func forceRead() async throws {
+    try await self.interactionProxy.forceRead(traitID: Self.identifier)
+  }
+}
+
+// MARK: - Attributes
+
+extension {{package_name}}.{{ cluster.name }}Trait {
+
+  /// Attributes for the `{{ cluster.name }}Trait`.
+  {{-restricted_callout() | FormatElementsForJazzy | wordwrap(96, break_long_words=False, wrapstring='\n/// ') }}
+  {{ access_level }} struct Attributes: Sendable {
+    // Attributes required at runtime.
+    {{"attributeList" | outputAttributeComment | wordwrap(92, break_long_words=False, wrapstring='\n    ')}}
+    /// Nullable: false.
+    @TraitAttribute {{ access_level }} var attributeList: [UInt32]?
+
+{% for attr in cluster.attributes | rejectattr("definition.code", "equalto", attribute_list_code) %}
+{%   set attr_doc = docs.attributes | selectattr("name", "equalto", attr.definition.name) | list | first %}
+{%   if attr_doc %}
+    /// {{ attr_doc.description | FormatElementsForJazzy | wordwrap(92, break_long_words=False, wrapstring='\n    /// ') }}
+{%   elif attr.definition.name | attributeDocType == "global" %}
+    {{attr.definition.name | outputAttributeComment | wordwrap(92, break_long_words=False, wrapstring='\n    ')}}
+{%   endif %}
+    /// Nullable: {{ attr.definition | IsNullable | lowercase }}.
+    @TraitAttribute {{ access_level }} var {{attr.definition.name | ToCamelCase | ToNormalizedSwiftName}}: {{attr.definition | FieldToSwiftType(optionality_strategy="ALWAYS", cluster_name=cluster.name)}}
+{% endfor %}
+
+    internal init(
+{% for attr in cluster.attributes %}
+      {{attr.definition.name | ToCamelCase | ToNormalizedSwiftName}}: {{attr.definition | FieldToSwiftType(optionality_strategy="ALWAYS", cluster_name=cluster.name)}} = nil{{ "," if not loop.last }}
+{% endfor %}
+    ) {
+{% for attr in cluster.attributes %}
+      self._{{ attr.definition.name | ToCamelCase }} = .init(
+        wrappedValue: {{ attr.definition.name | ToCamelCase | ToNormalizedSwiftName }},
+        isSupported: attributeList?.contains({{ "0x0%0X" | format(attr.definition.code) | capitalcase }}) ?? false,
+        isNullable: {{ attr.definition | IsNullable | lowercase }}
+      )
+{% endfor %}
+    }
+
+    fileprivate init(decoder: TraitDecoder) throws {
+      let decodedAttributeList: [UInt32] = try decoder.decodeOptionalArray(tag: {{ "0x0%0X" | format(attribute_list_code) | capitalcase }}) ?? []
+      var generatedAttributeList = [UInt32]()
+      generatedAttributeList.append({{ "0x0%0X" | format(attribute_list_code) | capitalcase }})
+{% for attr in cluster.attributes | rejectattr("definition.code", "equalto", attribute_list_code) %}
+{%   set attr_name = attr.definition.name | ToCamelCase %}
+{%   set attr_code = "0x0%0X" | format(attr.definition.code) | capitalcase %}
+
+      let {{ attr_name }}Value: {{ attr.definition | FieldToSwiftType(optionality_strategy="ALWAYS", cluster_name=cluster.name) }} = try decoder.{{ attr.definition | TypeToDecodeFunction(optionality_strategy="ALWAYS") }}(tag: {{ attr_code }})
+{#
+  The logic to determine if an attribute is supported is:
+  - If the attribute is not nullable, then the attribute is supported if the value is not null.
+  - If the attribute is nullable, the attribute is supported if it isn't null or if it is included in attributeList.
+  TODO(b/323390498): This should be a more comprehensive test, however our decoders only return nil if parsing fails at the moment.
+#}
+      let {{ attr_name }}IsSupported = {{ attr_name }}Value != nil
+{%   if attr.definition | IsNullable %}
+        || decodedAttributeList.contains({{ attr_code }})
+{%   endif %}
+      if {{ attr_name }}IsSupported {
+        generatedAttributeList.append({{ attr_code }})
+      }
+      self._{{ attr_name }} = .init(
+        wrappedValue: {{ attr_name }}IsSupported ? {{ attr_name }}Value : nil,
+        isSupported: {{ attr_name }}IsSupported,
+        isNullable: {{ attr.definition | IsNullable | lowercase }}
+      )
+{% endfor %}
+
+      self._attributeList = .init(
+        wrappedValue: generatedAttributeList,
+        isSupported: true,
+        isNullable: false
+      )
+    }
+{% if cluster | HasWritableAttributes %}
+
+    fileprivate func apply(_ update: {{package_name}}.{{ cluster.name }}Trait.MutableAttributes) -> Self {
+{% for attr in cluster.attributes %}
+{%   set attr_name = attr.definition.name | ToCamelCase %}
+{%   if attr | IsAttributeWritableFilter %}
+      let {{ attr_name }}Value = update.{{ attr_name }}IsSet ? update.{{ attr_name }} : self.{{ attr_name }}
+{%   else %}
+      let {{ attr_name }}Value = self.{{ attr_name }}
+{%   endif %}
+{% endfor %}
+      return {{package_name}}.{{ cluster.name }}Trait.Attributes(
+{% for attr in cluster.attributes %}
+{%   set attr_name = attr.definition.name | ToCamelCase %}
+        {{ attr_name }}: {{ attr_name }}Value{% if not loop.last %},{% endif +%}
+{% endfor %}
+      )
+    }
+
+{% endif %}
+  }
+}
+
+extension {{package_name}}.{{ cluster.name }}Trait.Attributes: TraitEncodable {
+  {{ access_level }} static var identifier: String { {{package_name}}.{{ cluster.name }}Trait.identifier }
+
+  {{ access_level }} func encode(with encoder: TraitEncoder) throws {
+{% for attr in cluster.attributes %}
+    try encoder.encode(tag: {{ "0x0%0X" | format(attr.definition.code) | capitalcase}}, value: self.{{attr.definition.name | ToCamelCase}})
+{% endfor %}
+  }
+}
+
+// MARK: - Hashable & Equatable
+
+extension {{package_name}}.{{ cluster.name }}Trait: Hashable {
+  {{ access_level }} static func ==(lhs: {{package_name}}.{{ cluster.name }}Trait, rhs: {{package_name}}.{{ cluster.name }}Trait) -> Bool {
+    return lhs.identifier == rhs.identifier
+      && lhs.attributes == rhs.attributes
+      && lhs.metadata == rhs.metadata
+  }
+
+  {{ access_level }} func hash(into hasher: inout Hasher) {
+    hasher.combine(identifier)
+    hasher.combine(attributes)
+    hasher.combine(metadata)
+  }
+}
+
+extension {{package_name}}.{{ cluster.name }}Trait.Attributes: Hashable {
+  {{ access_level }} static func ==(lhs: {{package_name}}.{{ cluster.name }}Trait.Attributes, rhs: {{package_name}}.{{ cluster.name }}Trait.Attributes) -> Bool {
+    var result = true
+{% for attr in cluster.attributes %}
+{%   set attr_name = attr.definition.name | ToCamelCase %}
+    result = lhs.{{ attr_name }} == rhs.{{ attr_name }} && result
+{% endfor %}
+    return result
+  }
+
+  {{ access_level }} func hash(into hasher: inout Hasher) {
+{% for attr in cluster.attributes %}
+{%   set attr_name = attr.definition.name | ToCamelCase %}
+    hasher.combine(self.{{ attr_name }})
+{% endfor %}
+  }
+}
+
+{% if cluster | HasWritableAttributes %}
+// MARK: - MutableAttributes
+
+extension {{package_name}}.{{ cluster.name }}Trait {
+
+  {{ access_level }} final class MutableAttributes: TraitEncodable {
+    {{ access_level }} static let identifier: String = {{package_name}}.{{ cluster.name }}Trait.identifier
+    private let baseAttributes: Attributes
+{% for attr in cluster.attributes | select('IsAttributeWritableTest') %}
+{%   set attr_name = attr.definition.name %}
+
+    fileprivate var {{ attr_name | ToCamelCase | ToNormalizedSwiftName }}: {{ attr.definition | FieldToSwiftType(optionality_strategy="ALWAYS", cluster_name=cluster.name) }}
+    private(set) {{ access_level }} var {{ attr_name | ToCamelCase }}IsSet = false
+    {{ access_level }} func set{{ attr_name | capitalcase }}(_ value: {{ attr.definition | FieldToSwiftType(optionality_strategy="IF_NULLABLE", cluster_name=cluster.name) }}) {
+      self.{{ attr_name | ToCamelCase }} = value
+      self.{{ attr_name | ToCamelCase }}IsSet = true
+    }
+    {{ access_level }} func clear{{ attr_name | capitalcase }}() {
+      self.{{ attr_name | ToCamelCase }} = nil
+      self.{{ attr_name | ToCamelCase }}IsSet = false
+    }
+{% endfor %}
+
+    internal init(attributes: {{package_name}}.{{ cluster.name }}Trait.Attributes) {
+      self.baseAttributes = attributes
+    }
+
+    {{ access_level }} func encode(with encoder: TraitEncoder) throws {
+      // MutableAttributes is encoded individually, e.g. through update(...),
+      // therefore uddm wrapping needs to be applied.
+      encoder.wrapPayload(namespace: Self.identifier.namespace)
+{% for attr in cluster.attributes | select('IsAttributeWritableTest') %}
+{%   set attr_name = attr.definition.name | ToCamelCase %}
+      if self.{{ attr.definition.name | ToCamelCase }}IsSet {
+        try encoder.encode(tag: {{ "0x0%0X" | format(attr.definition.code) | capitalcase }}, value: self.{{ attr.definition.name | ToCamelCase }})
+      }
+{% endfor %}
+    }
+  }
+}
+{% endif %}
+{% if cluster.structs | reject('IsCommandStruct') | list | length > 0 +%}
+// MARK: - Structs
+
+extension {{package_name}}.{{ cluster.name }}Trait {
+{% for struct in cluster.structs | reject('IsCommandStruct') %}
+
+{%   set struct_doc = docs.structs | selectattr("name", "equalto", struct.name) | list | first %}
+{%   if struct_doc %}
+  /// {{ struct_doc.description | FormatElementsForJazzy | wordwrap(94, break_long_words=False, wrapstring='\n  /// ') }}
+{%   endif %}
+  {{ access_level }} struct {{ struct.name | ToNormalizedSwiftName(cluster_name=cluster.name) }}: Sendable, StructDataRepresentable, DefaultConstructible {
+{% for field in struct.fields %}
+{%   if struct_doc %}
+{%     set field_doc = struct_doc.value | selectattr("name", "equalto", field.name) | list | first %}
+{%     if field_doc %}
+    /// {{ field_doc.description | FormatElementsForJazzy | wordwrap(90, break_long_words=False, wrapstring='\n    /// ') }}
+{%     endif %}
+{%   endif %}
+    {{ access_level }} let {{field.name | ToCamelCase | ToNormalizedSwiftName}}: {{field | FieldToSwiftType(optionality_strategy="IF_OPTIONAL_OR_NULLABLE", cluster_name=cluster.name)}}
+{% endfor %}
+
+    {{ access_level }} init(
+{%- for field in struct.fields +%}
+      {{field.name | ToCamelCase}}: {{field | FieldToSwiftType(optionality_strategy="IF_OPTIONAL_OR_NULLABLE", cluster_name=cluster.name)}}{% if field.default_value is defined and field.default_value is not none %} = {{ field.default_value }}{% elif field | IsOptionalFilter or field | IsNullable %} = nil{% endif %}{% if not loop.last %},{% endif %}
+{% endfor +%}
+    ) {
+{% for field in struct.fields %}
+      self.{{field.name | ToCamelCase}} = {{field.name | ToCamelCase}}
+{% endfor %}
+    }
+
+    {{ access_level }} init(decoder: TraitDecoder) throws {
+{% for field in struct.fields %}
+{%   if field | IsOptionalFilter or field | IsNullable %}
+      self.{{field.name | ToCamelCase}} = try decoder.{{ field | TypeToDecodeFunction(optionality_strategy="ALWAYS") }}(tag: {{ "0x0%0X" | format(field.code) | capitalcase}})
+{%   else %}
+      self.{{field.name | ToCamelCase}} = try decoder.{{ field | TypeToDecodeFunction(optionality_strategy="ALWAYS") }}(tag: {{ "0x0%0X" | format(field.code) | capitalcase}}) ?? TraitDecoder.defaultValue()
+{%   endif %}
+{% endfor %}
+    }
+
+{% if access_level == "public" %}
+    @_spi(GoogleHomeInternal)
+{% endif %}
+    {{ access_level }} init?(fields: [AnyField: AnyAutomationValue]) {
+      self.init(
+{% for index, field in struct.fields | enumerate %}
+{%   set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+{%   set field_type = field | FieldToSwiftType(optionality_strategy="NEVER", cluster_name=cluster.name) %}
+{%   set postfix = "," if index < (struct.fields | length - 1) else "" %}
+{%   if field | IsOptionalFilter or field | IsNullable %}
+        {{ field_name }}: fields[AnyField(erasing: Self.StructFields.{{ field_name }})]?.as({{ field_type }}.self){{ postfix }}
+{%   else %}
+        {{ field_name }}: fields[AnyField(erasing: Self.StructFields.{{ field_name }})]?.as({{ field_type }}.self) ?? TraitDecoder.defaultValue(){{ postfix }}
+{%   endif %}
+{% endfor %}
+      )
+    }
+
+{% if struct.fields | length > 0 %}
+    {{ access_level }} init() {
+{% for field in struct.fields %}
+{%   if field | IsOptionalFilter or field | IsNullable %}
+      self.{{field.name | ToCamelCase}} = nil
+{%   else %}
+      self.{{field.name | ToCamelCase}} = TraitDecoder.defaultValue()
+{%   endif %}
+{% endfor %}
+    }
+{% endif %}
+
+    {{ access_level }} func encode(with encoder: TraitEncoder) throws {
+{% for field in struct.fields %}
+      try encoder.encode(tag: {{ "0x0%0X" | format(field.code) | capitalcase}}, value: self.{{field.name | ToCamelCase}})
+{% endfor %}
+    }
+
+{% if access_level == "public" %}
+    @_spi(GoogleHomeInternal)
+{% endif %}
+    {{ access_level }} func toFields() -> [AnyField: AnyAutomationValue] {
+{% if struct.fields | length == 0 %}
+      return [:]
+{% else %}
+      return [
+{% for field in struct.fields %}
+{%   set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+        AnyField(erasing: Self.StructFields.{{ field_name }}): AnyAutomationValue.from(self.{{ field_name }}),
+{% endfor %}
+      ]
+{% endif %}
+    }
+  }
+{% endfor %}
+}
+{% endif %}
+
+{%- if cluster.events %}
+
+// MARK: - Events
+
+extension {{package_name}}.{{ cluster.name }}Trait {
+  {% for event in cluster.events %}
+
+  // MARK: `{{ cluster.name }}Trait.{{event.name}}Event`
+
+  {% if docs.events %}
+    {% for event_name in docs.events|selectattr("name", "equalto", event.name) %}
+  /// {{ event_name.description | FormatElementsForJazzy | wordwrap(90, break_long_words=False, wrapstring='\n    /// ') }}
+    {% endfor %}
+  {% endif %}
+  {{ access_level }} struct {{event.name}}Event: Event, Hashable {
+
+    /// Payload for the `{{event.name}}Event`.
+    {{ access_level }} struct Payload: CustomDebugStringConvertible, Hashable, Sendable {
+    {%  for field in event.fields %}
+      {% if docs.events %}
+        {% for event_name in docs.events|selectattr("name", "equalto", event.name) %}
+          {% for event_value in event_name.value|selectattr("name", "equalto", field.name) %}
+      /// {{ event_value.description | FormatElementsForJazzy | wordwrap(90, break_long_words=False, wrapstring='\n    /// ') }}
+          {% endfor %}
+        {% endfor %}
+      {% endif %}
+      {{ access_level }} let {{field.name | ToCamelCase}}: {{field | FieldToSwiftType(optionality_strategy="ALWAYS", cluster_name=cluster.name)}}
+    {% endfor %}
+
+      {{ access_level }} init(
+    {%  for field in event.fields %}
+        {{field.name | ToCamelCase}}: {{field | FieldToSwiftType(optionality_strategy="ALWAYS", cluster_name=cluster.name)}}{%- if not loop.last %},{% endif +%}
+    {% endfor %}
+      ) {
+    {%  for field in event.fields %}
+        self.{{field.name | ToCamelCase}} = {{field.name | ToCamelCase}}
+    {% endfor %}
+      }
+
+      {{ access_level }} init(decoder: TraitDecoder) throws {
+        self.init(
+    {% for field in event.fields %}
+          {{field.name | ToCamelCase}}: try decoder.{{ field | TypeToDecodeFunction(optionality_strategy="ALWAYS") }}(tag: {{ "0x0%0X" | format(field.code) | capitalcase}}){%- if not loop.last %},{% endif +%}
+    {% endfor %}
+        )
+      }
+
+      {{ access_level }} func encode(with encoder: TraitEncoder) throws {
+    {% for field in event.fields %}
+        try encoder.encode(tag: {{ "0x0%0X" | format(field.code) | capitalcase}}, value: self.{{field.name | ToCamelCase}})
+    {% endfor %}
+      }
+
+      {{ access_level }} var debugDescription: String {
+        return """
+          {{package_name}}.{{ cluster.name }}Trait.{{event.name}}Event.Payload(\
+    {% for field in event.fields %}
+            {{field.name | ToCamelCase}}: \(String(describing: self.{{field.name | ToCamelCase}})),
+    {% endfor %}
+          )
+          """
+      }
+    }
+
+    {{ access_level }} static let identifier = ScopedEventID(clusterID: {{package_name}}.{{ cluster.name }}Trait.identifier, event: {{ event.code }})
+    {{ access_level }} static let name: StaticString = "{{event.name}}"
+
+    {{ access_level }} let payload: Payload
+    {{ access_level }} let timestamp: TimeInterval
+    {{ access_level }} let importance: EventImportance
+    {{ access_level }} let number: UInt
+    {{ access_level }} let partID: String?
+
+    {{ access_level }} init(
+      payload: Payload,
+      timestamp: TimeInterval,
+      importance: EventImportance,
+      number: UInt,
+      partID: String?
+    ) {
+      self.payload = payload
+      self.timestamp = timestamp
+      self.importance = importance
+      self.number = number
+      self.partID = partID
+    }
+
+    {{ access_level }} init(
+      decoder: TraitDecoder,
+      timestamp: TimeInterval,
+      importance: EventImportance,
+      number: UInt,
+      partID: String?
+    ) throws {
+      let unwrappedDecoder = try decoder.unwrapPayload(namespace: Self.identifier.namespace)
+      self.payload = try Payload(decoder: unwrappedDecoder)
+      self.timestamp = timestamp
+      self.importance = importance
+      self.number = number
+      self.partID = partID
+    }
+
+    {{ access_level }} func encode(with encoder: TraitEncoder) throws {
+      encoder.wrapPayload(namespace: Self.identifier.namespace)
+      try self.payload.encode(with: encoder)
+    }
+
+    {{ access_level }} var debugDescription: String {
+      return """
+        {{package_name}}.{{ cluster.name }}Trait.{{event.name}}Event(\
+          payload: \(self.payload),
+          timestamp: \(self.timestamp),
+          importance: \(self.importance),
+          number: \(self.number),
+          partID: \(self.partID ?? "nil"))
+        """
+    }
+  }
+{% endfor %}
+}
+{%- endif %}
+{% if cluster.commands | length > 0 +%}
+
+// MARK: - Commands
+{% for command in cluster.commands %}
+  {% set request = command | GetCommandRequest %}
+  {% set response = command | GetCommandResponse %}
+
+// MARK: {{ command.name }}Command
+
+extension {{package_name}}.{{ cluster.name }}Trait {
+{% if response %}
+  {{ access_level }} typealias {{ command.name }}CommandResponse = {{ command.name }}Command.Response
+{% endif %}
+
+  /// Whether the device supports the `{{ command.name | ToCamelCase }}` command for this trait.
+  {{ access_level }} var supports{{ command.name | capitalcase }}Command: Bool {
+    return self.attributes.acceptedCommandList?.contains({{ command.code }}) ?? false
+  }
+
+{% for command_doc in docs.commands|selectattr("name", "equalto", command.name) %}{% if loop.last %}
+  {% for command_description in command_doc.description %}
+  /// {{command_description | FormatElementsForJazzy | wordwrap(94, break_long_words=False, wrapstring='\n  /// ')}}
+  {% endfor %}
+  {% if command_doc.param | length > 1 %}
+  ///
+  /// - Parameters:
+  {% for param in command_doc.param %}
+  ///   - {{param.name}}: {{param.description | FormatElementsForJazzy | wordwrap(88 - param.name | length, break_long_words=False, wrapstring='\n  ///     ')}}
+  {% endfor %}
+  {% endif %}{% if command_doc.param | length == 1 %}
+  ///
+  /// - Parameter{% for param in command_doc.param %} {{param.name}}: {{param.description | FormatElementsForJazzy | wordwrap(80 - param.name | length, break_long_words=False, wrapstring='\n  ///     ') }}
+  {% endfor %}
+  {% endif %}{% if command_doc.response %}
+  ///
+  /// - Returns: {{command_doc.response.description | FormatElementsForJazzy | wordwrap(94, break_long_words=False, wrapstring='\n  ///   ') }}
+  {% endif %}{% endif %}{% endfor %}
+  {{ access_level }} func {{ command.name | ToCamelCase | ToNormalizedSwiftName }}({%- if not request %}) async throws {% else %}
+{% for field in request.fields | reject('IsOptionalTest') +%}
+    {{ field.name | ToCamelCase }}: {{ field | FieldToSwiftType(optionality_strategy="IF_NULLABLE", cluster_name=cluster.name) }}{% if not loop.last or request | HasOptionalFields %},{% endif %}
+{% endfor +%}
+{% if request | HasOptionalFields %}
+    optionalArgsProvider: (@Sendable ({{ command.name }}Command.OptionalArgs) -> Void)? = nil
+{% endif %}
+  ) async throws {% endif %}{% if response %}-> {{ command.name }}CommandResponse {% endif %}{
+    guard !self.interactionProxy.strictOperationValidation
+      || self.supports{{ command.name | capitalcase }}Command
+    else {
+      throw HomeError.invalidArgument("{{ command.name | ToCamelCase }} command is not supported.")
+    }
+
+{% if request %}
+{%   if request | HasOptionalFields %}
+    let optionalArgs = {{ command.name }}Command.OptionalArgs()
+    optionalArgsProvider?(optionalArgs)
+
+{%   endif %}
+    let request = {{ command.name }}Command.Request(
+{%   for field in request.fields | reject('IsOptionalTest') %}
+      {{field.name | ToCamelCase}}: {{field.name | ToCamelCase}}{% if not loop.last or request | HasOptionalFields %},{% endif +%}
+{%   endfor %}
+{%   if request | HasOptionalFields %}
+      optionalArgs: optionalArgs
+{%   endif %}
+    )
+{% endif %}
+    {%+ if response %}return {% endif +%}try await self.interactionProxy.sendCommand(
+      commandID: {{ command.name }}Command.identifier,
+      request: {% if request %}request{% else %}nil{% endif -%},
+      useTimedInteraction: {{ command | IsTimedInvoke | lowercase }}
+    )
+  }
+
+  /// The batchable version of {{ command.name | ToCamelCase | ToNormalizedSwiftName }} command above.
+  /// - SeeAlso:
+  /// {{ command.name | ToCamelCase | ToNormalizedSwiftName }}
+  {{ access_level }} func {{ command.name | ToCamelCase | ToNormalizedSwiftName }}Batchable({%- if not request %}){% else %}
+{% for field in request.fields | reject('IsOptionalTest') +%}
+    {{ field.name | ToCamelCase }}: {{ field | FieldToSwiftType(optionality_strategy="IF_NULLABLE", cluster_name=cluster.name) }}{% if not loop.last or request | HasOptionalFields %},{% endif %}
+{% endfor +%}
+{% if request | HasOptionalFields %}
+    optionalArgsProvider: (({{ command.name }}Command.OptionalArgs) -> Void)? = nil
+{% endif %}
+  ){% endif %} throws -> BatchableCommand<{% if response %}{{ command.name }}CommandResponse{% else %}Void{% endif %}> {
+    guard !self.interactionProxy.strictOperationValidation
+      || self.supports{{ command.name | capitalcase }}Command
+    else {
+      throw HomeError.invalidArgument("{{ command.name | ToCamelCase }} command is not supported.")
+    }
+
+{% if request %}
+{%   if request | HasOptionalFields %}
+    let optionalArgs = {{ command.name }}Command.OptionalArgs()
+    optionalArgsProvider?(optionalArgs)
+
+{%   endif %}
+    let request = {{ command.name }}Command.Request(
+{%   for field in request.fields | reject('IsOptionalTest') %}
+      {{field.name | ToCamelCase}}: {{field.name | ToCamelCase}}{% if not loop.last or request | HasOptionalFields %},{% endif +%}
+{%   endfor %}
+{%   if request | HasOptionalFields %}
+      optionalArgs: optionalArgs
+{%   endif %}
+    )
+{% endif %}
+    return self.interactionProxy.buildBatchableCommand(
+      commandID: {{ command.name }}Command.identifier,
+      request: {% if request %}request{% else %}nil{% endif %},
+      useTimedInteraction: {{ command | IsTimedInvoke | lowercase }}
+    )
+  }
+
+  {{ access_level }} struct {{ command.name }}Command: Command {
+    {{ access_level }} static let identifier =
+      ScopedCommandID(clusterID: {{package_name}}.{{ cluster.name }}Trait.identifier, command: {{ command.code }})
+{% if request %}
+
+{%   if request | HasOptionalFields %}
+    {{ access_level }} final class OptionalArgs: @unchecked Sendable {
+{%     for field in request.fields | select('IsOptionalTest') %}
+      fileprivate var {{ field.name | ToCamelCase | ToNormalizedSwiftName }}: {{ field | FieldToSwiftType(optionality_strategy="ALWAYS", cluster_name=cluster.name) }}
+      private(set) {{ access_level }} var {{ field.name | ToCamelCase }}IsSet = false
+      {{ access_level }} func set{{ field.name | capitalcase }}(_ value: {{ field | FieldToSwiftType(optionality_strategy="IF_NULLABLE", cluster_name=cluster.name) }}) {
+        self.{{ field.name | ToCamelCase }} = value
+        self.{{ field.name | ToCamelCase }}IsSet = true
+      }
+      {{ access_level }} func clear{{ field.name | capitalcase }}() {
+        self.{{ field.name | ToCamelCase }} = nil
+        self.{{ field.name | ToCamelCase }}IsSet = false
+      }
+
+{%     endfor %}
+    }
+
+{%   endif %}
+    internal struct Request: CommandRequest {
+{% for field in request.fields | reject('IsOptionalTest') %}
+      internal let {{field.name | ToCamelCase | ToNormalizedSwiftName}}: {{field | FieldToSwiftType(optionality_strategy="IF_NULLABLE", cluster_name=cluster.name) }}
+{% endfor %}
+{% if request | HasOptionalFields %}
+      internal let optionalArgs: OptionalArgs
+{% endif %}
+
+      func encode(with encoder: TraitEncoder) throws {
+        encoder.wrapPayload(namespace: {{ command.name }}Command.identifier.namespace)
+{% for field in request.fields %}
+{%   if field | IsOptionalFilter %}
+        if self.optionalArgs.{{ field.name | ToCamelCase }}IsSet {
+          try encoder.encode(tag: {{ "0x0%0X" | format(field.code) | capitalcase }}, value: self.optionalArgs.{{ field.name | ToCamelCase }})
+        }
+{%   else %}
+        try encoder.encode(tag: {{ "0x0%0X" | format(field.code) | capitalcase }}, value: self.{{ field.name | ToCamelCase }})
+{%   endif %}
+{% endfor %}
+      }
+    }
+{% endif %}
+{% if response %}
+
+    {{ access_level }} struct Response: CommandResponse {
+      {{ access_level }} static let identifier =
+        ScopedCommandID(clusterID: {{package_name}}.{{ cluster.name }}Trait.identifier, command: {{ response.code }})
+{% for field in response.fields +%}
+      {{ access_level }} let {{field.name | ToCamelCase | ToNormalizedSwiftName}}: {{field | FieldToSwiftType(optionality_strategy="IF_OPTIONAL_OR_NULLABLE", cluster_name=cluster.name)}}
+{% endfor +%}
+      {{ access_level }} init(decoder: TraitDecoder) throws {
+        let unwrappedDecoder = try decoder.unwrapPayload(namespace: Self.identifier.namespace)
+{% for field in response.fields %}
+{%   if field | IsOptionalFilter or field | IsNullable %}
+        self.{{field.name | ToCamelCase}} = try unwrappedDecoder.{{ field | TypeToDecodeFunction(optionality_strategy="ALWAYS") }}(tag: {{ "0x0%0X" | format(field.code) | capitalcase}})
+{%   else %}
+        self.{{field.name | ToCamelCase}} = try unwrappedDecoder.{{ field | TypeToDecodeFunction(optionality_strategy="ALWAYS") }}(tag: {{ "0x0%0X" | format(field.code) | capitalcase}}) ?? TraitDecoder.defaultValue()
+{%   endif %}
+{% endfor %}
+      }
+    }
+{% endif %}
+  }
+}
+{% endfor %}
+{% endif %}
+{% if cluster.enums | length > 0 +%}
+// MARK: - Enums
+
+extension {{package_name}}.{{ cluster.name }}Trait {
+{% for entry in cluster.enums %}
+
+{%   set enum_doc = docs.enums | selectattr("name", "equalto", entry.name) | list | first %}
+{%   if enum_doc %}
+  /// {{ enum_doc.description | FormatElementsForJazzy | wordwrap(94, break_long_words=False, wrapstring='\n  /// ') }}
+{%   endif %}
+  {{ access_level }} enum {{entry.name | ToNormalizedSwiftName(cluster_name=cluster.name)}}: UInt64, {{entry.base_type | EnumTypeToSwiftEnumType}}, Sendable {
+{%   for field in entry.entries %}
+{%     if enum_doc %}
+{%       set field_doc = enum_doc.value | selectattr("name", "equalto", field.name) | list | first %}
+{%       if field_doc %}
+    /// {{ field_doc.description | FormatElementsForJazzy | wordwrap(92, break_long_words=False, wrapstring='\n    /// ') }}
+{%     endif %}
+{%   endif %}
+    case {{field.name | ToConstFieldName | ToCamelCase | ToNormalizedSwiftName}} = {{field.code}}
+{% endfor %}
+    // Added by codegen to be forward compatible.
+    case unrecognized_ = 0xffff_ffff_ffff_ffff
+
+    static {{ access_level }} func unrecognizedCase() -> Self { self.unrecognized_ }
+  }
+{% endfor %}
+}
+{% endif %}
+{% if cluster.bitmaps | length > 0 +%}
+// MARK: - Bitmaps
+
+extension {{package_name}}.{{ cluster.name }}Trait {
+{% for entry in cluster.bitmaps %}
+
+{%   set bitmap_doc = docs.bitmaps | selectattr("name", "equalto", entry.name) | list | first %}
+{%   if bitmap_doc %}
+  /// {{ bitmap_doc.description | FormatElementsForJazzy | wordwrap(94, break_long_words=False, wrapstring='\n  /// ') }}
+{%   endif %}
+  {{ access_level }} struct {{entry.name | ToNormalizedSwiftName(cluster_name=cluster.name)}}: Bitmap {
+
+    {{ access_level }} let rawValue: {{entry.base_type | BitmapTypeToSwiftUIntType}}
+
+    {{ access_level }} init(rawValue: {{entry.base_type | BitmapTypeToSwiftUIntType}}) {
+        self.rawValue = rawValue
+    }
+
+{% for field in entry.entries %}
+{%   if bitmap_doc %}
+{%     set field_doc = bitmap_doc.value | selectattr("name", "equalto", field.name) | list | first %}
+{%     if field_doc %}
+    /// {{ field_doc.description | FormatElementsForJazzy | wordwrap(92, break_long_words=False, wrapstring='\n    /// ') }}
+{%     endif %}
+{%   endif %}
+    {{ access_level }} static let {{field.name | ToConstFieldName | ToCamelCase | ToNormalizedSwiftName}} = {{entry.name}}(rawValue: {{ field.code }})
+{% endfor %}
+  }
+{% endfor %}
+}
+{% endif %}
+{% if cluster.attributes | length > 0 %}
+
+// MARK: - Attributes definitions
+
+extension {{package_name}}.{{ cluster.name }}Trait {
+  {{ access_level }} enum Attribute: UInt32, Field, CaseIterable {
+{%   for attr in cluster.attributes %}
+{%     set attr_name = attr.definition.name | ToCamelCase | ToNormalizedSwiftName %}
+    case {{ attr_name }} = {{ attr.definition.code }}
+{%   endfor %}
+
+    {{ access_level }} var id: UInt32 {
+      self.rawValue
+    }
+
+    {{ access_level }} var type: GoogleHomeSDK.FieldType {
+      switch self {
+{%   for attr in cluster.attributes %}
+{%     set attr_name = attr.definition.name | ToCamelCase | ToNormalizedSwiftName %}
+{%     set field_type = attr.definition.data_type | LookupDataType %}
+{%     set swift_type = field_type | DataTypeToSwiftTypeEnum %}
+        case .{{ attr_name }}:
+        {% if field_type is IsTraitType %}
+          return .{{ swift_type }}({{ field_type.idl_name | capitalcase | ToNormalizedSwiftName(cluster_name=cluster.name)}}.self)
+        {% else %}
+          return .{{ swift_type }}
+        {% endif %}
+{%   endfor %}
+      }
+    }
+  }
+
+  {{ access_level }} static func attribute(id: UInt32) -> (any Field)? {
+    return Attribute(rawValue: id)
+  }
+}
+
+// MARK: - Attribute fieldSelect definitions
+
+extension TypedReference where T == {{package_name}}.{{ cluster.name }}Trait {
+{%   for attr in cluster.attributes %}
+{%     set field_type = attr.definition.data_type | LookupDataType %}
+{%     set attr_name = attr.definition.name | ToCamelCase | ToNormalizedSwiftName %}
+{%     set type_prefix = package_name + "." + cluster.name + "Trait." if field_type is IsTraitType else "" %}
+  {{ access_level }} var {{ attr_name }}: TypedExpression<{{ attr.definition | FieldToSwiftType(optionality_strategy="IF_NULLABLE", type_prefix=type_prefix, cluster_name=cluster.name) }}> {
+    fieldSelect(from: self, selectedField: T.Attribute.{{ attr_name }})
+  }
+{%   endfor %}
+}
+
+extension TypedExpression where V == TypedTrait<{{package_name}}.{{ cluster.name }}Trait> {
+{%   for attr in cluster.attributes %}
+{%     set field_type = attr.definition.data_type | LookupDataType %}
+{%     set attr_name = attr.definition.name | ToCamelCase | ToNormalizedSwiftName %}
+{%     set type_prefix = package_name + "." + cluster.name + "Trait." if field_type is IsTraitType else "" %}
+  {{ access_level }} var {{ attr_name }}: TypedExpression<{{ attr.definition | FieldToSwiftType(optionality_strategy="IF_NULLABLE", type_prefix=type_prefix, cluster_name=cluster.name) }}> {
+    fieldSelect(from: self, selectedField: {{package_name}}.{{ cluster.name }}Trait.Attribute.{{ attr_name }})
+  }
+{%   endfor %}
+}
+{% endif %}
+
+extension Updater where T == {{package_name}}.{{ cluster.name }}Trait {
+{%   for attr in cluster.attributes | select('IsAttributeWritableTest') %}
+{%     set field_type = attr.definition.data_type | LookupDataType %}
+{%     set attr_name = attr.definition.name | ToCamelCase %}
+{%     set type_prefix = package_name + "." + cluster.name + "Trait." if field_type is IsTraitType else "" %}
+  {{ access_level }} func set{{ attr_name | ToUpperCamelCase }}(_ value: {{ attr.definition | FieldToSwiftType(optionality_strategy="IF_NULLABLE", type_prefix=type_prefix, cluster_name=cluster.name) }}) {
+    self.set(Parameter(field: T.Attribute.{{ attr_name | ToNormalizedSwiftName }}, value: value))
+  }
+{% endfor %}
+}
+{% if cluster.events | length > 0 %}
+
+// MARK: - Event Fields definitions
+{%   for event in cluster.events %}
+{%     if event.fields | length > 0 %}
+
+extension {{package_name}}.{{ cluster.name }}Trait.{{ event.name }}Event {
+  {{ access_level }} enum EventFields: UInt32, Field, CaseIterable {
+{%       for field in event.fields %}
+{%         set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+    case {{ field_name }} = {{ field.code }}
+{%       endfor %}
+
+    {{ access_level }} var id: UInt32 {
+      self.rawValue
+    }
+
+    {{ access_level }} var type: GoogleHomeSDK.FieldType {
+      switch self {
+{%       for field in event.fields %}
+{%         set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+{%         set field_type = field.data_type | LookupDataType %}
+{%         set swift_type = field_type | DataTypeToSwiftTypeEnum %}
+        case .{{ field_name }}:
+        {% if field_type is IsTraitType %}
+          return .{{ swift_type }}({{package_name}}.{{ cluster.name }}Trait.{{ field_type.idl_name | capitalcase | ToNormalizedSwiftName}}.self)
+        {% else %}
+          return .{{ swift_type }}
+        {% endif %}
+{%       endfor %}
+      }
+    }
+  }
+
+  {{ access_level }} static func eventField(id: UInt32) -> (any Field)? {
+    return EventFields(rawValue: id)
+  }
+}
+
+// MARK: - Event fieldSelect definitions
+
+extension TypedReference where T == {{package_name}}.{{ cluster.name }}Trait.{{ event.name }}Event {
+{%       for field in event.fields %}
+{%         set field_type = field.data_type | LookupDataType %}
+{%         set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+{%         set type_prefix = package_name + "." + cluster.name + "Trait." if field_type is IsTraitType else "" %}
+  {{ access_level }} var {{ field_name }}: TypedExpression<{{ field | FieldToSwiftType(optionality_strategy="IF_NULLABLE", type_prefix=type_prefix, cluster_name=cluster.name) }}> {
+    fieldSelect(from: self, selectedField: T.EventFields.{{ field_name }})
+  }
+{%       endfor %}
+}
+{%     endif %}
+{%   endfor %}
+{% endif %}
+{% if cluster.commands | length > 0 %}
+
+// MARK: - Command Request Fields definitions
+{%   for command in cluster.commands %}
+{%     set request = command | GetCommandRequest %}
+{%     if request.fields | length > 0 %}
+
+extension {{package_name}}.{{ cluster.name }}Trait.{{ command.name }}Command {
+  {{ access_level }} enum CommandRequestFields: UInt32, Field, CaseIterable {
+{%       for field in request.fields %}
+{%         set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+    case {{ field_name }} = {{ field.code }}
+{%       endfor %}
+
+    {{ access_level }} var id: UInt32 {
+      self.rawValue
+    }
+
+    {{ access_level }} var type: GoogleHomeSDK.FieldType {
+      switch self {
+{%       for field in request.fields %}
+{%         set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+{%         set field_type = field.data_type | LookupDataType %}
+{%         set swift_type = field_type | DataTypeToSwiftTypeEnum %}
+        case .{{ field_name }}:
+        {% if field_type is IsTraitType %}
+          return .{{ swift_type }}({{package_name}}.{{ cluster.name }}Trait.{{ field_type.idl_name | capitalcase | ToNormalizedSwiftName}}.self)
+        {% else %}
+          return .{{ swift_type }}
+        {% endif %}
+{%       endfor %}
+      }
+    }
+  }
+
+  {{ access_level }} static func requestField(id: UInt32) -> (any Field)? {
+    return CommandRequestFields(rawValue: id)
+  }
+}
+{%     endif %}
+{%   endfor %}
+{% endif %}
+
+{% if cluster.commands | length > 0 %}
+// MARK: - Automation Commands
+
+extension {{package_name}}.{{ cluster.name }}Trait {
+{%   for command in cluster.commands %}
+{%     set request = command | GetCommandRequest %}
+{%     set required_fields = request.fields | rejectattr("is_optional") | list -%}
+{%     set optional_fields = request.fields | selectattr("is_optional") | list %}
+
+  {{ access_level }} static func {{ command.name | ToCamelCase | ToNormalizedSwiftName }}(
+{%       if request %}
+{%         for field in required_fields %}
+    {{ field.name | ToCamelCase | ToNormalizedSwiftName }}: {{ field | FieldToSwiftType(optionality_strategy="IF_NULLABLE", cluster_name=cluster.name) }}{% if not loop.last or request | HasOptionalFields %},{% endif +%}
+{%         endfor %}
+{%         if optional_fields | length > 0 %}
+    optionalArgsProvider: (@Sendable ({{ command.name }}Command.OptionalArgs) -> Void)? = nil
+{%         endif %}
+{%       endif %}
+  ) -> AutomationCommand {
+{%       if request %}
+{%         if request | HasOptionalFields %}
+    let optionalArgs = {{ command.name }}Command.OptionalArgs()
+    optionalArgsProvider?(optionalArgs)
+
+{%         endif %}
+    var parameters: [Parameter] = []
+{%         for field in required_fields %}
+    parameters.append(
+        Parameter(
+            field: Self.{{ command.name }}Command.CommandRequestFields.{{ field.name | ToCamelCase | ToNormalizedSwiftName }},
+            value: {{field.name | ToCamelCase | ToNormalizedSwiftName }}))
+{%         endfor %}
+{%         for field in optional_fields %}
+    if optionalArgs.{{field.name | ToCamelCase }}IsSet {
+      parameters.append(
+          Parameter(
+              field: Self.{{ command.name }}Command.CommandRequestFields.{{ field.name | ToCamelCase | ToNormalizedSwiftName }},
+              value: optionalArgs.{{field.name | ToCamelCase | ToNormalizedSwiftName }}))
+    }
+{%         endfor %}
+
+    return AutomationCommand(
+      trait: Self.self,
+      command: Self.{{command.name}}Command.self,
+      commandID: Self.{{command.name}}Command.identifier.commandID,
+      parameters: parameters)
+{%       else %}
+    return AutomationCommand(
+      trait: Self.self,
+      command: Self.{{command.name}}Command.self,
+      commandID: Self.{{command.name}}Command.identifier.commandID)
+{%       endif %}
+  }
+{%   endfor %}
+}
+{% endif %}
+
+{% if cluster.structs | reject('IsCommandStruct') %}
+// MARK: - Struct Fields definitions
+{% endif %}
+{% for struct in cluster.structs | reject('IsCommandOrEmptyStruct') %}
+
+extension {{package_name}}.{{ cluster.name }}Trait.{{ struct.name }} {
+  {{ access_level }} enum StructFields: UInt32, Field, CaseIterable {
+{%   for field in struct.fields %}
+{%     set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+    case {{ field_name }} = {{ field.code }}
+{%   endfor %}
+
+    {{ access_level }} var id: UInt32 {
+      self.rawValue
+    }
+
+    {{ access_level }} var type: GoogleHomeSDK.FieldType {
+      switch self {
+{%   for field in struct.fields %}
+{%     set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+{%     set field_type = field.data_type | LookupDataType %}
+{%     set swift_type = field_type | DataTypeToSwiftTypeEnum %}
+        case .{{ field_name }}:
+{%     if field_type is IsTraitType %}
+          return .{{ swift_type }}({{package_name}}.{{ cluster.name }}Trait.{{ field_type.idl_name | capitalcase | ToNormalizedSwiftName}}.self)
+{%     else %}
+          return .{{ swift_type }}
+{%     endif %}
+{%   endfor %}
+      }
+    }
+  }
+
+  {{ access_level }} static func structField(id: UInt32) -> (any Field)? {
+    return StructFields(rawValue: id)
+  }
+}
+
+// MARK: - Struct FieldSelect definitions
+
+extension TypedExpression where V == {{package_name}}.{{ cluster.name }}Trait.{{ struct.name }} {
+{%   for field in struct.fields %}
+{%     set field_type = field.data_type | LookupDataType %}
+{%     set field_name = field.name | ToCamelCase | ToNormalizedSwiftName %}
+{%     set type_prefix = package_name + "." + cluster.name + "Trait." if field_type is IsTraitType else "" %}
+  {{ access_level }} var {{ field_name }}: TypedExpression<{{ field | FieldToSwiftType(optionality_strategy="IF_NULLABLE", type_prefix=type_prefix, cluster_name=cluster.name) }}> {
+    fieldSelect(from: self.expression, selectedField: V.StructFields.{{ field_name }})
+  }
+{%   endfor %}
+}
+{% endfor %}

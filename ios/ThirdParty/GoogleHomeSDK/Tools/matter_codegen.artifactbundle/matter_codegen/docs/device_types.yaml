@@ -1,0 +1,482 @@
+Aggregator:
+  description: "A device that aggregates endpoints as a collection."
+
+AirPurifier:
+  description: "A device that is designed to clean the air in a room."
+
+AirQualitySensor:
+  description: "A device that is able to monitor and measure various parameters related to ambient
+    air quality in indoor and outdoor environments."
+
+BasicVideoPlayer:
+  description: "A device that is able to play media to a physical output or to a display screen
+    which is part of the device. It has basic controls for playback (such as play or pause) and
+    keypad input (up, down, number input)."
+
+CastingVideoClient:
+  description: "A device that is able to launch content on a remote device, for example, a
+    smart speaker or a content provider's phone app."
+
+CastingVideoPlayer:
+  description: "A device that is able to play media to a physical output or to a display screen
+    which is part of the device, and is able to launch content. It has basic controls for playback
+    (such as play or pause) and keypad input (up, down, number input)."
+
+Chime:
+  description: "A device that can play from a range of pre-installed sounds and is typically used
+    with a doorbell, audio doorbell, or video doorbell."
+
+Closure:
+  description: "A device that seals an opening, such as a window or door. It may contain one or more
+    Closure Panel sub-components."
+
+ClosurePanel:
+  description: "A device that exists only as a child of a closure. It represents a single panel
+    aspect within that Closure, such as the position of a blind or the tilt of slats."
+
+ClosureController:
+  description: "A device that is capable of controlling a closure."
+
+ColorDimmerSwitch:
+  description: "A device that is able to control a lighting device by adjusting its color
+    temperature and intensity."
+
+ColorTemperatureLight:
+  description: "A lighting device that is capable of being switched on or off, the intensity of its
+    light adjusted, and its color temperature adjusted."
+
+ContactSensor:
+  description: "A device that detects whether an object, such as a door or window, is opened or
+    closed."
+
+ContentApp:
+  description: "A device that represents an application built by a content provider."
+
+ControlBridge:
+  description: "A controller device that when bound to a lighting device is capable of being used
+    to switch the device on or off, adjust the intensity of the light, and adjust the color of the
+    light being emitted."
+
+CookSurface:
+  description: "A device that represents a heating object on a cooking or other similar device."
+
+Cooktop:
+  description: "A device that represents a cooking surface with one or more heating elements."
+
+DimmableLight:
+  description: "A lighting device that is capable of being switched on or off, the intensity of its
+    light adjusted, and being switched by means of a bound occupancy sensor."
+
+DimmablePlugInUnit:
+  description: "A device that is capable of being switched on or off and have its level adjusted by
+    means of a bound controller device such as a Dimmer Switch or a Color Dimmer Switch."
+
+DimmerSwitch:
+  description: "A device that is capable of switching a device on or off and controlling the
+    intensity of the light."
+
+Dishwasher:
+  description: "A device that washes dishes, cutlery, and other items associated with food
+    preparation and consumption."
+
+Doorbell:
+  description: "A switch which when pressed usually causes a chime to activate."
+
+DoorLock:
+  description: "A device used to secure a door, which can be actuated either by means of a manual
+    or a remote method."
+
+DoorLockController:
+  description: "A device that is capable of controlling a door lock."
+
+ElectricalEnergyTariff:
+  description: "A device that defines a tariff for the consumption or production of electrical
+    energy."
+
+ElectricalMeter:
+  description: "A device that meters the electrical energy being imported and/or exported for
+    billing purposes."
+
+ElectricalUtilityMeter:
+  description: "A device that provides utility account information, as well as optional details
+    about tariffs and metering."
+
+EnergyEvse:
+  description: "A device that is capable of charging an electric or plug-in hybrid vehicle."
+
+ExtendedColorLight:
+  description: "A lighting device that is capable of being switched on or off, the intensity of its
+    light adjusted, its color temperature adjusted, and being switched by means of a bound occupancy
+    sensor."
+
+ExtractorHood:
+  description: "A device that that is generally installed above a stove or cooktop to reduce odors
+    and smoke by extracting the air."
+
+Fan:
+  description: "A device that features a fan and supports multiple modes and variable speed."
+
+FlowSensor:
+  description: "A device that measures and reports the flow rate of a fluid."
+
+GenericSwitch:
+  description: "A device that is capable of being switched on or off, either by latching (such as a
+    rocker) or by momentary (such as a push button)."
+
+GoogleAirCooler:
+  description: "A device that allows temperature cooling and humidity control. These devices are
+    typically more lightweight and portable than air conditioners, and have a water tank attached.
+    Air coolers may not support heating or setting exact temperatures. Interactions with air coolers
+    may include changing the fan speed and humidity setting."
+
+GoogleAirFreshener:
+  description: "A device that can be turned on and off and may allow adjusting various modes."
+
+GoogleAudioVideoReceiver:
+  description: "A device that takes audio input (for example, HDMI, optical, and RCA) and outputs
+    sound to one or more speakers."
+
+GoogleBathtub:
+  description: "A device that can be filled and drained, possibly to particular levels if the
+    bathtub supports it."
+
+GoogleBed:
+  description: "A furniture device used for sleeping. Interactions with beds may include adjusting
+    various modes and setting scenes."
+
+GoogleBike:
+  description: "A wheeled device that transports human beings, powered either by the rider or by
+    a small electric motor, and typically not capable of exceeding about 30 miles per hour."
+
+GoogleBlanket:
+  description: "A device consisting of a rectangular piece of fabric used as a bed covering for
+    warmth. Interactions with smart blankets may include turning them on and off, adjusting their
+    temperature, and/or setting various modes and toggles."
+
+GoogleBlender:
+  description: "A kitchen appliance device used to stir, chop, or mix food. Interactions with
+    blenders may include starting and stopping, setting a timer, setting cooking modes or food
+    presets, or adjusting other various settings."
+
+GoogleBoiler:
+  description: "A device consisting of a closed vessel and heat source, in which steam or other
+    vapor is generated from water to supply heat. Boilers can be turned on and off, and may support
+    adjusting temperature."
+
+GoogleCamera:
+  restricted: true
+  description: "A device that captures still images or video. Cameras may feature accessible
+    livestreams, two-way talkback, or detection events."
+
+GoogleCharger:
+  description: "A device that charges electrical storage batteries. Interactions with chargers may
+    include starting and stopping charging, and checking the current charge level, capacity
+    remaining, and capacity until full values."
+
+GoogleCloset:
+  description: "A device consisting of a small enclosed area that is used for storing items. Closets
+    can be opened and closed, potentially in more than one direction."
+
+GoogleCoffeeMaker:
+  description: "A kitchen applicance device that makes coffee. Interactions with coffee makers may
+    include turning them on and off, adjusting cooking modes and food presets, adjusting the target
+    temperature, and adjusting various non-cooking mode settings."
+
+GoogleControlPanel:
+  description: "A device that is capable of configuring and controlling other devices."
+
+GoogleDehydrator:
+  description: "A kitchen appliance device that is used to dehydrate foods such as fruit and
+    vegetables. Interactions with dehydrators may include starting and stopping, setting a timer,
+    adjusting cooking modes or food presets, or adjusting other various settings."
+
+GoogleDoor:
+  description: "A device consisting of a solid, movable barrier that controls access to an entrance,
+    a closet, a cabinet, and so forth. A door can be opened and closed, potentially in more
+    than one direction."
+
+GoogleDoorbell:
+  restricted: true
+  description: "A device actuated by a button outside a door that makes an audible and/or visual
+    signal, used to request the attention of a person who is somewhere on the other side of the
+    door. Doorbells may feature accessible livestreams, two-way talkback, or detection events."
+
+GoogleDrawer:
+  description: "A device consisting of a sliding, lidless, horizontal compartment that may be
+    drawn out from a piece of furniture or a wall in order to gain access to it. Drawers can be
+    opened and closed, potentially in more than one direction."
+
+GoogleFaucet:
+  description: "A device that controls the flow of liquid. Faucets can dispense liquids in various
+    quantities and presets. Faucets may have various modes and each mode has its own related
+    settings. These are specific to the faucet and are interpreted in a generalized form."
+
+GoogleFireplace:
+  description: "A device in which fuel is burned, which connects to a flue or chimney, and opens
+    a room. Fireplaces can be turned on and off, and may have adjustable modes."
+
+GoogleFreezer:
+  description: "A temperature-managing device which may be adjusted to various mode settings, and
+    may allow temperature monitoring."
+
+GoogleFryer:
+  description: "A kitchen appliance device that cooks food by frying it. Interactions with fryers
+    may include starting and stopping, setting a timer, adjusting cooking modes or food presets, or
+    adjusting other various settings."
+
+GoogleGameConsole:
+  description: "A device used to manage and play video games. Interactions with game consoles
+    include playing games and operating device controls."
+
+GoogleGarage:
+  description: "A device consisting of a solid, movable barrier that controls access to a garage.
+    Garage doors can open, close, and detect an open state. They can also indicate if an
+    object has obstructed the path of the door while closing or if the door is locked and therefore
+    cannot be controlled."
+
+GoogleGate:
+  description: "A device consisting of a solid, movable barrier that controls access to an outside
+    area through a fence or wall. Gates can be opened and closed, potentially in more than on
+    direction."
+
+GoogleGrill:
+  description: "A device that is used to cook food on a grate by applying direct heat from below.
+    Interactions with grills may include turning them on and off, starting and stopping, setting a
+    timer, adjusting cooking modes and food presets, and adjusting various non-cooking mode
+    settings."
+
+GoogleKettle:
+  description: "A device that boils water for use in hot beverages such as tea. Interactions with
+    kettles may include turning them on and off, adjusting the target temperature, and perhaps
+    adjusting various mode settings."
+
+GoogleMop:
+  description: "A device that is used to clean floors by dampening and scrubbing them."
+
+GoogleMower:
+  description: "A device used to trim a lawn to a uniform height. Interactions with mowers may
+    include starting, stopping and pausing mowing, docking, checking the current cycle, locating the
+    mower, and adjusting various modes."
+
+GoogleMulticooker:
+  description: "A device used to cook food using various methods including slow cooking, sauteing,
+    steaming, or pressure cooking, typically while unattended. Interactions with multicookers may
+    include starting and stopping, setting a timer, or and adjusting non-cooking modes."
+
+GoogleNetwork:
+  description: "A device representing a group of router nodes or a mesh network controlled as a
+    single entity rather than as individual devices. The network device may reboot, update its
+    software, and have modes to handle Quality of Service (QoS) controls and parental restrictions.
+    The device can perform operations such as enabling the guest network, and reporting
+    network-specific information such as the current internet throughput rates."
+
+GooglePergola:
+  description: "A device consisting of an arbor formed of horizontal trelliswork supported on
+    columns or posts that can be opened and closed, potentially in more than one direction. For
+    example, some pergolas with a canvas may open either to the LEFT or RIGHT."
+
+GooglePetFeeder:
+  description: "A device that automatically dispenses food to house pets such as cats and dogs.
+    Interactions with pet feeders may include dispensing pet food or water in various quantities and
+    presets."
+
+GooglePressureCooker:
+  description: "A kitchen appliance device that cooks food quickly at a high temperature using steam
+    under pressure. Interactions with pressure cookers may include starting and stopping, setting a
+    timer, adjusting cooking modes or food presets, or adjusting other various settings."
+
+GoogleRadiator:
+  description: "A heating device consisting of pipes through which hot water or steam is passed to
+    heat a space. Radiators can be turned on and off and may allow adjusting various modes."
+
+GoogleRouter:
+  description: "A network device that controls network traffic between two or more different
+    networks. Routers can reboot, update their software, have modes to handle Quality of Service
+    (QoS) controls and parental restrictions, and perform network specific operations (such as
+    enabling the guest network and reporting network specific information such as the current
+    internet throughput rates)."
+
+GoogleSecuritySystem:
+  description: "A device that monitors one or more sensors in a building and can raise an alert if
+    a sensor detects unexpected activity. Security systems can be armed and disarmed. They can be
+    armed at multiple security levels (for example, Home and Away) and they can report information
+    about certain sensors, such as a sensor that detects motion or an open window."
+
+GoogleSetTopBox:
+  description: "A device connected to a TV that is used to access digital video channels.
+    Interactions with Multichannel Video Programming Distributor (MVPD) and set-top-box devices may
+    include controlling media playback."
+
+GoogleShower:
+  description: "A device consisting of an area where water is sprayed on the body for the purpse of
+    washing. Showers can be turned on and off and may support adjusting temperature."
+
+GoogleSoundbar:
+  description: "An all-in-one audio device that is often used in conjunction with a TV and has a bar
+    form factor."
+
+GoogleSousVide:
+  description: "A kitchen appliance device used to cook foods in a vacuum at comparatively low
+    temperatures. Interactions with sous vides may include starting and stopping, setting a timer,
+    adjusting cooking modes or food presets, or adjusting other various settings."
+
+GoogleSprinkler:
+  description: "A device used to distribute water evenly across an area such as a garden. Sprinklers
+    can start and stop (or turn on and off). They may also support timers and/or schedules."
+
+GoogleStandmixer:
+  description: "A kitchen appliance device used to blend dry and liquid ingredients to make batter
+    or dough. Interactions with stand mixers may include turning mixers on and off, starting and
+    stopping the mixer, adjusting cooking modes or food presets, or adjusting various non-cooking
+    mode settings."
+
+GoogleStreamingBox:
+  description: "A device connected to a TV that is used to access digital streaming services for
+    media and music, often used in conjunction with a display such as a TV."
+
+GoogleStreamingSoundbar:
+  description: "A device consisting of a combination of speaker and streaming stick or box that
+    provides a streaming experience in addition to soundbar capabilities."
+
+GoogleStreamingStick:
+  description: "A device having a small stick-like form factor, usually powered by a USB or
+    HDMI cable, that is connected to a display such as a TV and is used to access digital streaming
+    services for media and music."
+
+GoogleTV:
+  description: "A device that combines a tuner, display, and loudspeakers for the purpose of
+    viewing and hearing media."
+
+GoogleWaterPurifier:
+  description: "A device that filters and purifies water."
+
+GoogleWaterSoftener:
+  description: "A device that removes minerals from water."
+
+GoogleWindow:
+  description: "A transparent device that allows light into a structure. Windows can be opened and
+    closed, optionally with sections that open in different directions, and may also be locked and
+    unlocked."
+
+GoogleYogurtmaker:
+  description: "A kitchen appliance device that makes yogurt. Interactions with yogurt makers may
+    include starting and stopping, setting a timer, adjusting cooking modes or food presets, or
+    adjusting other various settings."
+
+HeatingCoolingUnit:
+  description: "A device capable of heating or cooling a space in a home."
+
+HumiditySensor:
+  description: "A device that reports humidity measurements."
+
+IrrigationSystem:
+  description: "A device that is used to control a group of irrigation zones to water landscape."
+
+LaundryDryer:
+  description: "A device capable of drying laundry items."
+
+LaundryWasher:
+  description: "A device capable of laundering consumer items."
+
+LightSensor:
+  description: "A measurement and sensing device that is capable of measuring and reporting the
+    intensity of light (illuminance) to which the sensor is being subjected."
+
+MicrowaveOven:
+  description: "A device that uses microwaves to heat food and beverages."
+
+ModeSelect:
+  description: "A device that can be set to one of several predefined values."
+
+OccupancySensor:
+  description: "A measurement and sensing device that is capable of measuring and reporting the
+    occupancy state in a designated area."
+
+OnOffLight:
+  description: "A lighting device that is capable of being switched on or off."
+
+OnOffPluginUnit:
+  description: "A device that is capable of being switched on or off by means of a bound controller
+    device such as an On/Off Light Switch or a Dimmer Switch."
+
+OnOffSensor:
+  description: "A measurement and sensing device that, when bound to a lighting device, is capable
+    of being used to switch the device on or off."
+
+Oven:
+  description: "A device that contains one or more cabinets, and optionally a cooktop, and is
+    capable of heating food."
+
+PowerSource:
+  description: "A device that provides energy to operate or charge other equipment."
+
+PressureSensor:
+  description: "A device that measures and reports the pressure of a fluid."
+
+Pump:
+  description: "A device typically used to pump fluids like water that may have variable speed. It
+    may have optional built-in sensors and a regulation mechanism."
+
+PumpController:
+  description: "A device that is capable of configuring and controlling a pump."
+
+RainSensor:
+  description: "A device that reports the presence of rain."
+
+Refrigerator:
+  description: "A device containing one or more cabinets capable of chilling or freezing food."
+
+RoboticVacuumCleaner:
+  description: "A device that autonomously cleans floors and carpets by vacuuming dirt and debris."
+
+RoomAirConditioner:
+  description: "A device with the primary function of controlling the air temperature in a single
+    room."
+
+RootNode:
+  description: "A utility device type required for all nodes in a fabric whose main function is to
+    describe the node and what endpoints the node supports."
+
+SmokeCOAlarm:
+  description: "A device capable of sensing smoke, carbon monoxide, or both."
+
+SoilSensor:
+  description: "A device that reports measurements of soil values, such as moisture and (optionally)
+    temperature"
+
+Speaker:
+  description: "An audio or video device is capable of having its volume controlled and can be muted
+    or unmuted."
+
+TemperatureControlledCabinet:
+  description: "A device that represents a single cabinet for chilling or freezing food in a
+    refrigerator, freezer, wine chiller or other similar device."
+
+TemperatureSensor:
+  description: "A device that reports measurements of temperature."
+
+Thermostat:
+  description: "A device that is capable of having either built-in or separate sensors for
+    temperature, humidity or occupancy, and allows the desired temperature to be set. A Thermostat
+    is capable of sending heating and/or cooling requirement notifications to a heating/cooling unit
+    (for example, an indoor air handler) or is capable of including a mechanism to control a heating
+    or cooling unit directly."
+
+VideoRemoteControl:
+  description: "A device that can control a video player, for example, a traditional universal
+    remote control."
+
+WaterFreezeDetector:
+  description: "A device that reports the potential of water freezing."
+
+WaterLeakDetector:
+  description: "A device that reports the presence of a water leak."
+
+WaterValve:
+  description: "A device that is capable of configuring and controlling the flow of water."
+
+WindowCovering:
+  description: "A device that covers a window and is capable of being raised or tilted."
+
+WindowCoveringController:
+  description: "A device that is capable of controlling an automatic window covering."

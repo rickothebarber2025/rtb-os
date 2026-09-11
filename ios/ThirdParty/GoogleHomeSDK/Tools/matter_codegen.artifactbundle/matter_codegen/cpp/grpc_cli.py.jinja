@@ -1,0 +1,182 @@
+#
+# Copyright 2025 Google LLC
+#
+""" GRPC CLI support for GHP D&S API trait.
+   {{file_comment}}
+"""
+
+from typing import Optional
+import pprint
+import shlex
+
+import click
+
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.client.core import home
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.client.traits.{{PACKAGE_PY_NAMESPACE}} import {{cluster.name | ToLowerSnakeCase}}_trait
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.proto.traits.{{PACKAGE_PY_NAMESPACE}} import {{cluster.name | ToLowerSnakeCase}}_service_pb2
+
+_COMMANDS = [
+    'read',
+    'write',
+{%   for cmd in cluster.commands -%}
+    '{{cmd.name | ToLowerSnakeCase}}',
+{% endfor %}
+]
+
+
+@click.group(name='trait')
+def trait_cmd():
+  """Group for {{cluster.name}} Trait commands."""
+
+
+@trait_cmd.group(name='{{cluster.name | ToLowerSnakeCase}}')
+def {{cluster.name | ToLowerSnakeCase}}_cmd():
+  """Subgroup for {{cluster.name}} commands."""
+
+
+@{{cluster.name | ToLowerSnakeCase}}_cmd.command()
+@click.option('-d', '--device_id', default=None, help='device_id')
+@click.pass_context
+def read(ctx: click.Context, device_id: Optional[str]) -> bool:
+  """Reads attributes from the given device.
+
+  Returns:
+    True on success, False on failure.
+  """
+  if ctx.resilient_parsing:
+    # Allow click automatic handling of --help
+    return True
+  api = ctx.obj['home']
+  device = api.get_device(device_id)
+  if not device:
+    print('Device not found')
+    return False
+  trait = device.get_trait({{cluster.name | ToLowerSnakeCase}}_trait.{{cluster.name}})
+  if not trait:
+    print('Device does not have {{cluster.name | ToLowerSnakeCase}} trait')
+    return False
+  attr = trait.get_attributes()
+  print('Attributes:')
+  pprint.pprint(attr)
+  return True
+
+
+@{{cluster.name | ToLowerSnakeCase}}_cmd.command(name='write')
+@click.option('-d', '--device_id', default=None, help='device_id')
+@click.option('--{{cluster.name | ToLowerSnakeCase}}', default=False, help='{{cluster.name}} State')
+{%- for attr in cluster.attributes if attr.definition.writable %}
+@click.option('--{{attr.definition.name | ToLowerSnakeCase}}',
+              type={{attr.definition | ToClickType}},
+              default=None,
+              help='Value to set {{attr.definition.name | ToLowerSnakeCase}} attribute to')
+{% endfor %}
+@click.pass_context
+def write(ctx: click.Context, device_id: Optional[str],
+  {{cluster.attributes | ToWritableAttrArgs}}) -> bool:
+  """Writes attributes to the given device.
+
+  Missing attributes will be overwritten with default values.
+
+  Returns:
+    True on success, False on failure.
+  """
+  if ctx.resilient_parsing:
+    # Allow click automatic handling of --help
+    return True
+  print('device_id: ', device_id)
+  api = ctx.obj['home']
+  device = api.get_device(device_id)
+  if not device:
+    print('Device not found')
+    return False
+  trait = device.get_trait({{cluster.name | ToLowerSnakeCase}}_trait.{{cluster.name}})
+  if not trait:
+    print('Device does not have {{cluster.name | ToLowerSnakeCase}} trait')
+    return False
+  {%- for attr in cluster.attributes if attr.definition.is_writable %}
+    {%- set field_name = attr.definition.name | ToLowerSnakeCase %}
+  print('{{field_name}}: ', {{field_name}})
+  {%- endfor %}
+  response = trait.set_attributes({{cluster.name | ToLowerSnakeCase}}_service_pb2.{{cluster.name}}.Attribute.Data(
+      {{cluster.attributes | ToWritableAttrKeywordArgs}}
+  ))
+  print('Response:', response)
+  return True
+
+
+{%   for cmd in cluster.commands -%}
+  {%- set input_struct = cmd | commandInputStruct %}
+  {%- set output_struct = cmd | commandOutputStruct %}
+@{{cluster.name | ToLowerSnakeCase}}_cmd.command(name='{{cmd.name | ToLowerSnakeCase}}')
+@click.option('-d', '--device_id', default=None, help='device_id')
+{%- for field in input_struct.fields %}
+@click.option('--{{field.name | ToLowerSnakeCase}}',
+              type={{field | ToClickType}},
+              default=None,
+              help='Value to set {{field.name | ToLowerSnakeCase}} to')
+{% endfor %}
+@click.pass_context
+def {{cmd.name | ToLowerSnakeCase}}(ctx: click.Context, device_id: Optional[str],
+  {{input_struct.fields | ToFieldArgs }}) -> bool:
+  """Sends {{cmd.name | ToLowerSnakeCase}} command to the given device.
+
+  Returns:
+    True on success, False on failure.
+  """
+  if ctx.resilient_parsing:
+    # Allow click automatic handling of --help
+    return True
+  print('Action: {{cmd.name | ToLowerSnakeCase}}')
+  api = ctx.obj['home']
+  device = api.get_device(device_id)
+  if not device:
+    print('Device not found')
+    return False
+  trait = device.get_trait({{cluster.name | ToLowerSnakeCase}}_trait.{{cluster.name}})
+  if not trait:
+    print('Device does not have {{cluster.name | ToLowerSnakeCase}} trait')
+    return False
+  {%- for field_name in input_struct.fields | map(attribute="name") | map("ToLowerSnakeCase") %}
+  print('{{field_name}}: ', {{field_name}})
+  {%- endfor %}
+
+  response = trait.{{cmd.name | ToLowerSnakeCase}}(
+    {%- if input_struct.fields %}
+      {{input_struct.fields | ToFieldKeywordArgs}}
+    {%- endif -%}
+    )
+  print('Response:', response)
+  return True
+
+{% endfor %}
+
+
+def do_trait(line: str, api: home.Home) -> bool:
+  """Runs the trait command for the {{cluster.name | ToLowerSnakeCase}} trait.
+
+  Returns:
+    True on success, False on failure.
+  """
+  args = shlex.split(line, posix=False)
+  if len(args) < 2 or args[1] in ['', '--help', '-h', '-?']:
+    print(f"""
+    Usage:
+       trait {{cluster.name | ToLowerSnakeCase}} <action> [args]
+    Where:
+       action = {" | ".join(_COMMANDS)}
+    """)
+    return True
+  action = args[1]
+  if action not in _COMMANDS:
+    print('Action unknown to {{cluster.name}}Trait: %s' % action)
+    return False
+  try:
+    # Parse arguments directly within the context
+    with trait_cmd.make_context('trait', args) as ctx:
+      ctx.obj = {'home': api}
+      return trait_cmd.invoke(ctx)
+  except click.exceptions.UsageError as e:
+    print('UsageError: %s' % e)
+  except click.exceptions.Exit:
+    pass
+  return False
