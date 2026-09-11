@@ -10,8 +10,18 @@ WORKBENCH_LOG="$STATE_DIR/neural-workbench.log"
 echo "A.R.V.I.S. local startup"
 echo "RTB OS: $REPO_DIR"
 echo "Neural Workbench: $WORKBENCH_DIR"
+echo "Source of truth: RTB OS / Supabase"
 
 mkdir -p "$STATE_DIR"
+
+if [[ ! -f "$WORKBENCH_DIR/package.json" ]]; then
+  echo "Neural Workbench not found at $WORKBENCH_DIR" >&2
+  echo "Set NEURAL_WORKBENCH_DIR before running this launcher if the project was moved." >&2
+  exit 1
+fi
+
+# Apply the idempotent parent/iframe live-data bridge before startup.
+node "$REPO_DIR/integrations/arvis/patch-neural-workbench.mjs" "$WORKBENCH_DIR"
 
 # Refresh the protected localhost control runtime.
 /bin/zsh "$REPO_DIR/integrations/ada-control/install.sh"
@@ -27,7 +37,8 @@ workbench_online() {
 
 if workbench_online; then
   echo "Neural Workbench already running at $WORKBENCH_URL"
-elif [[ -f "$WORKBENCH_DIR/package.json" ]]; then
+  echo "Restart it once if this is the first run after the live-data bridge was installed."
+else
   echo "Starting Neural Workbench..."
   (
     cd "$WORKBENCH_DIR"
@@ -45,12 +56,9 @@ elif [[ -f "$WORKBENCH_DIR/package.json" ]]; then
     echo "Neural Workbench did not become healthy. Check $WORKBENCH_LOG" >&2
     exit 1
   fi
-else
-  echo "Neural Workbench not found at $WORKBENCH_DIR" >&2
-  echo "Set NEURAL_WORKBENCH_DIR before running this launcher if the project was moved." >&2
-  exit 1
 fi
 
 echo "A.R.V.I.S. control bridge: http://127.0.0.1:8791"
 echo "Neural Workbench: $WORKBENCH_URL"
+echo "RTB OS live-data bridge: enabled"
 echo "Startup complete."
