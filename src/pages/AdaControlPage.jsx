@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, CheckCircle2, ExternalLink, MonitorCog, Play, RefreshCw, Server, ShieldCheck, Wifi, XCircle } from 'lucide-react';
+import { Activity, Camera, CheckCircle2, ExternalLink, MonitorCog, Play, RefreshCw, Server, ShieldCheck, Video, Wifi, XCircle } from 'lucide-react';
 import { isOwnerProfile } from '../lib/permissions.js';
 
 const ENDPOINT_KEY = 'rtb-ada-control-endpoint';
 const TOKEN_KEY = 'rtb-ada-control-token';
 const WORKBENCH_URL_KEY = 'rtb-neural-workbench-url';
+const VENUE_FEED_URL_KEY = 'rtb-venue-feed-url';
+const VENUE_FEED_NAME_KEY = 'rtb-venue-feed-name';
 const DEFAULT_WORKBENCH_URL = 'http://127.0.0.1:3000';
+const DEFAULT_VENUE_FEED_NAME = 'RTB Venue Camera';
 
 function normalizeEndpoint(value) {
   const raw = String(value || '').trim().replace(/\/+$/, '');
@@ -17,6 +20,13 @@ function normalizeEndpoint(value) {
 function normalizeWorkbenchUrl(value) {
   const raw = String(value || '').trim().replace(/\/+$/, '');
   if (!raw) return DEFAULT_WORKBENCH_URL;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `http://${raw}`;
+}
+
+function normalizeVenueFeedUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
   if (/^https?:\/\//i.test(raw)) return raw;
   return `http://${raw}`;
 }
@@ -44,6 +54,9 @@ export default function AdaControlPage({
   const [endpoint, setEndpoint] = useState(() => normalizeEndpoint(window.localStorage.getItem(ENDPOINT_KEY) || ''));
   const [token, setToken] = useState(() => window.localStorage.getItem(TOKEN_KEY) || '');
   const [workbenchUrl, setWorkbenchUrl] = useState(() => normalizeWorkbenchUrl(window.localStorage.getItem(WORKBENCH_URL_KEY) || import.meta.env.VITE_NEURAL_WORKBENCH_URL || DEFAULT_WORKBENCH_URL));
+  const [venueFeedUrl, setVenueFeedUrl] = useState(() => normalizeVenueFeedUrl(window.localStorage.getItem(VENUE_FEED_URL_KEY) || import.meta.env.VITE_VENUE_FEED_URL || ''));
+  const [venueFeedName, setVenueFeedName] = useState(() => window.localStorage.getItem(VENUE_FEED_NAME_KEY) || DEFAULT_VENUE_FEED_NAME);
+  const [venueFeedLoaded, setVenueFeedLoaded] = useState(false);
   const [health, setHealth] = useState(null);
   const [status, setStatus] = useState(null);
   const [capabilities, setCapabilities] = useState([]);
@@ -55,6 +68,7 @@ export default function AdaControlPage({
   const workbenchOrigin = useMemo(() => {
     try { return new URL(workbenchUrl).origin; } catch { return '*'; }
   }, [workbenchUrl]);
+  const venueFeedIsHls = /\.m3u8(?:$|\?)/i.test(venueFeedUrl);
 
   const rtbSnapshot = useMemo(() => ({
     type: 'RTB_OS_SNAPSHOT',
@@ -145,6 +159,16 @@ export default function AdaControlPage({
     setWorkbenchUrl(normalized);
   }
 
+  function saveVenueFeed() {
+    const normalized = normalizeVenueFeedUrl(venueFeedUrl);
+    if (normalized) window.localStorage.setItem(VENUE_FEED_URL_KEY, normalized);
+    else window.localStorage.removeItem(VENUE_FEED_URL_KEY);
+    window.localStorage.setItem(VENUE_FEED_NAME_KEY, venueFeedName.trim() || DEFAULT_VENUE_FEED_NAME);
+    setVenueFeedUrl(normalized);
+    setVenueFeedName(venueFeedName.trim() || DEFAULT_VENUE_FEED_NAME);
+    setVenueFeedLoaded(false);
+  }
+
   async function runCommand(command) {
     setBusy(command);
     setError('');
@@ -182,9 +206,41 @@ export default function AdaControlPage({
         <div>
           <span className="eyebrow">Owner control plane</span>
           <h1>A.R.V.I.S. Control</h1>
-          <p>One control room for the Mac-side Ada bridge and the Neural Operations Workbench. RTB OS remains the business source of truth while these systems are consolidated.</p>
+          <p>One control room for the Mac-side Ada bridge, Neural Operations Workbench, and private venue monitoring. RTB OS remains the business source of truth.</p>
         </div>
         <StatusPill ok={Boolean(health?.ok)}>{health?.ok ? 'Mac bridge online' : 'Bridge offline'}</StatusPill>
+      </section>
+
+      <section className="panel full-span">
+        <div className="section-header">
+          <div><span>Venue monitoring</span><h2>Live venue feed</h2></div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <StatusPill ok={venueFeedLoaded}>{venueFeedLoaded ? 'Feed live' : venueFeedUrl ? 'Feed configured' : 'Not configured'}</StatusPill>
+            {venueFeedUrl ? <a className="ghost-button" href={venueFeedUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Open feed</a> : null}
+          </div>
+        </div>
+        <div className="ada-control-connection">
+          <label className="field"><span>Camera name</span><input value={venueFeedName} onChange={(e) => setVenueFeedName(e.target.value)} placeholder="RTB Lounge camera" /></label>
+          <label className="field wide"><span>Private HLS / WebRTC / bridge URL</span><input value={venueFeedUrl} onChange={(e) => setVenueFeedUrl(e.target.value)} placeholder="http://127.0.0.1:8888/..." /></label>
+          <button className="primary-button" type="button" onClick={saveVenueFeed}>Save camera</button>
+        </div>
+        <div className="alert warning" style={{ marginTop: 12 }}><strong>Private feed only.</strong><span>Use a local or Tailscale-protected Wyze bridge URL. Do not paste your Wyze account password or API secret into this field.</span></div>
+        <div style={{ marginTop: 16, border: '1px solid var(--border-color, rgba(255,255,255,.08))', borderRadius: 16, overflow: 'hidden', background: '#050505', minHeight: 320 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border-color, rgba(255,255,255,.08))' }}>
+            <Camera size={17} />
+            <strong>{venueFeedName || DEFAULT_VENUE_FEED_NAME}</strong>
+            <span className="muted" style={{ marginLeft: 'auto' }}>{venueFeedUrl ? 'Owner-only live view' : 'Add the camera bridge URL above'}</span>
+          </div>
+          {venueFeedUrl ? (
+            venueFeedIsHls ? (
+              <video src={venueFeedUrl} controls autoPlay muted playsInline onLoadedData={() => setVenueFeedLoaded(true)} onError={() => setVenueFeedLoaded(false)} style={{ width: '100%', minHeight: 320, maxHeight: '70vh', display: 'block', background: '#000' }} />
+            ) : (
+              <iframe title={`${venueFeedName} live feed`} src={venueFeedUrl} allow="autoplay; fullscreen; picture-in-picture" onLoad={() => setVenueFeedLoaded(true)} style={{ width: '100%', minHeight: '60vh', border: 0, display: 'block', background: '#000' }} />
+            )
+          ) : (
+            <div style={{ minHeight: 320, display: 'grid', placeItems: 'center', textAlign: 'center', padding: 24 }}><div><Video size={34} /><p className="muted">Wyze venue feed is ready to connect.</p></div></div>
+          )}
+        </div>
       </section>
 
       <section className="panel full-span">
@@ -229,6 +285,7 @@ export default function AdaControlPage({
       <section className="panel full-span">
         <div className="section-header"><div><span>Live status</span><h2>What A.R.V.I.S. can actually control</h2></div></div>
         <div className="ada-control-status-grid">
+          <article><Camera size={20} /><strong>Venue camera</strong><span>{venueFeedLoaded ? 'Live' : venueFeedUrl ? 'Configured' : 'Not configured'}</span></article>
           <article><MonitorCog size={20} /><strong>Neural Workbench</strong><span>{workbenchOnline ? 'Running' : status?.neural_workbench?.directory_exists ? 'Ready to start' : 'Project not found'}</span></article>
           <article><Server size={20} /><strong>Local Ada</strong><span>{status?.ada_archive?.ok ? 'Reachable' : 'Unavailable'}</span></article>
           <article><Wifi size={20} /><strong>Tailscale</strong><span>{status?.tailscale?.online ? 'Connected' : 'Unknown / offline'}</span></article>
