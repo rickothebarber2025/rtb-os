@@ -11,11 +11,8 @@ import {
 
 const EMAIL_AUTH_TYPES = new Set(['email', 'email_change', 'invite', 'magiclink', 'recovery', 'signup']);
 const NATIVE_AUTH_CALLBACK_URL = 'com.rtbheadquaters.os://auth/callback';
-// Safety net: if the initial session check hangs for any reason (a stuck
-// auth lock, a slow/unreachable network on first launch, etc.) fail open to
-// the sign-in screen instead of leaving the whole app stuck on a loading
-// spinner forever. See supabaseClient.js for the specific WKWebView lock
-// issue this guards against.
+const NATIVE_AUTH_RELAY_PARAM = 'rtb_native_auth';
+const FALLBACK_WEB_ORIGIN = 'https://rtbheadquaters.com';
 const SESSION_LOAD_TIMEOUT_MS = 8000;
 
 function isNativeApp() {
@@ -33,8 +30,17 @@ function notifySessionReady(session, profile = null) {
   }));
 }
 
+function getNativeRelayUrl() {
+  const candidate = /^https:\/\//i.test(window.location.origin)
+    ? window.location.origin
+    : FALLBACK_WEB_ORIGIN;
+  const url = new URL(candidate);
+  url.searchParams.set(NATIVE_AUTH_RELAY_PARAM, '1');
+  return url.toString();
+}
+
 function getAuthRedirectUrl() {
-  return isNativeApp() ? NATIVE_AUTH_CALLBACK_URL : window.location.origin;
+  return isNativeApp() ? getNativeRelayUrl() : window.location.origin;
 }
 
 function isNativeAuthRedirect(url) {
@@ -57,6 +63,26 @@ function readAuthRedirectParams(sourceUrl = window.location.href) {
   };
 }
 
+function relayBrowserAuthReturnToNative(sourceUrl = window.location.href) {
+  if (isNativeApp()) return false;
+  const source = new URL(sourceUrl);
+  if (source.searchParams.get(NATIVE_AUTH_RELAY_PARAM) !== '1') return false;
+
+  const params = readAuthRedirectParams(sourceUrl);
+  const hasAuthResult = Boolean(
+    params.accessToken || params.code || params.error || params.refreshToken || params.tokenHash,
+  );
+  if (!hasAuthResult) return false;
+
+  const native = new URL(NATIVE_AUTH_CALLBACK_URL);
+  source.searchParams.forEach((value, key) => {
+    if (key !== NATIVE_AUTH_RELAY_PARAM) native.searchParams.set(key, value);
+  });
+  native.hash = source.hash;
+  window.location.replace(native.toString());
+  return true;
+}
+
 function clearAuthRedirectParams(sourceUrl = window.location.href) {
   if (!sourceUrl.startsWith(window.location.origin)) return;
   window.history.replaceState(window.history.state, '', window.location.origin);
@@ -70,9 +96,9 @@ async function closeNativeAuthBrowser() {
 function getAuthRedirectErrorMessage(error) {
   const message = error?.message || String(error || '');
   if (/expired|invalid|used|otp|token/i.test(message)) {
-    return 'That invite link is expired or already used. Ask an admin to send a new invite, or use a magic link to sign in.';
+    return 'That sign-in link is expired, invalid, or already used. Please start sign-in again.';
   }
-  return message || 'Unable to finish the invite sign-in.';
+  return message || 'Unable to finish sign-in.';
 }
 
 async function completeAuthRedirect(sourceUrl = window.location.href) {
@@ -124,6 +150,7 @@ export function useAuth() {
     async function loadSession() {
       try {
         setAuthError('');
+        if (relayBrowserAuthReturnToNative()) return;
         await completeAuthRedirect();
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
@@ -289,18 +316,21 @@ export function useAuth() {
   }, []);
   const signInWithGoogle = useCallback(async () => {
     const native = isNativeApp();
-    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: getAuthRedirectUrl(), skipBrowserRedirect: native } });
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: getAuthRedirectUrl(),
+        skipBrowserRedirect: native,
+        scopes: 'openid email profile',
+        queryParams: { prompt: 'select_account' },
+      },
+    });
     if (error) throw error;
-    if (native && data?.url) await Browser.open({ presentationStyle: 'fullscreen', url: data.url });
+    if (native) {
+      if (!data?.url) throw new Error('Google did not return an authorization URL.');
+      await Browser.open({ presentationStyle: 'fullscreen', url: data.url });
+    }
   }, []);
-  // Apple App Store guideline 4.8: an app offering a third-party login
-  // (Google, above) must also offer an equivalent that (a) limits data
-  // collection to name/email, (b) lets the user keep their email private,
-  // and (c) doesn't collect ad-tracking interactions without consent. Sign
-  // in with Apple satisfies all three by definition, so it's offered here
-  // the same way as Google -- through Supabase's 'apple' OAuth provider,
-  // opened in the system browser on native so it goes through Apple's real
-  // sign-in flow (appleid.apple.com), not an embedded WebView.
   const signInWithApple = useCallback(async () => {
     const native = isNativeApp();
     const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'apple', options: { redirectTo: getAuthRedirectUrl(), skipBrowserRedirect: native } });
