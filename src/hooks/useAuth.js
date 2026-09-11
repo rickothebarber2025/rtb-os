@@ -11,8 +11,6 @@ import {
 
 const EMAIL_AUTH_TYPES = new Set(['email', 'email_change', 'invite', 'magiclink', 'recovery', 'signup']);
 const NATIVE_AUTH_CALLBACK_URL = 'com.rtbheadquaters.os://auth/callback';
-const NATIVE_AUTH_RELAY_PARAM = 'rtb_native_auth';
-const FALLBACK_WEB_ORIGIN = 'https://rtbheadquaters.com';
 const SESSION_LOAD_TIMEOUT_MS = 8000;
 
 function isNativeApp() {
@@ -30,17 +28,8 @@ function notifySessionReady(session, profile = null) {
   }));
 }
 
-function getNativeRelayUrl() {
-  const candidate = /^https:\/\//i.test(window.location.origin)
-    ? window.location.origin
-    : FALLBACK_WEB_ORIGIN;
-  const url = new URL(candidate);
-  url.searchParams.set(NATIVE_AUTH_RELAY_PARAM, '1');
-  return url.toString();
-}
-
 function getAuthRedirectUrl() {
-  return isNativeApp() ? getNativeRelayUrl() : window.location.origin;
+  return isNativeApp() ? NATIVE_AUTH_CALLBACK_URL : window.location.origin;
 }
 
 function isNativeAuthRedirect(url) {
@@ -63,26 +52,6 @@ function readAuthRedirectParams(sourceUrl = window.location.href) {
   };
 }
 
-function relayBrowserAuthReturnToNative(sourceUrl = window.location.href) {
-  if (isNativeApp()) return false;
-  const source = new URL(sourceUrl);
-  if (source.searchParams.get(NATIVE_AUTH_RELAY_PARAM) !== '1') return false;
-
-  const params = readAuthRedirectParams(sourceUrl);
-  const hasAuthResult = Boolean(
-    params.accessToken || params.code || params.error || params.refreshToken || params.tokenHash,
-  );
-  if (!hasAuthResult) return false;
-
-  const native = new URL(NATIVE_AUTH_CALLBACK_URL);
-  source.searchParams.forEach((value, key) => {
-    if (key !== NATIVE_AUTH_RELAY_PARAM) native.searchParams.set(key, value);
-  });
-  native.hash = source.hash;
-  window.location.replace(native.toString());
-  return true;
-}
-
 function clearAuthRedirectParams(sourceUrl = window.location.href) {
   if (!sourceUrl.startsWith(window.location.origin)) return;
   window.history.replaceState(window.history.state, '', window.location.origin);
@@ -95,8 +64,14 @@ async function closeNativeAuthBrowser() {
 
 function getAuthRedirectErrorMessage(error) {
   const message = error?.message || String(error || '');
-  if (/expired|invalid|used|otp|token/i.test(message)) {
-    return 'That sign-in link is expired, invalid, or already used. Please start sign-in again.';
+  if (/redirect.*not.*allow|redirect.*invalid|redirect_uri/i.test(message)) {
+    return `RTB OS OAuth redirect is not allowed. Add ${NATIVE_AUTH_CALLBACK_URL} to Supabase Auth > URL Configuration > Additional Redirect URLs.`;
+  }
+  if (/provider.*disabled|unsupported provider/i.test(message)) {
+    return 'Google sign-in is not enabled in Supabase Auth Providers.';
+  }
+  if (/expired|invalid|used|otp|token|code verifier|pkce/i.test(message)) {
+    return 'The Google sign-in return could not be verified. Start Google sign-in again from RTB OS.';
   }
   return message || 'Unable to finish sign-in.';
 }
@@ -105,14 +80,14 @@ async function completeAuthRedirect(sourceUrl = window.location.href) {
   const params = readAuthRedirectParams(sourceUrl);
   if (params.error) throw new Error(params.error);
 
-  if (params.accessToken && params.refreshToken) {
-    const { data, error } = await supabase.auth.setSession({ access_token: params.accessToken, refresh_token: params.refreshToken });
+  if (params.code) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
     if (error) throw error;
     clearAuthRedirectParams(sourceUrl);
     return data.session || null;
   }
-  if (params.code) {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
+  if (params.accessToken && params.refreshToken) {
+    const { data, error } = await supabase.auth.setSession({ access_token: params.accessToken, refresh_token: params.refreshToken });
     if (error) throw error;
     clearAuthRedirectParams(sourceUrl);
     return data.session || null;
@@ -150,7 +125,6 @@ export function useAuth() {
     async function loadSession() {
       try {
         setAuthError('');
-        if (relayBrowserAuthReturnToNative()) return;
         await completeAuthRedirect();
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
