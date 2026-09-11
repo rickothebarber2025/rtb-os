@@ -23,6 +23,9 @@ fi
 # Apply the idempotent parent/iframe live-data bridge before startup.
 node "$REPO_DIR/integrations/arvis/patch-neural-workbench.mjs" "$WORKBENCH_DIR"
 
+# Replace synthetic briefing/anomaly fallbacks with verified RTB OS-only behavior.
+node "$REPO_DIR/integrations/arvis/harden-neural-workbench.mjs" "$WORKBENCH_DIR"
+
 # Surface remaining legacy/fake telemetry and exposure risks on every launch.
 node "$REPO_DIR/integrations/arvis/audit-neural-workbench.mjs" "$WORKBENCH_DIR"
 
@@ -40,7 +43,7 @@ workbench_online() {
 
 if workbench_online; then
   echo "Neural Workbench already running at $WORKBENCH_URL"
-  echo "Restart it once if this is the first run after the live-data bridge was installed."
+  echo "Restart it once if this is the first run after the bridge/hardening update."
 else
   echo "Starting Neural Workbench..."
   (
@@ -64,5 +67,6 @@ fi
 echo "A.R.V.I.S. control bridge: http://127.0.0.1:8791"
 echo "Neural Workbench: $WORKBENCH_URL"
 echo "RTB OS live-data bridge: enabled"
+echo "Synthetic briefing/anomaly fallbacks: disabled"
 echo "Telemetry audit: $STATE_DIR/neural-workbench-audit.json"
 echo "Startup complete."
