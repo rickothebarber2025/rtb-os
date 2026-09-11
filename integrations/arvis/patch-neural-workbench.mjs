@@ -18,6 +18,7 @@ for (const requiredPath of [appPath, serverPath]) {
 const bridgeSource = `const OPERATIONS_KEY = 'rtb_real_operations_data';
 const STAFF_KEY = 'rtb_real_staff_data';
 const RAW_SNAPSHOT_KEY = 'rtb_os_snapshot_v1';
+const MAIN_BRAIN_KEY = 'rtb_main_brain_context_v1';
 
 function optionalNumber(source: any, keys: string[]) {
   for (const key of keys) {
@@ -118,9 +119,34 @@ async function mirrorSnapshotToServer(rawSnapshot: any, operations: any, staff: 
   }
 }
 
+async function mirrorMainBrainToServer(context: any) {
+  try {
+    await fetch('/api/rtb-os/main-brain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(context),
+    });
+  } catch (error) {
+    console.warn('[RTB Main Brain] Server mirror unavailable', error);
+  }
+}
+
 export function installRTBOSBridge() {
   function receive(event: MessageEvent) {
     if (window.parent === window || event.source !== window.parent) return;
+
+    if (event.data?.type === 'RTB_MAIN_BRAIN_CONTEXT' && event.data?.version === 1) {
+      try {
+        localStorage.setItem(MAIN_BRAIN_KEY, JSON.stringify(event.data));
+        (window as any).__RTB_MAIN_BRAIN__ = event.data;
+        window.dispatchEvent(new CustomEvent('rtb-main-brain-updated', { detail: event.data }));
+        void mirrorMainBrainToServer(event.data);
+      } catch (error) {
+        console.warn('[RTB Main Brain] Could not persist connection context', error);
+      }
+      return;
+    }
+
     if (event.data?.type !== 'RTB_OS_SNAPSHOT' || event.data?.version !== 1) return;
     const payload = event.data.payload || {};
     const staff = toWorkbenchStaff(payload);
@@ -168,16 +194,24 @@ if (!appSource.includes('installRTBOSBridge();')) {
 fs.writeFileSync(appPath, appSource, 'utf8');
 
 let serverSource = fs.readFileSync(serverPath, 'utf8');
+const healthMarker = "// Healthcheck\napp.get('/api/health', (req, res) => {";
+if (!serverSource.includes(healthMarker)) {
+  console.error('[A.R.V.I.S.] Expected Workbench health marker was not found. No server.ts changes made.');
+  process.exit(1);
+}
+
 if (!serverSource.includes("app.post('/api/rtb-os/snapshot'")) {
-  const healthMarker = "// Healthcheck\napp.get('/api/health', (req, res) => {";
-  if (!serverSource.includes(healthMarker)) {
-    console.error('[A.R.V.I.S.] Expected Workbench health marker was not found. No server.ts changes made.');
-    process.exit(1);
-  }
   const snapshotEndpoint = `// RTB OS owner-scoped live snapshot mirror\napp.post('/api/rtb-os/snapshot', (req, res) => {\n  try {\n    const remote = String(req.socket.remoteAddress || '');\n    const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';\n    if (!loopback) return res.status(403).json({ error: 'RTB OS snapshot bridge is localhost-only' });\n    const { rawSnapshot, operations, staff } = req.body || {};\n    if (!rawSnapshot || rawSnapshot.type !== 'RTB_OS_SNAPSHOT' || rawSnapshot.version !== 1) {\n      return res.status(400).json({ error: 'Valid RTB_OS_SNAPSHOT v1 is required' });\n    }\n    if (!operations || !Array.isArray(staff)) {\n      return res.status(400).json({ error: 'Mapped operations and staff are required' });\n    }\n    saveOperationsData({ ...operations, sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', lastUpdated: new Date().toISOString() });\n    saveStaffData(staff);\n    fs.writeFileSync(path.join(DATA_DIR, 'rtb-os-snapshot.json'), JSON.stringify(rawSnapshot, null, 2), 'utf-8');\n    return res.json({ status: 'ok', sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', dataAvailable: operations.dataAvailable === true, staffCount: staff.length, mirroredAt: new Date().toISOString() });\n  } catch (e: any) {\n    return res.status(500).json({ error: e.message || 'Failed to mirror RTB OS snapshot' });\n  }\n});\n\n`;
   serverSource = serverSource.replace(healthMarker, `${snapshotEndpoint}${healthMarker}`);
 }
+
+if (!serverSource.includes("app.post('/api/rtb-os/main-brain'")) {
+  const mainBrainEndpoint = `// RTB OS centralized connection broker mirror\napp.post('/api/rtb-os/main-brain', (req, res) => {\n  try {\n    const remote = String(req.socket.remoteAddress || '');\n    const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';\n    if (!loopback) return res.status(403).json({ error: 'RTB Main Brain bridge is localhost-only' });\n    const context = req.body || {};\n    if (context.type !== 'RTB_MAIN_BRAIN_CONTEXT' || context.version !== 1) {\n      return res.status(400).json({ error: 'Valid RTB_MAIN_BRAIN_CONTEXT v1 is required' });\n    }\n    fs.writeFileSync(path.join(DATA_DIR, 'rtb-main-brain.json'), JSON.stringify(context, null, 2), 'utf-8');\n    const connections = context.connections?.connections || [];\n    return res.json({ status: 'ok', connectedProviders: connections.filter((item: any) => item?.status === 'connected' || item?.status === 'configured').map((item: any) => item.provider), mirroredAt: new Date().toISOString() });\n  } catch (e: any) {\n    return res.status(500).json({ error: e.message || 'Failed to mirror RTB Main Brain context' });\n  }\n});\n\n`;
+  serverSource = serverSource.replace(healthMarker, `${mainBrainEndpoint}${healthMarker}`);
+}
+
 fs.writeFileSync(serverPath, serverSource, 'utf8');
 
 console.log(`[A.R.V.I.S.] RTB OS live-data bridge installed into ${workbenchDir}`);
-console.log('[A.R.V.I.S.] Snapshot ingestion is parent-only in the browser and localhost-only on the Workbench server.');
+console.log('[A.R.V.I.S.] Main Brain connection broker enabled for the embedded Workbench.');
+console.log('[A.R.V.I.S.] Snapshot and Main Brain ingestion are parent-only in the browser and localhost-only on the Workbench server.');
