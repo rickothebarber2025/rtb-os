@@ -120,6 +120,7 @@ async function mirrorSnapshotToServer(rawSnapshot: any, operations: any, staff: 
 
 export function installRTBOSBridge() {
   function receive(event: MessageEvent) {
+    if (window.parent === window || event.source !== window.parent) return;
     if (event.data?.type !== 'RTB_OS_SNAPSHOT' || event.data?.version !== 1) return;
     const payload = event.data.payload || {};
     const staff = toWorkbenchStaff(payload);
@@ -173,10 +174,10 @@ if (!serverSource.includes("app.post('/api/rtb-os/snapshot'")) {
     console.error('[A.R.V.I.S.] Expected Workbench health marker was not found. No server.ts changes made.');
     process.exit(1);
   }
-  const snapshotEndpoint = `// RTB OS owner-scoped live snapshot mirror\napp.post('/api/rtb-os/snapshot', (req, res) => {\n  try {\n    const { rawSnapshot, operations, staff } = req.body || {};\n    if (!rawSnapshot || rawSnapshot.type !== 'RTB_OS_SNAPSHOT' || rawSnapshot.version !== 1) {\n      return res.status(400).json({ error: 'Valid RTB_OS_SNAPSHOT v1 is required' });\n    }\n    if (!operations || !Array.isArray(staff)) {\n      return res.status(400).json({ error: 'Mapped operations and staff are required' });\n    }\n    saveOperationsData({ ...operations, sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', lastUpdated: new Date().toISOString() });\n    saveStaffData(staff);\n    fs.writeFileSync(path.join(DATA_DIR, 'rtb-os-snapshot.json'), JSON.stringify(rawSnapshot, null, 2), 'utf-8');\n    return res.json({ status: 'ok', sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', dataAvailable: operations.dataAvailable === true, staffCount: staff.length, mirroredAt: new Date().toISOString() });\n  } catch (e: any) {\n    return res.status(500).json({ error: e.message || 'Failed to mirror RTB OS snapshot' });\n  }\n});\n\n`;
+  const snapshotEndpoint = `// RTB OS owner-scoped live snapshot mirror\napp.post('/api/rtb-os/snapshot', (req, res) => {\n  try {\n    const remote = String(req.socket.remoteAddress || '');\n    const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';\n    if (!loopback) return res.status(403).json({ error: 'RTB OS snapshot bridge is localhost-only' });\n    const { rawSnapshot, operations, staff } = req.body || {};\n    if (!rawSnapshot || rawSnapshot.type !== 'RTB_OS_SNAPSHOT' || rawSnapshot.version !== 1) {\n      return res.status(400).json({ error: 'Valid RTB_OS_SNAPSHOT v1 is required' });\n    }\n    if (!operations || !Array.isArray(staff)) {\n      return res.status(400).json({ error: 'Mapped operations and staff are required' });\n    }\n    saveOperationsData({ ...operations, sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', lastUpdated: new Date().toISOString() });\n    saveStaffData(staff);\n    fs.writeFileSync(path.join(DATA_DIR, 'rtb-os-snapshot.json'), JSON.stringify(rawSnapshot, null, 2), 'utf-8');\n    return res.json({ status: 'ok', sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', dataAvailable: operations.dataAvailable === true, staffCount: staff.length, mirroredAt: new Date().toISOString() });\n  } catch (e: any) {\n    return res.status(500).json({ error: e.message || 'Failed to mirror RTB OS snapshot' });\n  }\n});\n\n`;
   serverSource = serverSource.replace(healthMarker, `${snapshotEndpoint}${healthMarker}`);
 }
 fs.writeFileSync(serverPath, serverSource, 'utf8');
 
 console.log(`[A.R.V.I.S.] RTB OS live-data bridge installed into ${workbenchDir}`);
-console.log('[A.R.V.I.S.] Missing operational metrics now remain unavailable instead of being converted into fake zeroes.');
+console.log('[A.R.V.I.S.] Snapshot ingestion is parent-only in the browser and localhost-only on the Workbench server.');
