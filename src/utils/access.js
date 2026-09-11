@@ -31,6 +31,7 @@ const OWNER_NAV_PRESENTATION = {
   integrations: { group: 'Control Room', label: 'Connections' },
   'marketing-calendar': { group: 'Daily Ops', label: 'Marketing Calendar' },
   'my-role': { group: 'Profile', label: 'My Role' },
+  'neural-workbench': { group: 'Control Room', label: 'Neural Workbench' },
   operations: { group: 'Daily Ops', label: 'Daily Operations' },
   payroll: { group: 'Team & Pay', label: 'Payroll' },
   performance: { group: 'Team & Pay', label: 'Performance' },
@@ -79,7 +80,7 @@ export function canUseApp(profile) { return hasAnyModulePermission(profile, 'vie
 
 export function canAccessPage(profile, pageId) {
   if (!canUseApp(profile)) return false;
-  if (pageId === 'ada-control') return isOwnerProfile(profile);
+  if (pageId === 'ada-control' || pageId === 'neural-workbench') return isOwnerProfile(profile);
   const payload = getEffectivePermissionsPayload(profile);
   if (pageId === 'talent-pipeline') return hasModulePermission(profile, 'operations', 'view') || hasModulePermission(profile, 'roster', 'view');
   const moduleId = PAGE_MODULE_MAP[pageId] || PAGE_MODULE_MAP.dashboard;
