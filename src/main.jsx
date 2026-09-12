@@ -17,6 +17,7 @@ import './styles/integrations.css';
 import './styles/staffHubHumanNav.css';
 import './styles/staffHubVibes.css';
 import './styles/accessControl.css';
+import './styles/nativeAppShell.css';
 import './styles/adaControl.css';
 import './styles/staffHubMobileSimplify.css';
 import './styles/googleHomeBridge.css';
