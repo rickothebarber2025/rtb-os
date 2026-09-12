@@ -19,22 +19,29 @@ const overrides = [
     source: path.join(repoDir, 'integrations', 'arvis', 'workbench-overrides', 'AgenticScreenVision.tsx'),
     target: path.join(workbenchDir, 'src', 'components', 'AgenticScreenVision.tsx'),
   },
+  {
+    source: path.join(repoDir, 'integrations', 'arvis', 'workbench-overrides', 'PayrollIntelligence.tsx'),
+    target: path.join(workbenchDir, 'src', 'components', 'PayrollIntelligence.tsx'),
+    createIfMissing: true,
+  },
 ];
 
-for (const { source, target } of overrides) {
+for (const { source, target, createIfMissing = false } of overrides) {
   if (!fs.existsSync(source)) {
     console.error(`[A.R.V.I.S.] Workbench override source missing: ${source}`);
     process.exit(1);
   }
 
-  if (!fs.existsSync(target)) {
+  if (!fs.existsSync(target) && !createIfMissing) {
     console.error(`[A.R.V.I.S.] Workbench override target missing: ${target}`);
     process.exit(1);
   }
 
-  const backup = `${target}.rtb-original`;
-  if (!fs.existsSync(backup)) {
-    fs.copyFileSync(target, backup);
+  if (fs.existsSync(target)) {
+    const backup = `${target}.rtb-original`;
+    if (!fs.existsSync(backup)) fs.copyFileSync(target, backup);
+  } else {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
   }
 
   fs.copyFileSync(source, target);
