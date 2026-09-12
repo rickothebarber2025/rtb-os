@@ -21,7 +21,7 @@ function notificationDestination(notification) {
     return { page: 'staff-hub', tab: 'daily' };
   }
   if (/announcement|policy|update/.test(type)) return { page: 'staff-hub', tab: 'home' };
-  if (/performance|coaching|goal/.test(type)) return { page: 'staff-hub', tab: 'performance' };
+  if (/performance|coaching|goal/.test(type)) return { page: 'staff-hub', tab: 'stats' };
   return { page: 'staff-hub', tab: 'daily' };
 }
 
@@ -107,7 +107,14 @@ export default function StaffNotifications({ setActivePage, setStaffHubTab }) {
       </button>
 
       {open ? (
-        <div className="staff-notifications__popover">
+        <>
+          <button
+            aria-label="Close notifications"
+            className="staff-notifications__scrim"
+            onClick={() => setOpen(false)}
+            type="button"
+          />
+          <div className="staff-notifications__popover" role="dialog" aria-modal="true" aria-label="Notifications">
           <div className="staff-notifications__header">
             <div>
               <strong>Notifications</strong>
@@ -140,7 +147,8 @@ export default function StaffNotifications({ setActivePage, setStaffHubTab }) {
               </button>
             )) : <p className="staff-notifications__empty">No notifications yet.</p>}
           </div>
-        </div>
+          </div>
+        </>
       ) : null}
     </div>
   );

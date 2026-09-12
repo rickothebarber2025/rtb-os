@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[project]
+name = "google-home-codegen"
+version = "1.0.0"
+requires-python = ">= 3.10"
+dependencies = [
+    "click",
+    "coloredlogs",
+    "jinja2",
+    "lark",
+    "pyyaml",
+    "stringcase",
+]

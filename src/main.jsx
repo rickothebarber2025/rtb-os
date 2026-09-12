@@ -2,13 +2,12 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import MobileNavigationEnhancer from './components/MobileNavigationEnhancer.jsx';
-import StaffHubNavigationEnhancer from './components/StaffHubNavigationEnhancer.jsx';
 import { AuthProfileProvider } from './contexts/AuthProfileContext.jsx';
 import './styles/global.css';
 import './styles/mobileNavigation.css';
 import './styles/mobileTopbar.css';
 import './styles/operationsChecklist.css';
+import './styles/staffMessageCenter.css';
 import './styles/contractorCleaning.css';
 import './styles/smartFlow.css';
 import './styles/behavioralUX.css';
@@ -17,6 +16,10 @@ import './styles/integrations.css';
 import './styles/staffHubHumanNav.css';
 import './styles/staffHubVibes.css';
 import './styles/accessControl.css';
+import './styles/nativeAppShell.css';
+import './styles/adaControl.css';
+import './styles/staffHubMobileSimplify.css';
+import './styles/googleHomeBridge.css';
 
 const CACHE_CLEANUP_KEY = 'rtb-os-cache-cleanup-2026-07-12';
 
@@ -53,8 +56,6 @@ createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
       <AuthProfileProvider>
-        <MobileNavigationEnhancer />
-        <StaffHubNavigationEnhancer />
         <App />
       </AuthProfileProvider>
     </ErrorBoundary>

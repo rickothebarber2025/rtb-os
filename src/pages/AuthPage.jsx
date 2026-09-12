@@ -5,6 +5,7 @@ export default function AuthPage({
   authError,
   isConfigured,
   sendMagicLink,
+  signInWithApple,
   signInWithGoogle,
   signInWithPassword,
   signUp,
@@ -48,6 +49,19 @@ export default function AuthPage({
       await signInWithGoogle();
     } catch (err) {
       setError(err.message || 'Google sign-in failed.');
+      setSubmitting(false);
+    }
+  }
+
+  async function handleAppleSignIn() {
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+
+    try {
+      await signInWithApple();
+    } catch (err) {
+      setError(err.message || 'Apple sign-in failed.');
       setSubmitting(false);
     }
   }
@@ -104,6 +118,16 @@ export default function AuthPage({
           </div>
 
           <form className="stack" onSubmit={handleSubmit}>
+            <button
+              className="apple-button"
+              disabled={!isConfigured || submitting}
+              type="button"
+              onClick={handleAppleSignIn}
+            >
+              <span className="apple-mark" aria-hidden="true"></span>
+              Continue with Apple
+            </button>
+
             <button
               className="google-button"
               disabled={!isConfigured || submitting}

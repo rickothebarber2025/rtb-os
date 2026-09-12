@@ -48,7 +48,19 @@
     display: contents;
   }
 
+  .topbar__context-pill {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-width: 0;
+    width: 100%;
+  }
+
   .topbar__status {
+    display: none !important;
+  }
+
+  .topbar__context-pill .role-pill,
+  .topbar__context-pill .user-chip {
     display: none !important;
   }
 
@@ -83,8 +95,6 @@
   }
 
   .topbar__business {
-    grid-column: 1 / -1;
-    grid-row: 2;
     min-width: 0;
     width: 100%;
   }

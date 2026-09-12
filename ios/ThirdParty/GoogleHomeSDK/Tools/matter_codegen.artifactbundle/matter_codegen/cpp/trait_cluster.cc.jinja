@@ -1,0 +1,145 @@
+// {{file_comment}}
+/*
+ * Copyright 2025 Google LLC
+ */
+
+#include "{{cluster.name | ToLowerSnakeCase}}_trait.h"
+
+#include <optional>  // IWYU pragma: keep
+
+#include "google_home_api/encoding/codec_reader.h"  // IWYU pragma: keep
+#include "google_home_api/encoding/codec_writer.h"  // IWYU pragma: keep
+
+namespace google_home_api::traits::{{PACKAGE_NAMESPACE}} {
+{%- if cluster.attributes %}
+
+  // ===============================================
+  //                  ATTRIBUTES
+  // ===============================================
+
+void {{cluster.name}}Trait::EncodeTo(CodecWriter& writer) const {
+  attributes_.EncodeTo(writer);
+}
+
+void {{cluster.name}}Trait::DecodeFrom(CodecReader& reader) {
+  attributes_.DecodeFrom(reader);
+}
+
+void {{cluster.name}}Trait::AttributesStructAdapter::EncodeTo(
+    CodecWriter& writer) const {
+  {%- for attr in cluster.attributes %}
+    {% if attr.is_writable -%}
+    {{attr.definition | SerializerWriteField('value_.writable.')}};
+    {%- else -%}
+    {{attr.definition | SerializerWriteField('value_.')}};
+    {%- endif -%}
+  {%- endfor %}
+}
+
+void {{cluster.name}}Trait::AttributesStructAdapter::DecodeFrom(
+    CodecReader& reader) {
+  {%- for attr in cluster.attributes %}
+    {% if attr.is_writable -%}
+    {{attr.definition | SerializerReadField('value_.writable.')}};
+    {%- else -%}
+    {{attr.definition | SerializerReadField('value_.')}}
+    {%- endif -%}
+  {%- endfor %}
+}
+
+bool IsBitwiseEqual(const {{cluster.name}}Trait::Attributes& lhs, 
+                const {{cluster.name}}Trait::Attributes& rhs) {
+  {%- for attr in cluster.attributes %}
+  {{ attr | IsAttributeEqual }}
+  {%- endfor %}
+  return true;
+}
+{%- endif %}
+{%- if cluster.structs %}
+
+  // ===============================================
+  //                   STRUCTS
+  // ===============================================
+
+{% for entry in cluster.structs | reject('isCommandStruct') -%}
+void {{cluster.name}}Trait::{{entry.name}}Adapter::EncodeTo(
+    CodecWriter& writer) const {
+    {%-  for field in entry.fields %}
+    {{field | SerializerWriteField('value_.')}};
+    {%- endfor %}
+}
+
+void {{cluster.name}}Trait::{{entry.name}}Adapter::DecodeFrom(CodecReader& reader) {
+    {%-  for field in entry.fields %}
+    {{field | SerializerReadField('value_.')}}
+    {%- endfor %}
+}
+
+{% endfor %}
+{%- endif %}
+{%- if cluster.commands %}
+
+  // ===============================================
+  //                  COMMANDS
+  // ===============================================
+
+{%   for cmd in cluster.commands -%}
+  {%- set input_struct = cmd | commandInputStruct %}
+  {%- set output_struct = cmd | commandOutputStruct %}
+
+{%- if input_struct %}
+void {{cluster.name}}Trait::{{cmd.name}}Command::EncodeTo(
+    CodecWriter& writer) const {
+    {%-  for field in input_struct.fields %}
+    {{field | SerializerWriteField('params_.')}};
+    {%- endfor %}
+}
+
+void {{cluster.name}}Trait::{{cmd.name}}Command::DecodeFrom(CodecReader& reader) {
+    {%-  for field in input_struct.fields %}
+    {{field | SerializerReadField('params_.')}}
+    {%- endfor %}
+}
+{% endif -%}
+
+{%- if output_struct %}
+void {{cluster.name}}Trait::{{cmd | ToCommandResponse}}::EncodeTo(
+    CodecWriter& writer) const {
+    {%-  for field in output_struct.fields %}
+    {{field | SerializerWriteField('params_.')}};
+    {%- endfor %}
+}
+
+void {{cluster.name}}Trait::{{cmd | ToCommandResponse}}::DecodeFrom(CodecReader& reader) {
+    {%-  for field in output_struct.fields %}
+    {{field | SerializerReadField('params_.')}}
+    {%- endfor %}
+}
+{% endif -%}
+{% endfor %}
+{%- endif %}
+{%- if cluster.events %}
+
+  // ===============================================
+  //                  EVENTS
+  // ===============================================
+
+{%-   for entry in cluster.events -%}
+{%- if entry.fields %}
+void {{cluster.name}}Trait::{{entry.name}}Event::EncodeTo(
+    CodecWriter& writer) const {
+    {%-  for field in entry.fields %}
+    {{field | SerializerWriteField('params_.')}};
+    {%- endfor %}
+}
+
+void {{cluster.name}}Trait::{{entry.name}}Event::DecodeFrom(CodecReader& reader) {
+    {%-  for field in entry.fields %}
+    {{field | SerializerReadField('params_.')}}
+    {%- endfor %}
+}
+{% endif -%}
+{% endfor %}
+{%- endif %}
+
+}  // namespace google_home_api::traits::matter

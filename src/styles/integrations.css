@@ -18,6 +18,8 @@
 .integration-capabilities { display: flex; flex-wrap: wrap; gap: 6px; }
 .integration-capabilities span { font-size: .72rem; border-radius: 999px; padding: 4px 8px; border: 1px solid rgba(255,255,255,.1); color: var(--muted, #9ba3b2); }
 .integration-actions { margin-top: auto; }
+.google-home-integration-panel { display: flex; flex-direction: column; gap: 14px; }
+.google-home-integration-panel.panel { min-height: 0; }
 @media (max-width: 860px) {
   .integration-grid, .integrations-metrics { grid-template-columns: 1fr; }
   .integration-card-header { grid-template-columns: auto minmax(0,1fr); }

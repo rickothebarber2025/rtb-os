@@ -1,0 +1,40 @@
+.shop-presence-connection {
+  align-items: center;
+  background: rgba(248, 244, 236, 0.025);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  gap: 0.8rem;
+  justify-content: space-between;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+}
+
+.shop-presence-connection > div {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.shop-presence-connection strong {
+  font-size: 0.88rem;
+}
+
+.shop-presence-connection small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 620px) {
+  .shop-presence-connection {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .shop-presence-connection .secondary-button {
+    justify-content: center;
+    min-height: 44px;
+    width: 100%;
+  }
+}

@@ -53,6 +53,28 @@ bundle a snapshot of the site into the app. This means:
    Apple will then give you the private install link to share with
    staff.
 
+## Google Home opening / closing bridge
+
+RTB OS now has a native Capacitor bridge prepared for Google Home authorization.
+The bridge is deliberately compiled behind `canImport(GoogleHomeSDK)` so normal
+web/iOS CI continues to build until the Google SDK is installed locally.
+
+One-time native setup:
+
+1. In Google Cloud, enable **Home API** for the project used by RTB OS.
+2. Create an **iOS OAuth client** for bundle ID `com.rtbheadquaters.os` and Apple Team ID `N6HF9ZX8D9`.
+3. Add `rickothebarber@gmail.com` as a test user while the OAuth consent screen is in testing.
+4. Set these Xcode build settings for the RTB OS target:
+   - `GOOGLE_HOME_CLIENT_ID` = the iOS OAuth Client ID
+   - `GOOGLE_HOME_CLOUD_PROJECT_NUMBER` = the numeric Google Cloud project number
+5. Download the signed-in Google Home iOS SDK from Google Home Developers and unpack it to:
+   `ios/ThirdParty/GoogleHomeSDK`.
+6. In Xcode choose **File → Add Package Dependencies… → Add Local…**, then select that `GoogleHomeSDK` directory. Add both `GoogleHomeSDK` and `GoogleHomeTypes` to the RTB OS target.
+7. Add the Apple **App Attest** capability. Google documents that Home APIs with App Attest require testing on a real iPhone rather than the simulator.
+8. Rebuild and install RTB OS on the iPhone. Open **Operations → Checklists → Google Home opening & closing** and tap **Connect Google Home**.
+
+Important limitation: Google currently marks its Google Camera device type as restricted. OAuth/Home SDK connection can be implemented now, but direct camera-event access may depend on Google's device-access approval. The RTB OS backend is intentionally source-agnostic so door/person events can still be supplied by another approved Google Home automation or supported device source without redesigning the opening/closing tracker.
+
 ## If you'd rather use Apple Business Manager Custom Apps instead
 
 Since you already have the D-U-N-S number, Custom Apps is also

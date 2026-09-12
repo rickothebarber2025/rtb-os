@@ -1,0 +1,136 @@
+    {
+      "name": "{{ cluster.name | ToUpperCamelCase}}",
+      "ghp_trait_id": "{{cluster | ToTraitId}}",
+      "cluster_id": {{ cluster.code | ToMeiSuffix }},
+      "cluster_id_hex": "{{ cluster.code | ToHex(16) }}",
+      "vendor_id": {{ cluster.code | ToVendorId }},
+      "vendor_id_hex": "{{ cluster.code | ToVendorId | ToHex(16) }}",
+      "enums": [
+        {%- for enum in cluster.enums -%}
+        {
+          "name": "{{ enum.name | ToUpperCamelCase}}",
+          "codec_type": "{{ enum.base_type | ToUpperCamelCase }}",
+          "fields": [
+            {%- for value in enum.entries %}
+            {
+              "name": "{{ value.name | RemoveConstantPrefix | ToUpperCamelCase}}",
+              "value": {{ value.code }}
+            }
+            {%- if not loop.last %},{%- endif %}
+            {%- endfor %}
+          ]
+        }
+        {%- if not loop.last %},{%- endif %}
+        {%- endfor %}
+      ],
+      "bitmaps": [
+        {%- for bitmap in cluster.bitmaps -%}
+        {
+          "name": "{{ bitmap.name | ToUpperCamelCase}}",
+          "codec_type": "{{ bitmap.base_type | ToUpperCamelCase }}",
+          "fields": [
+            {%- for mask in bitmap.entries %}
+            {
+              "name": "{{ mask.name | RemoveConstantPrefix | ToUpperCamelCase}}",
+              "mask": "0x{{ mask.code | ToHex }}"
+            }
+            {%- if not loop.last %},{%- endif %}
+            {%- endfor %}
+          ]
+        }
+        {%- if not loop.last %},{%- endif %}
+        {%- endfor %}
+      ],
+      "structs": [
+        {%- for struct in cluster.structs | reject('isCommandStruct') -%}
+        {
+          "name": "{{ struct.name | ToUpperCamelCase}}",
+          "fields": [
+            {%- for field in struct.fields %}
+            {
+              "name": "{{ field.name | ToUpperCamelCase}}",
+              "name_alt": "{{ field.name | ToLowerSnakeCase}}",
+              "field_id": {{ field.code }},
+              "field_id_hex": "{{ field.code | ToHex(16) }}",
+              "codec_type": "{{ field | ToCodecType }}",
+              "is_nullable": {%- if field.is_nullable %} true {%- endif %} {%- if not field.is_nullable %} false {%- endif %},
+              "is_optional": {%- if field.is_optional %} true {%- endif %} {%- if not field.is_optional %} false {%- endif %}
+            }
+            {%- if not loop.last %},{%- endif %}
+            {%- endfor %}
+          ]
+        }
+        {%- if not loop.last %},{%- endif %}
+        {%- endfor %}
+      ],
+      "attributes": [
+        {%- for attr in cluster.attributes -%}
+        {
+          "name": "{{ attr.definition.name | ToUpperCamelCase}}",
+          "name_alt": "{{ attr.definition.name | ToLowerSnakeCase}}",
+          "field_id": {{ attr.definition.code }},
+          "field_id_hex": "{{ attr.definition.code | ToHex(16) }}",
+          "codec_type": "{{ attr.definition | ToCodecType }}",
+          "is_nullable": {%- if attr.definition.is_nullable %} true {%- endif %} {%- if not attr.definition.is_nullable %} false {%- endif %},
+          "is_optional": {%- if attr.definition.is_optional %} true {%- endif %} {%- if not attr.definition.is_optional %} false {%- endif %}
+        }
+        {%- if not loop.last %},{%- endif %}
+        {%- endfor %}
+      ],
+      "commands": [
+        {%-   for cmd in cluster.commands -%}
+        {%- set input_struct = cmd | commandInputStruct %}
+        {%- set output_struct = cmd | commandOutputStruct %}
+        {
+          "name": "{{ cmd.name | ToUpperCamelCase}}",
+          "ghp_command_id": "{{ cluster | ToTraitId }}.{{cmd.code | ToHex(32)}}",
+          "command_id": {{ cmd.code | ToMeiSuffix }},
+          "command_id_hex": "{{ cmd.code | ToMeiSuffix | ToHex(16) }}",
+          "command_vendor_id": {{ cmd.code | ToVendorId }},
+          "command_vendor_id_hex": "{{ cmd.code | ToVendorId | ToHex(16) }}",
+          {%- if cmd.is_timed_invoke %}
+          "timed_invoke_required": true,
+          {%- endif %}
+          "parameters": [
+            {%-  for field in input_struct.fields %}
+            {
+              "name": "{{ field.name | ToUpperCamelCase}}",
+              "name_alt": "{{ field.name | ToLowerSnakeCase}}",
+              "field_id": {{ field.code }},
+              "field_id_hex": "{{ field.code | ToHex(16) }}",
+              "codec_type": "{{ field | ToCodecType }}",
+              "is_nullable": {%- if field.is_nullable %} true {%- endif %} {%- if not field.is_nullable %} false {%- endif %},
+              "is_optional": {%- if field.is_optional %} true {%- endif %} {%- if not field.is_optional %} false {%- endif %}
+            }
+            {%- if not loop.last %},{%- endif %}
+            {%- endfor %}
+          ]
+          {%- if output_struct %},
+          "response": {
+            "name": "{{ cmd | ToCommandResponse }}",
+            "ghp_command_id": "{{ cluster | ToTraitId }}.{{cmd.code | ToHex(32)}}",
+            "command_id": {{ cmd.code | ToMeiSuffix }},
+            "command_id_hex": "{{ cmd.code | ToMeiSuffix | ToHex(16) }}",
+            "command_vendor_id": {{ cmd.code | ToVendorId }},
+            "command_vendor_id_hex": "{{ cmd.code | ToVendorId | ToHex(16) }}",
+            "parameters": [
+              {%-  for field in output_struct.fields %}
+              {
+                "name": "{{field.name | ToUpperCamelCase}}",
+                "name_alt": "{{ field.name | ToLowerSnakeCase}}",
+                "field_id": {{ field.code }},
+                "field_id_hex": "{{ field.code | ToHex(16) }}",
+                "codec_type": "{{ field | ToCodecType }}",
+                "is_nullable": {%- if field.is_nullable %} true {%- endif %} {%- if not field.is_nullable %} false {%- endif %},
+                "is_optional": {%- if field.is_optional %} true {%- endif %} {%- if not field.is_optional %} false {%- endif %}
+              }
+              {%- if not loop.last %},{%- endif %}
+              {%- endfor %}
+            ]
+          }
+          {%- endif %}
+        }
+        {%- if not loop.last %},{%- endif %}
+        {%- endfor %}
+      ]
+    }

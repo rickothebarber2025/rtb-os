@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const dashboard = fs.readFileSync(new URL('../src/pages/DashboardPage.jsx', import.meta.url), 'utf8');
-const enhancer = fs.readFileSync(new URL('../src/components/MobileNavigationEnhancer.jsx', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/mobileNavigation.css', import.meta.url), 'utf8');
+const globalCss = fs.readFileSync(new URL('../src/styles/global.css', import.meta.url), 'utf8');
+const main = fs.readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
 
 test('mobile dashboard tabs are dynamic instead of fixed', () => {
   assert.match(dashboard, /tabs = \[\{ id: 'overview', label: 'Overview' \}\]/);
@@ -58,13 +59,26 @@ test('Actions tab has live count badge and mobile tab changes scroll navigation 
   assert.match(dashboard, /max-width: 900px/);
 });
 
-test('legacy dashboard enhancer leaves React-managed tabs alone', () => {
+test('dashboard mobile navigation is React-owned without the legacy DOM enhancer', () => {
   assert.match(dashboard, /data-managed="react"/);
-  assert.match(enhancer, /originalNav\.dataset\.managed === 'react'/);
+  assert.doesNotMatch(main, /MobileNavigationEnhancer/);
 });
 
 test('mobile hides inactive groups without changing desktop rendering', () => {
   assert.match(css, /@media \(max-width: 900px\)/);
   assert.match(css, /\[data-mobile-group\]:not\(\.is-active-mobile-tab\)/);
   assert.match(css, /display: none !important/);
+});
+
+test('dashboard has an exploration strip that connects summary cards to work areas', () => {
+  assert.match(dashboard, /explorationItems/);
+  assert.match(dashboard, /Explore RTB OS/);
+  assert.match(dashboard, /Jump to the work behind the numbers/);
+  assert.match(dashboard, /exploreDashboard\(item\)/);
+  assert.match(dashboard, /setActivePage\(item\.page\)/);
+  assert.match(dashboard, /page: 'staff-hub'/);
+  assert.match(dashboard, /label: 'Team & Pay'/);
+  assert.match(globalCss, /\.dashboard-explore-strip/);
+  assert.match(globalCss, /\.dashboard-explore-actions/);
+  assert.match(globalCss, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });

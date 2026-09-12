@@ -1,0 +1,183 @@
+// {{file_comment}}
+/*
+ * Copyright 2024 Google LLC
+ */
+
+#ifndef GOOGLE_HOME_API_TRAITS_MATTER_SERVICE_{{cluster.name | ToUpperSnakeCase}}_SERVICE_H_
+#define GOOGLE_HOME_API_TRAITS_MATTER_SERVICE_{{cluster.name | ToUpperSnakeCase}}_SERVICE_H_
+
+#include <optional>  // IWYU pragma: keep
+#include <cstdint>  // IWYU pragma: keep
+#include <utility>  // IWYU pragma: keep
+#include <vector>  // IWYU pragma: keep
+
+#include "google_home_api/core/device.h"
+#include "google_home_api/encoding/types.h"
+#include "google_home_api/lib/console/api_context.h"
+#include "google_home_api/lib/grpc/proto/traits/{{PACKAGE_PATH}}/{{cluster.name | ToLowerSnakeCase}}_service.grpc.pb.h"
+#include "google_home_api/lib/grpc/proto/traits/{{PACKAGE_PATH}}/{{cluster.name | ToLowerSnakeCase}}_service.proto.h"
+#include "google_home_api/traits/{{PACKAGE_PATH}}/{{cluster.name | ToLowerSnakeCase}}.h"
+#include "google_home_api/traits/{{PACKAGE_PATH}}/{{cluster.name | ToLowerSnakeCase}}_trait.h"
+#include "third_party/absl/log/log.h"
+#include "third_party/absl/synchronization/notification.h"  // IWYU pragma: keep
+#include "third_party/grpc/include/grpcpp/server_context.h"
+#include "third_party/grpc/include/grpcpp/support/status.h"
+
+namespace google_home_api::traits::{{PACKAGE_NAMESPACE}}::service {
+
+using ::google_home_api::console::ApiContext;
+
+class {{cluster.name}}Service final : public grpc::{{cluster.name}}Service::Service {
+ public:
+  using Trait = ::google_home_api::traits::{{PACKAGE_NAMESPACE}}::{{cluster.name}};
+
+  {# TODO: go/totw/116 - Ok to reference because ApiContext is never temporary. #}
+  explicit {{cluster.name}}Service(ApiContext& context) : context_(context) {
+    context_.SetDeleteObjectFunction(Trait::kTraitId, [](void* object) -> void {
+      delete reinterpret_cast<Trait*>(object);
+    });
+    context_.SetDeviceGetTraitFunction(
+        Trait::kTraitId, [](Device& device) -> void* {
+          Trait* trait = nullptr;
+          device.GetTrait<Trait>().Collect([&trait](auto collected_trait) {
+            trait = new Trait(std::move(collected_trait));
+          });
+          return trait;
+        });
+    context_.SetDeviceHasTraitFunction(
+        Trait::kTraitId,
+        [](const Device& device) -> bool { return device.HasTrait<Trait>(); });
+  }
+
+  ::grpc::Status AttributeGet(
+      ::grpc::ServerContext* server_context,
+      const {{cluster.name}}::Attribute::Get::Request* grpc_request,
+      {{cluster.name}}::Attribute::Get::Response* grpc_response) override {
+    LOG(INFO) << "{{cluster.name}}Service::AttributeGet";
+
+    Trait* trait = GetRequestObject(grpc_request);
+    if (!trait) {
+      return ::grpc::Status(::grpc::StatusCode::NOT_FOUND, "Trait not found");
+    }
+
+    {{cluster.name}}Trait::Attributes attributes = trait->GetAttributes();
+
+    {%- for attr in cluster.attributes %}
+    {{attr | ToGrpcServiceAttributeGet(cluster)}}
+    {%- endfor %}
+
+    return ::grpc::Status::OK;
+  }
+
+  ::grpc::Status AttributeSet(
+      ::grpc::ServerContext* server_context,
+      const {{cluster.name}}::Attribute::Set::Request* grpc_request,
+      {{cluster.name}}::Attribute::Set::Response* grpc_response) override {
+    LOG(INFO) << "{{cluster.name}}Service::AttributeSet";
+
+    Trait* trait = GetRequestObject(grpc_request);
+    if (!trait) {
+      return ::grpc::Status(::grpc::StatusCode::NOT_FOUND, "Trait not found");
+    }
+{% if cluster | HasWritableAttributes %}
+    trait->SetAttributes([grpc_request]({{cluster.name}}Trait::Attributes::Writable& attributes) {
+      {%- for attr in cluster.attributes %}
+      {{attr | ToGrpcServiceAttributeSet(cluster)}}
+      {%- endfor %}
+    });
+{% endif %}
+    return ::grpc::Status::OK;
+  }
+{%   for cmd in cluster.commands -%}
+  {%- set input_struct = cmd | commandInputStruct %}
+  {%- set output_struct = cmd | commandOutputStruct %}
+  ::grpc::Status Command{{cmd.name}}(::grpc::ServerContext* server_context,
+                            const {{cluster.name}}::Command::{{cmd.name}}::Request* grpc_request,
+                            {{cluster.name}}::Command::{{cmd.name}}::Response* grpc_response) override {
+    LOG(INFO) << "{{cluster.name}}Service::Command{{cmd.name}}";
+
+    Trait* trait = GetRequestObject(grpc_request);
+    if (!trait) {
+      return ::grpc::Status(::grpc::StatusCode::NOT_FOUND, "Trait not found");
+    }
+
+    {# TODO: b/353278923 - more error handling #}
+    grpc_response->set_value(false);
+    absl::Notification notification;
+
+    {%-  for field in input_struct.fields %}
+       {{field | ToCommandParameter(cluster.name, typeLookup)}};
+    {%- endfor %}
+    {%-  for field in input_struct.fields %}
+       {{field | ToGrpcFieldInitializer(typeLookup)}}
+    {%- endfor %}
+    trait->{{cmd | ToCommandName(cluster)}}(
+      {%- for field in input_struct.fields %}
+      {{field.name | ToLowerSnakeCase}},
+      {%- endfor %}
+      [&notification, grpc_response](auto value) {
+      if (!notification.HasBeenNotified()) {
+        grpc_response->set_value(true);
+        notification.Notify();
+      }
+    });
+
+    notification.WaitForNotification();
+
+    return ::grpc::Status::OK;
+  }
+  {%- endfor %}
+
+ private:
+  template <typename RequestT>
+  Trait* GetRequestObject(const RequestT* grpc_request) {
+    Trait* trait = reinterpret_cast<Trait*>(grpc_request->object_handle());
+    if (!context_.HasObject(trait)) {
+      return nullptr;
+    }
+    return trait;
+  }
+
+{% if cluster.structs -%}
+  // ===============================================
+  //                STRUCT HELPERS
+  // ===============================================
+
+{% for entry in cluster.structs | reject('isCommandStruct') -%}
+  static void EncodeToGrpc(
+      const google_home_api::traits::{{PACKAGE_NAMESPACE}}::
+          {{cluster.name}}Trait::{{entry.name}}& src,
+      google_home_api::traits::{{PACKAGE_NAMESPACE}}::service::
+          {{cluster.name}}_{{entry.name}}& dest) {
+    {%-  for field in entry.fields %}
+    {%- if field | FieldIsBasicType %}
+    if (src.{{field.name | ToLowerSnakeCase}}.has_value()) {
+      dest.set_{{field.name | ToLowerSnakeCase}}(
+        src.{{field.name | ToLowerSnakeCase}}.value());
+    }
+    {%- endif %}
+    {%-  endfor %}
+  }
+
+  static void DecodeFromGrpc(
+      const google_home_api::traits::{{PACKAGE_NAMESPACE}}::service::
+          {{cluster.name}}_{{entry.name}}& src,
+      google_home_api::traits::{{PACKAGE_NAMESPACE}}::
+          {{cluster.name}}Trait::{{entry.name}}& dest) {
+    {%-  for field in entry.fields %}
+    {%- if field | FieldIsBasicType %}
+    if (src.has_{{field.name | ToLowerSnakeCase}}()) {
+      dest.{{field.name | ToLowerSnakeCase}} = src.{{field.name | ToLowerSnakeCase}}();
+    }
+    {%- endif %}
+    {%-  endfor %}
+    }
+{%- endfor %}
+{%- endif %}
+
+  ApiContext& context_;
+};
+
+}  // namespace google_home_api::traits::{{PACKAGE_NAMESPACE}}::service
+
+#endif  // GOOGLE_HOME_API_TRAITS_MATTER_SERVICE_{{cluster.name | ToUpperSnakeCase}}_SERVICE_H_

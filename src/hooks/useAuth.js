@@ -11,6 +11,12 @@ import {
 
 const EMAIL_AUTH_TYPES = new Set(['email', 'email_change', 'invite', 'magiclink', 'recovery', 'signup']);
 const NATIVE_AUTH_CALLBACK_URL = 'com.rtbheadquaters.os://auth/callback';
+// Safety net: if the initial session check hangs for any reason (a stuck
+// auth lock, a slow/unreachable network on first launch, etc.) fail open to
+// the sign-in screen instead of leaving the whole app stuck on a loading
+// spinner forever. See supabaseClient.js for the specific WKWebView lock
+// issue this guards against.
+const SESSION_LOAD_TIMEOUT_MS = 8000;
 
 function isNativeApp() {
   return Capacitor.isNativePlatform();
@@ -107,21 +113,33 @@ export function useAuth() {
     let active = true;
     if (!isSupabaseConfigured) { setLoading(false); return undefined; }
 
+    let settled = false;
+    const failOpenTimer = window.setTimeout(() => {
+      if (settled || !active) return;
+      settled = true;
+      setAuthError((current) => current || 'Sign-in took longer than expected. Please try again.');
+      setLoading(false);
+    }, SESSION_LOAD_TIMEOUT_MS);
+
     async function loadSession() {
       try {
         setAuthError('');
         await completeAuthRedirect();
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
-        if (!active) return;
+        if (!active || settled) return;
         setSession(data.session);
         notifySessionReady(data.session);
       } catch (err) {
-        if (!active) return;
+        if (!active || settled) return;
         setAuthError(getAuthRedirectErrorMessage(err));
         setSession(null);
       } finally {
-        if (active) setLoading(false);
+        if (active && !settled) {
+          settled = true;
+          window.clearTimeout(failOpenTimer);
+          setLoading(false);
+        }
       }
     }
 
@@ -134,11 +152,13 @@ export function useAuth() {
         if (intentionalSignOutRef.current) intentionalSignOutRef.current = false;
         else setAuthError((current) => current || 'Your session ended. Please sign in again to continue.');
       }
+      settled = true;
+      window.clearTimeout(failOpenTimer);
       setSession(nextSession);
       setLoading(false);
     });
 
-    return () => { active = false; subscription.unsubscribe(); };
+    return () => { active = false; window.clearTimeout(failOpenTimer); subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
@@ -273,6 +293,20 @@ export function useAuth() {
     if (error) throw error;
     if (native && data?.url) await Browser.open({ presentationStyle: 'fullscreen', url: data.url });
   }, []);
+  // Apple App Store guideline 4.8: an app offering a third-party login
+  // (Google, above) must also offer an equivalent that (a) limits data
+  // collection to name/email, (b) lets the user keep their email private,
+  // and (c) doesn't collect ad-tracking interactions without consent. Sign
+  // in with Apple satisfies all three by definition, so it's offered here
+  // the same way as Google -- through Supabase's 'apple' OAuth provider,
+  // opened in the system browser on native so it goes through Apple's real
+  // sign-in flow (appleid.apple.com), not an embedded WebView.
+  const signInWithApple = useCallback(async () => {
+    const native = isNativeApp();
+    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'apple', options: { redirectTo: getAuthRedirectUrl(), skipBrowserRedirect: native } });
+    if (error) throw error;
+    if (native && data?.url) await Browser.open({ presentationStyle: 'fullscreen', url: data.url });
+  }, []);
   const signOut = useCallback(async () => {
     if (!supabase) return;
     intentionalSignOutRef.current = true;
@@ -284,7 +318,7 @@ export function useAuth() {
     isConfigured: isSupabaseConfigured,
     authError,
     loading: loading || profileLoading || Boolean(session && !profile && !profileError),
-    profile, profileError, refreshProfile, sendMagicLink, session, signInWithGoogle,
+    profile, profileError, refreshProfile, sendMagicLink, session, signInWithApple, signInWithGoogle,
     signInWithPassword, signOut, signUp, user: session?.user ?? null,
-  }), [authError, loading, profile, profileError, profileLoading, refreshProfile, sendMagicLink, session, signInWithGoogle, signInWithPassword, signOut, signUp]);
+  }), [authError, loading, profile, profileError, profileLoading, refreshProfile, sendMagicLink, session, signInWithApple, signInWithGoogle, signInWithPassword, signOut, signUp]);
 }

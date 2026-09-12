@@ -1,4 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import AgenticStaffWorkspace from './components/AgenticStaffWorkspace.jsx';
 import AppShell from './components/AppShell';
 import LoadingState from './components/LoadingState';
@@ -23,6 +25,8 @@ import {
 } from './utils/smartDefaults.js';
 
 const AccessPage = lazy(() => import('./pages/AccessPage'));
+const SupportPage = lazy(() => import('./pages/SupportPage'));
+const AdaControlPage = lazy(() => import('./pages/AdaControlPage'));
 const ActionCenterPage = lazy(() => import('./pages/ActionCenterPage'));
 const AiConsultantPage = lazy(() => import('./pages/AiConsultantPage'));
 const CustomerIntelligencePage = lazy(() => import('./pages/CustomerIntelligencePage'));
@@ -52,6 +56,23 @@ function getSurveyTokenFromLocation() {
 
 function isPublicPromotionsRoute() {
   return /^\/(promotions|deals|specials)\/?$/.test(window.location.pathname);
+}
+
+function isSupportRoute() {
+  return /^\/support\/?$/.test(window.location.pathname);
+}
+
+function readNativeRoute(url) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const page = parsed.hostname || parsed.pathname.split('/').filter(Boolean)[0] || '';
+    const section = parsed.searchParams.get('section') || parsed.searchParams.get('tab') || '';
+    if (!page) return null;
+    return { page, target: section ? { section } : null };
+  } catch {
+    return null;
+  }
 }
 
 function lastPageStorageKey(userId) {
@@ -135,6 +156,37 @@ export default function App() {
       setPageTarget(event.detail?.target ?? null);
     });
   }, [appEnabled, auth.profile, businessOptions]);
+
+  useEffect(() => {
+    if (!appEnabled || !Capacitor.isNativePlatform()) return undefined;
+    let active = true;
+    let listener = null;
+
+    function openNativeRoute(url) {
+      const route = readNativeRoute(url);
+      if (!route || !canAccessPage(auth.profile, route.page)) return;
+
+      if (route.target?.section) {
+        const browserUrl = new URL(window.location.href);
+        browserUrl.searchParams.set('section', route.target.section);
+        window.history.replaceState({ ...window.history.state, nativeRoute: route }, '', browserUrl);
+      }
+
+      setActivePage(route.page);
+      setPageTarget(route.target);
+    }
+
+    CapacitorApp.addListener('appUrlOpen', ({ url }) => { if (active) openNativeRoute(url); }).then((nextListener) => {
+      if (active) listener = nextListener;
+      else nextListener.remove();
+    });
+    CapacitorApp.getLaunchUrl().then(({ url }) => { if (active && url) openNativeRoute(url); });
+
+    return () => {
+      active = false;
+      listener?.remove();
+    };
+  }, [appEnabled, auth.profile]);
 
   useEffect(() => {
     if (!data.businessUnits.length || !businessOptions.length || !auth.profile) return;
@@ -223,6 +275,8 @@ export default function App() {
     if (data.error) return <div className="panel full-span"><div className="alert danger">{data.error}</div><button className="secondary-button" type="button" onClick={data.refresh}>Retry</button></div>;
 
     switch (activePage) {
+      case 'ada-control':
+        return <ModuleGate module="settings"><AdaControlPage {...pageProps} /></ModuleGate>;
       case 'access':
         return <ModuleGate module="access"><AccessPage accessProfile={auth.profile} businessUnits={data.businessUnits} currentUserId={auth.user?.id} /></ModuleGate>;
       case 'action-center':
@@ -233,34 +287,12 @@ export default function App() {
         return <ModuleGate module="finance"><FinancialBuddyPage {...pageProps} /></ModuleGate>;
       case 'marketing-calendar':
         return <ModuleGate module="performance"><MarketingCalendarPage {...pageProps} /></ModuleGate>;
-        return (
-          <ModuleGate module="operations">
-            <AiConsultantPage {...pageProps} />
-          </ModuleGate>
-        );
-      case 'messages':
-        return (
-          <ModuleGate module="messages">
-            <MessagesPage {...pageProps} />
-          </ModuleGate>
-        );
       case 'payroll':
         return <ModuleGate module="payroll"><PayrollPage {...pageProps} /></ModuleGate>;
       case 'staff':
         return <ModuleGate module="roster"><StaffPage {...pageProps} /></ModuleGate>;
       case 'talent-pipeline':
         return <ModuleGate module="roster" minimum="edit"><TalentPipelinePage {...pageProps} /></ModuleGate>;
-        return (
-          <ModuleGate module="roster">
-            <StaffPage {...pageProps} />
-          </ModuleGate>
-        );
-      case 'talent-pipeline':
-        return (
-          <ModuleGate module="roster" minimum="edit">
-            <TalentPipelinePage {...pageProps} />
-          </ModuleGate>
-        );
       case 'staff-hub':
         return <ModuleGate module="staff_hub"><StaffHubPage {...pageProps} /></ModuleGate>;
       case 'performance':
@@ -278,18 +310,14 @@ export default function App() {
       case 'dashboard':
       default:
         return <ModuleGate module="dashboard"><DashboardPage {...pageProps} /></ModuleGate>;
-        return (
-          <ModuleGate module="dashboard">
-            <DashboardPage {...pageProps} />
-          </ModuleGate>
-        );
     }
   }
 
+  if (isSupportRoute()) return <Suspense fallback={<LoadingState label="Loading support" />}><SupportPage /></Suspense>;
   if (auth.loading) return <LoadingState />;
   if (surveyToken) return <Suspense fallback={<LoadingState label="Loading feedback survey" />}><SurveyPage token={surveyToken} /></Suspense>;
   if (isPublicPromotionsRoute()) return <Suspense fallback={<LoadingState label="Loading promotions" />}><PublicPromotionsPage /></Suspense>;
-  if (!auth.session) return <AuthPage authError={auth.authError} isConfigured={auth.isConfigured} sendMagicLink={auth.sendMagicLink} signInWithGoogle={auth.signInWithGoogle} signInWithPassword={auth.signInWithPassword} signUp={auth.signUp} />;
+  if (!auth.session) return <AuthPage authError={auth.authError} isConfigured={auth.isConfigured} sendMagicLink={auth.sendMagicLink} signInWithApple={auth.signInWithApple} signInWithGoogle={auth.signInWithGoogle} signInWithPassword={auth.signInWithPassword} signUp={auth.signUp} />;
   if (!canUseApp(auth.profile)) return <AccessPendingPage error={auth.profileError} profile={auth.profile} refreshProfile={auth.refreshProfile} signOut={auth.signOut} />;
 
   return (

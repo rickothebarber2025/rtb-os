@@ -1,0 +1,1004 @@
+{% macro restricted_callout() %}{% if docs.restricted %}
+ *
+ * <aside class="warning">This trait is restricted and not available for general use.</aside>{% endif %}{% endmacro -%}
+{% macro structure_define(st, name = None, full_name = None, companion_object_name = "Adapter", struct_docs = None) -%}
+  {% set structName = name or st.name | ToUpperCamelCase -%}
+  {% if not st.fields %}
+
+  @Suppress("ClassShouldBeObject")
+  {%- endif %}
+  {%- if struct_docs %}
+    {%- for struct_name in struct_docs|selectattr("name", "equalto", st.name) %}
+  /**
+   * {{struct_name.description}}
+   *
+   * @constructor Creates the {{st.name}} class.
+   *
+   */
+    {%- endfor %}
+  {%- endif %}
+  class {{structName}}(
+  {%-  for field in st.fields %}
+    {%- if struct_docs %}
+      {%- for struct_name in struct_docs|selectattr("name", "equalto", st.name) %}
+        {%- for struct_value in struct_name.value|selectattr("name", "equalto", field.name) %}
+    /** {{struct_value.description}} */
+        {%- endfor %}
+      {%- endfor %}
+    {%- endif %}
+    {% if IsSemanticTag(cluster, st) and field.name != "label" %}override {% endif %}{% if IsSemanticTag(cluster, st) and field.name == "label" %}private val _{% else %}val {% endif %}{{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldType(field)}} = {{ field | DefaultValueForField}},
+  {%-  endfor %}
+  ) : ClusterStruct{% if IsSemanticTag(cluster, st) %}, Tag{% endif %} {
+
+    {%- if IsSemanticTag(cluster, st) %}
+    override val label: String? = _label.getOrNull()
+    {%- endif %}
+
+    /**
+     * Descriptor enum for this struct's fields.
+     */
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    enum class StructFields(
+      override val fieldName: String,
+      override val tag: UInt,
+      override val typeName: String,
+      override val typeEnum: FieldType,
+      override val isList: Boolean,
+      override val descriptor: HomeDescriptor,
+      val isNullable: Boolean,
+    ): com.google.home.Field {
+    {%- for field in st.fields %}
+      /** The [{{field.name | ToLowerCamelCase | EscapeKtKeyword}}] command request field. */
+      {{field.name | ToLowerCamelCase | EscapeKtKeyword}}("{{field.name | ToLowerCamelCase | EscapeKtKeyword}}", {{field.code}}u, "{{field.data_type | lookupDataType | dataTypeToKotlinAutomationConversionType}}", FieldType.{{field.data_type| lookupDataType | dataTypeToKotlinTypeEnum}}, {{field.is_list | boolAsStr}}, {{field.data_type | lookupDataType | dataTypeToDescriptorType}}, {{field | IsNullable | boolAsStr}})
+      {%- if loop.last %};
+      {%- else %},
+      {%- endif %}
+    {%- endfor %}
+    }
+
+  {%- if st.fields %}
+
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    override fun getDescriptor(): StructDescriptor = {{companion_object_name}}
+
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    override fun getFieldValueById(tagId: TagId): Any? {
+      return when(tagId) {
+      {%- for field in st.fields %}
+        StructFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword}}.tag -> {% if IsSemanticTag(cluster, st) and field.name == "label" %}_{% endif %}{{field.name | ToLowerCamelCase}}
+      {%- endfor %}
+        else -> null
+      }
+    }
+
+    /** @suppress */
+    @Immutable
+    companion object {{companion_object_name}} : StructAdapter<{{structName}}>, StructDescriptor {
+      override fun write(writer: ClusterPayloadWriter, value: {{structName}}) {
+    {%- for field in st.fields %}
+        {{field | SerializerWriteField}}
+    {%- endfor %}
+      }
+
+      override fun read(reader: ClusterPayloadReader): {{structName}} {
+    {%- if st.fields %}
+        val data = reader.readPayload(
+      {%- for f in st.fields | select('IsStructField') %}
+        {%- if loop.first -%} mapOf( {%- endif -%}
+            {{f.code}}u to {{f.data_type.name | ToUpperCamelCase}}.Adapter
+        {%- if loop.last -%} ) {%- else -%} , {%- endif -%}
+      {%- endfor -%}
+        )
+    {%- endif %}
+        return {{structName}}(
+    {%- for field in st.fields %}
+          {{field | SerializerReadField}},
+    {%- endfor %}
+        )
+      }
+
+      {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+      @Suppress("Immutable")
+      override val fields: DescriptorMap = StructFields.entries.toDescriptorMap()
+
+      {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+      override fun toStruct(fields: Map<com.google.home.Field, Any?>): ClusterStruct {
+        return {{structName}}(
+        {%- for field in st.fields %}
+          {% if IsSemanticTag(cluster, st) and field.name == "label" %}_{% endif %}{{field.name | ToLowerCamelCase}} = fields[StructFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword}}] as {{field.data_type | lookupDataType | ToKotlinFieldType(field)}},
+        {%- endfor %}
+        )
+      }
+
+    {%- for field in st.fields %}
+      {%- if loop.first %}
+{% endif %}
+      val TypedExpression<out {{structName}}?>.{{field.name | ToLowerCamelCase}}: TypedExpression<{{field.data_type | lookupDataType | ToKotlinFieldType(field)}}>
+        get() = fieldSelect<{{structName}}, {{field.data_type | lookupDataType | ToKotlinFieldType(field)}}>(this, StructFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword }})
+    {%- endfor %}
+    }
+
+    /** @suppress */
+    override fun equals(other: Any?): Boolean {
+      if (this === other) return true
+      if (other !is {{name or st.name | ToUpperCamelCase}}) return false
+
+      {%- for field in st.fields %}
+      {{field | SerializerEqualsField}}
+      {%- endfor %}
+
+      return true
+    }
+
+    /** @suppress */
+    override fun hashCode(): Int {
+      var result = 1
+
+    {%- for field in st.fields %}
+      {{field | SerializerHashcodeField}}
+    {%- endfor %}
+
+      return result
+    }
+
+    /** @suppress */
+    override fun toString(): String {
+      return "{{full_name or name or st.name | ToUpperCamelCase}}(
+    {%- for field in st.fields %}{{field.name | ToLowerCamelCase}}=${{field.name | ToLowerCamelCase}}
+      {%- if not loop.last %}, {% endif %}
+    {%- endfor %})"
+    }
+  {%- else %}
+    /** @suppress */
+    companion object {{companion_object_name}} : StructAdapter<{{name or st.name | ToUpperCamelCase}}> {
+
+      override fun read(reader: ClusterPayloadReader) = {{name or st.name | ToUpperCamelCase}}()
+
+    }
+  {%- endif %}
+  }
+{%- endmacro -%}
+{% macro event_define(st, name = None, full_name = None, companion_object_name = "Adapter", event_docs = None) -%}
+  {% if not st.fields %}
+
+  @Suppress("ClassShouldBeObject")
+  {%- endif %}
+  {%- if event_docs %}
+    {%- for event_name in event_docs|selectattr("name", "equalto", st.name) %}
+  /**
+   * {{event_name.description}}
+   */
+    {%- endfor %}
+  {%- endif %}
+  interface {{name or st.name | ToUpperCamelCase}} : ClusterStruct {
+  {%-  for field in st.fields %}
+    {%- if event_docs %}
+      {%- for event_name in event_docs|selectattr("name", "equalto", st.name) %}
+        {%- for event_value in event_name.value|selectattr("name", "equalto", field.name) %}
+    /** {{event_value.description}} */
+        {%- endfor %}
+      {%- endfor %}
+    {%- endif %}
+    val {{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(field)}}
+  {%-  endfor %}
+
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    override fun getDescriptor(): StructDescriptor = {{cluster.name | ToUpperCamelCase}}.{{name or st.name | ToUpperCamelCase}}Event.EventFields.StructDescriptor
+
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    override fun getFieldValueById(tagId: TagId): Any? {
+      return when (tagId) {
+      {%- for field in st.fields %}
+        {{cluster.name | ToUpperCamelCase}}.{{name or st.name | ToUpperCamelCase}}Event.EventFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword}}.tag -> {{field.name | ToLowerCamelCase}}
+      {%- endfor %}
+        else -> null
+      }
+    }
+  }
+
+  /** @suppress */
+  class {{name or st.name | ToUpperCamelCase}}Impl(
+  {%-  for field in st.fields %}
+    override val {{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(field)}} = null,
+  {%-  endfor %}
+  ) : {{name or st.name | ToUpperCamelCase}} {
+  {%- if st.fields %}
+    /** @suppress */
+    companion object {{companion_object_name}} : StructAdapter<{{name or st.name | ToUpperCamelCase}}> {
+    {%- if caller %}
+      {{caller(st)}}
+    {%- endif %}
+      override fun write(writer: ClusterPayloadWriter, value: {{name or st.name | ToUpperCamelCase}}) {
+        writer.wrapPayload(id = Id)
+      {%- for field in st.fields %}
+        {{field | SerializerWriteField}}
+      {%- endfor %}
+      }
+
+      override fun read(reader: ClusterPayloadReader): {{name or st.name | ToUpperCamelCase}} {
+      {%- if st.fields %}
+        reader.unwrapPayload(id = Id)
+        val data = reader.readPayload(
+        {%- for f in st.fields | select('IsStructField') %}
+          {%- if loop.first -%} mapOf( {%- endif -%}
+            {{f.code}}u to {{f.data_type.name | ToUpperCamelCase}}.Adapter
+          {%- if loop.last -%} ) {%- else -%} , {%- endif -%}
+        {%- endfor -%}
+        )
+      {%- endif %}
+        return {{name or st.name | ToUpperCamelCase}}Impl(
+      {%- for field in st.fields %}
+          {{field | SerializerReadNullableField }},
+      {%- endfor %}
+        )
+      }
+    }
+
+    /** @suppress */
+    override fun equals(other: Any?): Boolean {
+      if (this === other) return true
+      if (other !is {{name or st.name | ToUpperCamelCase}}) return false
+
+      {%- for field in st.fields %}
+      {{field | SerializerEqualsAttributeField}}
+      {%- endfor %}
+
+      return true
+    }
+
+    /** @suppress */
+    override fun hashCode(): Int {
+      var result = 1
+
+      {%- for field in st.fields %}
+      {{field | SerializerHashcodeAttributeField}}
+      {%- endfor %}
+
+      return result
+    }
+
+    /** @suppress */
+    override fun toString(): String {
+      return "{{full_name or name or st.name | ToUpperCamelCase}}(
+      {%- for field in st.fields %}{{field.name | ToLowerCamelCase}}=${{field.name | ToLowerCamelCase}}
+      {%- if not loop.last %}, {% endif %}
+      {%- endfor %})"
+    }
+    {%- else %}
+    /** @suppress */
+    companion object {{companion_object_name}} : StructAdapter<{{name or st.name | ToUpperCamelCase}}> {
+      {% if caller -%}
+      {{caller(st)}}
+      {%- endif -%}
+
+      override fun read(reader: ClusterPayloadReader) = {{name or st.name | ToUpperCamelCase}}Impl()
+
+    }
+    {%- endif %}
+  }
+{% endmacro -%}
+{% macro command_structure_define(st, name = None, full_name = None, companion_object_name = "Adapter", struct_docs = None, without_optionals = False) -%}
+  {% if not st.fields %}
+
+    @Suppress("ClassShouldBeObject")
+  {%- endif %}
+  {%- if struct_docs %}
+    {%- for struct_name in struct_docs|selectattr("name", "equalto", st.name) %}
+    /**
+    * {{struct_name.description}}
+    *
+    * @constructor Creates the {{st.name}} class.
+    *
+    */
+    {%- endfor %}
+  {%- endif %}
+    class {{name or st.name | ToUpperCamelCase}}(
+    {%-  for field in st.fields %}
+      {%- if struct_docs %}
+        {%- for struct_name in struct_docs|selectattr("name", "equalto", st.name) %}
+          {%- for struct_value in struct_name.value|selectattr("name", "equalto", field.name) %}
+      /** {{struct_value.description}} */
+          {%- endfor %}
+        {%- endfor %}
+      {%- endif %}
+      {%- if field.is_optional and without_optionals %}
+      val {{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(field)}} = null,
+      {%- else %}
+      val {{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldType(field)}} = {{ field | DefaultValueForField}},
+      {%- endif %}
+    {%-  endfor %}
+    ) : ClusterStruct {
+
+      /**
+       * Descriptor enum for this command's {{name | ToLowerCamelCase}} fields.
+       */
+      {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+      enum class CommandFields(
+        override val fieldName: String,
+        override val tag: UInt,
+        override val typeName: String,
+        override val typeEnum: FieldType,
+        override val isList: Boolean,
+        override val descriptor: HomeDescriptor,
+        val isNullable: Boolean,
+      ): com.google.home.Field {
+    {%- for field in st.fields %}
+        /** The [{{field.name | ToLowerCamelCase | EscapeKtKeyword}}] command {{name | ToLowerCamelCase}} field. */
+        {{field.name | ToLowerCamelCase | EscapeKtKeyword}}("{{field.name | ToLowerCamelCase | EscapeKtKeyword}}", {{field.code}}u, "{{field.data_type | lookupDataType | dataTypeToKotlinAutomationConversionType}}", FieldType.{{field.data_type| lookupDataType | dataTypeToKotlinTypeEnum}}, {{field.is_list | boolAsStr}}, {% if field is IsStructField %}{{field.data_type | lookupDataType | dataTypeToKotlinAutomationConversionType | ToUpperCamelCase}}.Adapter{% elif field.data_type | lookupDataType | dataTypeToKotlinTypeEnum == "Bitmap" %}{{field.data_type | lookupDataType | dataTypeToKotlinAutomationConversionType | ToUpperCamelCase}}.BitmapDescriptor{% elif field.data_type | lookupDataType | dataTypeToKotlinTypeEnum == "Enum" %}{{field.data_type | lookupDataType | dataTypeToKotlinAutomationConversionType | ToUpperCamelCase}}.EnumDescriptor{% else %}NoOpDescriptor{% endif %}, {{field | IsNullable | boolAsStr}})
+      {%- if loop.last %};
+      {%- else %},
+      {%- endif %}
+    {%- endfor %}
+
+    {%- if st.fields|length == 0 %}
+        ;
+    {%- endif %}
+
+        companion object {
+          val StructDescriptor = object : StructDescriptor {
+            @Suppress("Immutable")
+            override val fields: DescriptorMap = entries.toDescriptorMap()
+
+            {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+            override fun toStruct(fields: Map<com.google.home.Field, Any?>): ClusterStruct {
+              return {{name or st.name | ToUpperCamelCase}}(
+              {%- for field in st.fields %}
+              {%- if field.is_optional and without_optionals %}
+                {{field.name | ToLowerCamelCase}} = fields[CommandFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword}}] as {{field.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(field)}},
+              {%- else %}
+                {{field.name | ToLowerCamelCase}} = fields[CommandFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword}}] as {{field.data_type | lookupDataType | ToKotlinFieldType(field)}},
+              {%- endif %}
+              {%- endfor %}
+              )
+            }
+          }
+        }
+      }
+      {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+      override fun getDescriptor(): StructDescriptor = CommandFields.Companion.StructDescriptor
+
+      {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+      override fun getFieldValueById(tagId: TagId): Any? {
+        return when(tagId) {
+        {%- for field in st.fields %}
+          CommandFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword}}.tag -> {{field.name | ToLowerCamelCase}}
+        {%- endfor %}
+          else -> null
+        }
+      }
+
+      /** @suppress */
+      companion object {{companion_object_name}} : StructAdapter<{{name or st.name | ToUpperCamelCase}}> {
+        override fun write(writer: ClusterPayloadWriter, value: {{name or st.name | ToUpperCamelCase}}) {
+    {%- if caller %}
+          {{ caller("write") }}
+    {%- endif -%}
+    {%- for field in st.fields %}
+          {{field | SerializerWriteField}}
+    {%- endfor %}
+        }
+    {%- if st.fields %}
+
+        override fun read(reader: ClusterPayloadReader): {{name or st.name | ToUpperCamelCase}} {
+      {%- if caller %}
+          {{ caller("read") }}
+      {%- endif -%}
+      {% if st.fields %}
+          val data = reader.readPayload(
+        {%- for f in st.fields | select('IsStructField') %}
+          {%- if loop.first -%} mapOf( {%- endif -%}
+              {{f.code}}u to {{f.data_type.name | ToUpperCamelCase}}.Adapter
+          {%- if loop.last -%} ) {%- else -%} , {%- endif -%}
+        {%- endfor -%}
+          )
+      {%- endif %}
+          return {{name or st.name | ToUpperCamelCase}}(
+      {%- for field in st.fields %}
+        {%- if field.is_optional and without_optionals %}
+            {{field | SerializerReadNullableField}},
+        {%- else %}
+            {{field | SerializerReadField}},
+        {%- endif %}
+      {%- endfor %}
+          )
+        }
+    {%- else %}
+
+        override fun read(reader: ClusterPayloadReader) = {{name or st.name | ToUpperCamelCase}}()
+    {%- endif %}
+      }
+
+      /** @suppress */
+      override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is {{name or st.name | ToUpperCamelCase}}) return false
+
+    {%- for field in st.fields %}
+      {%- if field.is_optional and without_optionals %}
+        {{field | SerializerEqualsAttributeField}}
+      {%- else %}
+        {{field | SerializerEqualsField}}
+      {%- endif %}
+    {%- endfor %}
+
+        return true
+      }
+
+      /** @suppress */
+      override fun hashCode(): Int {
+        var result = 1
+
+    {%- for field in st.fields %}
+      {%- if field.is_optional and without_optionals %}
+        {{field | SerializerHashcodeAttributeField}}
+      {%- else %}
+        {{field | SerializerHashcodeField}}
+      {%- endif %}
+    {%- endfor %}
+    {%- if not st.fields %}
+        result = 31 * result + this.toString().hashCode()
+    {%- endif %}
+
+        return result
+      }
+
+      /** @suppress */
+      override fun toString(): String {
+        return "{{full_name or name or st.name | ToUpperCamelCase}}(
+    {%- for field in st.fields %}{{field.name | ToLowerCamelCase}}=${{field.name | ToLowerCamelCase}}
+      {%- if not loop.last %}, {% endif %}
+    {%- endfor %})"
+      }
+    }
+{%- endmacro -%}
+{% macro capfirst(text) %}{{text[0]|upper}}{{text[1:]}}{% endmacro %}
+// {{file_comment}}
+@file:Suppress("PackageName")
+package {{package}}
+
+import com.google.home.Type as FieldType
+{%- if not cluster.name | showClusterInDocs and package.startswith('com.google.home') %}
+import com.google.android.gms.common.internal.Hide
+import com.google.android.gms.common.internal.ShowFirstParty
+{% endif %}
+{% if is_internal %}import com.google.home.annotation.HomeExperimentalGenericApi{% endif %}
+import com.google.errorprone.annotations.Immutable
+import com.google.home.automation.TypedExpression
+import com.google.home.automation.fieldSelect
+import com.google.home.CommandDescriptor
+import com.google.home.HomeException
+import com.google.home.toDescriptorMap
+import com.google.home.DescriptorMap
+import com.google.home.Descriptor as HomeDescriptor
+import com.google.home.ClusterStruct
+import com.google.home.Tag
+import com.google.home.TagId
+import com.google.home.NoOpDescriptor
+import com.google.home.StructDescriptor
+import com.google.home.EnumDescriptor
+import com.google.home.BitmapDescriptor
+import com.google.home.toEnumDescriptor
+import com.google.home.toBitmapDescriptor
+import com.google.home.EnumEntry
+import com.google.home.Field
+import {{package}}.{{cluster.name | ToUpperCamelCase}}
+import com.google.home.matter.serialization.Bitmap
+import com.google.home.matter.serialization.BitmapAdapter
+import com.google.home.matter.serialization.camelToSnakeUpper
+import com.google.home.matter.serialization.CanMutate
+import com.google.home.matter.serialization.ClusterBitmap
+import com.google.home.matter.serialization.ClusterBitmapFlag
+import com.google.home.matter.serialization.ClusterEnum
+import com.google.home.matter.serialization.ClusterId
+import com.google.home.matter.serialization.ClusterPayloadReader
+import com.google.home.matter.serialization.ClusterPayloadWriter
+import com.google.home.matter.serialization.EnumAdapter
+import com.google.home.matter.serialization.OptionalValue
+import com.google.home.matter.serialization.MutableBitmap
+import com.google.home.matter.serialization.ScopedCommandId
+import com.google.home.matter.serialization.ScopedEventId
+import com.google.home.matter.serialization.StructAdapter
+import com.google.home.matter.serialization.unwrapPayload
+import com.google.home.matter.serialization.upperCamelToSnakeUpper
+import com.google.home.matter.serialization.wrapPayload
+import kotlin.collections.contentDeepEquals
+import kotlin.collections.contentEquals
+import kotlin.collections.contentHashCode
+import javax.annotation.processing.Generated
+
+/*
+ * Serialization object for {{cluster.name | ToUpperCamelCase}}Trait.
+ *
+ * This file was machine generate via the code generator
+ * in `codegen.clusters.kotlin.CustomGenerator`
+ *
+ */
+
+/**
+ * Attributes for {{cluster.name | ToUpperCamelCase}}Trait.{{restricted_callout()}}
+ */
+{%- if not cluster.name | showClusterInDocs and package.startswith('com.google.home') %}
+@Hide{% endif %}
+@Generated("GoogleHomePlatformCodegen")
+object {{cluster.name | ToUpperCamelCase}}Trait {
+  val Id = ClusterId({{cluster.code}}u, "{{cluster.name | ToUpperCamelCase}}")
+
+  // Enums
+{%-   for entry in cluster.enums %}
+  {%- for enum_doc in docs.enums|selectattr("name", "equalto", entry.name) %}
+  /** {{enum_doc.description}} */{% endfor %}
+  enum class {{entry.name | ToUpperCamelCase}}(
+    override val value: ULong,
+    override val traitId: String = ClusterId({{cluster.code}}u).traitId,
+    override val typeName: String = "{{entry.name}}",
+  ) : ClusterEnum {
+  {%-  for field in entry.entries %}
+    {%- for enum_doc in docs.enums|selectattr("name", "equalto", entry.name) %}
+      {%- for enum_value in enum_doc.value|selectattr("name", "equalto", field.name) %}
+    /** {{enum_value.description}} */{% endfor %}{% endfor %}
+    {{field.name | ToConstFieldName}}({{field.code}}u),
+  {%- endfor %}
+    // When encountering fields that out of range (e.g due to newer schema), this value is emitted
+    /**
+     * The enum value is out of range. For example, a newer Matter cluster
+     * definition may support enum values not yet supported by the Home APIs.
+     */
+    UnknownValue(ClusterEnum.UNKNOWN_ENUM_VALUE_CODE);
+
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    fun toDescription(): String {
+      return "{{entry.name | ToUpperCamelCase}}".upperCamelToSnakeUpper() + "_" + super.toString().camelToSnakeUpper()
+    }
+
+    /** @suppress */
+    companion object {
+      val Adapter = EnumAdapter(values())
+
+      {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+      val EnumDescriptor = object : EnumDescriptor {
+        override val name: String = "{{entry.name}}"
+
+        @Suppress("Immutable")
+        override val values: Map<ULong, EnumEntry> = entries.toEnumDescriptor()
+      }
+    }
+  }
+{% endfor %}
+
+  // Bitmaps
+{%-   for entry in cluster.bitmaps %}
+  {%- for bitmap_doc in docs.bitmaps|selectattr("name", "equalto", entry.name) %}
+  /**
+   * {{bitmap_doc.description}}
+   *
+   * @constructor Creates the {{entry.name}} data class.
+   *
+   */{% endfor %}
+  {%- if entry.entries | length > 0 %}
+  data class {{entry.name | ToUpperCamelCase}}(
+  {%-  for field in entry.entries %}
+    {%- for bitmap_doc in docs.bitmaps|selectattr("name", "equalto", entry.name) %}
+      {%- for bitmap_value in bitmap_doc.value|selectattr("name", "equalto", field.name) %}
+    /** {{bitmap_value.description}} */
+      {%- endfor %}
+    {%- endfor %}
+    val {{field.name | ToConstFieldName | ToLowerCamelCase}}: Boolean = false
+    {%- if not loop.last -%}, {%- endif %}
+  {%-   endfor %}
+  ): ClusterBitmap (
+    traitId = ClusterId({{cluster.code}}u).traitId,
+    bitmapName = "{{entry.name | ToUpperCamelCase}}",
+  ) {
+    override fun toRaw(): ULong {
+      return Bitmap.toRaw(Adapter.toRaw(this))
+    }
+
+    private enum class MaskFlags(override val value: ULong): ClusterBitmapFlag{
+      {%- for field in entry.entries %}
+        {{field.name | ToConstFieldName}}({{ "0x%0X" | format(field.code)}}u),
+      {%- endfor %}
+
+      ;
+    }
+
+    /** @suppress */
+    companion object {
+      val Adapter = object : BitmapAdapter<{{entry.name | ToUpperCamelCase}}> {
+        override fun toRaw(value: {{entry.name | ToUpperCamelCase}}): Bitmap =
+          MutableBitmap().also {
+    {%-  for field in entry.entries %}
+            it[MaskFlags.{{field.name | ToConstFieldName}}.value] = value.{{field.name | ToConstFieldName | ToLowerCamelCase}}
+    {%-   endfor %}
+          }
+
+        override fun toRuntime(value: Bitmap): {{entry.name | ToUpperCamelCase}} = {{entry.name | ToUpperCamelCase}}(
+    {%-  for field in entry.entries %}
+          value[MaskFlags.{{field.name | ToConstFieldName}}.value]
+      {%- if not loop.last -%}, {%- endif %}
+    {%-   endfor %}
+          )
+      }
+
+      val BitmapDescriptor = object : BitmapDescriptor {
+        override val name: String = "{{entry.name}}"
+
+        @Suppress("Immutable")
+        override val values: Map<ULong, EnumEntry> = MaskFlags.entries.toBitmapDescriptor()
+      }
+    }
+  }
+  {%- else %}
+  class {{entry.name | ToUpperCamelCase}} : ClusterBitmap (
+    traitId = ClusterId({{cluster.code}}u).traitId,
+    bitmapName = "{{entry.name | ToUpperCamelCase}}",
+  ) {
+    override fun toRaw(): ULong = 0u
+
+    override fun equals(other: Any?): Boolean {
+      if (this === other) return true
+      if (other !is {{entry.name | ToUpperCamelCase}}) return false
+      return true
+    }
+
+    override fun hashCode(): Int {
+      return 1
+    }
+
+    override fun toString(): String {
+      return "{{entry.name | ToUpperCamelCase}}()"
+    }
+
+    /** @suppress */
+    companion object {
+      val Adapter = object : BitmapAdapter<{{entry.name | ToUpperCamelCase}}> {
+        override fun toRaw(value: {{entry.name | ToUpperCamelCase}}): Bitmap = MutableBitmap()
+
+        override fun toRuntime(value: Bitmap): {{entry.name | ToUpperCamelCase}} = {{entry.name | ToUpperCamelCase}}()
+      }
+
+      val BitmapDescriptor = object : BitmapDescriptor {
+        override val name: String = "{{entry.name}}"
+
+        @Suppress("Immutable")
+        override val values: Map<ULong, EnumEntry> = emptyMap()
+      }
+    }
+  }
+  {%- endif %}
+{% endfor %}
+
+  // Events
+{%- for entry in cluster.events %}
+  {%- call(event) event_define(entry, event_docs=docs.events) -%}
+    val Id = ScopedEventId({{cluster.name | ToUpperCamelCase}}Trait.Id, {{event.code}}u)
+  {% endcall -%}
+{% endfor %}
+
+  // Structs
+{%- for entry in cluster.structs | reject('isCommandStruct') -%}
+  {{ structure_define(entry, struct_docs=docs.structs) }}
+{% endfor %}
+
+  /**
+   * Attributes for the {{cluster.name | ToUpperCamelCase}} cluster.{{restricted_callout()}}
+   */
+  @Generated("GoogleHomePlatformCodegen")
+  interface Attributes : ClusterStruct {
+
+{%- for attr in cluster.attributes %}
+  {%- if attr.definition.name | attributeDocType == "suppress" %}
+
+    /** @suppress */
+  {%- elif attr.definition.name | attributeDocType == "global" %}
+
+    {{attr.definition.name | outputAttributeComment}}
+  {%- else %}
+    {%- for attr_doc in docs.attributes|selectattr("name", "equalto", attr.definition.name) %}
+
+    /**
+     * {{attr_doc.description}}
+     *
+     * __Access type:__ {% if attr.is_writable %}Write{% else %}Read{% endif %}
+     */
+    {%- endfor %}
+  {%- endif %}
+    val {{attr.definition.name | ToLowerCamelCase }}: {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}}
+{%- endfor %}
+
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    override fun getDescriptor(): StructDescriptor = {{cluster.name | ToUpperCamelCase}}.Attribute.StructDescriptor
+
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    override fun getFieldValueById(tagId: TagId): Any? {
+      return when (tagId) {
+      {%- for attr in cluster.attributes %}
+        {{cluster.name | ToUpperCamelCase}}.Attribute.{{attr.definition.name | ToLowerCamelCase }}.tag -> {{attr.definition.name | ToLowerCamelCase }}
+      {%- endfor %}
+        else -> null
+      }
+    }
+
+    /** @suppress */
+    companion object Adapter : StructAdapter<Attributes> {
+
+      override fun write(writer: ClusterPayloadWriter, value: Attributes) {
+{%- if cluster | hasWritableAttributes %}
+        if (value is MutableAttributes) {
+            MutableAttributes.Adapter.write(writer, value)
+            return
+        }
+{%- endif %}
+        writer.wrapPayload(id = Id)
+{%- for attr in cluster.attributes %}
+        {{attr.definition | SerializerWriteAttributeField}}
+{%- endfor %}
+      }
+      override fun read(reader: ClusterPayloadReader): Attributes {
+        reader.unwrapPayload(id = Id)
+        val data = reader.readPayload(
+{%- for f in cluster.attributes | map(attribute='definition') | select('IsStructField') %}
+  {%- if loop.first -%} mapOf( {%- endif -%}
+            {{f.code}}u to {{f.data_type.name | ToUpperCamelCase}}.Adapter
+  {%- if loop.last -%} ) {%- else -%} , {%- endif -%}
+{%- endfor -%}
+        )
+        val attributeList = mutableListOf<UInt>()
+        return AttributesImpl(
+{%- for attr in cluster.attributes %}
+          {{attr.definition | SerializerReadNullableAttributeField}},
+{%- endfor %}
+        )
+      }
+    }
+  }
+
+  /** @suppress */
+  open class AttributesImpl(
+{%- for attr in cluster.attributes %}
+    override val {{attr.definition.name | ToLowerCamelCase }}: {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}} =
+  {%- if attr.definition.name == 'attributeList' -%}
+     listOf(
+    {%- for attr in cluster.attributes -%}
+      {{attr.definition.code}}u,
+    {%- endfor -%}
+    )
+  {%- elif attr.definition.name == 'generatedCommandList' or  attr.definition.name == 'acceptedCommandList' -%}
+     emptyList()
+  {%- elif attr.definition.name == 'featureMap' -%}
+     {{ attr.definition | DefaultValueForField }}
+  {%- elif attr.definition.name == 'clusterRevision' -%}
+     0u
+  {%- else -%}
+     null
+  {%- endif -%}
+    ,
+{%- endfor %}
+  ) : Attributes
+{%- if cluster | hasWritableAttributes -%}
+    , CanMutate<Attributes, MutableAttributes>
+{%- endif -%}
+   {
+
+    constructor(other: Attributes): this(
+{%- for attr in cluster.attributes %}
+      {{attr.definition.name | ToLowerCamelCase }}  = other.{{attr.definition.name | ToLowerCamelCase }}
+  {%- if not loop.last -%},{% endif %}
+{%- endfor -%}
+    )
+{%- if cluster | hasWritableAttributes %}
+
+    override fun mutate(init: MutableAttributes.() -> Unit): Attributes =
+      AttributesImpl(MutableAttributes(this).apply(init))
+{%- endif %}
+
+    companion object {
+      val Adapter = Attributes.Adapter
+    }
+
+    override fun equals(other: Any?): Boolean {
+      if (this === other) return true
+      if (other !is Attributes) return false
+
+{%- for attr in cluster.attributes %}
+      {{attr.definition | SerializerEqualsAttributeField}}
+{%- endfor %}
+
+      return true
+    }
+
+    override fun hashCode(): Int {
+      var result = 1
+
+{%- for attr in cluster.attributes %}
+      {{attr.definition | SerializerHashcodeAttributeField}}
+{%- endfor %}
+
+      return result
+    }
+
+    override fun toString(): String {
+      return "{{cluster.name | ToUpperCamelCase}}(
+{%- for attr in cluster.attributes %}{{attr.definition.name | ToLowerCamelCase }}=${{attr.definition.name | ToLowerCamelCase }}
+  {%- if not loop.last %}, {% endif %}
+{%- endfor %})"
+    }
+
+    fun copy(
+{%- for attr in cluster.attributes %}
+      {{attr.definition.name | ToLowerCamelCase }}: {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}} = this.{{attr.definition.name | ToLowerCamelCase }},
+{%- endfor %}
+    ) = AttributesImpl(
+{%- for attr in cluster.attributes %}
+      {{attr.definition.name | ToLowerCamelCase }} = {{attr.definition.name | ToLowerCamelCase }}, 
+{%- endfor %}
+    )
+  }
+
+{%- if cluster | hasWritableAttributes %}
+
+  /** @suppress */
+  class MutableAttributes(attributes: Attributes) : 
+    AttributesImpl(
+  {%- for attr in cluster.attributes %}
+      {{attr.definition.name | ToLowerCamelCase }} = attributes.{{attr.definition.name | ToLowerCamelCase }},
+  {%- endfor %}
+    ) {
+
+  {%- for attr in cluster.attributes | selectattr("is_writable") %}
+    internal var _{{attr.definition.name | ToLowerCamelCase }} : {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}} = null
+
+    {%- if attr.definition.is_nullable %}
+    internal var _is{{capfirst(attr.definition.name | ToLowerCamelCase )}}Set : Boolean = false
+
+    override val {{attr.definition.name | ToLowerCamelCase }} : {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}}
+      get() {
+        return if (_is{{capfirst(attr.definition.name | ToLowerCamelCase )}}Set) _{{attr.definition.name | ToLowerCamelCase }} else super.{{attr.definition.name | ToLowerCamelCase }}
+      }
+    {% else %}
+    override val {{attr.definition.name | ToLowerCamelCase }} : {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}}
+      get() {
+        return _{{attr.definition.name | ToLowerCamelCase }} ?: super.{{attr.definition.name | ToLowerCamelCase }}
+      }
+    {% endif -%}
+    fun set{{capfirst(attr.definition.name | ToLowerCamelCase )}}(value : {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForMutableAttributes(attr.definition)}}) {
+    {%- if attr.definition.is_nullable %}
+        _is{{capfirst(attr.definition.name | ToLowerCamelCase )}}Set = true
+    {%- endif %}
+        _{{attr.definition.name | ToLowerCamelCase }} = value
+    }
+  {%- endfor %}
+
+    override fun equals(other: Any?): Boolean {
+      if (this === other) return true
+      if (other !is MutableAttributes) return false
+      return super.equals(other)
+    }
+
+    override fun toString(): String {
+      return "{{cluster.name | ToUpperCamelCase}}.MutableAttributes(${super.toString()})"
+    }
+
+    companion object Adapter : StructAdapter<MutableAttributes> {
+      override fun write(writer: ClusterPayloadWriter, value: MutableAttributes) {
+        writer.wrapPayload(id = Id)
+  {%- for attr in cluster.attributes | selectattr("is_writable") %}
+    {%- if attr.definition.is_nullable %}
+        if (value._is{{capfirst(attr.definition.name | ToLowerCamelCase )}}Set) {
+    {%- else %}
+        if (value._{{attr.definition.name | ToLowerCamelCase }} != null) {
+    {%- endif %}
+        {{attr.definition | SerializerWriteMutableField | indent(2, true)}}
+        }
+  {%- endfor %}
+      }
+
+      override fun read(reader: ClusterPayloadReader): MutableAttributes =
+        MutableAttributes(Attributes.Adapter.read(reader))
+    }
+  }
+{%- endif %}
+
+  // Commands
+{% for cmd in cluster.commands -%}
+  {%- set input_struct = cmd | commandInputStruct %}
+  {%- set output_struct = cmd | commandOutputStruct %}
+
+  {%- for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) %}
+  /**{% for d in cmd_doc.description %}
+   * {{d}}
+   *{% endfor %}{{restricted_callout()}}
+   * @see {{cluster.name | ToUpperCamelCase}}Commands.{{cmd.name|camelcase}} Use this command from the `trait({{cluster.name | ToUpperCamelCase}})` method.
+   */{% endfor %}
+  object {{cmd.name | ToUpperCamelCase}}Command : CommandDescriptor {
+    /** @suppress */
+    override val requestId = ScopedCommandId({{cluster.name | ToUpperCamelCase}}Trait.Id, {{cmd.code}}u)
+    override val commandId = requestId.toString()
+    override val commandName = "{{cmd.name}}Command"
+
+    override val fields: DescriptorMap =
+      Request.CommandFields.values().associateBy({ it.tag }, { it })
+
+  {%- if output_struct: %}
+    override val responseFields: DescriptorMap =
+      Response.CommandFields.values().associateBy({ it.tag }, { it })
+
+    /** @suppress */
+    override val responseId = ScopedCommandId({{cluster.name | ToUpperCamelCase}}Trait.Id, {{output_struct.code}}u)
+  {%- else %}
+    override val responseFields: DescriptorMap = emptyMap()
+
+    override val responseId = null
+  {%- endif %}
+
+  {%- if input_struct.fields | list | count > 0 %}
+
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    override fun getCommandRequestFieldById(tagId: UInt): com.google.home.Field? {
+      return Request.CommandFields.values().firstOrNull { it.tag == tagId }
+    }
+
+    {% if is_internal %}@HomeExperimentalGenericApi{% endif %}
+    override fun getCommandRequestFieldByName(name: String): com.google.home.Field? {
+      return Request.CommandFields.values().firstOrNull { it.name == name }
+    }
+  {%- endif %}
+
+  {%- for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) %}
+
+    /**
+     * The request payload for the {{cmd.name}} command.
+     *
+     * @constructor Creates a request payload for the {{cmd.name}} command.
+    {%- if cmd_doc.param %}
+     *{% for p in cmd_doc.param %}
+     * @property {{p.name}} {{p.description}}{% endfor %}
+    {%- endif %}
+     */
+  {%- endfor -%}
+  {%- call(operation) command_structure_define(input_struct, "Request", cmd.name + "Command.Request", without_optionals = False) -%}
+    {%- if operation == "read" -%}
+      reader.unwrapPayload(id = requestId)
+    {%- elif operation == "write" -%}
+      writer.wrapPayload(id = requestId)
+    {%- endif %}
+  {%- endcall -%}
+  {%- if input_struct.fields | selectattr("is_optional") | list | count > 0 %}
+    /** Optional arguments for the command {{cmd.name}}Command Request */
+    interface OptionalArgs {
+    {%- for field in input_struct.fields|selectattr("is_optional") %}
+      {%- for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) %}
+        {%- if cmd_doc.param %}
+          {%- for p in cmd_doc.param|selectattr("name", "equalto", field.name) %}
+      /** {{p.description}} */
+          {%- endfor %}
+        {%- endif %}
+      {%- endfor %}
+      var {{field.name | ToLowerCamelCase}} : {{field.data_type | lookupDataType | ToKotlinFieldTypeForCommands(field)}}
+    {%- endfor %}
+    }
+  {%- endif %}
+  {%- if output_struct %}
+
+    {%- for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) -%}
+      {%- if cmd_doc.response %}
+
+    /**
+     * {{cmd_doc.response.description}}
+     *
+     * @constructor Creates a response payload from the {{cmd.name}} command.
+     *{% for r in cmd_doc.response.param %}
+     * @property {{r.name}} {{r.description}}{% endfor %}
+     */
+      {%- endif %}
+    {%- endfor -%}
+    {%- call(operation) command_structure_define(output_struct, "Response", cmd.name + "Command.Response", without_optionals = True) -%}
+      {%- if operation == "read" -%}
+      reader.unwrapPayload(id = responseId)
+      {%- elif operation == "write" -%}
+      writer.wrapPayload(id = responseId)
+      {%- endif -%}
+    {%- endcall -%}
+  {%- endif %}
+  }
+{% endfor %}
+}

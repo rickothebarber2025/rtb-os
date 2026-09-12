@@ -1,0 +1,1 @@
+Implementation audit started from issue #77 and PR #78. Next targets: owner home queue renderer, approval action handlers/data source, and integrations/ada-control endpoints.

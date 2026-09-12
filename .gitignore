@@ -11,3 +11,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Google Home iOS SDK - vendored in git (see ios/ThirdParty/GoogleHomeSDK), tracked via Git LFS
+/ios/ThirdParty/GoogleHomeSDK/build/
+/ios/ThirdParty/GoogleHomeSDK/.build/

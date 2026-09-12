@@ -1,0 +1,1 @@
+Work is active on branch `fix/ada-owner-command-center` in draft PR #78. This file exists only to anchor implementation progress while the owner is away from the Mac.

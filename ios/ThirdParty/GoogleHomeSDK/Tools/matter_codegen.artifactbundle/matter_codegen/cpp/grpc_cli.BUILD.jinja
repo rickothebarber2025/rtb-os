@@ -1,0 +1,28 @@
+load("//devtools/python/blaze:pytype.bzl", "pytype_library")
+
+# Reference Sample for gRPC integration with the GHP D&S C++ API.
+package(
+    default_applicable_licenses = ["//third_party/google_home_platform:license"],
+    default_visibility = [
+        "//nest/engprod/gna/inception/android/matter:__subpackages__",
+        "//third_party/google_home_platform:__subpackages__",
+    ],
+)
+
+pytype_library(
+    name = "{{target_name}}",
+    srcs = [
+{%- for cluster in clusters|sort(attribute="name") %}
+        "{{cluster.name | ToLowerSnakeCase}}_cli.py",
+{%- endfor %}
+    ],
+    deps = [
+        "//net/grpc/python:grpc",
+        "//third_party/google_home_platform/api/cpp/google_home_api/lib/grpc/client/core",
+        "//third_party/google_home_platform/api/cpp/google_home_api/lib/grpc/client/traits/{{package_name}}",
+{%- for cluster in clusters|sort(attribute="name") %}
+        "//third_party/google_home_platform/api/cpp/google_home_api/lib/grpc/proto/traits/{{package_name}}:{{cluster.name | ToLowerSnakeCase}}_grpc_py_proto",
+{%- endfor %}
+        "//third_party/py/click",
+    ],
+)
