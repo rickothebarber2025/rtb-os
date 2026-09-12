@@ -1,14 +1,59 @@
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { copyFileSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
 
-const root = resolve(process.argv[2] || process.env.ARVIS_DESKTOP_ROOT || join(process.env.HOME || '', 'Documents/RTB DAtabase/local-assistant 2'));
-const serverPath = join(root, 'server.mjs');
-const uiPath = join(root, 'ui.html');
+const requestedRoot = resolve(process.argv[2] || process.env.ARVIS_DESKTOP_ROOT || join(process.env.HOME || '', 'Documents/RTB DAtabase/local-assistant 2'));
 
-if (!existsSync(serverPath) || !existsSync(uiPath)) {
-  console.log(`[voice] skipped: ${root} does not contain server.mjs + ui.html`);
+function discoverFile(root, basename, maxDepth = 4) {
+  const ignored = new Set(['node_modules', '.git', 'dist', 'build', 'backups', '.next', '.vite']);
+  const queue = [{ dir: root, depth: 0 }];
+  const matches = [];
+  while (queue.length) {
+    const { dir, depth } = queue.shift();
+    let entries = [];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const entry of entries) {
+      const full = join(dir, entry.name);
+      if (entry.isFile() && entry.name === basename) matches.push(full);
+      if (entry.isDirectory() && depth < maxDepth && !ignored.has(entry.name)) queue.push({ dir: full, depth: depth + 1 });
+    }
+  }
+  return matches;
+}
+
+function chooseDesktopPair(root) {
+  const directServer = join(root, 'server.mjs');
+  const directUi = join(root, 'ui.html');
+  if (existsSync(directServer) && existsSync(directUi)) return { serverPath: directServer, uiPath: directUi, layoutRoot: root };
+
+  const servers = discoverFile(root, 'server.mjs');
+  const uis = discoverFile(root, 'ui.html');
+
+  for (const serverPath of servers) {
+    const sameDirUi = join(dirname(serverPath), 'ui.html');
+    if (existsSync(sameDirUi)) return { serverPath, uiPath: sameDirUi, layoutRoot: dirname(serverPath) };
+  }
+
+  // Current A.R.V.I.S. releases keep server.mjs and ui.html in the same app root,
+  // but allow a split layout as a migration fallback if there is exactly one of each.
+  if (servers.length === 1 && uis.length === 1) {
+    return { serverPath: servers[0], uiPath: uis[0], layoutRoot: root };
+  }
+  return { serverPath: null, uiPath: null, servers, uis };
+}
+
+const discovered = chooseDesktopPair(requestedRoot);
+const serverPath = discovered.serverPath;
+const uiPath = discovered.uiPath;
+
+if (!serverPath || !uiPath) {
+  console.log(`[voice] skipped: could not resolve the current A.R.V.I.S. server/UI pair under ${requestedRoot}`);
+  if (discovered.servers?.length) console.log(`[voice] server.mjs candidates: ${discovered.servers.join(', ')}`);
+  if (discovered.uis?.length) console.log(`[voice] ui.html candidates: ${discovered.uis.join(', ')}`);
   process.exit(0);
 }
+
+console.log(`[voice] targeting A.R.V.I.S. server: ${serverPath}`);
+console.log(`[voice] targeting A.R.V.I.S. UI: ${uiPath}`);
 
 for (const path of [serverPath, uiPath]) {
   const backup = `${path}.before-rtb-voice`;
@@ -20,7 +65,7 @@ let ui = readFileSync(uiPath, 'utf8');
 
 function replaceExact(text, oldValue, newValue, label) {
   if (text.includes(newValue)) return text;
-  if (!text.includes(oldValue)) throw new Error(`[voice] ${label} marker not found; refusing a blind patch.`);
+  if (!text.includes(oldValue)) throw new Error(`[voice] ${label} marker not found in current A.R.V.I.S. layout; refusing a blind patch.`);
   return text.replace(oldValue, newValue);
 }
 
@@ -80,4 +125,4 @@ ui = replaceExact(ui, oldMic, newMic, 'barge-in');
 
 writeFileSync(serverPath, server);
 writeFileSync(uiPath, ui);
-console.log('[voice] A.R.V.I.S. voice ready: selectable voice, faster/calm defaults, compact speech, stop + barge-in.');
+console.log(`[voice] A.R.V.I.S. voice ready on ${discovered.layoutRoot || requestedRoot}: selectable voice, faster/calm defaults, compact speech, stop + barge-in.`);
