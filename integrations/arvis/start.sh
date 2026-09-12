@@ -8,7 +8,9 @@ STATE_DIR="$HOME/.local/state/rtb"
 WORKBENCH_LOG="$STATE_DIR/neural-workbench.log"
 WYZE_DIR="$REPO_DIR/integrations/arvis/wyze"
 LEGACY_ARVIS_ROOT="${ARVIS_DESKTOP_ROOT:-$HOME/Documents/RTB DAtabase/local-assistant 2}"
-LEGACY_WYZE_ENV="$LEGACY_ARVIS_ROOT/.env.local"
+LEGACY_ENV="$LEGACY_ARVIS_ROOT/.env.local"
+RTB_OS_ENV="$REPO_DIR/.env"
+WORKBENCH_ENV="$WORKBENCH_DIR/.env"
 ARVIS_DESKTOP_LOG="$LEGACY_ARVIS_ROOT/logs/arvis-app.log"
 
 echo "A.R.V.I.S. unified startup"
@@ -25,19 +27,76 @@ if [[ ! -f "$WORKBENCH_DIR/package.json" ]]; then
   exit 1
 fi
 
-# Reuse the existing local Wyze configuration without copying secrets into Git.
-if [[ -f "$LEGACY_WYZE_ENV" && -d "$WYZE_DIR" ]]; then
-  set -a
-  source "$LEGACY_WYZE_ENV"
-  set +a
-  if [[ -n "${WYZE_API_KEY_ID:-}" ]]; then
-    export WYZE_API_ID="$WYZE_API_KEY_ID"
+# Read individual KEY=value entries without sourcing arbitrary .env content.
+# This prevents text values containing spaces/commas from being executed as shell commands.
+read_env_value() {
+  local file="$1"
+  local key="$2"
+  [[ -f "$file" ]] || return 1
+  local line
+  line="$(/usr/bin/grep -E "^[[:space:]]*${key}[[:space:]]*=" "$file" 2>/dev/null | /usr/bin/tail -n 1 || true)"
+  [[ -n "$line" ]] || return 1
+  local value="${line#*=}"
+  value="${value##[[:space:]]#}"
+  value="${value%%[[:space:]]#}"
+  if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+    value="${value:1:${#value}-2}"
   fi
+  print -r -- "$value"
+}
+
+first_env_value() {
+  local key="$1"
+  local value=""
+  local file
+  for file in "$WORKBENCH_ENV" "$RTB_OS_ENV" "$LEGACY_ENV"; do
+    value="$(read_env_value "$file" "$key" || true)"
+    if [[ -n "$value" ]]; then
+      print -r -- "$value"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Reuse only the Wyze keys we actually need. Never source the whole legacy .env.
+if [[ -f "$LEGACY_ENV" && -d "$WYZE_DIR" ]]; then
+  wyze_id="$(read_env_value "$LEGACY_ENV" "WYZE_API_KEY_ID" || true)"
+  wyze_key="$(read_env_value "$LEGACY_ENV" "WYZE_API_KEY" || true)"
+  wyze_email="$(read_env_value "$LEGACY_ENV" "WYZE_EMAIL" || true)"
+  wyze_password="$(read_env_value "$LEGACY_ENV" "WYZE_PASSWORD" || true)"
+  [[ -n "$wyze_id" ]] && export WYZE_API_ID="$wyze_id"
+  [[ -n "$wyze_key" ]] && export WYZE_API_KEY="$wyze_key"
+  [[ -n "$wyze_email" ]] && export WYZE_EMAIL="$wyze_email"
+  [[ -n "$wyze_password" ]] && export WYZE_PASSWORD="$wyze_password"
   if [[ ! -e "$WYZE_DIR/.env" ]]; then
-    ln -s "$LEGACY_WYZE_ENV" "$WYZE_DIR/.env"
+    ln -s "$LEGACY_ENV" "$WYZE_DIR/.env"
   fi
-  echo "Wyze API configuration: linked from existing A.R.V.I.S. config"
+  if [[ -n "${WYZE_API_ID:-}" && -n "${WYZE_API_KEY:-}" ]]; then
+    echo "Wyze API configuration: detected"
+  else
+    echo "Wyze API configuration: incomplete"
+  fi
 fi
+
+# Square can be configured once in Workbench .env, RTB OS .env, or legacy A.R.V.I.S. .env.local.
+# Values are exported only to the local Workbench process; secrets are never printed.
+for square_key in SQUARE_ACCESS_TOKEN SQUARE_LOCATION_ID_LOUNGE SQUARE_LOCATION_ID_BEAUTY; do
+  square_value="$(first_env_value "$square_key" || true)"
+  if [[ -n "$square_value" ]]; then
+    export "$square_key=$square_value"
+  fi
+done
+
+if [[ -n "${SQUARE_ACCESS_TOKEN:-}" ]]; then
+  echo "Square access token: detected"
+else
+  echo "Square access token: not detected"
+fi
+[[ -n "${SQUARE_LOCATION_ID_LOUNGE:-}" ]] && echo "Square Lounge location ID: detected" || echo "Square Lounge location ID: not detected"
+[[ -n "${SQUARE_LOCATION_ID_BEAUTY:-}" ]] && echo "Square Beauty location ID: detected" || echo "Square Beauty location ID: not detected"
 
 # Apply the idempotent parent/iframe live-data and Main Brain bridge before startup.
 node "$REPO_DIR/integrations/arvis/patch-neural-workbench.mjs" "$WORKBENCH_DIR"
@@ -65,7 +124,9 @@ workbench_online() {
 
 if workbench_online; then
   echo "Neural Workbench already running at $WORKBENCH_URL"
-  echo "Restart it once if this is the first run after the bridge/hardening update."
+  if [[ -n "${SQUARE_ACCESS_TOKEN:-}" ]]; then
+    echo "Square token is available to this launcher. If you just changed it, restart Workbench so the running process receives the new value."
+  fi
 else
   echo "Starting Neural Workbench..."
   (
@@ -84,6 +145,26 @@ else
     echo "Neural Workbench did not become healthy. Check $WORKBENCH_LOG" >&2
     exit 1
   fi
+fi
+
+# Report Square connectivity without displaying credentials.
+square_status_json="$(/usr/bin/curl -fsS --max-time 4 "$WORKBENCH_URL/api/square/status" 2>/dev/null || true)"
+if [[ -n "$square_status_json" ]]; then
+  SQUARE_STATUS_JSON="$square_status_json" /usr/bin/env node - <<'NODE'
+try {
+  const status = JSON.parse(process.env.SQUARE_STATUS_JSON || '{}');
+  const connected = status.connected ?? status.configured ?? status.live ?? status.status === 'connected';
+  const tokenConfigured = status.tokenConfigured ?? status.hasAccessToken ?? status.accessTokenConfigured;
+  const live = status.live ?? status.apiReachable ?? status.connected;
+  console.log(`Square Workbench status: ${connected === true || live === true ? 'CONNECTED' : connected === false ? 'NOT CONNECTED' : 'STATUS AVAILABLE'}`);
+  if (typeof tokenConfigured === 'boolean') console.log(`Square token recognized by Workbench: ${tokenConfigured ? 'yes' : 'no'}`);
+  if (status.error) console.log(`Square status error: ${String(status.error).slice(0, 240)}`);
+} catch {
+  console.log('Square Workbench status: endpoint responded but returned unreadable status');
+}
+NODE
+else
+  echo "Square Workbench status: unavailable"
 fi
 
 # Launch the real Electron A.R.V.I.S. desktop shell that has historically lived
