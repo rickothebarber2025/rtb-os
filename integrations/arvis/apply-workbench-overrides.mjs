@@ -15,6 +15,10 @@ const overrides = [
     source: path.join(repoDir, 'integrations', 'arvis', 'workbench-overrides', 'RevenueMatrixWidget.tsx'),
     target: path.join(workbenchDir, 'src', 'components', 'RevenueMatrixWidget.tsx'),
   },
+  {
+    source: path.join(repoDir, 'integrations', 'arvis', 'workbench-overrides', 'AgenticScreenVision.tsx'),
+    target: path.join(workbenchDir, 'src', 'components', 'AgenticScreenVision.tsx'),
+  },
 ];
 
 for (const { source, target } of overrides) {
