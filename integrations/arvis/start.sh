@@ -79,10 +79,6 @@ if [[ -f "$LEGACY_ENV" && -d "$WYZE_DIR" ]]; then
   fi
 fi
 
-# Local Square env values are legacy/fallback only. The authoritative Square
-# credential now lives server-side in Supabase integration_connections and is
-# consumed by Supabase Square functions. Keep these exports only so an older
-# Workbench build can still function during migration without exposing secrets.
 for square_key in SQUARE_ACCESS_TOKEN SQUARE_LOCATION_ID_LOUNGE SQUARE_LOCATION_ID_BEAUTY; do
   square_value="$(first_env_value "$square_key" || true)"
   if [[ -n "$square_value" ]]; then
@@ -96,11 +92,9 @@ else
   echo "Local Square fallback token: not needed"
 fi
 
-# Keep voice independent from the assistant brain so providers/voices can be
-# changed without touching RTB OS, Supabase, Workbench, or device control.
 node "$REPO_DIR/integrations/arvis/patch-arvis-voice.mjs" "$LEGACY_ARVIS_ROOT"
-
 node "$REPO_DIR/integrations/arvis/patch-neural-workbench.mjs" "$WORKBENCH_DIR"
+node "$REPO_DIR/integrations/arvis/patch-workbench-screen-vision.mjs" "$WORKBENCH_DIR"
 node "$REPO_DIR/integrations/arvis/apply-workbench-overrides.mjs" "$WORKBENCH_DIR"
 node "$REPO_DIR/integrations/arvis/harden-neural-workbench.mjs" "$WORKBENCH_DIR"
 node "$REPO_DIR/integrations/arvis/audit-neural-workbench.mjs" "$WORKBENCH_DIR"
@@ -137,9 +131,6 @@ else
   fi
 fi
 
-# The Workbench-local Square endpoint is now informational only. RTB OS/Supabase
-# is the source of truth and sends Square-backed metrics into Workbench through
-# the RTB_OS_SNAPSHOT bridge.
 square_status_json="$(/usr/bin/curl -fsS --max-time 4 "$WORKBENCH_URL/api/square/status" 2>/dev/null || true)"
 if [[ -n "$square_status_json" ]]; then
   echo "Workbench Square compatibility endpoint: available"
@@ -178,6 +169,7 @@ echo "A.R.V.I.S. control bridge: http://127.0.0.1:8791"
 echo "Neural Workbench: $WORKBENCH_URL"
 echo "A.R.V.I.S. desktop: $LEGACY_ARVIS_ROOT"
 echo "A.R.V.I.S. voice: selectable, compact, interruptible"
+echo "Agentic screen perception: native A.R.V.I.S. capture, synthetic fallback disabled"
 echo "RTB OS live-data bridge: enabled"
 echo "RTB Workbench process views: synchronized"
 echo "Synthetic briefing/anomaly fallbacks: disabled"
