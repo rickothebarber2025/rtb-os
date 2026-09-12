@@ -1,0 +1,7 @@
+- [ ] Locate owner home queue renderer
+- [ ] Locate approval handlers/data source
+- [ ] Add render-time deduplication
+- [ ] Add actionable buttons
+- [ ] Auto-clear read-only monitoring approvals
+- [ ] Surface ada-control health/actions
+- [ ] Add Telegram cooldown/deduplication
