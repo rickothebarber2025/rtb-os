@@ -1,0 +1,24 @@
+{% macro map_line(clusterCode, clusterName) -%}
+  {{clusterCode}} of {{clusterName}},
+{%- endmacro -%}
+// {{file_comment}}
+@file:Suppress("PackageName")
+package {{package}}.debugging
+
+/*
+ * This file was machine generated via the code generator
+ * in `codegen.clusters.kotlin.CustomGenerator`
+ *
+ */
+
+object MatterTraitClusterMapping {
+  val idTraitMapping = mapOf(
+    {%- for cluster in clusters %}
+    {{cluster.code}}.toUShort() to "{{cluster.name | ToUpperCamelCase}}",
+    {%- endfor %}
+  )
+
+  fun getTraitNameForClusterId(clusterId: UShort): String? {
+      return idTraitMapping[clusterId] ?: (clusterId.toString())
+  }
+}

@@ -33,12 +33,15 @@ import EmptyState from '../components/EmptyState';
 import MyHoursWidget from '../components/MyHoursWidget';
 import OpeningClosingChecklist from '../components/OpeningClosingChecklist';
 import StaffSpotlightBoard from '../components/StaffSpotlightBoard';
+import StaffMessageCenter from '../components/StaffMessageCenter';
+import OwnerRequestInbox from '../components/OwnerRequestInbox';
 import StatusBadge from '../components/StatusBadge';
 import TipsBreakdown from '../components/TipsBreakdown';
 import WeeklyGoalProgress from '../components/WeeklyGoalProgress';
 import { getEffectivePermissionsPayload, isOwnerProfile } from '../lib/permissions';
 import {
   acknowledgePolicyDocument,
+  archiveStaffAnnouncement,
   approveStaffOnboarding,
   closeStaffOnboarding,
   decideContentSubmission,
@@ -84,8 +87,8 @@ import {
 } from '../utils/onboarding';
 
 const TABS = [
-  { icon: ClipboardCheck, id: 'daily', label: 'Daily Ops' },
-  { icon: Home, id: 'home', label: 'Today' },
+  { icon: Home, id: 'home', label: 'Home' },
+  { icon: ClipboardCheck, id: 'daily', label: 'Work' },
   { icon: CircleDollarSign, id: 'money', label: 'Earnings' },
   { icon: TrendingUp, id: 'stats', label: 'Performance' },
   { icon: CalendarDays, id: 'schedule', label: 'Schedule' },
@@ -103,6 +106,23 @@ const TAB_PARENT = {
   tips: 'money',
   updates: 'home',
 };
+
+const STAFF_HUB_TAB_ALIASES = {
+  growth: 'stats',
+  performance: 'stats',
+  team: 'more',
+};
+
+const VALID_STAFF_HUB_TABS = new Set([
+  ...TABS.map((tab) => tab.id),
+  ...Object.keys(TAB_PARENT),
+]);
+
+function normalizeStaffHubTab(tab) {
+  const requested = String(tab || '').trim().toLowerCase();
+  const normalized = STAFF_HUB_TAB_ALIASES[requested] || requested;
+  return VALID_STAFF_HUB_TABS.has(normalized) ? normalized : 'home';
+}
 
 const EMPTY_STAFF_HUB = {
   announcementReads: [],
@@ -337,10 +357,16 @@ function manualRecordBelongsToStaff(record, staffProfile) {
 }
 
 function getStaffActionItems(actionCenter, staffProfile, ownerView) {
+  // The Staff Hub is a staff-dedicated portal: once a login is matched to a
+  // staff profile it must only ever surface that staff member's own warnings
+  // and documents, never every staff member's, even when the viewer is the
+  // owner. The unscoped "show everything" fallback only applies to the true
+  // owner-preview state, i.e. no staff profile has been matched yet.
+  const showAll = ownerView && !staffProfile;
   const state = normalizeActionCenterState(actionCenter);
   const warnings = state.warnings
     .filter((warning) => !warning.resolved_at)
-    .filter((warning) => ownerView || manualRecordBelongsToStaff(warning, staffProfile))
+    .filter((warning) => showAll || manualRecordBelongsToStaff(warning, staffProfile))
     .map((warning) => ({
       date: warning.date || warning.created_at,
       detail: warning.notes || warning.warning_type || 'Staff warning needs review.',
@@ -350,7 +376,7 @@ function getStaffActionItems(actionCenter, staffProfile, ownerView) {
     }));
   const documents = state.documents
     .filter((document) => !document.resolved_at)
-    .filter((document) => ownerView || manualRecordBelongsToStaff(document, staffProfile))
+    .filter((document) => showAll || manualRecordBelongsToStaff(document, staffProfile))
     .map((document) => ({
       date: document.due_date || document.created_at,
       detail: `${document.document_name || 'Document'}${document.staff_name ? ` for ${document.staff_name}` : ''}`,
@@ -464,8 +490,9 @@ export default function StaffHubPage({
   // top-level pages). Falls back to local state if this page is ever
   // rendered without the lifted props (e.g. in isolation/tests).
   const [localActiveTab, setLocalActiveTab] = useState('daily');
-  const activeTab = staffHubTab ?? localActiveTab;
-  const setActiveTab = setStaffHubTab ?? setLocalActiveTab;
+  const activeTab = normalizeStaffHubTab(staffHubTab ?? localActiveTab);
+  const updateActiveTab = setStaffHubTab ?? setLocalActiveTab;
+  const setActiveTab = (tab) => updateActiveTab(normalizeStaffHubTab(tab));
   const [dailyOpsView, setDailyOpsView] = useState('checklist');
   const [hubMessage, setHubMessage] = useState('');
   const [hubError, setHubError] = useState('');
@@ -487,16 +514,16 @@ export default function StaffHubPage({
   // tab instead of the default Daily Ops -- otherwise the approve/decline
   // buttons are two tabs away with no indication of where to look.
   useEffect(() => {
-    if (pageTarget && (TABS.some((tab) => tab.id === pageTarget) || TAB_PARENT[pageTarget])) {
-      setActiveTab(pageTarget);
-    }
+    if (pageTarget) setActiveTab(pageTarget);
   }, [pageTarget]);
   const [announcementForm, setAnnouncementForm] = useState({
     body: '',
     category: 'reminder',
+    id: '',
     pinned: false,
     title: '',
   });
+  const [announcementComposerOpen, setAnnouncementComposerOpen] = useState(false);
   const [availabilityForm, setAvailabilityForm] = useState({
     day_of_week: 1,
     end_time: '17:00',
@@ -613,7 +640,11 @@ export default function StaffHubPage({
   const scheduleRows = useMemo(
     () =>
       getDashboardScheduleRows(masterDashboard)
-        .filter((row) => ownerView || scheduleBelongsToStaff(row, staffProfile))
+        // Same rule as getStaffActionItems: a matched staff profile always
+        // scopes the schedule to that person's own shifts, even for the
+        // owner. Shop-wide schedule only shows in the true owner-preview
+        // state (no staff profile matched).
+        .filter((row) => (ownerView && !staffProfile) || scheduleBelongsToStaff(row, staffProfile))
         .slice(0, 8),
     [masterDashboard, ownerView, staffProfile],
   );
@@ -625,6 +656,14 @@ export default function StaffHubPage({
     ...EMPTY_STAFF_HUB,
     ...(staffHub || {}),
   };
+  // Time-off requests carry another staff member's private reason for the
+  // absence — the Hub must only ever list the logged-in staff member's own
+  // requests here, never the whole team's. (Managers still review and
+  // decide every request from the dedicated OwnerRequestInbox above.)
+  const myTimeOffRequests = useMemo(
+    () => hubRecords.timeOffRequests.filter((request) => entryBelongsToStaff(request, staffProfile)),
+    [hubRecords.timeOffRequests, staffProfile],
+  );
   const restrictedOnboarding = isOnboardingRestrictedProfile(accessProfile);
   const myOnboardingInvitation = useMemo(
     () =>
@@ -1325,16 +1364,19 @@ export default function StaffHubPage({
   const visibleQuickTools = quickTools.filter((tool) => Boolean(tool.tab) || canOpen(tool.id));
   const visibleMoreOptions = moreOptions.filter((option) => canOpen(option.id));
 
-  async function runHubAction(actionKey, action, successMessage) {
+  async function runHubAction(actionKey, action, successMessage, { rethrow = false } = {}) {
     setHubError('');
     setHubMessage('');
     setSavingHubAction(actionKey);
     try {
-      await action();
+      const result = await action();
       setHubMessage(successMessage);
       await onRefresh?.();
+      return result;
     } catch (err) {
       setHubError(err.message || 'Unable to save Staff Hub update.');
+      if (rethrow) throw err;
+      return null;
     } finally {
       setSavingHubAction('');
     }
@@ -1406,16 +1448,51 @@ export default function StaffHubPage({
 
   async function submitAnnouncement(event) {
     event.preventDefault();
-    await runHubAction(
-      'announcement',
+    const saved = await runHubAction(
+      announcementForm.id ? `announcement-edit-${announcementForm.id}` : 'announcement',
       () =>
         saveStaffAnnouncement({
           ...announcementForm,
           business_unit_id: allBusinessesView ? null : businessUnit?.id,
+          created_by: user?.id,
         }),
-      'Announcement posted.',
+      announcementForm.id ? 'Update saved.' : 'Update posted and sent to staff.',
     );
-    setAnnouncementForm({ body: '', category: 'reminder', pinned: false, title: '' });
+
+    if (saved) {
+      setAnnouncementForm({ body: '', category: 'reminder', id: '', pinned: false, title: '' });
+      setAnnouncementComposerOpen(false);
+    }
+  }
+
+  function editAnnouncement(announcement) {
+    setAnnouncementComposerOpen(true);
+    setAnnouncementForm({
+      body: announcement.body || '',
+      category: announcement.category || 'reminder',
+      id: announcement.id,
+      pinned: Boolean(announcement.pinned),
+      title: announcement.title || '',
+    });
+  }
+
+  function cancelAnnouncementEdit() {
+    setAnnouncementForm({ body: '', category: 'reminder', id: '', pinned: false, title: '' });
+    setAnnouncementComposerOpen(false);
+  }
+
+  function canManageAnnouncement(announcement) {
+    return ownerView || canManageHub || Boolean(announcement.created_by && announcement.created_by === user?.id);
+  }
+
+  async function archiveAnnouncement(announcement) {
+    if (!canManageAnnouncement(announcement)) return;
+    const archived = await runHubAction(
+      `announcement-archive-${announcement.id}`,
+      () => archiveStaffAnnouncement(announcement.id, user?.id),
+      'Update archived.',
+    );
+    if (archived && announcementForm.id === announcement.id) cancelAnnouncementEdit();
   }
 
   async function markAnnouncementRead(announcementId) {
@@ -1533,6 +1610,39 @@ export default function StaffHubPage({
     });
   }
 
+  // Message Center — one composer for everything staff send Ricko.
+  // Reuses the same save paths as the older per-form flows so nothing
+  // about storage or permissions changes; only the way staff get there.
+  async function sendMessageCenterOperations(fields) {
+    if (!operationsBusinessId) throw new Error('Choose one business first.');
+    return runHubAction(
+      'operations-request',
+      () =>
+        saveStaffOperationsRequest({
+          ...fields,
+          business_unit_id: operationsBusinessId,
+          staff_id: staffProfile?.id || null,
+        }),
+      'Sent to Ricko.',
+      { rethrow: true },
+    );
+  }
+
+  async function sendMessageCenterTimeOff(fields) {
+    if (!staffProfile?.id) throw new Error('Your login must be matched to a roster profile to request time off.');
+    return runHubAction(
+      'time-off',
+      () =>
+        saveTimeOffRequest({
+          ...fields,
+          business_unit_id: operationsBusinessId || null,
+          staff_id: staffProfile.id,
+        }),
+      'Time off request sent to Ricko.',
+      { rethrow: true },
+    );
+  }
+
   async function submitShiftNote(event) {
     event.preventDefault();
     if (!operationsBusinessId) {
@@ -1638,13 +1748,31 @@ export default function StaffHubPage({
     );
   }
 
-  async function decideTimeOff(recordId, status) {
+  async function decideTimeOff(recordId, status, adminNote = '') {
     await runHubAction(
       `time-off-${recordId}`,
-      () => decideTimeOffRequest(recordId, status),
+      () => decideTimeOffRequest(recordId, status, adminNote),
       `Time-off request ${status}.`,
+      { rethrow: true },
     );
   }
+
+  // Owner replies to a staff request. Writes manager_note, which is what the
+  // staff thread renders as "Ricko replied", and optionally moves status.
+  async function replyToOperationsRequest(record, { manager_note, status }) {
+    await runHubAction(
+      `ops-reply-${record.id}`,
+      () => saveStaffOperationsRequest({ ...record, manager_note, status: status || record.status }),
+      'Reply sent.',
+      { rethrow: true },
+    );
+  }
+
+  const staffById = useMemo(() => {
+    const map = {};
+    for (const person of Array.isArray(staff) ? staff : []) if (person?.id) map[person.id] = person;
+    return map;
+  }, [staff]);
 
   async function decideContent(recordId, status) {
     await runHubAction(
@@ -2081,6 +2209,12 @@ export default function StaffHubPage({
   }
 
   function renderManagerOnboarding() {
+    // Onboarding approvals are an owner/manager oversight tool, not part of
+    // an individual staff member's own portal. Once a login is matched to a
+    // staff profile, the Hub is that person's own daily view (even if they
+    // are also the owner) and should not surface every new-hire's approval
+    // queue on top of it — that belongs in the dedicated Access/Roster area.
+    if (staffProfile) return null;
     if (!(canManageHub || canApproveOnboarding) || !managerOnboardingInvitations.length) return null;
 
     return (
@@ -2364,11 +2498,12 @@ export default function StaffHubPage({
         </section>
       ) : null}
 
+      {activeTab === 'home' ? (
       <section className="full-span staff-hub-pro-dashboard">
         <div className="staff-hub-pro-topbar">
           <div className="staff-hub-pro-title">
-            <span>Professional dashboard</span>
-            <strong>Insights</strong>
+            <span>My RTB</span>
+            <strong>Overview</strong>
           </div>
           <div className="staff-hub-pro-profile">
             <div>
@@ -2384,6 +2519,9 @@ export default function StaffHubPage({
         <div className="staff-hub-pro-range">
           <span className="staff-hub-pro-pill">Last 28 days</span>
           <span>{recentRangeLabel(28)}</span>
+          <button className="staff-hub-pro-range-action" type="button" onClick={() => setActiveTab('daily')}>
+            Today <ChevronRight size={15} />
+          </button>
         </div>
 
         <div className="staff-hub-pro-score-card">
@@ -2419,7 +2557,7 @@ export default function StaffHubPage({
         </div>
 
         <div className="staff-hub-pro-section-heading">
-          <strong>Popular with your clients</strong>
+          <strong>Your performance</strong>
           <button type="button" onClick={() => setActiveTab('stats')}>
             See all
           </button>
@@ -2469,7 +2607,9 @@ export default function StaffHubPage({
           </div>
         </div>
       </section>
+      ) : null}
 
+      {activeTab !== 'home' ? (
       <section className="panel full-span staff-hub-command-panel">
         <div className="staff-hub-command-header">
           <div className="staff-hub-command-profile">
@@ -2530,6 +2670,7 @@ export default function StaffHubPage({
           })}
         </div>
       </section>
+      ) : null}
 
       <section className="panel full-span staff-hub-tabs-panel">
         <div className="staff-hub-tabs" role="tablist" aria-label="Staff Hub sections">
@@ -2832,15 +2973,6 @@ export default function StaffHubPage({
 
       {activeTab === 'home' ? (
         <>
-          <div className="staff-hub-subnav">
-            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('updates')} type="button">
-              <Megaphone size={14} /> Updates
-            </button>
-            <button className="staff-hub-subnav__link" onClick={() => setActiveTab('spotlight')} type="button">
-              <Trophy size={14} /> Staff of the Month
-            </button>
-          </div>
-
           <section className="panel full-span staff-hub-focus-band">
             <article className={`staff-hub-focus-card ${focusCard.value === 'Overdue' ? 'urgent' : ''}`}>
               <div className="staff-hub-priority-icon">
@@ -2868,16 +3000,46 @@ export default function StaffHubPage({
             </article>
           </section>
 
-          <section className="staff-hub-dashboard-grid full-span" aria-label="Staff Hub daily dashboard">
-            <article className="staff-hub-app-card staff-hub-app-card--wide staff-hub-earnings-card">
-              <div className="staff-hub-card-header">
+          <section className="staff-hub-dashboard-grid staff-hub-operating-band full-span" aria-label="Staff Hub daily operating screen">
+            {!latestEntry && !scheduleRows.length && !reviewCount ? (
+              <article className="staff-hub-sync-banner">
                 <div>
-                  <span>Earnings overview</span>
-                  <h2>{latestEntry ? formatCurrency(latestEntry.take_home) : 'Waiting for payroll'}</h2>
-                  <p>{latestEntry?.week_label || 'Saved payroll entries will build this trend.'}</p>
+                  <span>Data sync</span>
+                  <strong>Sync Booksy, Square, or payroll to fill this daily screen.</strong>
                 </div>
-                <button className="ghost-button small" type="button" onClick={() => setActiveTab('money')}>
-                  Money
+                <button className="secondary-button small" type="button" onClick={() => openPage('integrations')}>
+                  Open Connections
+                </button>
+              </article>
+            ) : null}
+
+            <article className="staff-hub-performance-banner">
+              <div className="staff-hub-performance-banner__main">
+                <span>Today’s operating view</span>
+                <h2>{latestEntry ? formatCurrency(latestEntry.take_home) : 'Waiting for payroll'}</h2>
+                <p>{latestEntry?.week_label || 'Payroll, schedule, and review activity will appear here after sync.'}</p>
+              </div>
+              <div className="staff-hub-performance-steps">
+                <button type="button" onClick={() => setActiveTab('money')}>
+                  <WalletCards size={16} />
+                  <span>
+                    <strong>{formatCurrency(totalTakeHome)}</strong>
+                    <small>Total earned</small>
+                  </span>
+                </button>
+                <button type="button" onClick={() => setActiveTab('schedule')}>
+                  <CalendarDays size={16} />
+                  <span>
+                    <strong>{formatNumber(scheduleRows.length)}</strong>
+                    <small>Schedule rows</small>
+                  </span>
+                </button>
+                <button type="button" onClick={() => setActiveTab('stats')}>
+                  <Star size={16} />
+                  <span>
+                    <strong>{formatNumber(fiveStarReviews)}/{reviewGoal.target}</strong>
+                    <small>Review goal</small>
+                  </span>
                 </button>
               </div>
               {weeklyTrend.length ? (
@@ -2889,58 +3051,43 @@ export default function StaffHubPage({
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="staff-hub-empty-compact">
-                  <WalletCards size={22} />
-                  <span>Payroll history will show here after a saved run.</span>
-                </div>
-              )}
-              <div className="staff-hub-card-metrics">
-                <div>
-                  <span>Total earned</span>
-                  <strong>{formatCurrency(totalTakeHome)}</strong>
-                </div>
-                <div>
-                  <span>Total tips</span>
-                  <strong>{formatCurrency(totalTips)}</strong>
-                </div>
-                <div>
-                  <span>Recorded weeks</span>
-                  <strong>{formatNumber(ownEntries.length)}</strong>
-                </div>
-              </div>
+              ) : null}
             </article>
 
-            <article className="staff-hub-app-card staff-hub-goal-summary">
-              <div className="staff-hub-card-header">
-                <div>
-                  <span>Goal progress</span>
-                  <h2>{formatCurrency(monthlyGoal.currentRevenue)}</h2>
-                  <p>Monthly revenue goal: {formatCurrency(monthlyGoal.goal)}</p>
+            <article className="staff-hub-action-panel">
+              <div className="staff-hub-action-panel__metric">
+                <span>Monthly revenue</span>
+                <strong>{monthlyGoal.percentComplete}%</strong>
+                <div className="staff-hub-progress-track">
+                  <span style={{ width: `${monthlyGoal.percentComplete}%` }} />
                 </div>
-              </div>
-              <div className="staff-hub-progress-track">
-                <span style={{ width: `${monthlyGoal.percentComplete}%` }} />
-              </div>
-              <strong>{monthlyGoal.percentComplete}% complete</strong>
-              <small>Need {formatCurrency(monthlyGoal.remaining)} more this month.</small>
-              <button className="secondary-button" type="button" onClick={() => setActiveTab('money')}>
-                Adjust goal
-              </button>
-            </article>
-
-            <article className="staff-hub-app-card">
-              <div className="staff-hub-card-header">
-                <div>
-                  <span>Reminders</span>
-                  <h2>Today’s focus</h2>
-                </div>
-                <button className="ghost-button small" type="button" onClick={() => setActiveTab('more')}>
-                  Tasks
+                <small>{formatCurrency(monthlyGoal.remaining)} left to goal</small>
+                <button className="secondary-button small" type="button" onClick={() => setActiveTab('money')}>
+                  Adjust goal
                 </button>
               </div>
+              <div className="staff-hub-action-panel__metric">
+                <span>Review goal</span>
+                <strong>{reviewGoal.percent}%</strong>
+                <div className="staff-hub-progress-track">
+                  <span style={{ width: `${reviewGoal.percent}%` }} />
+                </div>
+                <small>{reviewGoal.remaining} more five-star review{reviewGoal.remaining === 1 ? '' : 's'} needed</small>
+                <button className="primary-button small" type="button" onClick={() => setActiveTab('stats')}>
+                  Open review flow
+                </button>
+              </div>
+            </article>
+
+            <article className="staff-hub-next-action-card">
+              <div className="staff-hub-card-header">
+                <div>
+                  <span>Next actions</span>
+                  <h2>Move from numbers to work</h2>
+                </div>
+              </div>
               <div className="staff-hub-reminder-list">
-                {reminders.map((item) => {
+                {reminders.slice(0, 3).map((item) => {
                   const Icon = item.icon;
                   return (
                     <button
@@ -2960,64 +3107,7 @@ export default function StaffHubPage({
               </div>
             </article>
 
-            <article className="staff-hub-app-card">
-              <div className="staff-hub-card-header">
-                <div>
-                  <span>Schedule</span>
-                  <h2>Next appointments</h2>
-                </div>
-                <button className="ghost-button small" type="button" onClick={() => setActiveTab('schedule')}>
-                  View
-                </button>
-              </div>
-              {scheduleRows.length ? (
-                <div className="staff-hub-schedule-preview">
-                  {scheduleRows.slice(0, 4).map((row, index) => (
-                    <div key={`${row.date || row.created_at || index}-${row.client || row.service || index}`}>
-                      <time>{scheduleDisplayTime(row)}</time>
-                      <span>
-                        <strong>{row.service || row.item || 'Service'}</strong>
-                        <small>{row.client || row.customer || 'Client not listed'}</small>
-                      </span>
-                      <StatusBadge tone={row.schedule_type === 'Upcoming' ? 'gold' : 'muted'}>
-                        {row.schedule_type || 'Imported'}
-                      </StatusBadge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="staff-hub-empty-compact">
-                  <CalendarDays size={22} />
-                  <span>Imported Booksy or Square appointments will appear here.</span>
-                </div>
-              )}
-            </article>
-
-            <article className="staff-hub-app-card">
-              <div className="staff-hub-card-header">
-                <div>
-                  <span>Reviews</span>
-                  <h2>
-                    {ownActivityReviewSummary?.average_rating
-                      ? `${ownActivityReviewSummary.average_rating}/5`
-                      : 'Waiting'}
-                  </h2>
-                  <p>{formatNumber(reviewCount)} verified review{reviewCount === 1 ? '' : 's'}</p>
-                </div>
-                <MessageSquare size={22} />
-              </div>
-              <div className="staff-hub-progress-track">
-                <span style={{ width: `${reviewGoal.percent}%` }} />
-              </div>
-              <small>
-                {formatNumber(fiveStarReviews)} five-star reviews · {reviewGoal.remaining} left for the next goal.
-              </small>
-              <button className="secondary-button" type="button" onClick={() => setActiveTab('stats')}>
-                Review stats
-              </button>
-            </article>
-
-            <article className="staff-hub-app-card staff-hub-app-card--wide">
+            <article className="staff-hub-app-card staff-hub-app-card--wide staff-hub-secondary-card">
               <div className="staff-hub-card-header">
                 <div>
                   <span>Achievements</span>
@@ -3043,7 +3133,7 @@ export default function StaffHubPage({
               </div>
             </article>
 
-            <article className="staff-hub-app-card">
+            <article className="staff-hub-app-card staff-hub-secondary-card">
               <div className="staff-hub-card-header">
                 <div>
                   <span>Week vs previous</span>
@@ -3065,7 +3155,7 @@ export default function StaffHubPage({
               </div>
             </article>
 
-            <article className="staff-hub-app-card">
+            <article className="staff-hub-app-card staff-hub-secondary-card">
               <div className="staff-hub-card-header">
                 <div>
                   <span>Activity feed</span>
@@ -3095,6 +3185,50 @@ export default function StaffHubPage({
                 </div>
               )}
             </article>
+          </section>
+
+          <section className="full-span staff-hub-communication-zone" aria-label="Team communication">
+            <div className="staff-hub-zone-header">
+              <div>
+                <span>Team communication</span>
+                <h2>Updates, requests, and quick messages</h2>
+              </div>
+              <div className="staff-hub-subnav">
+                <button className="staff-hub-subnav__link" onClick={() => setActiveTab('updates')} type="button">
+                  <Megaphone size={14} /> Updates
+                </button>
+                <button className="staff-hub-subnav__link" onClick={() => setActiveTab('spotlight')} type="button">
+                  <Trophy size={14} /> Staff of the Month
+                </button>
+              </div>
+            </div>
+            <div className="staff-hub-communication-grid">
+              {/* Approving other staff's requests is an owner/manager
+                  oversight tool. Once a staff profile is matched, this is
+                  that person's own Hub and should stick to their own
+                  messages (see StaffMessageCenter below) rather than mixing
+                  in every staff member's requests. */}
+              {!staffProfile && (ownerView || canManageOperations(accessProfile)) ? (
+                <OwnerRequestInbox
+                  operationsRequests={hubRecords.operationsRequests}
+                  timeOffRequests={hubRecords.timeOffRequests}
+                  staffById={staffById}
+                  busy={Boolean(savingHubAction)}
+                  onReplyOperations={replyToOperationsRequest}
+                  onDecideTimeOff={decideTimeOff}
+                />
+              ) : null}
+
+              <StaffMessageCenter
+                staffId={staffProfile?.id || null}
+                businessId={operationsBusinessId}
+                operationsRequests={hubRecords.operationsRequests}
+                timeOffRequests={hubRecords.timeOffRequests}
+                busy={savingHubAction === 'operations-request' || savingHubAction === 'time-off'}
+                onSendOperations={sendMessageCenterOperations}
+                onSendTimeOff={sendMessageCenterTimeOff}
+              />
+            </div>
           </section>
 
           <section className="panel full-span staff-hub-nav-panel">
@@ -3218,10 +3352,14 @@ export default function StaffHubPage({
               <span>{formatNumber(visibleAnnouncements.length)} updates</span>
             </div>
             {canManageHub ? (
-              <details className="staff-hub-composer">
+              <details
+                className="staff-hub-composer"
+                onToggle={(event) => setAnnouncementComposerOpen(event.currentTarget.open)}
+                open={announcementComposerOpen}
+              >
                 <summary>
                   <span>
-                    <strong>Post staff update</strong>
+                    <strong>{announcementForm.id ? 'Edit staff update' : 'Post staff update'}</strong>
                     <small>Share a reminder, policy note, event, or training update.</small>
                   </span>
                   <ChevronRight size={16} />
@@ -3269,9 +3407,14 @@ export default function StaffHubPage({
                     />
                     Pin this update
                   </label>
-                  <button className="primary-button" disabled={savingHubAction === 'announcement'} type="submit">
-                    Post update
+                  <button className="primary-button" disabled={savingHubAction === 'announcement' || savingHubAction === `announcement-edit-${announcementForm.id}`} type="submit">
+                    {announcementForm.id ? 'Save update' : 'Post update'}
                   </button>
+                  {announcementForm.id ? (
+                    <button className="ghost-button small" type="button" onClick={cancelAnnouncementEdit}>
+                      Cancel edit
+                    </button>
+                  ) : null}
                 </form>
               </details>
             ) : null}
@@ -3289,6 +3432,24 @@ export default function StaffHubPage({
                       </div>
                       <h3>{announcement.title}</h3>
                       <p>{announcement.body}</p>
+                      <small className="staff-hub-feed-card__byline">
+                        {announcement.created_by === user?.id ? 'Posted by you' : 'Posted by management'}
+                      </small>
+                      {canManageAnnouncement(announcement) ? (
+                        <div className="staff-hub-feed-card__actions">
+                          <button className="ghost-button small" type="button" onClick={() => editAnnouncement(announcement)}>
+                            Edit
+                          </button>
+                          <button
+                            className="ghost-button small"
+                            disabled={savingHubAction === `announcement-archive-${announcement.id}`}
+                            onClick={() => archiveAnnouncement(announcement)}
+                            type="button"
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      ) : null}
                       {staffProfile ? (
                         <button
                           className="ghost-button small"
@@ -3759,12 +3920,12 @@ export default function StaffHubPage({
 
           <div className="staff-hub-section-stack">
             <div className="staff-hub-preview-list__header">
-              <strong>Time-off requests</strong>
-              <span>{formatNumber(hubRecords.timeOffRequests.length)} total</span>
+              <strong>My time-off requests</strong>
+              <span>{formatNumber(myTimeOffRequests.length)} total</span>
             </div>
-            {hubRecords.timeOffRequests.length ? (
+            {myTimeOffRequests.length ? (
               <div className="staff-hub-list">
-                {hubRecords.timeOffRequests.slice(0, 8).map((request) => (
+                {myTimeOffRequests.slice(0, 8).map((request) => (
                   <article className="staff-hub-list-row" key={request.id}>
                     <div>
                       <strong>
@@ -3775,16 +3936,6 @@ export default function StaffHubPage({
                     <StatusBadge tone={request.status === 'approved' ? 'success' : request.status === 'denied' ? 'danger' : 'warning'}>
                       {request.status}
                     </StatusBadge>
-                    {canManageHub && request.status === 'pending' ? (
-                      <div className="staff-hub-inline-actions">
-                        <button className="ghost-button small" type="button" onClick={() => decideTimeOff(request.id, 'approved')}>
-                          <Check size={14} /> Approve
-                        </button>
-                        <button className="ghost-button small danger" type="button" onClick={() => decideTimeOff(request.id, 'denied')}>
-                          <X size={14} /> Deny
-                        </button>
-                      </div>
-                    ) : null}
                   </article>
                 ))}
               </div>
@@ -3842,6 +3993,22 @@ export default function StaffHubPage({
               <ClipboardCheck size={20} />
             </div>
             <div className="staff-hub-more-grid">
+              <button className="staff-hub-more-card" onClick={() => setActiveTab('schedule')} type="button">
+                <CalendarDays size={18} />
+                <span>
+                  <strong>Schedule & availability</strong>
+                  <small>Appointments, availability, and time-off history</small>
+                </span>
+                <ChevronRight size={16} />
+              </button>
+              <button className="staff-hub-more-card" onClick={() => setActiveTab('stats')} type="button">
+                <TrendingUp size={18} />
+                <span>
+                  <strong>Performance</strong>
+                  <small>Score, reviews, sales, and growth details</small>
+                </span>
+                <ChevronRight size={16} />
+              </button>
               {visibleMoreOptions.map((option) => {
                 const Icon = option.icon;
                 return (

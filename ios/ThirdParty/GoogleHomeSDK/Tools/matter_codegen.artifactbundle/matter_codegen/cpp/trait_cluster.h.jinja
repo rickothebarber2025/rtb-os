@@ -1,0 +1,533 @@
+{% macro structure_define(st, name = None, full_name = None, companion_object_name = "Adapter", struct_docs = None) -%}
+  {% if not st.fields -%} @Suppress("ClassShouldBeObject") {%- endif -%}
+  {%- if struct_docs %}
+    {%- for struct_name in struct_docs|selectattr("name", "equalto", st.name) %}
+  /**
+   * {{struct_name.description | FormatElementsForDoxygen(docs_enums_no_enum)}}
+   */
+    {%- endfor %}
+  {%- endif %}
+  struct {{name or st.name}} {
+    {%-  for field in st.fields %}
+      {%- if struct_docs %}
+        {%- for struct_name in struct_docs|selectattr("name", "equalto", st.name) %}
+          {%- for struct_value in struct_name.value|selectattr("name", "equalto", field.name) %}
+    /** {{struct_value.description | FormatElementsForDoxygen(docs_enums_no_enum)}} */
+          {%- endfor %}
+        {%- endfor %}
+      {%- endif %}
+    {{field | ToFieldType}} {{field.name | ToLowerSnakeCase}};
+    {%-  endfor %}
+  };
+{%- endmacro -%}
+{% macro attribute_comment(attr) %}
+  {%- if attr.definition.name | AttributeDocType == "suppress" %}
+    {{ cluster.name | DocExcludeComment("inline", "start") }}
+    {%- elif attr.definition.name | AttributeDocType == "global" %}
+    {{attr.definition.name | OutputAttributeComment}}
+    {%- else %}
+      {%- for attr_doc in docs.attributes|selectattr("name", "equalto", attr.definition.name) %}
+    /**
+     * {{attr_doc.description | FormatElementsForDoxygen(docs_enums_no_enum)}}
+     *
+     * __Access type:__ {% if attr.is_writable %}Write{% else %}Read{% endif %}
+     */
+      {%- endfor %}
+    {%- endif %}
+{%- endmacro -%}
+{% macro attribute_comment_end(attr) %}
+  {%- if attr.definition.name | AttributeDocType == "suppress" -%}
+    {{ cluster.name | DocExcludeComment("inline", "end") }}
+  {% endif %}
+{%- endmacro -%}
+{%- macro bitmap_example(entry, constructor = "default") %}
+  {%- if constructor == "default" %}
+      /**
+       * Bitmap default constructor.
+       *
+       * Example usage:
+       * @code
+       * {{entry.name | ToBitmapAdapter}} my_bitmap;
+{%- if entry.entries %}
+       * my_bitmap = {{entry.name | ToBitmapAdapter}}::{{entry.entries[0].name}};
+{%- endif %}
+       * @endcode
+       */
+  {%- elif constructor == "assignment" %}
+      /**
+       * Bitmap assignment operator.
+       *
+       * Example usage:
+       * @code
+       * {{entry.name | ToBitmapAdapter}} my_bitmap;
+{%- if entry.entries %}
+       * my_bitmap = {{entry.name}}::{{entry.entries[0].name}};
+{%- endif %}
+       * @endcode
+       *
+       * NOTE the following is not valid at this time:
+       * @code
+{%- if entry.entries %}
+       * {{entry.name | ToBitmapAdapter}} my_bitmap =
+       *     {{entry.name}}::{{entry.entries[0].name}};
+{%- else %}
+       * {{entry.name | ToBitmapAdapter}} my_bitmap = 0;
+{%- endif %}
+       * @endcode
+       */
+  {%- elif constructor == "parameters" %}
+      /**
+       * Bitmap constructor with parameters.
+       *
+       * Example usage:
+       * @code
+{%- if entry.entries %}
+       * {{entry.name | ToBitmapAdapter}} my_bitmap({{entry.name}}::{{entry.entries[0].name}});
+{%- else %}
+       * {{entry.name | ToBitmapAdapter}} my_bitmap(0);
+{%- endif %}
+       * @endcode
+       */
+  {%- endif %}
+{%- endmacro -%}
+// {{file_comment}}
+/*
+ * Copyright 2025 Google LLC
+ */
+
+#ifndef GOOGLE_HOME_API_TRAITS_{{PACKAGE_DEFINE}}_{{cluster.name | ToUpperSnakeCase}}_TRAIT_H_
+#define GOOGLE_HOME_API_TRAITS_{{PACKAGE_DEFINE}}_{{cluster.name | ToUpperSnakeCase}}_TRAIT_H_
+
+#include <cstdint>
+#include <functional>
+#include <limits>  // IWYU pragma: keep
+#include <optional>  // IWYU pragma: keep
+#include <string>  // IWYU pragma: keep
+#include <vector>
+
+#include "google_home_api/encoding/bitmap_adapter.h"  // IWYU pragma: keep
+#include "google_home_api/encoding/codec_reader.h"  // IWYU pragma: keep
+#include "google_home_api/encoding/codec_writer.h"  // IWYU pragma: keep
+#include "google_home_api/encoding/command.h"  // IWYU pragma: keep
+#include "google_home_api/encoding/struct_adapter.h"  // IWYU pragma: keep
+#include "google_home_api/encoding/types.h"
+#include "third_party/absl/log/log.h"  // IWYU pragma: keep
+#include "third_party/absl/strings/string_view.h"  // IWYU pragma: keep
+
+namespace google_home_api::traits::{{PACKAGE_NAMESPACE}} {
+
+/**
+ * @internal
+ * The {{cluster.name}}Trait is the in-memory representation of
+ * the trait state as a Data Transfer Object (DTO), with serialization helpers
+ * for the various trait elements, including commands, events and attributes.
+ * The Attributes structure of the trait are accessible via `GetAttributes`
+ * and writable via`SetAttribute`.
+ *
+ * NOTE: Operations on this object only affect the in-memory representation,
+ * and are not automatically forwarded to the device.
+ *
+ * To actually forward this Trait's changes to the device, use the Semantic
+ * Trait API. The Entity wrapper object for this trait will perform the
+ * update operations on this object, serialize the result, and forward those
+ * changes through the Interaction API to the GHP Core Runtime.
+ * @endinternal
+ */
+
+{{ cluster.name | DocExcludeComment("cluster", "start") }}
+/**
+ * The in-memory representation of the {{cluster.name}} trait state.
+ */
+class {{cluster.name}}Trait {
+ public:
+  {{ cluster.name | DocExcludeComment("inline", "start") }}
+  static constexpr uint32_t kTraitId = 0x{{cluster.code | ToHex}};
+  {{ cluster.name | DocExcludeComment("inline", "end") }}
+
+  // ===============================================
+  //                  ENUMS
+  // ===============================================
+
+{%- for entry in cluster.enums %}
+  {%- for enum_doc in docs.enums|selectattr("name", "equalto", entry.name) %}
+  /** {{enum_doc.description | FormatElementsForDoxygen(docs_enums_no_enum)}} */{% endfor %}
+  enum class {{entry.name | ToEnum}} {
+    {%-  for field in entry.entries %}
+      {%- for enum_doc in docs.enums|selectattr("name", "equalto", entry.name) %}
+        {%- for enum_value in enum_doc.value|selectattr("name", "equalto", field.name) %}
+    /** {{enum_value.description | FormatElementsForDoxygen(docs_enums_no_enum)}} */{% endfor %}{% endfor %}
+    {{field.name}} = {{field.code}},
+    {%- endfor %}
+  };
+{% endfor %}
+
+  // ===============================================
+  //                  BITMAPS
+  // ===============================================
+{%-   for entry in cluster.bitmaps %}
+  {%- for bitmap_doc in docs.bitmaps|selectattr("name", "equalto", entry.name) %}
+  /**
+   * {{bitmap_doc.description | FormatElementsForDoxygen(docs_enums_no_enum)}}
+   */{% endfor %}
+  struct {{entry.name | ToBitmap}} {
+    enum Bitmask {
+    {%-  for field in entry.entries %}
+      {%- for bitmap_doc in docs.bitmaps|selectattr("name", "equalto", entry.name) %}
+        {%- for bitmap_value in bitmap_doc.value|selectattr("name", "equalto", field.name) %}
+      /** {{bitmap_value.description | FormatElementsForDoxygen(docs_enums_no_enum)}} */
+        {%- endfor %}
+      {%- endfor %}
+      {{field.name}} = 0x{{field.code | ToHex}},
+    {%-   endfor %}
+    };
+  };
+{% endfor %}
+
+{%-   for entry in cluster.bitmaps %}
+  {%- for bitmap_doc in docs.bitmaps|selectattr("name", "equalto", entry.name) %}
+  /**
+   * {{bitmap_doc.description | FormatElementsForDoxygen(docs_enums_no_enum)}} Use this with the
+   * {{entry.name}} Bitmask class to define a bitmap for use in the API.
+   */{% endfor %}
+  class {{entry.name | ToBitmapAdapter}} : public BitmapAdapter<{{entry.name | ToBitmap}}::Bitmask, {{entry | BitmapToBaseType}}> {
+    public:
+      {{- bitmap_example(entry) }}
+      {{entry.name | ToBitmapAdapter}}() = default;
+
+      {{ bitmap_example(entry, "parameters") }}
+      explicit {{entry.name | ToBitmapAdapter}}({{entry | BitmapToBaseType}} value)
+        : BitmapAdapter<{{entry.name | ToBitmap}}::Bitmask, {{entry | BitmapToBaseType}}>(value) {}
+
+      {{ bitmap_example(entry, "assignment") }}
+      {{entry.name | ToBitmapAdapter}}& operator=(const uint64_t value) {
+        if (value > std::numeric_limits<{{entry | BitmapToBaseType}}>::max()) {
+          {# TODO(b/314067143): is logging best error handling for out-of-range? #}
+          LOG(ERROR) << "{{entry.name | ToBitmapAdapter}} set to out of range value.";
+        }
+        value_ = static_cast<{{entry | BitmapToBaseType}}>(value);
+        return *this;
+      }
+  };
+{% endfor %}
+
+  // ===============================================
+  //                   STRUCTS
+  // ===============================================
+{%- for entry in cluster.structs | reject('isCommandStruct') -%}
+  {{ structure_define(entry, struct_docs=docs.structs) }}
+
+  {{ cluster.name | DocExcludeComment("inline", "start") }}
+  class {{entry.name}}Adapter : public StructAdapter<{{entry.name}}> {
+    public:
+      using StructAdapter<{{entry.name}}>::StructAdapter;
+
+  {%- if entry.fields -%}
+  enum TagConstants : uint32_t {
+  {%- for field in entry.fields %}
+    kTag{{field.name | ToUpperCamelCase}} = {{field.code}},
+  {%- endfor %}
+  };
+  {%- endif %}
+
+      void DecodeFrom(CodecReader& reader);
+      void EncodeTo(CodecWriter& writer) const;
+  };
+  {{ cluster.name | DocExcludeComment("inline", "end") }}
+{% endfor %}
+
+  // ===============================================
+  //                  ATTRIBUTES
+  // ===============================================
+
+  {{ cluster.name | DocExcludeComment("inline", "start") }}
+  /**
+   * Attribute tags for this trait.
+   */
+  {% if cluster.attributes -%}
+  enum TagConstants : uint32_t {
+  {%- for attr in cluster.attributes %}
+    kTag{{attr.definition.name | ToUpperCamelCase}} = {{attr.definition.code}},
+  {%- endfor %}
+  };
+  {%- endif %}
+  {{ cluster.name | DocExcludeComment("inline", "end") }}
+
+  /**
+   * Defines the Attributes for this trait.
+   */
+  struct Attributes {
+    /**
+     * Writable attributes for this trait.
+     */
+    struct Writable {
+    {%- for attr in cluster.attributes -%}
+      {% if attr.is_writable -%}
+      {{attribute_comment(attr)}}
+      {{attr.definition | ToFieldType}} {{attr.definition.name | ToLowerSnakeCase}};
+      {{attribute_comment_end(attr)}}
+      {%- endif -%}
+    {%- endfor %}
+    } writable;
+
+  {% for attr in cluster.attributes -%}
+    {% if not attr.is_writable -%}
+    {{attribute_comment(attr)}}
+    {{attr.definition | ToFieldType}} {{attr.definition.name | ToLowerSnakeCase}};
+    {{attribute_comment_end(attr)}}
+    {%- endif -%}
+  {%- endfor %}
+  };
+
+  class AttributesStructAdapter : public StructAdapter<Attributes> {
+   public:
+    using StructAdapter<Attributes>::StructAdapter;
+
+    void DecodeFrom(CodecReader& reader);
+    void EncodeTo(CodecWriter& writer) const;
+
+    Attributes::Writable& GetWritable() { return value_.writable; }
+  };
+
+  explicit {{cluster.name}}Trait() = default;
+
+  {{ cluster.name | DocExcludeComment("inline", "start") }}
+  /**
+   * Construct the Trait Data Object from the given attributes struct.
+   */
+  explicit {{cluster.name}}Trait(Attributes attributes) : attributes_(attributes) {}
+
+  /**
+   * Get a read-only copy of the attributes of this trait.
+   */
+  const Attributes& GetAttributes() const { return attributes_.GetStruct(); }
+
+  /**
+   * Alter the attributes of this trait within the given mutator lambda.
+   * Example:
+   *
+   *   trait.SetAttributes([](Trait::Attributes::Writable& attrs) {
+   *      attrs.<attr_name> = <attr_value>;
+   *   });
+   */
+  void SetAttributes(
+      const std::function<void(Attributes::Writable&)>& mutator) {
+    mutator(attributes_.GetWritable());
+  }
+
+  /**
+   * Forwards Trait equality to Trait::Attributes equality.
+   */
+  bool operator==(const {{cluster.name}}Trait& other) const {
+    return GetAttributes() == other.GetAttributes();
+  }
+
+  bool operator!=(const {{cluster.name}}Trait& other) const {
+    return !(*this == other);
+  }
+
+  /**
+   * Performs a bitwise comparison of all fields in the Attributes object.
+   * Lists must have the same elements (including duplicates) in the same order. 
+   */
+  friend bool IsBitwiseEqual(const Attributes& lhs, const Attributes& rhs);
+
+  friend bool operator==(const Attributes& lhs, const Attributes& rhs) {
+    return IsBitwiseEqual(lhs, rhs);
+  }
+
+  friend bool operator!=(const Attributes& lhs, const Attributes& rhs) {
+    return !(lhs == rhs);
+  }
+
+  /**
+   * Serializes the attributes of this trait to the given CodecWriter.
+   */
+  void EncodeTo(CodecWriter& writer) const;
+
+  /**
+   * Deserializes the attributes of this trait from the given CodecReader.
+   */
+  void DecodeFrom(CodecReader& reader);
+  {{ cluster.name | DocExcludeComment("inline", "end") }}
+
+  // ===============================================
+  //                  COMMANDS
+  // ===============================================
+
+{%-   for cmd in cluster.commands -%}
+  {%- set input_struct = cmd | commandInputStruct %}
+  {%- set output_struct = cmd | commandOutputStruct %}
+
+  {%- if output_struct: %}
+  class {{cmd | ToCommandResponse}};
+  {%- endif %}
+
+  {% for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) -%}
+  /**{% for d in cmd_doc.description %}
+   * {{d | FormatElementsForDoxygen(docs_enums_no_enum)}}
+   *{% endfor %}
+   * Use this command from the `ReadTrait&amp;lt;{{cluster.name}}&amp;gt;()` method.
+   *
+   * @see `{{cluster.name}}::{{cmd.name}}`
+   */{% endfor %}
+  class {{cmd.name}}Command {
+   public:
+    using ResponseType = {{cmd | ToCommandResponse}};
+
+    {{ cluster.name | DocExcludeComment("inline", "start") }}
+    static constexpr absl::string_view kCommandId = "home.matter.{{cluster.code | ToVendorId | ToHex(16)}}.clusters.{{cluster.code | ToMeiSuffix | ToHex(16)}}.{{cmd.code | ToHex(32)}}";
+    {%- if input_struct -%}
+    enum TagConstants : uint32_t {
+    {%-  for field in input_struct.fields %}
+      kTag{{field.name | ToUpperCamelCase}} = {{field.code}},
+    {%- endfor %}
+    };
+    {{ cluster.name | DocExcludeComment("inline", "end") }}
+    /**
+     * Parameters struct for {{cmd.name}}Command.
+     */
+    struct Parameters {
+    {%-  for field in input_struct.fields %}
+      {%- for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) %}
+        {%- if cmd_doc.param %}
+          {%- for p in cmd_doc.param %}
+            {%- if p.name == field.name %}
+       /** {{p.description | FormatElementsForDoxygen(docs_enums_no_enum)}} */
+            {%- endif %}
+          {%- endfor %}
+        {%- endif %}
+      {%- endfor %}
+       {{field | ToFieldType}} {{field.name | ToLowerSnakeCase}};
+    {%- endfor %}
+    };
+
+    {{cmd.name}}Command() = default;
+
+    explicit {{cmd.name}}Command(Parameters params)
+        : params_(params) {}
+
+    {{ cluster.name | DocExcludeComment("inline", "start") }}
+    void EncodeTo(CodecWriter& writer) const;
+    void DecodeFrom(CodecReader& reader);
+
+    Parameters GetParameters() const { return params_; }
+    void SetParameters(const std::function<void(Parameters&)>& mutator) {
+      mutator(params_);
+    }
+
+   private:
+    Parameters params_;
+    {%- endif %}
+    {{ cluster.name | DocExcludeComment("inline", "end") }}
+  };
+
+  {% if output_struct: %}
+  class {{cmd | ToCommandResponse}} {
+   public:
+    /// @cond EXCLUDE_FROM_DOCS
+    static constexpr absl::string_view kCommandId =
+        "home.matter.{{cluster.code | ToVendorId | ToHex(16)}}.clusters.{{cluster.code | ToMeiSuffix | ToHex(16)}}.{{output_struct.code | ToHex(32)}}";
+    {%-  if output_struct.fields %}
+    enum TagConstants : uint32_t {
+    {%-  for field in output_struct.fields %}
+      kTag{{field.name | ToUpperCamelCase}} = {{field.code}},
+    {%- endfor %}
+    };
+    {%- endif %}
+
+    struct Parameters {
+    {%-  for field in output_struct.fields %}
+      {%- for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) %}
+        {%- if cmd_doc.param %}
+          {%- for p in cmd_doc.param %}
+            {%- if p.name == field.name %}
+       /** {{p.description | FormatElementsForDoxygen(docs_enums_no_enum)}} */
+            {%- endif %}
+          {%- endfor %}
+        {%- endif %}
+      {%- endfor %}
+       {{field | ToFieldType}} {{field.name | ToLowerSnakeCase}};
+    {%- endfor %}
+    };
+
+    {{cmd | ToCommandResponse}}() = default;
+    explicit {{cmd | ToCommandResponse}}(Parameters params) : params_(params) {}
+
+    void EncodeTo(CodecWriter& writer) const;
+    void DecodeFrom(CodecReader& reader);
+
+    Parameters GetParameters() const { return params_; }
+    void SetParameters(const std::function<void(Parameters&)>& mutator) {
+      mutator(params_);
+    }
+
+   private:
+    Parameters params_;
+    /// @endcond
+  };
+  {%- endif %}
+
+{% endfor %}
+{%- if cluster.events %}
+
+  // ===============================================
+  //                  EVENTS
+  // ===============================================
+{%- endif %}
+
+{%- for entry in cluster.events %}
+   class {{entry.name}}Event {
+    public:
+     {{ cluster.name | DocExcludeComment("inline", "start") }}
+     static constexpr absl::string_view kEventId = "home.matter.{{cluster.code | ToVendorId | ToHex(16)}}.clusters.{{cluster.code | ToMeiSuffix | ToHex(16)}}.{{entry.code | ToHex(32)}}";
+     {%- if entry.fields -%}
+     enum TagConstants : uint32_t {
+     {%-  for field in entry.fields %}
+       kTag{{field.name | ToUpperCamelCase}} = {{field.code}},
+     {%- endfor %}
+     };
+     {{ cluster.name | DocExcludeComment("inline", "end") }}
+
+    /**
+     * Parameters struct for {{entry.name}}Event.
+     */
+    struct Parameters {
+     {%  for field in entry.fields %}
+      {%- for event_doc in docs.commands|selectattr("name", "equalto", entry.name) %}
+        {%- if event_doc.param %}
+          {%- for p in event_doc.param %}
+            {%- if p.name == field.name %}
+       /** {{p.description | FormatElementsForDoxygen(docs_enums_no_enum)}} */
+            {%- endif %}
+          {%- endfor %}
+        {%- endif %}
+      {%- endfor %}
+      {{field | ToFieldType}} {{field.name | ToLowerSnakeCase}};
+     {%- endfor %}
+    };
+
+    {{ cluster.name | DocExcludeComment("inline", "start") }}
+    void EncodeTo(CodecWriter& writer) const;
+    void DecodeFrom(CodecReader& reader);
+
+    Parameters GetParameters() const { return params_; }
+    void SetParameters(const std::function<void(Parameters&)>& mutator) {
+      mutator(params_);
+    }
+
+   private:
+    Parameters params_;
+    {%- endif %}
+    {{ cluster.name | DocExcludeComment("inline", "end") }}
+   };
+{% endfor %}
+
+ private:
+  AttributesStructAdapter attributes_;
+};  // class {{cluster.name}}Trait
+
+{{ cluster.name | DocExcludeComment("cluster", "end") }}
+
+}  // namespace google_home_api::traits::::{{PACKAGE_NAMESPACE}}
+
+#endif  // GOOGLE_HOME_API_TRAITS_{{PACKAGE_DEFINE}}_{{cluster.name | ToUpperSnakeCase}}_TRAIT_H_

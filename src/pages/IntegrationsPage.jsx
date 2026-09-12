@@ -11,6 +11,7 @@ import {
   Unplug,
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
+import GoogleHomeConnectionPanel from '../components/GoogleHomeConnectionPanel';
 import {
   INTEGRATION_CATEGORIES,
   INTEGRATION_PROVIDERS,
@@ -262,6 +263,8 @@ export default function IntegrationsPage({ businessUnit, isAllBusinessesView }) 
 
       {error ? <div className="alert warning full-span">{error}</div> : null}
       {notice ? <div className="alert success full-span">{notice}</div> : null}
+
+      <GoogleHomeConnectionPanel businessUnitId={businessUnitId} />
 
       {setupProvider ? (
         <section className="panel full-span">

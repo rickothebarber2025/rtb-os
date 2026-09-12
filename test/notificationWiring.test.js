@@ -6,6 +6,10 @@ const notificationMigration = new URL(
   '../supabase/migrations/20260814022906_unify_staff_notifications_and_push.sql',
   import.meta.url,
 );
+const ownerRequestNotificationMigration = new URL(
+  '../supabase/migrations/20260906024500_owner_request_notifications.sql',
+  import.meta.url,
+);
 
 test('auth explicitly signals notification token sync when a session is ready', () => {
   const source = fs.readFileSync(new URL('../src/hooks/useAuth.js', import.meta.url), 'utf8');
@@ -45,4 +49,36 @@ test('meaningful staff events create notifications without notifying on every ch
   assert.match(migration, /notify_staff_announcement/);
   assert.match(migration, /notify_staff_shop_status/);
   assert.doesNotMatch(migration, /create trigger .*operation_checklist_run_items[^]*staff_operation_notifications/i);
+});
+
+test('staff requests notify the owner and deep-link to the right workflow', () => {
+  const migration = fs.readFileSync(ownerRequestNotificationMigration, 'utf8');
+  assert.match(migration, /notify_owner_time_off_request/);
+  assert.match(migration, /notify_owner_operations_request/);
+  assert.match(migration, /owner_activity_events/);
+  assert.match(migration, /push_notification_queue/);
+  assert.match(migration, /'route','action-center'/);
+  assert.match(migration, /'tab','time_off'/);
+  assert.match(migration, /'staff_hub_tab','daily'/);
+  assert.match(migration, /on conflict \(user_id, source_table, source_id, title\)/i);
+});
+
+test('owner notification center uses a mobile-safe sheet with compact tabs', () => {
+  const component = fs.readFileSync(new URL('../src/components/OwnerActivityNotifications.jsx', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../src/styles/ownerActivityNotifications.css', import.meta.url), 'utf8');
+  assert.match(component, /owner-activity-scrim/);
+  assert.match(component, /aria-modal="true"/);
+  assert.match(css, /\.owner-activity-scrim/);
+  assert.match(css, /max-width: 430px/);
+  assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+});
+
+test('staff notification center keeps header actions usable on iPhone widths', () => {
+  const css = fs.readFileSync(new URL('../src/styles/staffNotifications.css', import.meta.url), 'utf8');
+  assert.match(css, /max-width: 430px/);
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\) auto/);
+  assert.match(css, /max-width: 132px/);
+  assert.match(css, /white-space: normal/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
 });

@@ -1,0 +1,765 @@
+{% macro restricted_callout() %}{% if docs.restricted %}
+ *
+ * <aside class="warning">This trait is restricted and not available for general use.</aside>{% endif %}{% endmacro -%}
+{% macro cluster_command(clusterName, commandName) -%}
+{{clusterName | ToUpperCamelCase}}Trait.{{commandName | ToUpperCamelCase}}Command
+{%- endmacro -%}
+{% macro event_define(event, clusterName) -%}
+  {% set eventName = event.name | ToUpperCamelCase -%}
+  class {{eventName}}Event
+  private constructor(
+    override val eventName: String = "{{eventName}}",
+    private val timestampInMs: Long,
+    override val eventImportance: EventImportance,
+    override val eventNumber: ULong,
+    private val eventPayload : {{clusterName}}Trait.{{eventName}},
+  ) : Event,
+    {{clusterName}}Trait.{{eventName}} by eventPayload {
+
+    override val eventId : Id = Id({{clusterName}}Trait.{{eventName}}Impl.Id.toString())
+    override val timestamp: Instant = Instant.ofEpochMilli(timestampInMs)
+    override val payload: ClusterStruct by this::eventPayload
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is {{eventName}}Event) return false
+        if (eventId != other.eventId) return false
+        if (eventName != other.eventName) return false
+        if (timestamp != other.timestamp) return false
+        if (eventImportance != other.eventImportance) return false
+        if (eventNumber != other.eventNumber) return false
+        if (!eventPayload.equals(other.eventPayload)) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = 1
+        result += 31 * eventId.hashCode()
+        result += 31 * eventName.hashCode()
+        result += 31 * timestamp.hashCode()
+        result += 31 * eventImportance.hashCode()
+        result += 31 * eventNumber.hashCode()
+        result += 31 * eventPayload.hashCode()
+        return result
+    }
+
+    /**
+     * Descriptor enum for this event's fields.
+     */
+    enum class EventFields(
+      override val fieldName: String,
+      override val tag: UInt,
+      override val typeName: String,
+      override val typeEnum: FieldType,
+      override val isList: Boolean,
+      override val descriptor: HomeDescriptor,
+      val isNullable: Boolean,
+    ) : Field {
+    {%- for field in event.fields %}
+      /** The [{{field.name | ToLowerCamelCase | EscapeKtKeyword }}][{{eventName}}Event.Attributes.{{field.name | ToLowerCamelCase }}] event field. */
+      {{field.name | ToLowerCamelCase | EscapeKtKeyword }}("{{field.name | ToLowerCamelCase | EscapeKtKeyword }}", {{field.code}}u, "{{field.data_type | lookupDataType | dataTypeToKotlinAutomationConversionType}}", FieldType.{{field.data_type| lookupDataType | dataTypeToKotlinTypeEnum}}, {{field.is_list | boolAsStr}}, {% if field is IsStructField %}{{field.data_type | lookupDataType | dataTypeToKotlinAutomationConversionType | ToUpperCamelCase}}.Adapter{% else %}NoOpDescriptor{% endif %}, {{field | IsNullable | boolAsStr}})
+      {%- if loop.last %};
+      {%- else %},
+      {%- endif %}
+    {%- endfor %}
+    {%- if event.fields|length == 0 %}
+    ;
+    {%- endif %}
+
+      companion object {
+        val StructDescriptor = object : StructDescriptor {
+          @Suppress("Immutable")
+          override val fields: DescriptorMap = entries.toDescriptorMap()
+
+          {% if is_internal %}@HomeExperimentalApi{% endif %}
+          override fun toStruct(fields: Map<Field, Any?>): ClusterStruct {
+            return {{clusterName}}Trait.{{eventName}}Impl(
+            {%- for field in event.fields %}
+              {{field.name | ToLowerCamelCase}} = fields[EventFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword}}] as {{field.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(field)}},
+            {%- endfor %}
+            )
+          }
+        }
+      }
+    }
+
+    /** @suppress */
+    companion object :
+      EventFactory<{{eventName}}Event>(
+        MatterEventFactory(
+          {{clusterName}}Trait.{{eventName}}Impl.Id,
+          "{{eventName}}",
+          {{clusterName}}Trait.{{eventName}}Impl.Adapter,
+          ::{{eventName}}Event
+        )
+      ) {
+      {%- for field in event.fields %}
+        {%- if event_docs %}
+          {%- for event_name in event_docs|selectattr("name", "equalto", st.name) %}
+            {%- for event_value in event_name.value|selectattr("name", "equalto", field.name) %}
+      /** {{event_value.description}} */
+            {%- endfor %}
+          {%- endfor %}
+        {%- endif %}
+        {%- if field is IsFieldConvertibleToAdm %}
+      val {{field.name | ToLowerCamelCase}}: EventField<{{field.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(field)}}>
+        get() = EventField<{{field.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(field)}}>({{cluster.name | ToUpperCamelCase}}Trait.{{eventName}}Impl.Id.traitId, {{field.code}}u)
+        {%- endif %}
+      {%- endfor %}
+{% for field in event.fields %}
+{#- TODO: b/343295871 - Replace legacy EventField with TypedExpression extension property, and make sure indentation matches. #}
+{%- if field is IsFieldConvertibleToAdm %}
+      val TypedExpression<out {{eventName}}Event?>.{{field.name | ToLowerCamelCase}}: TypedExpression<{{field.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(field)}}>
+        get() = fieldSelect<{{eventName}}Event, {{field.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(field)}}>(this, EventFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword }})
+{%- endif %}
+{%- endfor %}
+
+      override fun getEventFieldById(tagId: UInt): Field? {
+        return EventFields.values().firstOrNull { it.tag == tagId }
+      }
+    }
+  }
+{%- endmacro -%}
+
+{% macro command_todo_impl(cmd) -%}
+  {%- set input_struct = cmd | commandInputStruct -%}
+  {%- set non_optional_fields = input_struct.fields | rejectattr("is_optional") | list -%}
+  {%- set optional_fields = input_struct.fields | selectattr("is_optional") | list -%}  {%- set input_struct = cmd | commandInputStruct -%}
+
+  override suspend fun {{cmd.name | ToLowerCamelCase}}(
+  {%- if input_struct.fields -%}
+    {%- for field in non_optional_fields %}
+      {{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldType(field)}},
+    {%- endfor -%}
+    {% if optional_fields | count > 0 %}
+      optionalArgs : {{cluster.name | ToUpperCamelCase}}Trait.{{cmd.name | ToUpperCamelCase}}Command.OptionalArgs.()->Unit)
+    {%- else %}
+        )
+    {%- endif %}
+  {%- else -%}
+    )
+  {%- endif %}
+  {%- if cmd | hasResponse -%}
+    : {{cluster_command(cluster.name, cmd.name)}}.Response
+  {%- endif -%} {
+    TODO("Not Implemented")
+  }
+{%- endmacro -%}
+
+
+{% macro batchable_todo_impl(cmd) -%}
+  {%- set input_struct = cmd | commandInputStruct -%}
+  {%- set non_optional_fields = input_struct.fields | rejectattr("is_optional") | list -%}
+  {%- set optional_fields = input_struct.fields | selectattr("is_optional") | list -%}
+
+  override fun {{cmd.name | ToLowerCamelCase}}Batchable(
+  {%- if input_struct.fields -%}
+    {%- for field in non_optional_fields %}
+      {{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldType(field)}},
+    {%- endfor -%}
+    {% if optional_fields | count > 0 %}
+      optionalArgs : {{cluster.name | ToUpperCamelCase}}Trait.{{cmd.name | ToUpperCamelCase}}Command.OptionalArgs.()->Unit)
+    {%- else %}
+      )
+    {%- endif %}
+  {%- else -%}
+    )
+  {%- endif %}
+  {%- if cmd | hasResponse -%}
+    : BatchableCommand<{{cluster_command(cluster.name, cmd.name)}}.Response>
+  {%- else -%}
+    : BatchableCommand<Unit>
+  {%- endif -%}
+  {
+     TODO("Not Implemented")
+  }
+{%- endmacro -%}
+
+{% macro command_define(cmd, emitImpl) -%}
+  {%- set input_struct = cmd | commandInputStruct -%}
+  {%- set non_optional_fields = input_struct.fields | rejectattr("is_optional") | list -%}
+  {%- set optional_fields = input_struct.fields | selectattr("is_optional") | list -%}
+  {%- for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) %}
+  /**{%- for d in cmd_doc.description %}
+   * {{d}}{% if not loop.last %}
+   *{% endif %}{% endfor %}{% if cmd_doc.param %}
+   *{% for p in cmd_doc.param %}
+   {%-if p.name in non_optional_fields | map(attribute="name") | list %}
+   * @param {{p.name | ToLowerCamelCase}} {{p.description}}{% endif %}{% endfor %}{% endif %}
+   {%- if optional_fields | count > 0 %}
+   * @param optionalArgs Receiver for the optional arguments of this command{% endif %}
+   {%- if cmd_doc.response %}
+   *
+   * @return {{cmd_doc.response.description}}{% endif %}
+   *
+   */
+  {% endfor %}
+  {%- if emitImpl %} override {% endif %} suspend fun {{cmd.name | ToLowerCamelCase}}(
+  {%- if input_struct.fields -%}
+    {%- for field in non_optional_fields %}
+      {{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldType(field)}},
+    {%- endfor -%}
+    {% if optional_fields | count > 0 %}
+      optionalArgs : {{cluster.name | ToUpperCamelCase}}Trait.{{cmd.name | ToUpperCamelCase}}Command.OptionalArgs.()->Unit {%- if not emitImpl %} = {} {% endif %})
+    {%- else %}
+        )
+    {%- endif %}
+  {%- else -%}
+    )
+  {%- endif %}
+  {%- if cmd | hasResponse -%}
+    : {{cluster_command(cluster.name, cmd.name)}}.Response
+  {%- endif -%}
+  {%- if emitImpl %}
+  {
+  {%- if optional_fields | count > 0 %}
+    val optionalValues = object : {{cluster_command(cluster.name, cmd.name)}}.OptionalArgs {
+      private val presence = BooleanArray({{optional_fields | count}})
+    {%- for field in optional_fields %}
+      override var {{field.name | ToLowerCamelCase}} : {{field.data_type | lookupDataType | ToKotlinFieldTypeForCommands(field)}} = {{ field | DefaultValueForOptionalArgField}}
+      set(value) {
+        presence[{{loop.index0}}] = true
+        field = value
+      }
+
+      fun {{field.name | ToLowerCamelCase}}AsOptional() : {{field.data_type | lookupDataType | ToKotlinFieldType(field)}} =
+        if (presence[{{loop.index0}}]) {
+          OptionalValue.present({{field.name | ToLowerCamelCase}})
+        } else {
+          OptionalValue.absent()
+        }
+    {%- endfor %}
+    }
+    optionalValues.optionalArgs()
+  {%- endif %}
+
+  {%- if cmd | hasResponse %}
+    return sendCommand({%- else %}
+    sendCommand({%- endif %}
+      commandId = {{cluster_command(cluster.name, cmd.name)}}.requestId,
+      request = {{cluster_command(cluster.name, cmd.name)}}.Request(
+  {%- for field in input_struct.fields %}
+    {%- if field.is_optional %}
+        optionalValues.{{field.name | ToLowerCamelCase}}AsOptional(),
+    {%- else %}
+        {{field.name | ToLowerCamelCase}},
+    {%- endif %}
+  {%- endfor %}
+      ),
+      requestAdapter = {{cluster_command(cluster.name, cmd.name)}}.Request
+  {%- if cmd | hasResponse %},
+      responseAdapter = {{cluster_command(cluster.name, cmd.name)}}.Response
+  {%- endif %},
+  {%- if cmd.is_timed_invoke %}
+      useTimedCommand = true
+  {%- else %}
+      useTimedCommand = false
+  {%- endif %}
+    )
+  }
+{%- endif %}
+{%- endmacro -%}
+{% macro batchable_command_define(cmd, emitImpl) -%}
+  {%- set input_struct = cmd | commandInputStruct -%}
+  {%- set non_optional_fields = input_struct.fields | rejectattr("is_optional") | list -%}
+  {%- set optional_fields = input_struct.fields | selectattr("is_optional") | list -%}
+  {%- for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) %}
+  /**
+   * The batchable version of [{{cmd.name | ToLowerCamelCase}}] command.
+   *{%- for d in cmd_doc.description %}
+   * {{d}}{% if not loop.last %}
+   *{% endif %}{% endfor %}{% if cmd_doc.param %}
+   *{% for p in cmd_doc.param %}
+   {%-if p.name in non_optional_fields | map(attribute="name") | list %}
+   * @param {{p.name | ToLowerCamelCase}} {{p.description}}{% endif %}{% endfor %}{% endif %}
+   {%- if optional_fields | count > 0 %}
+   * @param optionalArgs Receiver for the optional arguments of this command{% endif %}
+   *
+   * @return BatchableCommand<{% if cmd_doc.response %}{{cluster_command(cluster.name, cmd.name)}}.Response{% else %}Unit{% endif %}>
+   *
+   */{% endfor %}
+  {% if emitImpl %} override {% endif %}fun {{cmd.name | ToLowerCamelCase}}Batchable(
+  {%- if input_struct.fields -%}
+    {%- for field in non_optional_fields %}
+      {{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldType(field)}},
+    {%- endfor -%}
+    {% if optional_fields | count > 0 %}
+      optionalArgs : {{cluster.name | ToUpperCamelCase}}Trait.{{cmd.name | ToUpperCamelCase}}Command.OptionalArgs.()->Unit {%- if not emitImpl %} = {} {% endif %})
+    {%- else %}
+      )
+    {%- endif %}
+  {%- else -%}
+    )
+  {%- endif %}
+  {%- if cmd | hasResponse -%}
+    : BatchableCommand<{{cluster_command(cluster.name, cmd.name)}}.Response>
+  {%- else -%}
+    : BatchableCommand<Unit>
+  {%- endif -%}
+  {%- if emitImpl %}
+  {
+  {%- if optional_fields | count > 0 %}
+    val optionalValues = object : {{cluster_command(cluster.name, cmd.name)}}.OptionalArgs {
+      private val presence = BooleanArray({{optional_fields | count}})
+    {%- for field in optional_fields %}
+      override var {{field.name | ToLowerCamelCase}} : {{field.data_type | lookupDataType | ToKotlinFieldTypeForCommands(field)}} = {{ field | DefaultValueForOptionalArgField}}
+      set(value) {
+        presence[{{loop.index0}}] = true
+        field = value
+      }
+
+      fun {{field.name | ToLowerCamelCase}}AsOptional() : {{field.data_type | lookupDataType | ToKotlinFieldType(field)}} =
+        if (presence[{{loop.index0}}]) {
+          OptionalValue.present({{field.name | ToLowerCamelCase}})
+        } else {
+          OptionalValue.absent()
+        }
+    {%- endfor %}
+    }
+    optionalValues.optionalArgs()
+  {%- endif %}
+
+  {%- if cmd | hasResponse %}
+    return BatchableCommand<{{cluster_command(cluster.name, cmd.name)}}.Response>({%- else %}
+    return BatchableCommand<Unit>({%- endif %}
+      objectCommand = createObjectCommand(
+        commandId = {{cluster_command(cluster.name, cmd.name)}}.requestId,
+        requestAdapter = {{cluster_command(cluster.name, cmd.name)}}.Request,
+        request = {{cluster_command(cluster.name, cmd.name)}}.Request(
+    {%- for field in input_struct.fields %}
+      {%- if field.is_optional %}
+          optionalValues.{{field.name | ToLowerCamelCase}}AsOptional(),
+      {%- else %}
+          {{field.name | ToLowerCamelCase}},
+      {%- endif %}
+    {%- endfor %}
+        ),
+      {%- if cmd.is_timed_invoke %}
+        useTimedCommand = true
+      {%- else %}
+        useTimedCommand = false
+      {%- endif %}
+      )
+  {%- if cmd | hasResponse %},
+      responseAdapter = {{cluster_command(cluster.name, cmd.name)}}.Response
+  {%- endif %}
+    )
+  }
+{%- endif %}
+{%- endmacro -%}
+{% macro automation_command_define(cmd) -%}
+  {%- set input_struct = cmd | commandInputStruct -%}
+  {%- set non_optional_fields = input_struct.fields | rejectattr("is_optional") | list -%}
+  {%- set optional_fields = input_struct.fields | selectattr("is_optional") | list -%}
+  {%- if input_struct is IsStructConvertibleToAdm %}
+{% for cmd_doc in docs.commands|selectattr("name", "equalto", cmd.name) %}
+    /**{%- for d in cmd_doc.description %}
+     * {{d}}{% if not loop.last %}
+     *{% endif %}{% endfor %}{% if cmd_doc.param %}
+     *{% for p in cmd_doc.param %}
+     {%-if p.name in non_optional_fields | map(attribute="name") | list %}
+     * @param {{p.name | ToLowerCamelCase }} {{p.description}}{% endif %}{% endfor %}{% endif %}
+     {%- if optional_fields | count > 0 %}
+     * @param optionalArgs Receiver for the optional arguments of this command{% endif %}
+     {%- if cmd_doc.response %}
+     *
+     * @return {{cmd_doc.response.description}}{% endif %}
+     */
+    {%- endfor %}
+    fun {{cmd.name | ToLowerCamelCase}}(
+    {%- if input_struct.fields -%}
+      {%- for field in non_optional_fields %}
+        {{field.name | ToLowerCamelCase}}: {{field.data_type | lookupDataType | ToKotlinFieldType(field)}},
+      {%- endfor -%}
+      {% if optional_fields | count > 0 %}
+        optionalArgs : {{cluster_command(cluster.name, cmd.name)}}.OptionalArgs.()->Unit = {},)
+      {%- else %}
+        )
+      {%- endif %}
+    {%- else -%}
+      )
+    {%- endif %}
+      : AutomationCommand {
+      val commandId = {{cluster_command(cluster.name, cmd.name)}}.requestId.toString()
+    {%- if input_struct.fields %}
+      val paramsMap: MutableMap<Field, Any?> = mutableMapOf(
+      {%- for field in non_optional_fields %}
+          {{cmd.name | ToUpperCamelCase}}Command.Request.CommandFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword}} to {{field.name | ToLowerCamelCase}},
+      {%- endfor -%}
+        )
+      {%- if optional_fields | count > 0 %}
+
+      val optionalValues = object : {{cluster_command(cluster.name, cmd.name)}}.OptionalArgs {
+        private val presence = BooleanArray({{optional_fields | count}})
+        {%- for field in optional_fields %}
+
+        override var {{field.name | ToLowerCamelCase}} : {{field.data_type | lookupDataType | ToKotlinFieldTypeForCommands(field)}} = {{ field | DefaultValueForOptionalArgField}}
+        set(value) {
+          presence[{{loop.index0}}] = true
+          field = value
+        }
+        fun {{field.name | ToLowerCamelCase}}AsOptional() : {{field.data_type | lookupDataType | ToKotlinFieldType(field)}} =
+          if (presence[{{loop.index0}}]) {
+            OptionalValue.present({{field.name | ToLowerCamelCase}})
+          } else {
+            OptionalValue.absent()
+          }
+        {%- endfor %}
+      }
+      optionalValues.optionalArgs()
+{% for field in optional_fields %}
+      optionalValues.{{field.name | ToLowerCamelCase}}AsOptional().doWhenPresent {
+        paramsMap.put({{cmd.name | ToUpperCamelCase}}Command.Request.CommandFields.{{field.name | ToLowerCamelCase | EscapeKtKeyword}}, it)
+      }
+        {%- endfor %}
+      {%- endif %}
+
+      return AutomationCommand({{cluster.name | ToUpperCamelCase}}, commandId, paramsMap)
+    {%- else %}
+      return AutomationCommand({{cluster.name | ToUpperCamelCase}}, commandId)
+    {%- endif %}
+    }
+  {%- endif -%}
+{%- endmacro -%}
+{% macro capfirst(text) -%}{{text[0]|upper}}{{text[1:]}}{%- endmacro -%}
+// {{file_comment}}
+@file:Suppress("PackageName")
+package {{package}}
+
+{%- if not cluster.name | showClusterInDocs and package.startswith('com.google.home') %}
+import com.google.android.gms.common.internal.Hide
+import com.google.android.gms.common.internal.ShowFirstParty
+{% endif %}
+{% if is_internal %}import com.google.home.annotation.HomeExperimentalApi{% endif %}
+import com.google.home.BatchableCommand
+import com.google.home.HomeException
+import com.google.home.ClusterStruct
+import com.google.home.Id
+import com.google.home.Event
+import com.google.home.EventFactory
+import com.google.home.EventImportance
+import com.google.home.Field
+import com.google.home.Descriptor as HomeDescriptor
+import com.google.home.NoOpDescriptor
+import com.google.home.StructDescriptor
+import com.google.home.Type as FieldType
+import com.google.home.Trait
+import com.google.home.TraitFactory
+import com.google.home.Updatable
+import com.google.home.toDescriptorMap
+import com.google.home.DescriptorMap
+import com.google.errorprone.annotations.Immutable
+import com.google.home.automation.Attribute as AutomationAttribute
+import com.google.home.automation.AttributeToUpdate
+import com.google.home.automation.Command as AutomationCommand
+import com.google.home.automation.EventField
+import com.google.home.automation.TypedExpression
+import com.google.home.automation.Updater
+import com.google.home.automation.fieldSelect
+import com.google.home.matter.EventImpl
+import com.google.home.matter.MatterEventFactory
+import com.google.home.matter.MatterTrait
+import com.google.home.matter.MatterTraitImpl
+import com.google.home.matter.MatterTraitFactory
+import com.google.home.matter.serialization.BitmapAdapter
+import com.google.home.matter.serialization.EnumAdapter
+import {{package}}.{{cluster.name | ToUpperCamelCase}}Trait
+import {{package}}.{{cluster.name | ToUpperCamelCase}}Trait.Attributes
+import {{package}}.{{cluster.name | ToUpperCamelCase}}Trait.AttributesImpl
+{%- if cluster | hasWritableAttributes %}
+import {{package}}.{{cluster.name | ToUpperCamelCase}}Trait.MutableAttributes
+{%- endif %}
+{%-   for entry in cluster.enums %}
+import {{package}}.{{cluster.name | ToUpperCamelCase}}Trait.{{entry.name | ToUpperCamelCase}}
+{%- endfor %}
+{%-   for entry in cluster.events %}
+import {{package}}.{{cluster.name | ToUpperCamelCase}}Trait.{{entry.name | ToUpperCamelCase}}
+{%- endfor %}
+{%-   for entry in cluster.commands %}
+import {{package}}.{{cluster.name | ToUpperCamelCase}}Trait.{{entry.name | ToUpperCamelCase}}Command
+{%- endfor %}
+{%-   for entry in cluster.bitmaps %}
+import {{package}}.{{cluster.name | ToUpperCamelCase}}Trait.{{entry.name | ToUpperCamelCase}}
+{%- endfor %}
+{%-   for entry in cluster.structs | reject('isCommandStruct') %}
+import {{package}}.{{cluster.name | ToUpperCamelCase}}Trait.{{entry.name | ToUpperCamelCase}}
+{%- endfor %}
+import com.google.home.matter.MatterTraitClient
+import com.google.home.matter.serialization.OptionalValue
+import java.time.Instant
+import javax.annotation.processing.Generated
+
+/*
+ * This file was machine generated via the code generator
+ * in `codegen.clusters.kotlin.CustomGenerator`
+ *
+ */
+
+/**
+{%- if not cluster.name | showClusterInDocs %}
+ * @suppress
+{% endif %}
+ * Commands for the {{cluster.name | ToUpperCamelCase}} trait.{{ restricted_callout()}}
+ */
+{%- if cluster.commands | count > 0 %}
+@Generated("GoogleHomePlatformCodegen")
+interface {{cluster.name | ToUpperCamelCase}}Commands {
+  {%- for cmd in cluster.commands %}
+  {{ command_define(cmd, False)}}
+  {%- endfor -%}
+
+  {%- for cmd in cluster.commands %}
+   {{ batchable_command_define(cmd, False)}}
+  {%- endfor -%}
+}
+
+/**
+ * @suppress
+ */
+@Generated("GoogleHomePlatformCodegen")
+interface {{cluster.name | ToUpperCamelCase}}CommandsDefaultImpl : {{cluster.name | ToUpperCamelCase}}Commands {
+  {%- for cmd in cluster.commands %}
+  {{ command_todo_impl(cmd)}}
+  {%- endfor -%}
+
+  {%- for cmd in cluster.commands %}
+  {{ batchable_todo_impl(cmd) }}
+  {%- endfor -%}
+}
+{%- endif %}
+
+/**
+ * API for the {{cluster.name | ToUpperCamelCase}} trait.{% if docs.description %} {{docs.description}}{% endif %}{{restricted_callout()}}
+ */
+{%- if not cluster.name | showClusterInDocs and package.startswith('com.google.home') %}
+@Hide{% endif %}
+@Generated("GoogleHomePlatformCodegen")
+interface {{cluster.name | ToUpperCamelCase}} : 
+   Attributes, MatterTrait
+   {%- if cluster | hasWritableAttributes %}
+   , Updatable<{{cluster.name | ToUpperCamelCase}}, MutableAttributes>
+   {%- endif %}
+   {%- if cluster.commands | count > 0 %}
+   , {{cluster.name | ToUpperCamelCase}}Commands
+   {%- endif %}
+{
+   /**
+   * Descriptor enum for this trait's attributes.{{restricted_callout()}}
+   */
+  enum class Attribute(
+    override val fieldName: String,
+    override val tag: UInt,
+    override val typeName: String,
+    override val typeEnum: FieldType,
+    override val isList: Boolean,
+    override val descriptor: HomeDescriptor,
+    val isNullable: Boolean,
+  ) : Field {
+{%- for attr in cluster.attributes %}
+    /** The [{{attr.definition.name | ToLowerCamelCase }}][{{cluster.name | ToUpperCamelCase}}Trait.Attributes.{{attr.definition.name | ToLowerCamelCase }}] trait attribute. */
+    {{attr.definition.name | ToLowerCamelCase}}("{{attr.definition.name | ToLowerCamelCase}}", {{attr.definition.code}}u, "{{attr.definition.data_type | lookupDataType | dataTypeToKotlinAutomationConversionType}}", FieldType.{{attr.definition.data_type| lookupDataType | dataTypeToKotlinTypeEnum}}, {{attr.is_list | boolAsStr}}, {{attr.definition.data_type | lookupDataType | dataTypeToDescriptorType}}, {{attr.definition | IsNullable | boolAsStr}})
+  {%- if loop.last %};
+  {%- else %},
+  {%- endif %}
+{%- endfor %}
+    {% if cluster.attributes|length == 0 %}
+    ;
+    {%- endif %}
+
+    companion object {
+      val StructDescriptor = object : StructDescriptor {
+        @Suppress("Immutable")
+        override val fields: DescriptorMap = entries.toDescriptorMap()
+
+        {% if is_internal %}@HomeExperimentalApi{% endif %}
+        override fun toStruct(fields: Map<Field, Any?>): ClusterStruct {
+          return AttributesImpl(
+          {%- for attr in cluster.attributes %}
+            {{attr.definition.name | ToLowerCamelCase }} = fields[{{attr.definition.name | ToLowerCamelCase }}] as {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}},
+          {%- endfor %}
+          )
+        }
+      }
+    }
+  }
+
+  fun supports(attribute : Attribute): Boolean
+
+  {%- if cluster.commands | count > 0 %}
+
+  /**
+   * Descriptor enum for this trait's commands.{{restricted_callout()}}
+   */
+  enum class Command(val tag : UInt) {
+    {%- for cmd in cluster.commands %}
+    /** The [{{cmd.name | camelcase }}][{{cluster.name | ToUpperCamelCase}}Commands.{{cmd.name | camelcase}}] trait command. */
+    {{cmd.name | ToUpperCamelCase }}({{cmd.code}}u)
+      {%- if loop.last %};
+      {%- else %},
+      {%- endif %}
+    {%- endfor %}
+  }
+
+  fun supports(command: Command): Boolean
+
+  {%- endif %}
+
+  /**
+   * @suppress
+   */
+  companion object : TraitFactory<{{cluster.name | ToUpperCamelCase}}>(
+    MatterTraitFactory(
+      clusterId = {{cluster.name | ToUpperCamelCase}}Trait.Id,
+      adapter = Attributes.Adapter,
+      traitDescriptor = Attribute.StructDescriptor,
+      // Map of enum type name string -> EnumAdapter
+      enumAdapters = mapOf<String, EnumAdapter<*>>(
+{%- for entry in cluster.enums %}
+        "{{entry.name}}" to {{cluster.name | ToUpperCamelCase}}Trait.{{entry.name | ToUpperCamelCase }}.Adapter,
+{%- endfor %}
+      ),
+      bitmapAdapters = mapOf<String, BitmapAdapter<*>>(
+{%- for entry in cluster.bitmaps %}
+        "{{entry.name | ToUpperCamelCase}}" to {{cluster.name | ToUpperCamelCase}}Trait.{{entry.name | ToUpperCamelCase}}.Adapter,
+{%- endfor %}
+      ),
+      creator = ::{{cluster.name | ToUpperCamelCase}}Impl,
+      supportedEvents = mapOf(
+{%- for entry in cluster.events %}
+        {{cluster.name | ToUpperCamelCase}}Trait.{{entry.name | ToUpperCamelCase}}Impl.Id.toString() to {{cluster.name | ToUpperCamelCase}}.{{entry.name | ToUpperCamelCase }}Event,
+{%- endfor %}
+      ),
+      // All Trait Commands
+      commands = mapOf(
+{%- for entry in cluster.commands %}
+        {{cluster.name | ToUpperCamelCase}}Trait.{{entry.name | ToUpperCamelCase}}Command.requestId.toString() to {{entry.name | ToUpperCamelCase }}Command,
+{%- endfor %}
+      )
+    )
+  ) {
+
+{%- for attr in cluster.attributes %}
+    val {{attr.definition.name | ToLowerCamelCase }}: AutomationAttribute<{{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}}>
+      get() = AutomationAttribute<{{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}}>({{cluster.name | ToUpperCamelCase}}Trait.Id.traitId, {{cluster.name | ToUpperCamelCase}}.Attribute.{{attr.definition.name | ToLowerCamelCase }}.tag)
+{%- endfor %}
+{% for attr in cluster.attributes %}
+    val TypedExpression<out {{cluster.name | ToUpperCamelCase}}?>.{{attr.definition.name | ToLowerCamelCase }}: TypedExpression<{{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}}>
+      get() = fieldSelect<{{cluster.name | ToUpperCamelCase}}, {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeForAttributes(attr.definition)}}>(this, {{cluster.name | ToUpperCamelCase}}.Attribute.{{attr.definition.name | ToLowerCamelCase }})
+{%- endfor %}
+{% for attr in cluster.attributes | selectattr("is_writable") %}
+  {#- TODO(stellax): Current scope for mutable attributes update only support primitive, bitmap and enum values. #}
+  {%- if attr.definition is IsFieldConvertibleToAdm %}
+    fun Updater<{{cluster.name | ToUpperCamelCase}}>.set{{capfirst(attr.definition.name | ToLowerCamelCase)}}(value: {{attr.definition.data_type | lookupDataType | ToKotlinFieldTypeBeforeOptionalNullable(attr.definition)}}) { attributesToUpdate.add(AttributeToUpdate(Attribute.{{attr.definition.name | ToLowerCamelCase | EscapeKtKeyword}}, value)) }
+  {%- endif %}
+{%- endfor -%}
+{%- for cmd in cluster.commands -%}
+{{automation_command_define(cmd)}}
+{%- endfor %}
+
+    {% if is_internal %}@HomeExperimentalApi{% endif %}
+    override fun getAttributeById(tagId: UInt): Field? {
+      return Attribute.values().firstOrNull { it.tag == tagId }
+    }
+
+    {% if is_internal %}@HomeExperimentalApi{% endif %}
+    override fun getAttributeByName(name: String): Field? {
+      return Attribute.values().firstOrNull { it.name == name }
+    }
+
+    override fun toString() = "{{cluster.name | ToUpperCamelCase}}"
+  }
+
+  override val factory : TraitFactory<{{cluster.name | ToUpperCamelCase}}> get() = Companion
+
+  {%- if cluster.events %}
+  // Events
+  {%- for entry in cluster.events %}
+  {{ event_define(entry, cluster.name | ToUpperCamelCase) }}
+  {%- endfor %}
+  {%- endif %}
+}
+
+/**
+ * @suppress
+ */
+class {{cluster.name | ToUpperCamelCase}}Impl
+
+constructor(
+  override val metadata: Trait.TraitMetadata,
+  client: MatterTraitClient,
+  internal val attributes: Attributes
+) :
+  {{cluster.name | ToUpperCamelCase}},
+  MatterTraitImpl(metadata, client),
+  Attributes by attributes
+  {%- if cluster | hasWritableAttributes %},
+  Updatable<{{cluster.name | ToUpperCamelCase}}, MutableAttributes>
+  {%- endif %}
+{
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is {{cluster.name | ToUpperCamelCase}}Impl) return false
+
+    if (metadata != other.metadata) return false
+    if (attributes != other.attributes) return false
+
+    return true
+  }
+
+   /**
+   * Checks if the trait supports an attribute. Some devices might not
+   * implement all attributes in a Trait definition.
+   *
+   * @param attribute The attribute to check for.
+   * @return True if the attribute is supported by the trait, false if it is not.
+   */
+  override fun supports(attribute : {{cluster.name | ToUpperCamelCase}}.Attribute) = attributes.attributeList.contains(attribute.tag)
+
+  {%- if cluster.commands | count > 0 %}
+  /**
+   * Checks if the trait supports a command. Some devices might not
+   * implement all the commands in a Trait definition.
+   *
+   * @param command The command to check for.
+   * @return True if the command is supported by the trait, false if it is not.
+   */
+  override fun supports(command : {{cluster.name | ToUpperCamelCase}}.Command) = attributes.acceptedCommandList.contains(command.tag)
+  {%- endif %}
+
+  // Commands
+  {%- for cmd in cluster.commands %}
+    {{ command_define(cmd, True)}}
+  {%- endfor -%}
+
+  {%- if cluster | hasWritableAttributes %}
+  /**
+   * @suppress
+   */
+  override suspend fun update(
+    optimisticReturn: ({{cluster.name | ToUpperCamelCase}}) -> Unit,
+    init: MutableAttributes.() -> Unit
+  ): {{cluster.name | ToUpperCamelCase}}
+   {
+    val newVal = MutableAttributes(attributes).apply(init)
+    val returnVal = {{cluster.name | ToUpperCamelCase}}Impl(metadata, client, newVal)
+    optimisticReturn(returnVal)
+    write(MutableAttributes, newVal,
+    {%- if cluster | hasTimedAttributes %}
+    useTimedInteraction = true
+    {%- else %}
+    useTimedInteraction = false
+    {%- endif %}
+    )
+    return returnVal
+   }
+{%- endif %}
+
+{% if cluster.commands %}
+  // Commands
+  {%- for cmd in cluster.commands %}
+    {{ batchable_command_define(cmd, True)}}
+  {%- endfor -%}
+{%- endif %}
+
+  override fun toString() = attributes.toString()
+}

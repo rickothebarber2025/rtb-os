@@ -4,6 +4,7 @@ import {
   mergeProfilePermissionFields,
   normalizePermissionsPayload,
 } from '../lib/permissions.js';
+import { emitDataChanged } from '../lib/appEvents.js';
 import { buildPermissionsFromTemplate } from '../lib/roleTemplates.js';
 import { calculateEntryValues } from '../utils/payroll';
 import { PROBATION_RATE, toDateKey } from '../utils/probation';
@@ -792,6 +793,36 @@ export async function getChecklistHistory(businessUnitId, days = 14) {
   return requireData(await query);
 }
 
+export async function getShopPresenceHistory(businessUnitId, days = 14) {
+  const client = requireClient();
+  if (!businessUnitId) return [];
+
+  return requireData(
+    await client.rpc('get_shop_presence_history', {
+      p_business_unit_id: businessUnitId,
+      p_days: Math.max(1, Math.min(Number(days || 14), 120)),
+    }),
+  );
+}
+
+export async function recordGoogleHomeSetupTestEvent(businessUnitId) {
+  if (!businessUnitId) {
+    throw new Error('Choose one business before sending a Google Home test event.');
+  }
+
+  const eventId = globalThis.crypto?.randomUUID?.() || `google-home-setup-${Date.now()}`;
+  return invokeFunction('google-home-shop-event', {
+    businessUnitId,
+    eventType: 'manual',
+    externalEventId: eventId,
+    source: 'google_home_setup',
+    metadata: {
+      setup_test: true,
+      purpose: 'google_home_ios_authorization_check',
+    },
+  });
+}
+
 export async function getStaffHubRecords({ businessUnitId = null, staffId = null } = {}) {
   const client = requireClient();
   const [
@@ -809,6 +840,7 @@ export async function getStaffHubRecords({ businessUnitId = null, staffId = null
         client
           .from('staff_announcements')
           .select('*')
+          .is('archived_at', null)
           .order('pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(80),
@@ -1335,13 +1367,14 @@ export async function saveStaffAnnouncement(record) {
     body: record.body,
     business_unit_id: record.business_unit_id || null,
     category: record.category || 'reminder',
+    created_by: record.id ? undefined : record.created_by || undefined,
     pinned: Boolean(record.pinned),
     title: record.title,
     updated_at: new Date().toISOString(),
   });
 
   if (record.id) {
-    return requireData(
+    const saved = requireData(
       await client
         .from('staff_announcements')
         .update(payload)
@@ -1349,9 +1382,32 @@ export async function saveStaffAnnouncement(record) {
         .select()
         .single(),
     );
+    emitDataChanged('staff-announcement-updated', { announcementId: saved.id, businessUnitId: saved.business_unit_id });
+    return saved;
   }
 
-  return requireData(await client.from('staff_announcements').insert(payload).select().single());
+  const saved = requireData(await client.from('staff_announcements').insert(payload).select().single());
+  emitDataChanged('staff-announcement-created', { announcementId: saved.id, businessUnitId: saved.business_unit_id });
+  return saved;
+}
+
+export async function archiveStaffAnnouncement(announcementId, userId = null) {
+  const client = requireClient();
+  const payload = cleanObject({
+    archived_at: new Date().toISOString(),
+    archived_by: userId || undefined,
+    updated_at: new Date().toISOString(),
+  });
+  const saved = requireData(
+    await client
+      .from('staff_announcements')
+      .update(payload)
+      .eq('id', announcementId)
+      .select()
+      .single(),
+  );
+  emitDataChanged('staff-announcement-archived', { announcementId, businessUnitId: saved.business_unit_id });
+  return saved;
 }
 
 export async function markStaffAnnouncementRead(announcementId, staffId) {

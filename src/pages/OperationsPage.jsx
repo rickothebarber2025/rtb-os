@@ -13,7 +13,7 @@ import {
   SquarePen,
   Trash2,
 } from 'lucide-react';
-import ChecklistHistoryPanel from '../components/ChecklistHistoryPanel';
+import AdminChecklistDashboard from '../components/AdminChecklistDashboard';
 import ConfirmDialog from '../components/ConfirmDialog';
 import LoadingState from '../components/LoadingState';
 import Modal from '../components/Modal';
@@ -47,6 +47,14 @@ const TAB_ITEMS = [
 ];
 
 const SHOP_OPTIONS = ['RTB Lounge', 'RTB Beauty Lounge', 'Both businesses'];
+const DEFAULT_TAB = 'sops';
+
+function readOperationsTabFromUrl() {
+  if (typeof window === 'undefined') return DEFAULT_TAB;
+  const params = new URLSearchParams(window.location.search);
+  const requestedTab = params.get('section') || params.get('tab');
+  return TAB_ITEMS.some((tab) => tab.id === requestedTab) ? requestedTab : DEFAULT_TAB;
+}
 
 function dateKey(value = new Date()) {
   return value.toISOString().slice(0, 10);
@@ -218,10 +226,10 @@ function FormPreview({ form }) {
   );
 }
 
-export default function OperationsPage({ accessProfile, businessUnit, staff }) {
+export default function OperationsPage({ accessProfile, businessUnit, pageTarget, staff }) {
   const canEditOperations = canManageOperations(accessProfile);
   const canAdminOps = canAdminOperations(accessProfile);
-  const [activeTab, setActiveTab] = useState('sops');
+  const [activeTab, setActiveTab] = useState(readOperationsTabFromUrl);
   const [state, setState] = useState(() => createDefaultOperationsState());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -286,6 +294,27 @@ export default function OperationsPage({ accessProfile, businessUnit, staff }) {
       };
     });
   }, [businessUnit?.name]);
+
+  useEffect(() => {
+    function handlePopState() {
+      setActiveTab(readOperationsTabFromUrl());
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const requestedTab = pageTarget?.section || pageTarget?.tab;
+    if (TAB_ITEMS.some((tab) => tab.id === requestedTab)) setActiveTab(requestedTab);
+  }, [pageTarget]);
+
+  function selectTab(tabId) {
+    setActiveTab(tabId);
+    const url = new URL(window.location.href);
+    url.searchParams.set('section', tabId);
+    window.history.pushState({ ...window.history.state, operationsSection: tabId }, '', url);
+  }
 
   async function persist(nextState, successMessage) {
     if (!canEditOperations) {
@@ -938,7 +967,7 @@ export default function OperationsPage({ accessProfile, businessUnit, staff }) {
 
   function renderChecklists() {
     return (
-      <ChecklistHistoryPanel businessUnitId={isAllBusinessesUnit(businessUnit) ? null : businessUnit?.id} />
+      <AdminChecklistDashboard businessUnitId={isAllBusinessesUnit(businessUnit) ? null : businessUnit?.id} />
     );
   }
 
@@ -981,7 +1010,7 @@ export default function OperationsPage({ accessProfile, businessUnit, staff }) {
                 className={activeTab === tab.id ? 'active' : ''}
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => selectTab(tab.id)}
               >
                 <Icon size={16} />
                 {tab.label}

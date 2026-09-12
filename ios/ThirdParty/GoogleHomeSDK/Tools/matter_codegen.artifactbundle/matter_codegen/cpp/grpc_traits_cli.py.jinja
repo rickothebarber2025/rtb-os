@@ -1,0 +1,24 @@
+"""Expose {{PACKAGE_PY_NAMESPACE}} trait library to the CLI."""
+
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.cli.traits import trait_handler
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.client.core import home
+
+
+{%- for cluster in clusters|sort(attribute="name") %}
+from google3.third_party.google_home_platform.api.cpp.google_home_api.lib.grpc.cli.traits.{{PACKAGE_PY_NAMESPACE}} import {{cluster.name | ToLowerSnakeCase}}_cli
+{%- endfor %}
+
+_TRAIT_MAP = {
+{%- for cluster in clusters|sort(attribute="name") %}
+    '{{cluster.name | ToLowerSnakeCase}}': {{cluster.name | ToLowerSnakeCase}}_cli.do_trait,
+{%- endfor %}
+}
+
+
+def do_trait(line: str, api: home.Home) -> bool:
+  """Top-level dispatcher for {{PACKAGE_PY_NAMESPACE}} trait commands.
+
+  Commands take the general form of:
+    trait {{PACKAGE_PY_NAMESPACE}} <trait_name> <action> [args]
+  """
+  return trait_handler.trait_handler(line, api, '{{PACKAGE_PY_NAMESPACE}}', _TRAIT_MAP)

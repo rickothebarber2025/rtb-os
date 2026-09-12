@@ -237,6 +237,60 @@ export default function DashboardPage({
     selectMobileTab(mobileTabs[nextIndex].id, { focus: true });
   }
 
+  const explorationItems = [
+    {
+      id: 'actions',
+      label: 'Actions',
+      detail: actionSummary.total ? `${actionSummary.total} open items` : 'Priority board is clear',
+      icon: BellRing,
+      page: 'action-center',
+      tab: availableTabIds.has('actions') ? 'actions' : 'overview',
+    },
+    {
+      id: 'appointments',
+      label: 'Appointments',
+      detail: hasAppointmentData ? `${formatNumber(appointmentMetrics.bookings)} bookings` : 'Import Booksy or Square data',
+      icon: CalendarDays,
+      tab: availableTabIds.has('appointments') ? 'appointments' : 'overview',
+    },
+    {
+      id: 'team',
+      label: 'Team',
+      detail: `${activeStaff.length} active staff`,
+      icon: Users,
+      tab: availableTabIds.has('team') ? 'team' : 'overview',
+    },
+    {
+      id: 'finance',
+      label: 'Team & Pay',
+      detail: latestRun?.week_label || 'Payroll workspace',
+      icon: BadgeDollarSign,
+      page: payrollAllowed ? 'payroll' : null,
+      tab: availableTabIds.has('finance') ? 'finance' : 'overview',
+      available: payrollAllowed,
+    },
+    {
+      id: 'staff-hub',
+      label: 'Staff Hub',
+      detail: 'Daily screen and messages',
+      icon: Store,
+      page: 'staff-hub',
+      tab: 'overview',
+    },
+  ].filter((item) => item.available !== false);
+
+  function exploreDashboard(item) {
+    if (window.matchMedia(MOBILE_BREAKPOINT).matches && item.tab) {
+      selectMobileTab(item.tab);
+      return;
+    }
+    if (item.page) {
+      setActivePage(item.page);
+      return;
+    }
+    if (item.tab) selectMobileTab(item.tab);
+  }
+
   return (
     <div className="page-grid dashboard-page">
       <section className="hero-panel dashboard-hero">
@@ -282,6 +336,27 @@ export default function DashboardPage({
           </button>
         ))}
       </nav>
+
+      <section aria-label="Explore RTB OS" className="panel full-span dashboard-explore-strip">
+        <div className="dashboard-explore-strip__header">
+          <span>Explore</span>
+          <h2>Jump to the work behind the numbers</h2>
+        </div>
+        <div className="dashboard-explore-actions">
+          {explorationItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button className="dashboard-explore-action" key={item.id} onClick={() => exploreDashboard(item)} type="button">
+                <Icon size={18} />
+                <span>
+                  <strong>{item.label}</strong>
+                  <small>{item.detail}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       <section {...panelAccessibility('overview', 'overview-workspace')} className={`panel full-span workspace-panel ${mobileGroupClass('overview')}`}>
         <div className="section-header"><div><span>{workspace.roleTitle}</span><h2>Quick actions</h2></div><StatusBadge tone={workspace.editableModules.length ? 'gold' : 'muted'}>{workspace.editableModules.length ? `${workspace.editableModules.length} edit areas` : 'View only'}</StatusBadge></div>
