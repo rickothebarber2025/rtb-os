@@ -1,0 +1,446 @@
+/* RTB OS native-app shell
+   This layer intentionally changes chrome/layout without changing business logic. */
+
+:root {
+  --app-sidebar-width: 244px;
+  --app-topbar-height: 68px;
+  --app-bottom-nav-height: 76px;
+  --app-surface: rgba(19, 22, 29, 0.96);
+  --app-surface-raised: rgba(27, 31, 40, 0.96);
+  --app-border: rgba(255, 255, 255, 0.09);
+  --app-muted: rgba(255, 255, 255, 0.58);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  background: #0b0d12;
+  min-height: 100dvh;
+}
+
+.app-ambient {
+  display: none;
+}
+
+/* Desktop application frame */
+@media (min-width: 901px) {
+  .app-shell {
+    display: grid;
+    grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);
+  }
+
+  .sidebar {
+    background: #0d1016;
+    border-right: 1px solid var(--app-border);
+    bottom: 0;
+    box-shadow: none;
+    height: 100dvh;
+    left: 0;
+    position: sticky;
+    top: 0;
+    transform: none !important;
+    width: var(--app-sidebar-width);
+    z-index: 30;
+  }
+
+  .sidebar__brand {
+    border-bottom: 1px solid var(--app-border);
+    min-height: var(--app-topbar-height);
+    padding: 0 16px;
+  }
+
+  .sidebar__brand .brand-mark {
+    border-radius: 12px;
+    height: 38px;
+    width: 38px;
+  }
+
+  .sidebar__brand strong {
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+  }
+
+  .sidebar__brand span {
+    color: var(--app-muted);
+    font-size: 0.7rem;
+  }
+
+  .sidebar__close {
+    display: none !important;
+  }
+
+  .sidebar__nav {
+    gap: 16px;
+    padding: 14px 10px 16px;
+  }
+
+  .nav-group {
+    gap: 3px;
+  }
+
+  .nav-group__label {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 5px 10px;
+    text-transform: uppercase;
+  }
+
+  .nav-item {
+    border: 1px solid transparent;
+    border-radius: 11px;
+    font-size: 0.82rem;
+    min-height: 42px;
+    padding: 0 11px;
+  }
+
+  .nav-item:hover {
+    background: rgba(255, 255, 255, 0.045);
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .nav-item.active {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 3px 0 0 var(--gold, #d7b56d);
+  }
+
+  .sidebar__footer {
+    border-top: 1px solid var(--app-border);
+    padding: 13px 16px 17px;
+  }
+
+  .main-area {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .topbar {
+    backdrop-filter: blur(20px);
+    background: rgba(11, 13, 18, 0.88);
+    border-bottom: 1px solid var(--app-border);
+    box-shadow: none;
+    height: var(--app-topbar-height);
+    min-height: var(--app-topbar-height);
+    padding: 0 20px;
+    position: sticky;
+    top: 0;
+    z-index: 25;
+  }
+
+  .topbar__menu {
+    display: none !important;
+  }
+
+  .topbar__kicker {
+    display: none;
+  }
+
+  .topbar__title h1 {
+    font-size: 1.05rem;
+    font-weight: 760;
+    letter-spacing: -0.02em;
+  }
+
+  .topbar__actions {
+    gap: 8px;
+  }
+
+  .topbar__status,
+  .topbar__business,
+  .topbar__user-controls {
+    border-radius: 10px;
+  }
+
+  .content {
+    margin: 0;
+    max-width: none;
+    padding: 18px 20px 36px;
+    width: 100%;
+  }
+}
+
+/* Make pages feel like screens instead of landing pages. */
+.content .hero-panel {
+  align-items: center;
+  background: var(--app-surface-raised);
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  box-shadow: none;
+  min-height: 0;
+  padding: 16px 18px;
+}
+
+.content .hero-panel h2,
+.content .hero-panel h1 {
+  font-size: clamp(1.15rem, 2vw, 1.5rem);
+  letter-spacing: -0.025em;
+  margin-bottom: 4px;
+}
+
+.content .hero-panel p {
+  color: var(--app-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  max-width: 760px;
+}
+
+.content .panel {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.content .metrics-grid .panel,
+.content .metric-card,
+.content .stat-card {
+  min-height: 0;
+}
+
+.section-header {
+  margin-bottom: 12px;
+}
+
+.section-header h2,
+.section-header h3 {
+  letter-spacing: -0.02em;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button,
+.icon-button,
+button,
+select,
+input,
+textarea {
+  touch-action: manipulation;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button {
+  border-radius: 10px;
+  min-height: 40px;
+}
+
+.icon-button {
+  border-radius: 10px;
+  min-height: 40px;
+  min-width: 40px;
+}
+
+input,
+select,
+textarea {
+  border-radius: 10px;
+}
+
+/* Mobile / installed-app treatment */
+@media (max-width: 900px) {
+  :root {
+    --app-topbar-height: 58px;
+    --app-bottom-nav-height: 72px;
+  }
+
+  .app-shell {
+    min-height: 100dvh;
+  }
+
+  .main-area {
+    min-height: 100dvh;
+  }
+
+  .topbar {
+    backdrop-filter: blur(22px);
+    background: rgba(11, 13, 18, 0.92);
+    border-bottom: 1px solid var(--app-border);
+    box-shadow: none;
+    min-height: calc(var(--app-topbar-height) + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 12px 0;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .topbar__title {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .topbar__title > div:last-child {
+    min-width: 0;
+  }
+
+  .topbar__kicker {
+    display: none;
+  }
+
+  .topbar__title h1 {
+    font-size: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar__actions {
+    gap: 4px;
+  }
+
+  .topbar__status,
+  .topbar__business,
+  .topbar .role-pill,
+  .topbar .user-chip,
+  .topbar__user-controls > .icon-button[aria-label="Refresh data"],
+  .topbar__user-controls > .icon-button[aria-label="Sign out"] {
+    display: none !important;
+  }
+
+  .topbar__user-controls {
+    gap: 3px;
+  }
+
+  .topbar__menu,
+  .topbar__user-controls .owner-activity-button,
+  .topbar__user-controls > button {
+    min-height: 38px;
+    min-width: 38px;
+  }
+
+  .content {
+    padding: 12px 12px calc(var(--app-bottom-nav-height) + env(safe-area-inset-bottom) + 18px);
+  }
+
+  .page-grid {
+    gap: 10px;
+  }
+
+  .content .hero-panel,
+  .content .panel {
+    border-radius: 13px;
+    padding: 14px;
+  }
+
+  .content .hero-panel {
+    display: grid;
+    gap: 10px;
+  }
+
+  .content .hero-panel h1,
+  .content .hero-panel h2 {
+    font-size: 1.16rem;
+  }
+
+  .content .hero-panel p {
+    font-size: 0.78rem;
+  }
+
+  .mobile-app-nav {
+    background: rgba(12, 14, 19, 0.96);
+    border-top: 1px solid var(--app-border);
+    bottom: 0;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.22);
+    left: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    position: fixed;
+    right: 0;
+    z-index: 70;
+  }
+
+  .mobile-app-nav__handle {
+    display: none;
+  }
+
+  .mobile-tabbar {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    min-height: var(--app-bottom-nav-height);
+    padding: 7px 5px 5px;
+  }
+
+  .mobile-tabbar__item {
+    border: 0;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.52);
+    gap: 3px;
+    min-height: 56px;
+    padding: 5px 2px;
+  }
+
+  .mobile-tabbar__item.active {
+    background: rgba(255, 255, 255, 0.075);
+    color: var(--gold-strong, #f0d89c);
+  }
+
+  .mobile-tabbar__item > span:last-child {
+    font-size: 0.63rem;
+    font-weight: 700;
+  }
+
+  .mobile-tabbar__icon-wrap svg {
+    height: 20px;
+    width: 20px;
+  }
+
+  .sidebar {
+    border-right: 1px solid var(--app-border);
+    max-width: min(86vw, 330px);
+    width: min(86vw, 330px);
+  }
+
+  .sidebar__brand {
+    min-height: calc(64px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .sidebar__nav {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .nav-item {
+    border-radius: 11px;
+    min-height: 46px;
+  }
+
+  .scrim {
+    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.54);
+  }
+
+  /* Tables should scroll inside the screen, not widen the whole app. */
+  .table-wrap,
+  .table-scroll,
+  .data-table-wrapper {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (display-mode: standalone) {
+  body {
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"] {
+    user-select: text;
+  }
+}
