@@ -96,6 +96,10 @@ else
   echo "Local Square fallback token: not needed"
 fi
 
+# Keep voice independent from the assistant brain so providers/voices can be
+# changed without touching RTB OS, Supabase, Workbench, or device control.
+node "$REPO_DIR/integrations/arvis/patch-arvis-voice.mjs" "$LEGACY_ARVIS_ROOT"
+
 node "$REPO_DIR/integrations/arvis/patch-neural-workbench.mjs" "$WORKBENCH_DIR"
 node "$REPO_DIR/integrations/arvis/apply-workbench-overrides.mjs" "$WORKBENCH_DIR"
 node "$REPO_DIR/integrations/arvis/harden-neural-workbench.mjs" "$WORKBENCH_DIR"
@@ -173,6 +177,7 @@ fi
 echo "A.R.V.I.S. control bridge: http://127.0.0.1:8791"
 echo "Neural Workbench: $WORKBENCH_URL"
 echo "A.R.V.I.S. desktop: $LEGACY_ARVIS_ROOT"
+echo "A.R.V.I.S. voice: selectable, compact, interruptible"
 echo "RTB OS live-data bridge: enabled"
 echo "RTB Workbench process views: synchronized"
 echo "Synthetic briefing/anomaly fallbacks: disabled"
