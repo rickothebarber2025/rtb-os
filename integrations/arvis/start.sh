@@ -6,6 +6,7 @@ WORKBENCH_DIR="${NEURAL_WORKBENCH_DIR:-$HOME/Downloads/neural-workbench}"
 WORKBENCH_URL="${NEURAL_WORKBENCH_URL:-http://127.0.0.1:3000}"
 STATE_DIR="$HOME/.local/state/rtb"
 WORKBENCH_LOG="$STATE_DIR/neural-workbench.log"
+WORKBENCH_BUILD_LOG="$STATE_DIR/neural-workbench-build.log"
 WYZE_DIR="$REPO_DIR/integrations/arvis/wyze"
 LEGACY_ARVIS_ROOT="${ARVIS_DESKTOP_ROOT:-$HOME/Documents/RTB DAtabase/local-assistant 2}"
 LEGACY_ENV="$LEGACY_ARVIS_ROOT/.env.local"
@@ -100,6 +101,19 @@ node "$REPO_DIR/integrations/arvis/patch-workbench-payroll.mjs" "$WORKBENCH_DIR"
 node "$REPO_DIR/integrations/arvis/harden-neural-workbench.mjs" "$WORKBENCH_DIR"
 node "$REPO_DIR/integrations/arvis/audit-neural-workbench.mjs" "$WORKBENCH_DIR"
 
+echo "Validating Neural Workbench frontend build..."
+: > "$WORKBENCH_BUILD_LOG"
+if ! (
+  cd "$WORKBENCH_DIR"
+  npm run build >> "$WORKBENCH_BUILD_LOG" 2>&1
+); then
+  echo "Neural Workbench build FAILED. Refusing to report startup success." >&2
+  echo "Build log: $WORKBENCH_BUILD_LOG" >&2
+  /usr/bin/tail -n 60 "$WORKBENCH_BUILD_LOG" >&2 || true
+  exit 1
+fi
+echo "Neural Workbench build: PASS"
+
 /bin/zsh "$REPO_DIR/integrations/ada-control/install.sh"
 
 if command -v tailscale >/dev/null 2>&1; then
@@ -173,7 +187,7 @@ echo "A.R.V.I.S. voice: selectable, compact, interruptible"
 echo "Agentic screen perception: native A.R.V.I.S. capture, synthetic fallback disabled"
 echo "RTB OS live-data bridge: enabled"
 echo "RTB Workbench process views: synchronized"
-echo "Payroll Intelligence: RTB OS payroll snapshot + read-only A.R.V.I.S. analysis"
+echo "Payroll Intelligence backend: RTB OS payroll snapshot + read-only A.R.V.I.S. analysis"
 echo "Synthetic briefing/anomaly fallbacks: disabled"
 echo "Telemetry audit: $STATE_DIR/neural-workbench-audit.json"
-echo "Startup complete."
+echo "Startup complete (frontend build verified)."
