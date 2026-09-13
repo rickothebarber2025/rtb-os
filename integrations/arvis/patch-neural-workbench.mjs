@@ -194,20 +194,34 @@ if (!appSource.includes('installRTBOSBridge();')) {
 fs.writeFileSync(appPath, appSource, 'utf8');
 
 let serverSource = fs.readFileSync(serverPath, 'utf8');
-const healthMarker = "// Healthcheck\napp.get('/api/health', (req, res) => {";
-if (!serverSource.includes(healthMarker)) {
-  console.error('[A.R.V.I.S.] Expected Workbench health marker was not found. No server.ts changes made.');
-  process.exit(1);
+
+function findSafeServerInsertionIndex(source) {
+  const healthRoute = /app\.get\(\s*['"]\/api\/health['"]\s*,/m.exec(source);
+  if (healthRoute?.index >= 0) return healthRoute.index;
+
+  const listenRoute = /(?:app|server)\.listen\s*\(/m.exec(source);
+  if (listenRoute?.index >= 0) return listenRoute.index;
+
+  return -1;
 }
 
-if (!serverSource.includes("app.post('/api/rtb-os/snapshot'")) {
+function insertServerBlock(source, block) {
+  const index = findSafeServerInsertionIndex(source);
+  if (index < 0) {
+    console.error('[A.R.V.I.S.] Could not find a safe Workbench server insertion point. Refusing a blind server.ts edit.');
+    process.exit(1);
+  }
+  return source.slice(0, index) + block + source.slice(index);
+}
+
+if (!serverSource.includes("app.post('/api/rtb-os/snapshot'") && !serverSource.includes('app.post("/api/rtb-os/snapshot"')) {
   const snapshotEndpoint = `// RTB OS owner-scoped live snapshot mirror\napp.post('/api/rtb-os/snapshot', (req, res) => {\n  try {\n    const remote = String(req.socket.remoteAddress || '');\n    const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';\n    if (!loopback) return res.status(403).json({ error: 'RTB OS snapshot bridge is localhost-only' });\n    const { rawSnapshot, operations, staff } = req.body || {};\n    if (!rawSnapshot || rawSnapshot.type !== 'RTB_OS_SNAPSHOT' || rawSnapshot.version !== 1) {\n      return res.status(400).json({ error: 'Valid RTB_OS_SNAPSHOT v1 is required' });\n    }\n    if (!operations || !Array.isArray(staff)) {\n      return res.status(400).json({ error: 'Mapped operations and staff are required' });\n    }\n    saveOperationsData({ ...operations, sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', lastUpdated: new Date().toISOString() });\n    saveStaffData(staff);\n    fs.writeFileSync(path.join(DATA_DIR, 'rtb-os-snapshot.json'), JSON.stringify(rawSnapshot, null, 2), 'utf-8');\n    return res.json({ status: 'ok', sourceTruth: 'RTB_OS_SUPABASE_BRIDGE', dataAvailable: operations.dataAvailable === true, staffCount: staff.length, mirroredAt: new Date().toISOString() });\n  } catch (e: any) {\n    return res.status(500).json({ error: e.message || 'Failed to mirror RTB OS snapshot' });\n  }\n});\n\n`;
-  serverSource = serverSource.replace(healthMarker, `${snapshotEndpoint}${healthMarker}`);
+  serverSource = insertServerBlock(serverSource, snapshotEndpoint);
 }
 
-if (!serverSource.includes("app.post('/api/rtb-os/main-brain'")) {
+if (!serverSource.includes("app.post('/api/rtb-os/main-brain'") && !serverSource.includes('app.post("/api/rtb-os/main-brain"')) {
   const mainBrainEndpoint = `// RTB OS centralized connection broker mirror\napp.post('/api/rtb-os/main-brain', (req, res) => {\n  try {\n    const remote = String(req.socket.remoteAddress || '');\n    const loopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';\n    if (!loopback) return res.status(403).json({ error: 'RTB Main Brain bridge is localhost-only' });\n    const context = req.body || {};\n    if (context.type !== 'RTB_MAIN_BRAIN_CONTEXT' || context.version !== 1) {\n      return res.status(400).json({ error: 'Valid RTB_MAIN_BRAIN_CONTEXT v1 is required' });\n    }\n    fs.writeFileSync(path.join(DATA_DIR, 'rtb-main-brain.json'), JSON.stringify(context, null, 2), 'utf-8');\n    const connections = context.connections?.connections || [];\n    return res.json({ status: 'ok', connectedProviders: connections.filter((item: any) => item?.status === 'connected' || item?.status === 'configured').map((item: any) => item.provider), mirroredAt: new Date().toISOString() });\n  } catch (e: any) {\n    return res.status(500).json({ error: e.message || 'Failed to mirror RTB Main Brain context' });\n  }\n});\n\n`;
-  serverSource = serverSource.replace(healthMarker, `${mainBrainEndpoint}${healthMarker}`);
+  serverSource = insertServerBlock(serverSource, mainBrainEndpoint);
 }
 
 fs.writeFileSync(serverPath, serverSource, 'utf8');
