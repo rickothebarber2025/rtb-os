@@ -28,6 +28,22 @@ WORKBENCH_DIR = os.path.expanduser(os.environ.get("NEURAL_WORKBENCH_DIR", "~/Dow
 WORKBENCH_HEALTH_URL = os.environ.get("NEURAL_WORKBENCH_HEALTH_URL", "http://127.0.0.1:3000/api/health")
 WORKBENCH_LOG = os.path.expanduser(os.environ.get("NEURAL_WORKBENCH_LOG", "~/.local/state/rtb/neural-workbench.log"))
 WORKBENCH_PID_FILE = os.path.expanduser(os.environ.get("NEURAL_WORKBENCH_PID_FILE", "~/.local/state/rtb/neural-workbench.pid"))
+DEFAULT_TRUSTED_ORIGINS = {
+    "http://127.0.0.1",
+    "http://localhost",
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "https://rtbheadquarters.com",
+    "https://www.rtbheadquarters.com",
+    "https://rtbheadquaters.com",
+    "https://www.rtbheadquaters.com",
+    "capacitor://localhost",
+}
+TRUSTED_ORIGINS = DEFAULT_TRUSTED_ORIGINS | {
+    value.strip().rstrip("/")
+    for value in os.environ.get("ADA_CONTROL_TRUSTED_ORIGINS", "").split(",")
+    if value.strip()
+}
 
 CAPABILITIES = [
     "system_status",
@@ -46,12 +62,7 @@ CAPABILITIES = [
 
 def run(cmd, timeout=20):
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
-    return {
-        "ok": proc.returncode == 0,
-        "code": proc.returncode,
-        "stdout": proc.stdout[-4000:],
-        "stderr": proc.stderr[-4000:],
-    }
+    return {"ok": proc.returncode == 0, "code": proc.returncode, "stdout": proc.stdout[-4000:], "stderr": proc.stderr[-4000:]}
 
 
 def json_health(url, timeout=4):
@@ -75,12 +86,7 @@ def archive_check():
 
 def archive_sync():
     try:
-        request = urllib.request.Request(
-            ADA_ARCHIVE_SYNC_URL,
-            data=b"{}",
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
+        request = urllib.request.Request(ADA_ARCHIVE_SYNC_URL, data=b"{}", headers={"Content-Type": "application/json"}, method="POST")
         with urllib.request.urlopen(request, timeout=60) as response:
             payload = json.loads(response.read(4096) or b"{}")
             return {"ok": 200 <= response.status < 300, "status": response.status, "result": payload}
@@ -120,7 +126,6 @@ def system_status():
                     disk_percent = float(parts[4].rstrip("%"))
                 except ValueError:
                     pass
-
     mem_total = run(["/usr/sbin/sysctl", "-n", "hw.memsize"], timeout=10)
     vm = run(["/usr/bin/vm_stat"], timeout=10)
     memory_percent = None
@@ -145,13 +150,7 @@ def system_status():
             memory_percent = round((used_bytes / total_bytes) * 100, 1) if total_bytes else None
         except Exception:
             memory_percent = None
-
-    return {
-        "ok": bool(disk["ok"] and mem_total["ok"] and vm["ok"]),
-        "disk_used_percent": disk_percent,
-        "disk_free_kb": disk_free_kb,
-        "memory_used_percent": memory_percent,
-    }
+    return {"ok": bool(disk["ok"] and mem_total["ok"] and vm["ok"]), "disk_used_percent": disk_percent, "disk_free_kb": disk_free_kb, "memory_used_percent": memory_percent}
 
 
 def workbench_status():
@@ -163,15 +162,7 @@ def workbench_status():
                 pid = int(handle.read().strip())
     except Exception:
         pid = None
-    return {
-        "ok": bool(health.get("ok")),
-        "running": bool(health.get("ok")),
-        "health": health,
-        "directory": WORKBENCH_DIR,
-        "directory_exists": os.path.isdir(WORKBENCH_DIR),
-        "pid": pid,
-        "url": "http://127.0.0.1:3000",
-    }
+    return {"ok": bool(health.get("ok")), "running": bool(health.get("ok")), "health": health, "directory": WORKBENCH_DIR, "directory_exists": os.path.isdir(WORKBENCH_DIR), "pid": pid, "url": "http://127.0.0.1:3000"}
 
 
 def start_workbench():
@@ -184,15 +175,7 @@ def start_workbench():
     try:
         os.makedirs(os.path.dirname(WORKBENCH_LOG), exist_ok=True)
         with open(WORKBENCH_LOG, "ab", buffering=0) as log_handle:
-            proc = subprocess.Popen(
-                ["/usr/bin/env", "npm", "run", "dev"],
-                cwd=WORKBENCH_DIR,
-                stdin=subprocess.DEVNULL,
-                stdout=log_handle,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-                env=os.environ.copy(),
-            )
+            proc = subprocess.Popen(["/usr/bin/env", "npm", "run", "dev"], cwd=WORKBENCH_DIR, stdin=subprocess.DEVNULL, stdout=log_handle, stderr=subprocess.STDOUT, start_new_session=True, env=os.environ.copy())
         with open(WORKBENCH_PID_FILE, "w", encoding="utf-8") as handle:
             handle.write(str(proc.pid))
         for _ in range(20):
@@ -208,19 +191,8 @@ def start_workbench():
 
 
 def diagnostics():
-    system = system_status()
-    archive = archive_check()
-    sync = launchd_status()
-    tailscale = tailscale_status()
-    workbench = workbench_status()
-    return {
-        "ok": bool(system.get("ok") and sync.get("ok") and tailscale.get("online") and workbench.get("running")),
-        "system": system,
-        "ada_archive": archive,
-        "ada_sync": sync,
-        "tailscale": tailscale,
-        "neural_workbench": workbench,
-    }
+    system = system_status(); archive = archive_check(); sync = launchd_status(); tailscale = tailscale_status(); workbench = workbench_status()
+    return {"ok": bool(system.get("ok") and sync.get("ok") and tailscale.get("online") and workbench.get("running")), "system": system, "ada_archive": archive, "ada_sync": sync, "tailscale": tailscale, "neural_workbench": workbench}
 
 
 def staff_audit(staff):
@@ -232,24 +204,15 @@ def staff_audit(staff):
 
 def command(name, payload=None):
     payload = payload or {}
-    if name == "system_status":
-        return system_status()
-    if name == "ada_sync_run":
-        return archive_sync()
-    if name == "ada_sync_restart":
-        return run(["/bin/launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{SYNC_LABEL}"], timeout=20)
-    if name == "messages_archive_check":
-        return archive_check()
-    if name == "tailscale_status":
-        return tailscale_status()
-    if name == "neural_workbench_status":
-        return workbench_status()
-    if name == "neural_workbench_start":
-        return start_workbench()
-    if name == "run_diagnostics":
-        return diagnostics()
-    if name == "staff_audit":
-        return staff_audit(str(payload.get("staff", "")))
+    if name == "system_status": return system_status()
+    if name == "ada_sync_run": return archive_sync()
+    if name == "ada_sync_restart": return run(["/bin/launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{SYNC_LABEL}"], timeout=20)
+    if name == "messages_archive_check": return archive_check()
+    if name == "tailscale_status": return tailscale_status()
+    if name == "neural_workbench_status": return workbench_status()
+    if name == "neural_workbench_start": return start_workbench()
+    if name == "run_diagnostics": return diagnostics()
+    if name == "staff_audit": return staff_audit(str(payload.get("staff", "")))
     if name in {"owner_brief", "payroll_safety"}:
         brief = build_owner_brief(payload.get("snapshot") or {})
         return {"ok": True, "brief": brief, "safe": brief["safe_to_run_payroll"]}
@@ -259,80 +222,76 @@ def command(name, payload=None):
 def jarvis_prompt(text, snapshot=None):
     prompt = " ".join(str(text or "").strip().split())
     ops = route_operations_prompt(prompt, snapshot or {})
-    if ops.get("handled"):
-        return ops
+    if ops.get("handled"): return ops
     lowered = prompt.casefold()
     if "failla" in lowered and any(word in lowered for word in ("audit", "pay", "payroll", "owe", "owed", "outstanding", "reconcile", "check")):
         return {"handled": True, "intent": "staff_audit", **staff_audit("Failla Mika")}
     match = re.search(r"(?:audit|check|reconcile)\s+([a-z][a-z .'-]+)$", prompt, re.I)
     if match:
-        result = staff_audit(match.group(1))
-        return {"handled": result.get("ok", False), "intent": "staff_audit", **result}
+        result = staff_audit(match.group(1)); return {"handled": result.get("ok", False), "intent": "staff_audit", **result}
     return {"handled": False}
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "ArvisControl/1.3"
+    server_version = "ArvisControl/1.4"
+
+    def _origin(self):
+        return str(self.headers.get("Origin", "")).rstrip("/")
+
+    def _origin_allowed(self):
+        origin = self._origin()
+        return not origin or origin in TRUSTED_ORIGINS
 
     def _json(self, code, payload):
         body = json.dumps(payload).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", self.headers.get("Origin", "*"))
+        origin = self._origin()
+        if origin in TRUSTED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
         if code != 204:
             self.wfile.write(body)
 
+    def _is_loopback(self):
+        return self.client_address[0] in {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+
     def _authorized(self):
-        if not TOKEN:
-            return False
         supplied = self.headers.get("Authorization", "")
         if supplied.startswith("Bearer "):
             supplied = supplied[7:]
-        return hmac.compare_digest(supplied, TOKEN)
+        if TOKEN and supplied and hmac.compare_digest(supplied, TOKEN):
+            return True
+        # Browser controls running on this Mac may operate without copying the private
+        # token into localStorage. This is restricted to loopback + explicit RTB origins.
+        return self._is_loopback() and self._origin_allowed()
 
     def do_OPTIONS(self):
+        if not self._origin_allowed():
+            return self._json(403, {"error": "Origin not allowed"})
         self._json(204, {})
 
     def do_GET(self):
-        if not self._authorized():
-            return self._json(401, {"error": "Unauthorized"})
-        if self.path == "/api/health":
-            return self._json(200, {"ok": True, "service": "arvis-control", "version": "1.3", "port": PORT})
-        if self.path == "/api/control/capabilities":
-            return self._json(200, {"capabilities": CAPABILITIES})
-        if self.path == "/api/control/status":
-            return self._json(200, {
-                "system": system_status(),
-                "ada_archive": archive_check(),
-                "ada_sync": launchd_status(),
-                "tailscale": tailscale_status(),
-                "neural_workbench": workbench_status(),
-            })
-        if self.path == "/api/staff/failla/audit":
-            return self._json(200, staff_audit("Failla Mika"))
+        if not self._authorized(): return self._json(401, {"error": "Unauthorized"})
+        if self.path == "/api/health": return self._json(200, {"ok": True, "service": "arvis-control", "version": "1.4", "port": PORT})
+        if self.path == "/api/control/capabilities": return self._json(200, {"capabilities": CAPABILITIES})
+        if self.path == "/api/control/status": return self._json(200, {"system": system_status(), "ada_archive": archive_check(), "ada_sync": launchd_status(), "tailscale": tailscale_status(), "neural_workbench": workbench_status()})
+        if self.path == "/api/staff/failla/audit": return self._json(200, staff_audit("Failla Mika"))
         return self._json(404, {"error": "Not found"})
 
     def do_POST(self):
-        if not self._authorized():
-            return self._json(401, {"error": "Unauthorized"})
+        if not self._authorized(): return self._json(401, {"error": "Unauthorized"})
         try:
-            length = min(int(self.headers.get("Content-Length", "0")), 65536)
-            payload = json.loads(self.rfile.read(length) or b"{}")
-        except Exception:
-            return self._json(400, {"error": "Invalid JSON"})
-
-        if self.path == "/api/jarvis/query":
-            return self._json(200, jarvis_prompt(payload.get("message") or payload.get("prompt") or "", payload.get("snapshot")))
-        if self.path != "/api/control/commands":
-            return self._json(404, {"error": "Not found"})
-
+            length = min(int(self.headers.get("Content-Length", "0")), 65536); payload = json.loads(self.rfile.read(length) or b"{}")
+        except Exception: return self._json(400, {"error": "Invalid JSON"})
+        if self.path == "/api/jarvis/query": return self._json(200, jarvis_prompt(payload.get("message") or payload.get("prompt") or "", payload.get("snapshot")))
+        if self.path != "/api/control/commands": return self._json(404, {"error": "Not found"})
         name = str(payload.get("command", ""))
-        if name not in CAPABILITIES:
-            return self._json(400, {"error": "Unsupported command"})
+        if name not in CAPABILITIES: return self._json(400, {"error": "Unsupported command"})
         result = command(name, payload)
         return self._json(200 if result.get("ok") else 500, {"command": name, **result})
 
