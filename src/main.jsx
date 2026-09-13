@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { AuthProfileProvider } from './contexts/AuthProfileContext.jsx';
+import { installMainBrainBootstrap } from './services/mainBrainBootstrap.js';
 import './styles/global.css';
 import './styles/mobileNavigation.css';
 import './styles/mobileTopbar.css';
@@ -51,6 +52,7 @@ function clearLegacyServiceWorkerCache() {
 }
 
 clearLegacyServiceWorkerCache();
+installMainBrainBootstrap();
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

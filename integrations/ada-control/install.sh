@@ -23,8 +23,13 @@ ADA_CONTROL_PORT=8791
 RTB_OS_REPO=$REPO_DIR
 ADA_ARCHIVE_URL=http://127.0.0.1:8790/api/messages/archive?sort=priority
 ADA_ARCHIVE_SYNC_URL=http://127.0.0.1:8790/api/messages/archive/sync
+NEURAL_WORKBENCH_DIR=$HOME/Downloads/neural-workbench
+NEURAL_WORKBENCH_HEALTH_URL=http://127.0.0.1:3000/api/health
 EOF
   chmod 600 "$ENV_FILE"
+else
+  grep -q '^NEURAL_WORKBENCH_DIR=' "$ENV_FILE" || echo "NEURAL_WORKBENCH_DIR=$HOME/Downloads/neural-workbench" >> "$ENV_FILE"
+  grep -q '^NEURAL_WORKBENCH_HEALTH_URL=' "$ENV_FILE" || echo "NEURAL_WORKBENCH_HEALTH_URL=http://127.0.0.1:3000/api/health" >> "$ENV_FILE"
 fi
 
 cat > "$PLIST" <<EOF
@@ -44,7 +49,8 @@ launchctl bootout "gui/$(id -u)/com.rtb.ada-control" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 
 echo
-echo "Ada control bridge installed on localhost:8791."
-echo "Now expose it privately with Tailscale Serve:"
+echo "A.R.V.I.S. control bridge installed on localhost:8791."
+echo "Neural Workbench directory: $(grep '^NEURAL_WORKBENCH_DIR=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+echo "Now expose the control bridge privately with Tailscale Serve:"
 echo "  tailscale serve --bg 8791"
 echo "The control token remains private in $ENV_FILE."

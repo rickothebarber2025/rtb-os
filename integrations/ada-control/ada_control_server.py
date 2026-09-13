@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+"""Owner-only A.R.V.I.S./Ada control bridge for Tailscale Serve.
+
+Binds to localhost only. Tailscale Serve provides the private HTTPS ingress.
+No arbitrary shell execution is exposed.
+"""
+from __future__ import annotations
+import hmac
+import json
+import os
+import subprocess
+import time
+import urllib.request
 """Owner-only Ada/Jarvis control bridge for Tailscale Serve."""
 from __future__ import annotations
 import hmac, json, os, re, subprocess, urllib.request
@@ -12,6 +24,12 @@ TOKEN = os.environ.get("ADA_CONTROL_TOKEN", "").strip()
 ADA_ARCHIVE_URL = os.environ.get("ADA_ARCHIVE_URL", "http://127.0.0.1:8790/api/messages/archive?sort=priority")
 ADA_ARCHIVE_SYNC_URL = os.environ.get("ADA_ARCHIVE_SYNC_URL", "http://127.0.0.1:8790/api/messages/archive/sync")
 SYNC_LABEL = "com.rtb.ada-sync"
+WORKBENCH_DIR = os.path.expanduser(os.environ.get("NEURAL_WORKBENCH_DIR", "~/Downloads/neural-workbench"))
+WORKBENCH_HEALTH_URL = os.environ.get("NEURAL_WORKBENCH_HEALTH_URL", "http://127.0.0.1:3000/api/health")
+WORKBENCH_LOG = os.path.expanduser(os.environ.get("NEURAL_WORKBENCH_LOG", "~/.local/state/rtb/neural-workbench.log"))
+WORKBENCH_PID_FILE = os.path.expanduser(os.environ.get("NEURAL_WORKBENCH_PID_FILE", "~/.local/state/rtb/neural-workbench.pid"))
+
+CAPABILITIES = [
 
 CAPABILITIES = [
     "system_status",
@@ -19,6 +37,9 @@ CAPABILITIES = [
     "ada_sync_restart",
     "messages_archive_check",
     "tailscale_status",
+    "neural_workbench_status",
+    "neural_workbench_start",
+]
     "run_diagnostics",
 ]
 
@@ -27,6 +48,14 @@ def run(cmd, timeout=20):
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
     return {"ok": proc.returncode == 0, "code": proc.returncode, "stdout": proc.stdout[-4000:], "stderr": proc.stderr[-4000:]}
 
+def json_health(url, timeout=4):
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            body = response.read(16384)
+            payload = json.loads(body or b"{}")
+            return {"ok": 200 <= response.status < 300, "status": response.status, "payload": payload}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 def archive_check():
     try:
@@ -133,6 +162,57 @@ def diagnostics():
     }
 
 
+def workbench_status():
+    health = json_health(WORKBENCH_HEALTH_URL)
+    pid = None
+    try:
+        if os.path.exists(WORKBENCH_PID_FILE):
+            with open(WORKBENCH_PID_FILE, "r", encoding="utf-8") as handle:
+                pid = int(handle.read().strip())
+    except Exception:
+        pid = None
+    return {
+        "ok": bool(health.get("ok")),
+        "running": bool(health.get("ok")),
+        "health": health,
+        "directory": WORKBENCH_DIR,
+        "directory_exists": os.path.isdir(WORKBENCH_DIR),
+        "pid": pid,
+        "url": "http://127.0.0.1:3000",
+    }
+
+def start_workbench():
+    current = workbench_status()
+    if current.get("running"):
+        return {"ok": True, "already_running": True, **current}
+    package_json = os.path.join(WORKBENCH_DIR, "package.json")
+    if not os.path.isfile(package_json):
+        return {"ok": False, "error": f"Neural Workbench package.json not found at {package_json}", "directory": WORKBENCH_DIR}
+    try:
+        os.makedirs(os.path.dirname(WORKBENCH_LOG), exist_ok=True)
+        with open(WORKBENCH_LOG, "ab", buffering=0) as log_handle:
+            proc = subprocess.Popen(
+                ["/usr/bin/env", "npm", "run", "dev"],
+                cwd=WORKBENCH_DIR,
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                env=os.environ.copy(),
+            )
+        with open(WORKBENCH_PID_FILE, "w", encoding="utf-8") as handle:
+            handle.write(str(proc.pid))
+        for _ in range(20):
+            time.sleep(0.5)
+            status = workbench_status()
+            if status.get("running"):
+                return {"ok": True, "started": True, "pid": proc.pid, "log": WORKBENCH_LOG, **status}
+            if proc.poll() is not None:
+                break
+        return {"ok": False, "error": "Neural Workbench did not become healthy after startup.", "pid": proc.pid, "log": WORKBENCH_LOG}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "directory": WORKBENCH_DIR}
+
 def command(name):
     if name == "system_status":
         return system_status()
@@ -145,12 +225,17 @@ def command(name):
         return archive_check()
     if name == "tailscale_status":
         return tailscale_status()
+    if name == "neural_workbench_status":
+        return workbench_status()
+    if name == "neural_workbench_start":
+        return start_workbench()
     if name == "run_diagnostics":
         return diagnostics()
     return {"ok": False, "error": "Unsupported command"}
 
 
 class Handler(BaseHTTPRequestHandler):
+    server_version = "ArvisControl/1.1"
     server_version = "AdaControl/1.1"
 
     def _json(self, code, payload):
@@ -179,7 +264,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authorized():
             return self._json(401, {"error": "Unauthorized"})
         if self.path == "/api/health":
-            return self._json(200, {"ok": True, "service": "ada-control", "port": PORT})
+            return self._json(200, {"ok": True, "service": "arvis-control", "port": PORT})
         if self.path == "/api/control/capabilities":
             return self._json(200, {"capabilities": CAPABILITIES})
         if self.path == "/api/control/status":
@@ -188,6 +273,7 @@ class Handler(BaseHTTPRequestHandler):
                 "ada_archive": archive_check(),
                 "ada_sync": launchd_status(),
                 "tailscale": tailscale_status(),
+                "neural_workbench": workbench_status(),
             })
         return self._json(404, {"error": "Not found"})
 
@@ -208,7 +294,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(200 if result.get("ok") else 500, {"command": name, **result})
 
     def log_message(self, fmt, *args):
-        print(f"[ada-control] {self.address_string()} {fmt % args}")
+        print(f"[arvis-control] {self.address_string()} {fmt % args}")
 
 
 if __name__ == "__main__":

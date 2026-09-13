@@ -8,27 +8,19 @@ const supabaseAnonKey =
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-// supabase-js defaults to `navigatorLock`, which serializes auth calls
-// (getSession/refresh/etc.) through the browser's Web Locks API so multiple
-// tabs don't race each other. Inside a single Capacitor WKWebView instance
-// (iOS/iPadOS) that coordination is unnecessary, and on some iPadOS builds
-// `navigator.locks.request()` never invokes its callback at all -- the lock
-// is requested but nothing acquires it, so every auth call that goes through
-// it (including the very first `getSession()` on app launch) hangs forever.
-// Since useAuth() gates the entire app -- including the login screen itself
-// -- behind that first call resolving, the whole app is stuck on a loading
-// spinner with no way to reach the sign-in form. This is what Apple's
-// reviewer saw on an iPad Air (M3): "Page loaded indefinitely when we tried
-// to log in."
+// WKWebView can stall on navigator.locks. A process-local lock is sufficient
+// because RTB OS runs one authenticated JS context per native app instance.
 //
-// `processLock` is an in-memory mutex (no Web Locks API involved) that
-// still serializes concurrent auth calls within this one JS context, which
-// is all a single WKWebView instance or a single browser tab ever needs.
+// PKCE is required here so OAuth can leave the app in the system browser and
+// safely return an authorization code through the registered custom URL scheme.
+// The verifier remains in this app's persisted auth storage and is exchanged
+// only after Capacitor hands the deep link back to useAuth().
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: true,
+        flowType: 'pkce',
         persistSession: true,
         lock: processLock,
       },

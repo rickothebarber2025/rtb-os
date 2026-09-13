@@ -23,7 +23,7 @@ const HUB_ONLY_TEMPLATES = new Set(['staff_portal', 'operations_cleaning', 'onbo
 const OWNER_NAV_PRESENTATION = {
   access: { group: 'Control Room', label: 'Access' },
   'action-center': { group: 'Today', label: 'Action Center' },
-  'ada-control': { group: 'Control Room', label: 'Ada Control' },
+  'ada-control': { group: 'Control Room', label: 'A.R.V.I.S. Control' },
   'ai-consultant': { group: 'Daily Ops', label: 'AI Consultant' },
   'customer-intelligence': { group: 'Client Flow', label: 'Client Signals' },
   dashboard: { group: 'Today', label: 'Command Center' },
