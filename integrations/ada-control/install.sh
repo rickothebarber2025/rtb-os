@@ -10,6 +10,8 @@ mkdir -p "$ENV_DIR"
 chmod 700 "$ENV_DIR"
 /usr/bin/install -d -m 700 "$RUNTIME_DIR"
 /usr/bin/install -m 600 "$REPO_DIR/integrations/ada-control/ada_control_server.py" "$RUNTIME_SCRIPT"
+/usr/bin/install -m 600 "$REPO_DIR/integrations/ada-control/operations_copilot.py" "$RUNTIME_DIR/operations_copilot.py"
+/usr/bin/install -m 600 "$REPO_DIR/integrations/ada-control/staff_reconciliation.py" "$RUNTIME_DIR/staff_reconciliation.py"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   TOKEN="$(python3 - <<'PY'
@@ -37,7 +39,7 @@ cat > "$PLIST" <<EOF
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>com.rtb.ada-control</string>
-<key>ProgramArguments</key><array><string>/bin/zsh</string><string>-lc</string><string>set -a; source "$ENV_FILE"; set +a; exec /usr/bin/python3 "$RUNTIME_SCRIPT"</string></array>
+<key>ProgramArguments</key><array><string>/bin/zsh</string><string>-lc</string><string>set -a; source "$ENV_FILE"; set +a; cd "$RUNTIME_DIR"; exec /usr/bin/python3 "$RUNTIME_SCRIPT"</string></array>
 <key>RunAtLoad</key><true/>
 <key>KeepAlive</key><false/>
 <key>StandardOutPath</key><string>/tmp/rtb-ada-control.log</string>
