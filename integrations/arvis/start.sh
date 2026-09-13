@@ -13,6 +13,7 @@ LEGACY_ENV="$LEGACY_ARVIS_ROOT/.env.local"
 RTB_OS_ENV="$REPO_DIR/.env"
 WORKBENCH_ENV="$WORKBENCH_DIR/.env"
 ARVIS_DESKTOP_LOG="$LEGACY_ARVIS_ROOT/logs/arvis-app.log"
+FULLSTACK_ADAPTER="$REPO_DIR/integrations/arvis/fullstack-agent/install-adapter.sh"
 
 echo "A.R.V.I.S. unified startup"
 echo "RTB OS: $REPO_DIR"
@@ -91,6 +92,12 @@ if [[ -n "${SQUARE_ACCESS_TOKEN:-}" ]]; then
   echo "Local Square fallback token: detected"
 else
   echo "Local Square fallback token: not needed"
+fi
+
+# Adopt Jared's useful runtime components without running the fresh-agent wizard.
+# This preserves the existing A.R.V.I.S. identity and RTB OS/Main Brain architecture.
+if [[ -f "$FULLSTACK_ADAPTER" ]]; then
+  /bin/zsh "$FULLSTACK_ADAPTER"
 fi
 
 node "$REPO_DIR/integrations/arvis/patch-arvis-voice.mjs" "$LEGACY_ARVIS_ROOT"
@@ -183,6 +190,7 @@ fi
 echo "A.R.V.I.S. control bridge: http://127.0.0.1:8791"
 echo "Neural Workbench: $WORKBENCH_URL"
 echo "A.R.V.I.S. desktop: $LEGACY_ARVIS_ROOT"
+echo "A.R.V.I.S. fullstack runtime: adopted voice/face/hands staged under ~/.local/share/rtb/arvis-fullstack"
 echo "A.R.V.I.S. voice: selectable, compact, interruptible"
 echo "Agentic screen perception: native A.R.V.I.S. capture, synthetic fallback disabled"
 echo "RTB OS live-data bridge: enabled"
